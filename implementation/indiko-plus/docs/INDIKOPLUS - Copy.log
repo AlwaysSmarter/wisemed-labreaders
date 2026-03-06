@@ -1,0 +1,111 @@
+07/03/2017 4:15:39 PM:active
+07/03/2017 4:15:40 PM:Connect
+07/03/2017 4:22:14 PM:Load fileID form DB
+07/03/2017 4:22:14 PM:select a.tip_analiza, a.fisa_investigatie_id, b.nume_pacient, b.prenume_pacient from FISE_INVESTIGATII a left join PACIENTI b on a.pacient_id = b.pacient_id
+where a.fisa_investigatie_id="174703"
+
+07/03/2017 4:22:14 PM:Am gasit 1 inregistrari
+07/03/2017 4:22:14 PM:Caut analizele din mplab
+07/03/2017 4:22:14 PM:select a.analiza_id, c.*  from ANALIZE_INVESTIGATII a
+ left join TIPURI_DE_ANALIZE b on a.analiza_id = b.tip_de_analiza_id
+ left join TIPURI_DE_ANALIZE_SISTEME b1 on a.analiza_id = b1.tip_de_analiza_id
+ left join ANALIZE_SISTEME c on b1.analiza_sistem_id = c.analiza_sistem_id
+ where a.fisa_investigatie_id  ="174703" and c.sistem_automat_id = "14"
+
+07/03/2017 4:22:14 PM:Am gasit 2 inregistrari
+07/03/2017 4:22:14 PM:insert into INDIKOPLUS_ORDERS_ANALISYS
+ set indikoplus_order_id = "1"
+ ,analiza_id = "43"
+ ,analiza_sistem_id = "271"
+ ,sistem_automat_id = "14"
+ ,denumire_analiza_sistem = "CA"
+ ,codificare_in_sistem = "CA"
+ ,selectat_pt_trimitere = 1
+
+07/03/2017 4:22:14 PM:insert into INDIKOPLUS_ORDERS_ANALISYS
+ set indikoplus_order_id = "1"
+ ,analiza_id = "47"
+ ,analiza_sistem_id = "272"
+ ,sistem_automat_id = "14"
+ ,denumire_analiza_sistem = "COL"
+ ,codificare_in_sistem = "COL"
+ ,selectat_pt_trimitere = 1
+
+07/03/2017 4:22:14 PM:Filtram datele
+07/03/2017 4:22:14 PM:select a.*, b.denumire_analiza from INDIKOPLUS_ORDERS_ANALISYS a
+ left join TIPURI_DE_ANALIZE b on a.analiza_id = b.tip_de_analiza_id
+ where indikoplus_order_id = "1"
+
+07/03/2017 4:22:14 PM:Incarcam rezultatele
+07/03/2017 4:22:14 PM:select a.* from INDIKOPLUS_ORDERS_ANALISYS_RESULTS a
+ left join INDIKOPLUS_ORDERS_ANALISYS b on a.indikoplus_order_analisys_id = b.indikoplus_order_analisys_id
+ where b.indikoplus_order_id = "1"
+
+07/03/2017 4:26:49 PM:send order all
+07/03/2017 4:26:49 PM:confirm:sample(174703)
+07/03/2017 4:26:49 PM:2CA^CA^^\COL^COL^^96
+
+07/03/2017 4:26:49 PM:out:
+07/03/2017 4:26:49 PM:sendstr_queue ENQ
+07/03/2017 4:26:49 PM:===>
+07/03/2017 4:26:49 PM:===>6
+07/03/2017 4:26:49 PM:Parsing: ===>
+07/03/2017 4:26:49 PM:got ACK
+07/03/2017 4:26:49 PM:sendsstr_queue: 1H|\^&|||IndikoPlus^01.03.27.00^|||||||SA|1394-97|20170307162649P|1||174703||ARDELEAN^ELENA|||||||||||||||||||||||||||||O|3|174703^1^1|174703|CA^CA^^\COL^COL^^|R|20170307162649|20170307162649||||||||serum||||||||||O|||||L|1|NC9
+
+07/03/2017 4:26:49 PM:out:1H|\^&|||IndikoPlus^01.03.27.00^|||||||SA|1394-97|20170307162649P|1||174703||ARDELEAN^ELENA|||||||||||||||||||||||||||||O|3|174703^1^1|174703|CA^CA^^\COL^COL^^|R|20170307162649|20170307162649||||||||serum||||||||||O|||||L|1|NC9
+
+07/03/2017 4:26:49 PM:===>
+07/03/2017 4:26:49 PM:===>6
+07/03/2017 4:26:49 PM:Parsing: ===>
+07/03/2017 4:26:49 PM:got ACK
+07/03/2017 4:26:49 PM:out:
+07/03/2017 4:27:55 PM:===>
+07/03/2017 4:27:55 PM:===>5
+07/03/2017 4:27:55 PM:Parsing: ===>
+07/03/2017 4:27:55 PM:got ENQ
+07/03/2017 4:27:55 PM:out:
+07/03/2017 4:27:55 PM:===>1H|\^&|||1^Analyzer 1^5.0|||||||P||20170307162755EA
+
+07/03/2017 4:27:55 PM:===>2
+07/03/2017 4:27:55 PM:Parsing: ===>1H|\^&|||1^Analyzer 1^5.0|||||||P||20170307162755EA
+
+07/03/2017 4:27:55 PM:got STX
+07/03/2017 4:27:55 PM:Parse Record:H
+07/03/2017 4:27:55 PM:out:
+07/03/2017 4:27:55 PM:===>2Q|1|^174703^^||^^^ALL^||||||||O84
+
+07/03/2017 4:27:55 PM:===>2
+07/03/2017 4:27:55 PM:Parsing: ===>2Q|1|^174703^^||^^^ALL^||||||||O84
+
+07/03/2017 4:27:55 PM:got STX
+07/03/2017 4:27:55 PM:Parse Record:Q
+07/03/2017 4:27:55 PM:out:
+07/03/2017 4:27:55 PM:===>3L|1|N06
+
+07/03/2017 4:27:55 PM:===>2
+07/03/2017 4:27:55 PM:Parsing: ===>3L|1|N06
+
+07/03/2017 4:27:55 PM:got STX
+07/03/2017 4:27:55 PM:Parse Record:L
+07/03/2017 4:27:55 PM:out:
+07/03/2017 4:27:55 PM:===>
+07/03/2017 4:27:55 PM:===>4
+07/03/2017 4:27:55 PM:Parsing: ===>
+07/03/2017 4:27:55 PM:got EOT
+07/03/2017 4:27:55 PM:ordreq_queue
+07/03/2017 4:27:55 PM:sendord_queue
+07/03/2017 4:27:55 PM:send order all
+07/03/2017 4:27:55 PM:confirm:sample(174703)
+07/03/2017 4:27:55 PM:2CA^CA^^\COL^COL^^96
+
+07/03/2017 4:27:55 PM:out:
+07/03/2017 4:27:55 PM:sendordSeg_queue ENQ
+07/03/2017 4:27:55 PM:out:
+07/03/2017 4:27:55 PM:===>
+07/03/2017 4:27:55 PM:===>6
+07/03/2017 4:27:55 PM:Parsing: ===>
+07/03/2017 4:27:55 PM:got ACK
+07/03/2017 4:27:55 PM:sendsstr_queue: 1H|\^&|||IndikoPlus^01.03.27.00^|||||||SA|1394-97|20170307162755P|1||174703||ARDELEAN^ELENA|||||||||||||||||||||||||||||O|3|174703^1^1|174703|CA^CA^^\COL^COL^^|R|20170307162755|20170307162755||||||||serum||||||||||O|||||L|1|NC3
+
+07/03/2017 4:27:55 PM:out:1H|\^&|||IndikoPlus^01.03.27.00^|||||||SA|1394-97|20170307162755P|1||174703||ARDELEAN^ELENA|||||||||||||||||||||||||||||O|3|174703^1^1|174703|CA^CA^^\COL^COL^^|R|20170307162755|20170307162755||||||||ser

@@ -1,0 +1,1 @@
+GOOS=darwin GOARCH=amd64 GO111MODULE=on CGO_ENABLED=1 go build -o GoSIUILinux  -i main.go

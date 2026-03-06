@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="RemoteTargetsManager">
+    <option name="projectDefaultTargetUuid" value="8e7f830c-8b84-4626-ac2e-8819b41df184" />
+    <targets>
+      <target name="antares@127.0.0.1:6623" type="ssh/sftp" uuid="8e7f830c-8b84-4626-ac2e-8819b41df184">
+        <config>
+          <option name="projectRootOnTarget" value="/home/antares/sysmex" />
+          <option name="serverName" value="antares@127.0.0.1:6623 password" />
+          <option name="useRsync" value="true" />
+        </config>
+        <ContributedStateBase type="GoLanguageRuntime">
+          <config>
+            <option name="compiledExecutablesVolume">
+              <VolumeState>
+                <option name="remotePath" value="/home/antares/sysmex" />
+              </VolumeState>
+            </option>
+            <option name="goPath" value="/home/antares/go" />
+            <option name="goRoot" value="/usr/bin/go" />
+            <option name="goVersion" value="go1.18.1 linux/arm64" />
+          </config>
+        </ContributedStateBase>
+      </target>
+    </targets>
+  </component>
+</project>

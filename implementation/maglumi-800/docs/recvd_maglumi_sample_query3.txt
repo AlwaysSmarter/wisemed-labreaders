@@ -1,0 +1,38 @@
+﻿Debug Output: ===> Process Maglumi600Reader.exe (5972)
+Debug Output: got ENQ Process Maglumi600Reader.exe (5972)
+Debug Output: out: Process Maglumi600Reader.exe (5972)
+Debug Output: ===>H|\^&||PSWD|Maglumi User|||||Lis||P|E1394-97|20180224Q|1|^328873||ALL||||||||O Process Maglumi600Reader.exe (5972)
+Debug Output: got STX Process Maglumi600Reader.exe (5972)
+Debug Output: ===>L|1|N Process Maglumi600Reader.exe (5972)
+Debug Output: Parse Record:| Process Maglumi600Reader.exe (5972)
+Debug Output: Parse Record:Q Process Maglumi600Reader.exe (5972)
+Debug Output: Parse Record:L Process Maglumi600Reader.exe (5972)
+Debug Output: Parse Record: Process Maglumi600Reader.exe (5972)
+Debug Output: out: Process Maglumi600Reader.exe (5972)
+Debug Output: got EOT Process Maglumi600Reader.exe (5972)
+Debug Output: ordreq_queue Process Maglumi600Reader.exe (5972)
+Debug Output: prepareOrder: enter date:2018-02-24 id:328873rack: pos: Process Maglumi600Reader.exe (5972)
+Debug Output: prepareOrder: find Process Maglumi600Reader.exe (5972)
+Debug Output: prepareOrder: load pacient Process Maglumi600Reader.exe (5972)
+Debug Output: determin position: select max(position_no) as max_pos from MAGLUMI600_ORDERS  where maglumi600_analysis_date="2018-02-24" and rack_no = "0" and runda_no = "0"  Process Maglumi600Reader.exe (5972)
+Debug Output: prepareOrder: loaded pacient Process Maglumi600Reader.exe (5972)
+Debug Output: push send patient:328873 orderid: 17 Process Maglumi600Reader.exe (5972)
+Debug Output: prepareOrder: Create pacient ID: 328873 Name: CALCAN RADU Pos: 15 Round: 0 Rack: 0 Process Maglumi600Reader.exe (5972)
+Debug Output: prepareOrder: push Process Maglumi600Reader.exe (5972)
+Debug Output: sendord_queue Process Maglumi600Reader.exe (5972)
+Debug Output: send order all Process Maglumi600Reader.exe (5972)
+Debug Output: confirm:sample(328873) Process Maglumi600Reader.exe (5972)
+Debug Output: out: Process Maglumi600Reader.exe (5972)
+Debug Output: SendStr_queue ENQ Process Maglumi600Reader.exe (5972)
+Debug Output: start beacon: Process Maglumi600Reader.exe (5972)
+Debug Output: out: Process Maglumi600Reader.exe (5972)
+Debug Output: ===> Process Maglumi600Reader.exe (5972)
+Debug Output: got ACK Process Maglumi600Reader.exe (5972)
+Debug Output: out:1H|\^&|||host|||||MAGLUMI600||P|LIS2A|20180224215009P|1||328873||CALCAN^RADU|||||||||||||||||||||||||||||O|1|328873||^^^PSA|R||20180224215009||||A||||S||||||||||O|||||L|1|N Process Maglumi600Reader.exe (5972)
+Debug Output: ===> Process Maglumi600Reader.exe (5972)
+Debug Output: got ACK Process Maglumi600Reader.exe (5972)
+Debug Output: out: Process Maglumi600Reader.exe (5972)
+Debug Output: ===> Process Maglumi600Reader.exe (5972)
+Debug Output: got ACK Process Maglumi600Reader.exe (5972)
+Thread Exit: Thread ID: 5372. Process Maglumi600Reader.exe (5972)
+Thread Exit: Thread ID: 6180. Process Maglumi600Reader.exe (5972)

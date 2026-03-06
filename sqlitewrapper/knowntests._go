@@ -1,0 +1,311 @@
+package sqlitewrapper
+
+import (
+	"wisemed-labreaders/general"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"strconv"
+)
+
+type SQLOrdersType int
+
+const (
+	KATypeQuantitative SQLOrdersType = iota + 1
+	KATypeQalitative
+)
+
+type SQLOrdersFormatting int
+
+const (
+	KAFormatingNoFormat SQLOrdersFormatting = iota + 1
+	KAFormatingToNumberNoDecimals
+	KAFormatingToNumber1Decimals
+	KAFormatingToNumber2Decimals
+	KAFormatingToNumber3Decimals
+	KAFormatingToNumber4Decimals
+)
+
+type SQLOrderTrans struct {
+	From string `json:"from"`
+	To   string `json:"to"`
+}
+type SQLOrder struct {
+	Id                   int                 `json:"known_test_id"`
+	Active               int                 `json:"kt_active"`
+	Tag                  string              `json:"kt_tag"`
+	Code                 string              `json:"kt_code"`
+	ResultType           SQLOrdersType       `json:"kt_result_type"`
+	ResultFormatting     SQLOrdersFormatting `json:"kt_result_formatting"`
+	ResultWeighting      float32             `json:"kt_result_weighting"`
+	ResultTransformation []SQLOrderTrans     `json:"kt_result_transformation"`
+	ResultMeasureUnit    string              `json:"kt_result_measure_unit"`
+	ResultReagentsSet    string              `json:"kt_result_reagents_set"`
+}
+
+var knownTestsTablesChecked bool = false
+
+/** =================================================================================================== **/
+
+func (sqlkt *SQLOrder) ParseFromRawData(rawData map[string]interface{}) error {
+	if len(rawData) != 10 {
+		return errors.New("RawData not matching the SQLOrder type")
+	}
+
+	sqlkt.Id = rawData["known_test_id"].(int)
+	sqlkt.Active = rawData["kt_active"].(int)
+	sqlkt.Tag = rawData["kt_tag"].(string)
+	sqlkt.Code = rawData["kt_code"].(string)
+	sqlkt.ResultType = rawData["kt_result_type"].(SQLOrdersType)
+	sqlkt.ResultFormatting = rawData["kt_result_formatting"].(SQLOrdersFormatting)
+	sqlkt.ResultWeighting = rawData["kt_result_weighting"].(float32)
+	sqlkt.ResultMeasureUnit = rawData["kt_result_measure_unit"].(string)
+	sqlkt.ResultReagentsSet = rawData["kt_result_reagents_set"].(string)
+	trans := []SQLOrderTrans{}
+	transJSON := rawData["kt_result_transformation"].(string)
+	json.Unmarshal([]byte(transJSON), &trans)
+	sqlkt.ResultTransformation = trans
+
+	return nil
+}
+
+func (sqlkt *SQLOrder) ParseFromMap(mapData map[string]string) error {
+	var err error
+	sqlkt.Id, err = strconv.Atoi(mapData["known_test_id"])
+	if err != nil {
+		sqlkt.Id = 0
+	}
+	sqlkt.Active, err = strconv.Atoi(mapData["kt_active"])
+	if err != nil {
+		sqlkt.Active = 0
+	}
+	sqlkt.Tag = mapData["kt_tag"]
+	sqlkt.Code = mapData["kt_code"]
+
+	tmpId, err := strconv.Atoi(mapData["kt_result_type"])
+	if err != nil {
+		tmpId = 0
+	}
+	sqlkt.ResultType = SQLOrdersType(tmpId)
+	tmpId, err = strconv.Atoi(mapData["kt_result_formatting"])
+	if err != nil {
+		tmpId = 0
+	}
+	sqlkt.ResultFormatting = SQLOrdersFormatting(tmpId)
+	sqlkt.ResultWeighting, err = strconv.ParseFloat(mapData["kt_result_weighting"], 64)
+	if err != nil {
+		sqlkt.ResultWeighting = 0
+	}
+	sqlkt.ResultMeasureUnit = mapData["kt_result_measure_unit"]
+	sqlkt.ResultReagentsSet = mapData["kt_result_reagents_set"]
+
+	trans := []SQLOrderTrans{}
+
+	json.Unmarshal([]byte(mapData["kt_result_transformation"]), &trans)
+	sqlkt.ResultTransformation = trans
+
+	return nil
+}
+
+func (sqlkt *SQLOrder) ToMap() (map[string]string, error) {
+	tmpMap := make(map[string]string)
+	tmpMap["known_test_id"] = strconv.Itoa(sqlkt.Id)
+	tmpMap["kt_active"] = strconv.Itoa(sqlkt.Active)
+	tmpMap["kt_tag"] = sqlkt.Tag
+	tmpMap["kt_code"] = sqlkt.Code
+	tmpMap["kt_result_type"] = strconv.Itoa(int(sqlkt.ResultType))
+	tmpMap["kt_result_formatting"] = strconv.Itoa(int(sqlkt.ResultFormatting))
+	tmpMap["kt_result_weighting"] = fmt.Sprintf("%f", sqlkt.ResultWeighting)
+	tmpMap["kt_result_measure_unit"] = sqlkt.ResultMeasureUnit
+	tmpMap["kt_result_reagents_set"] = sqlkt.ResultReagentsSet
+
+	jsonTxt, err := json.Marshal(sqlkt.ResultTransformation)
+	if err != nil {
+		jsonTxt = []byte("[]")
+	}
+	tmpMap["kt_result_transformation"] = string(jsonTxt)
+
+	return tmpMap, nil
+}
+
+func GetKTQueryInterface() []interface{} {
+	return []interface{}{ // Standard MySQL columns
+		new(int),
+		new(int),
+		new(string),
+		new(string),
+		new(SQLOrdersType),
+		new(SQLOrdersFormatting),
+		new(float32),
+		new(string),
+		new(string),
+		new(string),
+	}
+}
+
+func CheckOrdersTable() error {
+
+	if knownTestsTablesChecked {
+		return nil
+	}
+	OpenSQLLiteDatabase()
+
+	SQLITEDatabase.CheckTableObj("KNOWN_TESTS", "create table KNOWN_TESTS ("+
+		"known_test_id INTEGER PRIMARY KEY, "+
+		"kt_active int, "+
+		"kt_tag string, "+
+		"kt_code string, "+
+		"kt_result_type int, "+
+		"kt_result_formatting int, "+
+		"kt_result_weighting real, "+
+		"kt_result_transformation string,"+
+		"kt_result_measure_unit string,"+
+		"kt_result_reagents_set string"+
+		")")
+
+	SQLITEDatabase.CheckTableObj("KNOWN_TESTS_UNAVAILABILITY", "create table KNOWN_TESTS_UNAVAILABILITY ("+
+		"known_test_unav_id INTEGER PRIMARY KEY, "+
+		"ktua_known_test_id int, "+
+		"ktua_date date, "+
+		"ktua_reason string, "+
+		"ktua_registered_by_id int, "+
+		"ktua_registered_by_name string"+
+		")")
+
+	knownTestsTablesChecked = true
+	return nil
+}
+
+func GetOrdersNo() (int, int, error) {
+	CheckOrdersTable()
+
+	tot, err := SQLITEDatabase.ExecTotalQuery("KNOWN_TESTS", "", nil)
+	if err != nil {
+		return -1, -1, err
+	}
+	totActive, err := SQLITEDatabase.ExecTotalQuery("KNOWN_TESTS", "kt_active = ?", 1)
+	if err != nil {
+		return -1, -1, err
+	}
+
+	return tot, totActive, nil
+}
+
+func GetOrders() ([]SQLOrder, error) {
+	dest := GetKTQueryInterface()
+
+	data, err := SQLITEDatabase.ExecQueryFromTable("KNOWN_TESTS", "select * from KNOWN_TESTS", dest)
+	if err != nil {
+		return nil, err
+	}
+
+	sqlKTS := []SQLOrder{}
+	for i := range data {
+		sqlKT := SQLOrder{}
+		sqlKT.ParseFromRawData(data[i])
+		sqlKTS = append(sqlKTS, sqlKT)
+	}
+
+	return sqlKTS, nil
+}
+
+func GetOrder(ktId int) (SQLOrder, error) {
+	sqlKT := SQLOrder{}
+	if ktId > 0 {
+		dest := GetKTQueryInterface()
+		data, err := SQLITEDatabase.ExecQueryFromTable("KNOWN_TESTS", fmt.Sprintf("select * from KNOWN_TESTS where known_test_id = %d", ktId), dest)
+		if err != nil {
+			return sqlKT, err
+		}
+
+		if len(data) > 0 {
+			sqlKT.ParseFromRawData(data[0])
+		}
+	}
+
+	return sqlKT, nil
+}
+
+func SaveOrder(ktId int, ktData SQLOrder) error {
+	stmt, err := SQLITEDatabase.DbObj.Prepare("select * from KNOWN_TESTS where known_test_id = ?")
+	if err != nil {
+		return err
+	}
+
+	rows, err := stmt.Query(ktId)
+	if err != nil {
+		return err
+	}
+	stmt.Close()
+
+	var execParams []interface{}
+
+	jsonTransformation, err := json.Marshal(ktData.ResultTransformation)
+	if err != nil {
+		jsonTransformation = []byte("[]")
+	}
+
+	if rows.Next() {
+		//update
+		fmt.Println("Updating KT")
+		stmt, err = SQLITEDatabase.DbObj.Prepare("update KNOWN_TESTS set kt_active = ?,kt_tag=?,kt_code=?,kt_result_type=?,kt_result_formatting=?,kt_result_weighting=?,kt_result_transformation=?,kt_result_measure_unit=?,kt_result_reagents_set=?  where known_test_id = ?")
+
+		if err != nil {
+			return err
+		}
+		execParams = []interface{}{ktData.Active, ktData.Tag, ktData.Code, ktData.ResultType, ktData.ResultFormatting, ktData.ResultWeighting, string(jsonTransformation), ktData.ResultMeasureUnit, ktData.ResultReagentsSet, ktId}
+
+	} else {
+		//insert
+		fmt.Println("Inserting KT")
+		stmt, err = SQLITEDatabase.DbObj.Prepare("insert into KNOWN_TESTS(kt_active, kt_tag, kt_code,kt_result_type,kt_result_formatting,kt_result_weighting,kt_result_transformation,kt_result_measure_unit=?, kt_result_reagents_set=?) values(?, ?, ?, ?, ?, ?, ?,?,?)")
+		if err != nil {
+			return err
+		}
+		execParams = []interface{}{ktData.Active, ktData.Tag, ktData.Code, ktData.ResultType, ktData.ResultFormatting, ktData.ResultWeighting, string(jsonTransformation), ktData.ResultMeasureUnit, ktData.ResultReagentsSet}
+	}
+	rows.Close()
+
+	_, err = stmt.Exec(execParams...)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+	return nil
+}
+
+func SaveOrdersBulk(queue *general.ObjectQueue) {
+	for queue.Len() > 0 {
+		tmpObj, err := queue.Pop()
+		if err != nil {
+			fmt.Printf("Erroron save result: %v\n", err)
+		}
+		tmpPac, ok := tmpObj.(SQLOrder)
+		if ok {
+			fmt.Println("New file result to save %v\n", tmpPac)
+		}
+	}
+}
+
+func SaveOrderFromMap(ktId int, ktData map[string]string) error {
+	ktObj := SQLOrder{}
+	ktObj.ParseFromMap(ktData)
+	return SaveOrder(ktId, ktObj)
+}
+
+func DeleteOrder(ktId int) error {
+	fmt.Println("Deleting KT")
+	stmt, err := SQLITEDatabase.DbObj.Prepare("delete from KNOWN_TESTS where known_test_id = ?")
+	defer stmt.Close()
+
+	if err != nil {
+		return err
+	}
+	execParams := []interface{}{ktId}
+
+	_, err = stmt.Exec(execParams...)
+	if err != nil {
+		return err
+	}
+	return nil
+}

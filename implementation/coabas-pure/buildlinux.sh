@@ -1,0 +1,1 @@
+env GOOS=linux GOARCH=386 GOROOT=/usr/local/opt/go/libexec GOPATH=/Users/radu/go go build -i -o GoSIUILinux  main.go

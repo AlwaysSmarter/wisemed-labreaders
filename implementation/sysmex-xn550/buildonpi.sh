@@ -1,0 +1,1 @@
+env GOOS=linux GOARCH=arm64 GO111MODULE=on CGO_ENABLED=1 go build -o ../../WMSysmexReader
