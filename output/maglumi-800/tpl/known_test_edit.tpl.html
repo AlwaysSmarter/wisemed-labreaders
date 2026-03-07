@@ -1,0 +1,261 @@
+<div class="title" style="min-height:120px;background-image: url(/web/imgs/WiseMED.png); background-position: top right; background-size: 100px; background-repeat: no-repeat;">
+    <span style="align-self: start;margin-left: 200px"><a href="{{APP_PATH}}">&lt; Home</a></span>
+    <h1><img src="/web/icons/no-lion/{{APP_ANALYZER_TYPE_ICON}}" height="32" style="margin-right:20px">{{APP_ANALYZER_NAME}} {{APP_ANALYZER_TYPE_NAME}} Reader Configuration</h1>
+    <small style="color: gray">{{APP_DATE}} -2 App Serial #{{APP_SERIAL_NO}}</small>
+</div>
+<form id="ktedit-form" action="/knowntests" method="POST" class="title">
+    <input class="ace-col-12" type="hidden" name="EditAction" optional value="">
+    <input class="ace-col-12" type="hidden" name="EditedId" optional value="{{known_test_id}}">
+    <input class="ace-col-12" type="hidden" name="kt_result_transformation" optional value="">
+
+    <div id="error-text" class="hide">
+        <span class="err-title">Attention</span>
+        <span class="error-text">{{APP_ERROR_TXT}}</span>
+    </div>
+    <div class="ace-col-8" style="margin: auto;padding: 0px;">
+        <div class="ace-col-12" style="display: flex">
+            <div class="ace-col-12" style="background-color: #caebff;">
+                <h3>Known Test #{{known_test_id}}</h3>
+                <div style="float: left"><a href="{{APP_PATH}}/knowntests" style="color:red">&lt;Back</a></div>
+                <div style="float: right"><a href="#" action="save">Save</a></div>
+                <div class="ace-col-12">
+                    <div class="ace-col-1">
+                        <div class="ace-col-12">Activ</div>
+                        <div class="ace-col-12 ace-bold"><input class="ace-col-12" type="checkbox" value="1" name="kt_active" val="{{kt_active}}"></div>
+                    </div>
+                    <div class="ace-col-3">
+                        <div class="ace-col-12">Tag</div>
+                        <div class="ace-col-12 ace-bold"><input class="ace-col-12" type="text" name="kt_tag" value="{{kt_tag}}"></div>
+                    </div>
+                    <div class="ace-col-4">
+                        <div class="ace-col-12">Details</div>
+                        <div class="ace-col-12 ace-bold"><input class="ace-col-12" type="text" name="kt_details" value="{{kt_details}}"></div>
+                    </div>
+                    <div class="ace-col-4">
+                        <div class="ace-col-12">Code on analyzer</div>
+                        <div class="ace-col-12 ace-bold"><input class="ace-col-12" type="text" name="kt_code" value="{{kt_code}}"></div>
+                    </div>
+                    <div class="ace-col-3">
+                        <div class="label">Result type</div>
+                        <div>
+                            <select class="ace-col-12" name="kt_result_type" val="{{kt_result_type}}">
+                                <option value="">Unset</option>
+                                <option value="1">Quantitative</option>
+                                <option value="2">Qualitative</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="ace-col-3">
+                        <div class="label">Result formatting</div>
+                        <div>
+                            <select class="ace-col-12" name="kt_result_formatting" val="{{kt_result_formatting}}">
+                                <option value="">Unset</option>
+                                <option value="1">No formatting</option>
+                                <option value="2">Number, no decimals</option>
+                                <option value="3">Number 1 decimals</option>
+                                <option value="4">Number 2 decimals</option>
+                                <option value="5">Number 3 decimals</option>
+                                <option value="6">Number 4 decimals</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="ace-col-2">
+                        <div class="label">Result weighting</div>
+                        <div class="ace-col-12 ace-bold"><input class="ace-col-12" type="text" name="kt_result_weighting" optional value="{{kt_result_weighting}}"></div>
+                    </div>
+                    <div class="ace-col-2">
+                        <div class="ace-col-12">Rewrite Measure Unit</div>
+                        <div class="ace-col-12 ace-bold"><input class="ace-col-12" type="text" optional name="kt_result_measure_unit" value="{{kt_result_measure_unit}}"></div>
+                    </div>
+                    <div class="ace-col-2">
+                        <div class="ace-col-12">Rewrite Reagents Set</div>
+                        <div class="ace-col-12 ace-bold"><input class="ace-col-12" type="text" optional name="kt_result_reagents_set" value="{{kt_result_reagents_set}}"></div>
+                    </div>
+                    <div class="ace-col-12">
+                        <div class="ace-col-12 {{EQUIPMENT_FORM_HIDDEN}} " {{EQUIPMENT_FORM_OPTIONAL}} style="background-color: #ecffec;">
+                            <h4 id="result-transf-title">Result transformation</h4>
+                            <div><a href="#" action="add-trans">Add new transformation pair</a></div>
+                            <div class="ace-col-12 hide" id="kt-result-transformation-list">
+                                <div class="ace-col-12" id="kt-result-transformation-list-header">
+                                    <div class="ace-col-4 ace-bold">From</div>
+                                    <div class="ace-col-4 ace-bold">To</div>
+                                    <div class="ace-col-2 ace-bold">Actions</div>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+<div class="ace-col-12 edit-row hide" id="kt-transformation-edit-row-tpl">
+    <div class="ace-col-4 kt-id"><input name="_from"></div>
+    <div class="ace-col-4 kt-id"><input name="_to"></div>
+    <div class="ace-col-2 kt-id"><a style="color:red" href="#" action="cancel-trans">Cancel</a>&nbsp;<a href="#" action="save-trans">Save</a></div>
+</div>
+<div class="ace-col-12 edit-row hide kt-transformation-row"  ktid="[[known_test_id]]" id="kt-transformation-row-tpl">
+    <div class="ace-col-4 kt-transformation-from">[[_from]]</div>
+    <div class="ace-col-4 kt-transformation-to">[[_to]]</div>
+    <div class="ace-col-2"><a href="#" action="del-trans" style="color:red">Delete</a></div>
+</div>
+
+<script lang="javascript">
+    var ktTransformations = `{{kt_result_transformation}}`;
+    var newTransformation = 0;
+     $( document ).ready(function() {
+        try {
+            parseTransformationJSON();
+            setTransformationsActions();
+
+            $('[action="save"]').click(function(){
+                if (!tryToSave('#ktedit-form')) $('#ktedit-form').submit();
+            });
+
+            $('[action="add-trans"]').removeClass('hide'); //to be sure is shown at the begining
+
+            $('[action="add-trans"]').click(function(){
+                var editRow = $("#kt-transformation-edit-row-tpl").clone().removeClass("hide");
+                $("#kt-result-transformation-list-header").after(editRow);
+                $("#kt-result-transformation-list").removeClass("hide");
+
+                setTransformationsActions();
+                $(this).addClass('hide');
+            });
+
+        }
+        catch (e) {
+            //nothing here
+        }
+
+         $('select').each(function() {
+            var selVal = $(this).attr("val");
+            if (selVal == "") return;
+
+            $(this).val(selVal);
+            $(this).trigger('change');
+        });
+
+        $('input[type="checkbox"]').each(function() {
+            var checkVal = $(this).attr("val");
+            if (checkVal == "1") {
+                $(this).prop('checked', true);
+            }
+            else {
+                $(this).prop('checked', false);
+            }
+        });
+
+     });
+
+    function tryToSave(formSelector) {
+        $(formSelector+" .label").removeClass("error");
+        var haveErr = false;
+
+        $(formSelector+' input').each(function() {
+            if ($(this).val() != "") return;
+            if ($(this).is('[readonly]')) return;
+            if ($(this).is('[optional]')) return;
+            $(this).parents('.config').find('.label').addClass('error');
+            haveErr = true;
+        });
+        $(formSelector+' select').each(function() {
+            if ($(this).is('[readonly]')) return;
+            if ($(this).is('[optional]')) return;
+            if ($(this).find('option:selected').val() != "") return;
+            if ($(this).find('option:selected').val() > 0) return;
+            $(this).parents('.config').find('.label').addClass('error');
+            haveErr = true;
+        });
+
+        $("[name='kt_result_transformation']").val(returnTransformationJSON());
+
+        if (haveErr) {
+            setApplicationError('First fill in all initial data');
+        } else {
+            $("input[name='EditAction']").val('save');
+        }
+        return haveErr;
+    }
+
+    function returnTransformationJSON() {
+        var list = $("#kt-result-transformation-list");
+        var rtJSON = [];
+        list.find(".kt-transformation-row").each(function(index) {
+            var tmpFrom = $(this).find('.kt-transformation-from').html();
+            var tmpTo = $(this).find('.kt-transformation-to').html();
+            if (tmpFrom != "") {
+                rtJSON.push({"from":tmpFrom,"to":tmpTo});
+            }
+        });
+        return JSON.stringify(rtJSON);
+    }
+
+    function parseTransformationJSON(jsonTxt) {
+        var rtJSON;
+        try {
+            var rtJSON = JSON.parse(ktTransformations);
+            $.each(rtJSON, function(index, value) {
+                appendTransformationRow(value.from, value.to);
+            });
+        }
+        catch (e) {
+        }
+    }
+    
+    function cancelKTTransformationEdit() {
+        var parentRow = $(this).parents('.edit-row').first();
+        parentRow.remove();
+        setTransformationsActions(true);
+    }
+    function deleteKTTransformation() {
+        var parentRow = $(this).parents('.edit-row').first();
+        parentRow.remove();
+        setTransformationsActions(true);
+    }
+    function saveKTTransformation() {
+        var parentRow = $(this).parents('.edit-row').first();
+        var from = parentRow.find("input[name='_from']").val();
+        var to = parentRow.find("input[name='_to']").val();
+        
+        if (from == "") {
+            setApplicationError('A transformation should have at least an identitier in the FROM field.');
+            return;
+        }
+
+        //removed editing form
+        parentRow.remove();
+        //add the new row
+        appendTransformationRow(from, to);
+    }
+
+    function appendTransformationRow(from, to) {
+        var newRow = $("#kt-transformation-row-tpl").clone().attr('id', "kt-transf-"+(newTransformation++)).appendTo("#kt-result-transformation-list");
+        newRow.html(newRow.html().replace('[[_from]]', from));
+        newRow.html(newRow.html().replace('[[_to]]', to));
+        newRow.removeClass('hide');
+        setTransformationsActions(true);
+    }
+    function getNoOfTransformations() {
+        return $("#kt-result-transformation-list .edit-row").length;
+    }
+
+    function setTransformationsActions() {
+        $('[action="save-trans"]').unbind().click(saveKTTransformation);
+        $('[action="cancel-trans"]').unbind().click(cancelKTTransformationEdit);
+        $('[action="del-trans"]').unbind().click(deleteKTTransformation);
+
+        $('[action="add-trans"]').removeClass('hide');
+
+        if (getNoOfTransformations() > 0) {
+            $("#kt-result-transformation-list").removeClass('hide');
+            $("#result-transf-title").html("Result transformations");
+        }
+        else {
+            $("#kt-result-transformation-list").addClass('hide');
+            $("#result-transf-title").html("This result doesn't have any transformaiton pairs defined yet.");
+        }
+    }
+
+</script>

@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en" dir=ltr>
+<head>
+    <meta charset="UTF-8">
+    <title>WMLR - {{CONFIG_ANALIZER_NAME}}</title>
+    <link rel="stylesheet" href="/web/css/main.css"  type="text/css" />
+    <link rel="icon" href="/web/icons/{{APP_ANALYZER_TYPE_ICON}}">
+    <!-- script src="https://code.jquery.com/jquery-3.6.0.min.js" integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4=" crossorigin="anonymous"></script -->
+    <script src="/web/jquery-3.5.1.min.js" rossorigin="anonymous"></script>
+    <script>
+        var ws_addr = "{{ip}}";//"x6i80.wisemed.eu";
+        var ws_port = parseInt({{port}});//8010;
+        var ws_type = "wss://";
+        var ws_path = "/ws";
+    </script>
+</head>
+<body style="background-image: url(/web/icons/{{APP_ANALYZER_TYPE_ICON}}); background-position: top left; background-repeat: no-repeat; background-size: 10%">

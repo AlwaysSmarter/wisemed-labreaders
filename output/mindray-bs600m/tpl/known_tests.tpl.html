@@ -1,0 +1,184 @@
+<div class="title" style="min-height:120px;background-image: url(/web/imgs/WiseMED.png); background-position: top right; background-size: 100px; background-repeat: no-repeat;">
+    <span style="align-self: start;margin-left: 200px"><a href="{{APP_PATH}}">&lt; Home</a></span>
+    <h1><img src="/web/icons/no-lion/{{APP_ANALYZER_TYPE_ICON}}" height="32" style="margin-right:20px">{{APP_ANALYZER_NAME}} {{APP_ANALYZER_TYPE_NAME}} Reader Configuration</h1>
+    <small style="color: gray">{{APP_DATE}} -2 App Serial #{{APP_SERIAL_NO}}</small>
+</div>
+<form id="ktlist-form" action="/knowntests" method="POST" class="title">
+    <input class="ace-col-12" type="hidden" name="EditAction" value="">
+    <input class="ace-col-12" type="hidden" name="EditedId" value="">
+
+    <div id="error-text" class="hide">
+        <span class="err-title">Attention</span>
+        <span class="error-text">{{APP_ERROR_TXT}}</span>
+    </div>
+    <div class="ace-col-8" style="margin: auto;padding: 0px;">
+        <div class="ace-col-12" style="display: flex">
+            <div class="ace-col-12" style="background-color: #caebff;">
+                <h3>Known Tests </h3>
+                <div><a href="#" action="add">Add Known Test</a></div>
+                <div>&nbsp;&nbsp;&nbsp;</div>
+                <div><a href="/reloadktfromanalyzer" action="add">Reload tests from analyzer</a></div>
+                <div><a href="/addmissingkt" action="add">Add missing default tests</a></div>
+                <div class="ace-col-12 hide" id="kt-list">
+                    <div class="ace-col-12">
+                        <div class="ace-col-1 ace-bold">Id</div>
+                        <div class="ace-col-1 ace-bold">Active</div>
+                        <div class="ace-col-2 ace-bold">Name</div>
+                        <div class="ace-col-1 ace-bold">Code</div>
+                        <div class="ace-col-1 ace-bold">Result type</div>
+                        <div class="ace-col-2 ace-bold">Formatting</div>
+                        <div class="ace-col-1 ace-bold">Weighting</div>
+                        <div class="ace-col-2 ace-bold">Details</div>
+                        <div class="ace-col-1 ace-bold">Actions</div>
+                    </div>
+                </div>
+                <div class="ace-col-12 hide" id="kt-no-tests">
+                    <div class="config">
+                        <div class="label">No known tests were found in the database. </div>
+                    </div>
+                    <div class="config">
+                        <div class="label">You can start by adding one now</div>
+                        <div>
+                            <input class="ace-col-12" type="submit" name="add-kt" value="Add known test">
+                        </div>
+                    </div>
+                    <br/>
+                    <br/>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+<style>
+    .kt-active-class {
+        width: 15px;
+        height: 15px;
+        border-radius: 50%;
+        background-color: red;
+    }
+    .kt-active-class-1 {
+        background-color: green;
+    }
+</style>
+<div class="ace-col-12 edit-row hide"  ktid="[[known_test_id]]" id="kt-row-tpl">
+    <div class="ace-col-1 kt-id">[[known_test_id]]</div>
+    <div class="ace-col-1 kt_active"><div class="kt-active-class kt-active-class-[[kt_active]]">&nbsp;</div></div>
+    <div class="ace-col-1 kt_tag">[[kt_tag]]</div>
+    <div class="ace-col-1 kt-code">[[kt_code]]</div>
+    <div class="ace-col-1 kt-result-type">[[kt_result_type_name]]</div>
+    <div class="ace-col-2 kt-formatting">[[kt_result_formatting_name]]</div>
+    <div class="ace-col-1 kt-weighting">[[kt_result_weighting]]</div>
+    <div class="ace-col-3 kt-has-transformation">[[kt_details]]</div>
+    <div class="ace-col-1"><a href="#" action="delete" style="color:red">Delete</a>&nbsp;<a href="#" action="edit">Edit</a></div>
+</div>
+<script lang="javascript">
+    var ktJSON = `{{KT_JSON}}`;
+    var ktJSONObj;
+    $( document ).ready(function() {
+        try {
+            ktJSONObj =JSON.parse(ktJSON);
+
+            if (ktJSONObj.length <= 0) {
+                $('#kt-no-tests').removeClass('hide');
+                $('#kt-list').addClass('hide');
+            }
+            else {
+                $.each(ktJSONObj, function(index, ktObj){
+                    parseKTObj(ktObj);
+                    var tmpRow = $('#kt-row-tpl').clone().detach().attr('id', 'kt-row-'+index).attr('ktid', ktObj.known_test_id);
+                    myHtml = tmpRow.html();
+                    $.each(ktObj, function(key, val){
+                        myHtml = myHtml.replace('[['+key+']]', val);
+                    });
+                    tmpRow.html(myHtml);
+
+                    $(tmpRow).find("[action='delete']").click(delKTRow);
+                    $(tmpRow).find("[action='edit']").click(editKTRow);
+
+                    $(tmpRow).removeClass('hide').appendTo($("#kt-list"));
+                });
+
+                $('#kt-no-tests').addClass('hide');
+                $('#kt-list').removeClass('hide');
+            }
+            $("[action='add']").click(addKTRow);
+        }
+        catch (e) {
+            //nothing here
+        }
+    });
+
+    function parseKTObj(ktObj) {
+        switch(ktObj.kt_result_type) {
+            case 1:
+                ktObj.kt_result_type_name = "Quantitative";
+                break;
+            case 2:
+                ktObj.kt_result_type_name = "Qualitative";
+                break;
+            default:
+                ktObj.kt_result_type_name = "Unknown";
+                break;
+        }
+        switch(ktObj.kt_result_formatting) {
+            case 1:
+                ktObj.kt_result_formatting_name = "-";
+                break;
+            case 2:
+                ktObj.kt_result_formatting_name = "Integer";
+                break;
+            case 3:
+                ktObj.kt_result_formatting_name = "Number, 1 decimal";
+                break;
+            case 4:
+                ktObj.kt_result_formatting_name = "Number, 2 decimals";
+                break;
+            case 5:
+                ktObj.kt_result_formatting_name = "Number, 3 decimals";
+                break;
+            case 6:
+                ktObj.kt_result_formatting_name = "Number, 4 decimals";
+                break;
+            default:
+                ktObj.kt_result_formatting_name = "Unknown";
+                break;
+        }
+        if ((ktObj.kt_result_transformation != "") && (ktObj.kt_result_transformation != "[]")) {
+            ktObj.kt_result_has_transformation  = 'Yes';
+        } else {
+            ktObj.kt_result_has_transformation  = '';
+        }
+    }
+
+    function addKTRow(sender) {
+        $("input[name='EditAction']").val('add');
+        $("input[name='EditedId']").val(0);
+
+        $("#ktlist-form").submit();
+    }
+    function delKTRow(sender) {
+        var parentRow = $(this).parents('.edit-row').first();
+        var editedKTId = $(this).parents('.edit-row').first().attr('ktid');
+
+
+        if (confirm('Are you sure you want to delete '+parentRow.find('.kt_tag').html()+'?') != true) {
+            return;
+        }
+
+        $("input[name='EditAction']").val('delete');
+        $("input[name='EditedId']").val(editedKTId);
+
+        $("#ktlist-form").submit();
+    }
+
+    function editKTRow(sender) {
+        var parentRow = $(this).parents('.edit-row').first();
+        var editedKTId = $(this).parents('.edit-row').first().attr('ktid');
+
+        $("input[name='EditAction']").val('edit');
+        $("input[name='EditedId']").val(editedKTId);
+
+        $("#ktlist-form").submit();
+    }
+
+</script>

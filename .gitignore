@@ -1,4 +1,12 @@
-/output/
+/output/*/certs/
+/output/cobas-pro/certs/
+/output/cobas-u411/certs/
+/output/dirui-h800/certs/
+/output/indiko-plus/certs/
+/output/maglumi-800/certs/
+/output/mindray-bs600m/certs/
+/output/sysmex-ca600/certs/
+/output/sysmex-xn550/certs/
 /old-src/
 /old-src/
 /common/output/certs/

@@ -1,0 +1,308 @@
+<form id="cfg-form" action="/config" method="POST" class="title">
+    <input class="ace-col-12" type="hidden" name="SaveCfg" value="SaveCfg">
+    <input class="ace-col-12" type="hidden" name="EquipmentFormHidden" value="{{EQUIPMENT_FORM_HIDDEN}}" optional>
+
+    <div id="error-text" class="hide">
+        <span class="err-title">Attention</span>
+        <span class="error-text">{{APP_ERROR_TXT}}</span>
+    </div>
+    <div class="ace-col-8" style="margin: auto;padding: 0px;">
+        <div class="ace-col-12" style="display: flex">
+            <div class="ace-col-5" style="background-color: #caebff;" id="wise-med-api-cfg">
+                <h3>WiseMED API configuration</h3>
+                <div class="config">
+                    <div class="label">WiseMED API IP</div>
+                    <div>
+                        <input class="ace-col-12" type="text" name="cfg_wisemed_ip" value="{{cfg_wisemed_ip}}">
+                    </div>
+                </div>
+                <div class="config">
+                    <div class="label">WiseMED API Path</div>
+                    <div>
+                        <input class="ace-col-12" type="text" name="cfg_wisemed_path" value="{{cfg_wisemed_path}}">
+                    </div>
+                </div>
+                <div class="config ace-col-6">
+                    <div class="label">WiseMED API Port</div>
+                    <div>
+                        <input class="ace-col-12" type="text" name="cfg_wisemed_port" value="{{cfg_wisemed_port}}">
+                    </div>
+                </div>
+                <div class="config ace-col-6">
+                    <div class="label">WiseMED API Protocol</div>
+                    <div>
+                        <input class="ace-col-12" type="text" name="cfg_wisemed_protocol" value="{{cfg_wisemed_protocol}}">
+                    </div>
+                </div>
+                <div class="config">
+                    <div class="label">WiseMED API Key</div>
+                    <div>
+                        <input class="ace-col-12" type="text" name="cfg_wisemed_key" value="{{cfg_wisemed_key}}">
+                    </div>
+                </div>
+                <div class="config" style="text-align: center">
+                    <br>
+                    <br>
+                    <a href="#" id="rewrite-config">Rewrite API configuration</a>
+                </div>
+            </div>
+
+            <div class="ace-col-5 {{EQUIPMENT_FORM_HIDDEN}} " {{EQUIPMENT_FORM_OPTIONAL}} style="background-color: #ecffec;">
+            <h3>Equipment configuration</h3>
+            <div class="config ace-col-6">
+                <div class="label">Equipment ID (in WiseMED)</div>
+                <div>
+                    <input style="background-color: #eee" class="ace-col-12" type="text" readonly name="echipament_id" value="{{echipament_id}}">
+                </div>
+            </div>
+            <div class="config ace-col-6">
+                <div class="label">Equipment API Key</div>
+                <div>
+                    <input style="background-color: #eee" class="ace-col-12" type="text" readonly name="api_key_echipament" value="{{APP_ANALYZER_API_KEY}}">
+                </div>
+            </div>
+            <div class="config">
+                <div class="label">Equipment medical unit (in WiseMED)</div>
+                <div>
+                    <select class="ace-col-12" name="unitate_medicala_id" val="{{unitate_medicala_id}}">
+                        <option value="">Select please</option>
+                    </select>
+                </div>
+            </div>
+            <div class="config">
+                <div class="label">Equipment Type (in WiseMED)</div>
+                <div>
+                    <select class="ace-col-12" name="tip_de_echipament_id" val="{{tip_de_echipament_id}}">
+                        <option value="">Select please</option>
+                    </select>
+                </div>
+            </div>
+            <div class="ace-col-6 config">
+                <div class="label">Code</div>
+                <div>
+                    <input class="ace-col-12" type="text" name="cod_echipament" value="{{cod_echipament}}">
+                </div>
+            </div>
+            <div class="ace-col-6 config">
+                <div class="label">Manufacturer</div>
+                <div>
+                    <input class="ace-col-12" type="text" name="producator_echipament" value="{{producator_echipament}}">
+                </div>
+            </div>
+            <div class="ace-col-4 config">
+                <div class="label">Serial Number</div>
+                <div>
+                    <input class="ace-col-12" type="text" name="numar_serial_echipament" value="{{numar_serial_echipament}}">
+                </div>
+            </div>
+            <div class="ace-col-4 config">
+                <div class="label">Racks Number</div>
+                <div>
+                    <input class="ace-col-12" type="text" name="nr_rackuri" value="{{nr_rackuri}}">
+                </div>
+            </div>
+            <div class="ace-col-4 config">
+                <div class="label">Positions / Rack</div>
+                <div>
+                    <input class="ace-col-12" type="text" name="pozitii_pe_rack" value="{{pozitii_pe_rack}}">
+                </div>
+            </div>
+        </div>
+        </div>
+        <div class="ace-col-12" style="display: flex">
+            <div class="ace-col-5 {{EQUIPMENT_FORM_HIDDEN}} " {{EQUIPMENT_FORM_OPTIONAL}} style="background-color: #ffedd9;">
+                <h3>Equipment WS configuration</h3>
+                <div class="config">
+                    <div class="label">Equipment WS IP</div>
+                    <div>
+                        <input class="ace-col-12" type="text" name="ip" value="{{ip}}">
+                    </div>
+                </div>
+                <div class="config">
+                    <div class="label">Equipment WS Port</div>
+                    <div>
+                        <input class="ace-col-12" type="text" name="port" value="{{port}}">
+                    </div>
+                </div>
+                <div class="config">
+                    <div class="label">Equipment Name on Report</div>
+                    <div>
+                        <input class="ace-col-12" type="text" name="nume_pe_raport_final" value="{{nume_pe_raport_final}}">
+                    </div>
+                </div>
+                <div class="config">
+                    <div class="label">Communication type</div>
+                    <div>
+                        <select class="ace-col-12" optional name="cfg_comm_type" val="{{cfg_comm_type}}">
+                            <option value="">Unset</option>
+                            <option value="SERIAL">Serial</option>
+                            <option value="TCPIP">TCP/IP</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="ace-col-5 hide" optional-form style="background-color: #E9E3FD;" id="serial-comm">
+                <h3>Serial Communication Details</h3>
+                <div class="config">
+                    <div class="label">Serial Port</div>
+                    <div>
+                        <input class="ace-col-12" type="text" name="cfg_comm_serial_port" value="{{cfg_comm_serial_port}}">
+                    </div>
+                </div>
+                <div class="config">
+                    <div class="label">Baud Rate</div>
+                    <div>
+                        <input class="ace-col-12" type="text" name="cfg_comm_serial_baud" value="{{cfg_comm_serial_baud}}">
+                    </div>
+                </div>
+                <div class="config">
+                    <div class="label">Stop Bits</div>
+                    <div>
+                        <input class="ace-col-12" type="text" name="cfg_comm_serial_stop_bits" value="{{cfg_comm_serial_stop_bits}}">
+                    </div>
+                </div>
+                <div class="config">
+                    <div class="label">Parity type</div>
+                    <div>
+                        <select class="ace-col-12" name="cfg_comm_serial_parity" val="{{cfg_comm_serial_parity}}">
+                            <option value="">Unset</option>
+                            <option value="1">None</option>
+                            <option value="2">Odd</option>
+                            <option value="3">Even</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="ace-col-5 hide" optional-form style="background-color: #E9E3FD;" id="tcpip-comm">
+                <h3>TCP/IP Communication Details</h3>
+                <div class="config">
+                    <div class="label">Comm type</div>
+                    <div>
+                        <select class="ace-col-12" name="cfg_comm_tcpip_type" val="{{cfg_comm_tcpip_type}}">
+                            <option value="">Unset</option>
+                            <option value="1">Client</option>
+                            <option value="2">Server</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="config">
+                    <div class="label">IP Address</div>
+                    <div>
+                        <input class="ace-col-12" type="text" name="cfg_comm_tcpip_addr" value="{{cfg_comm_tcpip_addr}}">
+                    </div>
+                </div>
+                <div class="config">
+                    <div class="label">Port</div>
+                    <div>
+                        <input class="ace-col-12" type="text" name="cfg_comm_tcpip_port" value="{{cfg_comm_tcpip_port}}">
+                    </div>
+                </div>
+            </div>
+        </div>
+        {{OTHER_CONFIG}}
+
+    </div>
+    <div>
+        <br>
+        <input class="ace-col-12" type="button" value="Save configuration">
+    </div>
+</form>
+<form id="rewrite-api-cfg-form" action="/config" method="POST" class="title">
+<input type="hidden" name="cfg_wisemed_ip">
+<input type="hidden" name="cfg_wisemed_path">
+<input type="hidden" name="cfg_wisemed_port">
+<input type="hidden" name="cfg_wisemed_protocol">
+<input type="hidden" name="cfg_wisemed_key">
+<input type="hidden" name="SaveCfg" value="1">
+</form>
+<script>
+    var medicalUnits = '{{MEDICAL_UNITS_JSON}}';
+    var wmAnalizerTypes = '{{WM_ANALIZER_TYPES_JSON}}';
+
+
+
+    $( document ).ready(function() {
+        //setting initial data
+        $('input[value=""]').parents('.config').removeClass('hide');
+        $("[optional-form] input").attr('optional', true);
+        $("[optional-form] select").attr('optional', true);
+
+        populateSelectFromJson('[name="unitate_medicala_id"]', medicalUnits, 'medical_unit_id', 'medical_unit_name');
+        populateSelectFromJson('[name="tip_de_echipament_id"]', wmAnalizerTypes, 'analyzer_type_id', 'analyzer_type_name');
+
+        //attaching events listeners
+        $('[name="cfg_comm_type"]').change(function () {
+            console.log("cfg_comm_type changed");
+            $("#serial-comm").addClass('hide').find("input").attr('optional', true);
+            $("#serial-comm").addClass('hide').find("select").attr('optional', true);
+            $("#tcpip-comm").addClass('hide').find("input").attr('optional', true);
+            $("#tcpip-comm").addClass('hide').find("select").attr('optional', true);
+
+            var showForm = "";
+            switch ($( '[name="cfg_comm_type"] option:selected' ).val()) {
+                case "SERIAL":
+                    showForm = '#serial-comm';
+                    break;
+                case "TCPIP":
+                    showForm = '#tcpip-comm';
+                    break;
+
+            }
+
+            if (showForm != "") {
+                $(showForm).removeClass('hide').find("input").removeAttr('optional', true);
+                $(showForm).removeClass('hide').find("select").removeAttr('optional', true);
+            }
+        });
+
+        $('#rewrite-config').click(function() {
+            if (!tryToSave('#wise-med-api-cfg')) {
+                $('#wise-med-api-cfg input').each(function() {
+                    $('#rewrite-api-cfg-form [name="'+$(this).attr('name')+'"]').val($(this).val());
+                });
+                $('#rewrite-api-cfg-form').submit();
+            }
+        });
+        $('input[type="button"]').click(function(){
+            if (!tryToSave('#cfg-form')) $('#cfg-form').submit();
+        });
+
+        //setting values where case
+        $('select').each(function() {
+            var selVal = $(this).attr("val");
+            if (selVal == "") return;
+
+            $(this).val(selVal);
+            $(this).trigger('change');
+        });
+    });
+
+    function tryToSave(formSelector) {
+        $(formSelector+" .label").removeClass("error");
+        var haveErr = false;
+
+        $(formSelector+' input').each(function() {
+            if ($(this).val() != "") return;
+            if ($(this).is('[readonly]')) return;
+            if ($(this).is('[optional]')) return;
+            console.log($(this).attr('name') + ' = ' + $(this).val());
+            console.log( $(this).parents('.config').find('.label'));
+            $(this).parents('.config').find('.label').addClass('error');
+            haveErr = true;
+        });
+        $(formSelector+' select').each(function() {
+            if ($(this).is('[readonly]')) return;
+            if ($(this).is('[optional]')) return;
+            if ($(this).find('option:selected').val() != "") return;
+            if ($(this).find('option:selected').val() > 0) return;
+            $(this).parents('.config').find('.label').addClass('error');
+            haveErr = true;
+        });
+
+        if (haveErr) {
+            setApplicationError('First fill in all initial data');
+        }
+        return haveErr;
+    }
+</script>

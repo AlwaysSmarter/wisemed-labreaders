@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>SIUI</title>
+</head>
+<body>
+<h1>Nomenclatoare SIUI</h1>
+<form action="update_nomenclators" method="post" enctype="multipart/form-data">
+<table>
+  <tr>
+    <td>Upload fisier nomenclatoare</td>
+    <td><input type="file" name="nom_file"></td>
+  </tr>
+</table>
+<table>
+  <tr>
+    <td colspan="2">Update modules</td>
+  </tr>
+  <tr>
+    <td><input type="checkbox" name="update_drugs" checked></td>
+    <td>Medicamente</td>
+  </tr>
+  <tr>
+    <td><input type="checkbox" name="update_doctors" checked></td>
+    <td>Doctori</td>
+  </tr>
+  <tr>
+    <td colspan="2"><input type="submit" value="Send"></td>
+  </tr>
+</table>
+</form>
+</body>
+</html>

@@ -1,0 +1,147 @@
+<script src="/web/ws.js?{APP_js_version}"></script>
+<div class="title" style="padding-bottom:80px;background-image: url(/web/imgs/WiseMED.png); background-position: top right; background-size: 100px; background-repeat: no-repeat;">
+    <span style="align-self: start;margin-left: 200px"><a href="{{APP_PATH}}">&lt; Home</a></span>
+    <h1><img src="/web/icons/no-lion/{{APP_ANALYZER_TYPE_ICON}}" height="32" style="margin-right:20px">{{APP_ANALYZER_NAME}} {{APP_ANALYZER_TYPE_NAME}} Analyzer Communication</h1>
+    <small style="color: gray">{{APP_DATE}} -2 App Serial #{{APP_SERIAL_NO}}</small>
+</div>
+
+<div class="ace-col-4">
+<form action="/communication" method="POST">
+Simulate analyzer communication (analyzer->host):<br>
+<textarea class="ace-col-12"  id="sim_an_host" name="sim_an_host" style="min-height: 300px;">
+</textarea><br>
+    <div>
+        <select id="predefined_test_types">
+            <option value="0">Select a predefined test</option>
+        </select>
+    <input type="button" name="simulate_an" value="Send" onclick="sendDataToServer()">
+    </div>
+</form>
+</div>
+<div class="ace-col-8">
+    Real-time communication<br>
+    <div class="ace-col-12" style="min-width:200px;height: 300px;border: 1px solid lightgray;overflow: scroll;" id="ws-an-communication"></div>
+</div>
+
+
+<style>
+    .ws-analyzer-msg {
+        margin-left: 30px;
+        color: #0099f6;
+    }
+    .ws-host-msg {
+        margin-left: 30px;
+        color: #ffa500;
+    }
+    .ws-err-msg {
+        margin-left: 30px;
+        color: indianred;
+    }
+    .ws-host-msg {
+        margin-left: 30px;
+        color: grey;
+    }
+
+</style>
+<script>
+var testTypes =  [];
+testTypes.push({
+    name: 'Result example',
+    val: `\\x05
+\\x021H|\\\\^&|||CA-600^ 00-27||||||||1\\r\\x0325\\r\\n
+\\x022P|1\\r\\x033F\\r\\n
+\\x023O|1||000001^01^ 498195^B^||R||||||N\\r\\x0357\\r\\n
+\\x024R|1|^^^041^PT       ^100^5| 21.0|sec ||N||||||20231007090900\\r\\x03F5\\r\\n
+\\x025R|2|^^^042^AP ^100^5| 37.1|% ||N||||||20231007090900\\r\\x0317\\r\\n
+\\x026C|1|I|CAL^042^20230208^1^01537|I\\r\\x03DC\\r\\n
+\\x027R|3|^^^044^PT INR   ^100^5| 1.92|INR ||N||||||20231007090900\\r\\x033D\\r\\n
+\\x020C|1|I|CAL^044^20230208^1^01537|I\\r\\x03D8\\r\\n
+\\x021C|2|I|LOT^040^568122|I\\r\\x03AF\\r\\n
+\\x022C|3|I|QC^040^202310061027^^507926\\\\QC^040^202310061026^^556741\\\\QC^040^^^556540|I\\r\\x0333\\r\\n
+\\x023R|4|^^^061^FBG     ^100^5|***.*|sec  ||A||||||20231007090900\\r\\x03EC\\r\\n
+\\x024R|5|^^^062^Fbg C.  ^100^5|-----|mg/dL||A||||||20231007090900\\r\\x03A3\\r\\n
+\\x025C|1|I|CAL^062^20230915^1^5631098|I\\r\\x0352\\r\\n
+\\x026C|2|I|LOT^060^565188,569938|I\\r\\x0333\\r\\n
+\\x027C|3|I|QC^060^202310061027^^507926\\\\QC^060^202310061026^^556741|I\\r\\x0307\\r\\n
+\\x020L|1|N\\r\\x0303\\r\\n\\x04`
+    
+
+});
+
+testTypes.push({
+    name: 'Result example with starnge result on AP',
+    val:`\\x05\\x021H|\\\\^&|||CA-600^ 00-27||||||||1\\r\\x0325\\r\\n\\x022P|1\\r\\x033F\\r\\n
+\\x023O|1||000001^01^         498195^B^||R||||||N\\r\\x034D\\r\\n
+\\x024R|1|^^^041^PT      ^100^5| 21.0|sec  ||N||||||20231007090900\\r\\x03F5\\r\\n
+\\x025R|2|^^^042^AP      ^100^5| 37.17\\r\\n   ||N||||||20231007090900\\r\\x0317\\r\\n
+\\x026C|1|I|CAL^042^20230208^1^01537|I\\r\\x03DC\\r\\n
+\\x027R|3|^^^044^PT INR  ^100^5| 1.92|INR  ||N||||||20231007090900\\r\\x033D\\r\\n
+\\x020C|1|I|CAL^044^20230208^1^01537|I\\r\\x03D8\\r\\n
+\\x021C|2|I|LOT^040^568122|I\\r\\x03AF\\r\\n
+\\x022C|3|I|QC^040^202310061027^^507926\\\\QC^040^202310061026^^556741\\\\QC^040^^^556540|I\\r\\x0333\\r\\n
+\\x023R|4|^^^061^FBG     ^100^5|***.*|sec  ||A||||||20231007090900\\r\\x03EC\\r\\n
+\\x024R|5|^^^062^Fbg C.  ^100^5|-----|mg/dL||A||||||20231007090900\\r\\x03A3\\r\\n
+\\x025C|1|I|CAL^062^20230915^1^5631098|I\\r\\x0352\\r\\n
+\\x026C|2|I|LOT^060^565188,569938|I\\r\\x0333\\r\\n
+\\x027C|3|I|QC^060^202310061027^^507926\\\\QC^060^202310061026^^556741|I\\r\\x0307\\r\\n
+\\x020L|1|N\\r\\x0303\\r\\n\\x04`
+})
+
+testTypes.push({
+    name: 'Query example',
+    val: `\\x05
+\\x021H|\\\\^&|||CA-600^ 00-27||||||||1
+\\r\\x0325\\r\\n
+\\x022Q|1|000001^01^         498195^
+B||^^^040^PT      \\\\^^^050^APTT
+  \\\\^^^060^FBG     \\\\^^^500^FBG+
+  \\\\^^^520^FBG-    |O|20230929172
+700\\r\\x0336\\r\\n
+\\x023L|1|N\\r\\x0306\\r\\n
+\\x04`,
+});
+
+$( document ).ready(function() {
+    $.each(testTypes, function (idx, obj) {
+       $('#predefined_test_types').append($('<option>', {
+            value: idx+1,
+            text : obj.name
+        }));
+    });
+
+    $('#predefined_test_types').change(function() {
+        var val = parseInt($('#predefined_test_types').val())
+        if ((!$.isNumeric(val)) || (val <= 0)) return;
+
+        $("#sim_an_host").html(testTypes[val-1].val);
+    })
+});
+</script>
+<!--
+\x05
+\x021H|\\^&|||CA-600^ 00-28||||||||1
+\r\x0326\r\n
+\x022P|1\r\x033F\r\n
+\x023O|1||000003^02^         498195
+^M^||R||||||N\r\x0365\r\n
+\x024R|1|^^^041^PT      ^100^5| 37.
+7|sec  ||N||||||20230329105000\r\x03
+FD\r\n
+\x025R|2|^^^042^AP      ^100^5| 19.
+6|%    ||N||||||20230329105000\r\x03
+16\r\n
+\x026R|3|^^^044^PT INR  ^100^5| 3.4
+6|-    ||N||||||20230329105000\r\x03
+BB\r\n
+\x027R|4|^^^051^APTT    ^100^5| 64.
+2|sec  ||N||||||20230329105000\r\x03
+54\r\n
+\x020R|5|^^^061^FBG     ^100^5| 14.
+3|sec  ||N||||||20230329105000\r\x03
+01\r\n
+\x021R|6|^^^062^Fbg C.  ^100^5|  16
+4|mg/dL||N||||||20230329105000\r\x03
+A2\r\n
+\x022L|1|N\r\x0305\r\n
+\x04
+-->

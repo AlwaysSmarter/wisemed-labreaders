@@ -54,6 +54,7 @@ require (
 	golang.org/x/crypto v0.26.0 // indirect
 	golang.org/x/exp v0.0.0-20231006140011-7918f672742d // indirect
 	golang.org/x/sys v0.23.0 // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
 	wisemed-labreaders/comm v0.0.0-00010101000000-000000000000 // indirect
 	wisemed-labreaders/comm/serial v0.0.0-00010101000000-000000000000 // indirect
 	wisemed-labreaders/comm/tcpip v0.0.0-00010101000000-000000000000 // indirect

@@ -1,0 +1,144 @@
+<div class="title">
+    <h1>WiseMED - LabReader Initialization</h1>
+    <img src="/web/imgs/WiseMED.png" width="300">
+</div>
+<form id="login-form" action="/login" method="POST" class="title">
+    <input type="hidden" name="Login" value="Login">
+    <div id="error-text" class="hide">
+        <span class="err-title">Attention</span>
+        <span class="error-text">{{APP_ERROR_TXT}}</span>
+    </div>
+    <div>
+        <div>Login name</div>
+        <div>
+            <input type="text" name="APP_login" value="{{APP_login}}">
+        </div>
+    </div>
+    <div>
+        <div>Password</div>
+        <div>
+            <input type="password" name="APP_pass" value="{{APP_pass}}">
+        </div>
+    </div>
+    <div>
+        <div><input type="checkbox" id="show-wmapi"> Show WiseMED API configuration data</div>
+    </div>
+    <div>
+        <br>
+        <input type="button" name="Login" value="Login">
+    </div>
+</form>
+<form id="wmcfg-form" action="/login" method="POST" class="title">
+    <input type="hidden" name="SaveCfg" value="SaveCfg">
+    <div class="config hide">
+        <h3>WiseMED API configuration</h3>
+    <div class="config hide">
+        <div class="label">WiseMED API IP</div>
+        <div>
+            <input type="text" name="cfg_wisemed_ip" value="{{cfg_wisemed_ip}}">
+
+        </div>
+    </div>
+    <div class="config hide">
+        <div class="label">WiseMED API Port</div>
+        <div>
+            <input type="text" name="cfg_wisemed_port" value="{{cfg_wisemed_port}}">
+        </div>
+    </div>
+    <div class="config hide">
+        <div class="label">WiseMED API Protocol</div>
+        <div>
+            <input type="text" name="cfg_wisemed_protocol" value="{{cfg_wisemed_protocol}}">
+        </div>
+    </div>
+    <div class="config hide">
+        <div class="label">WiseMED API Path</div>
+        <div>
+            <input type="text" name="cfg_wisemed_path" value="{{cfg_wisemed_path}}">
+        </div>
+    </div>
+    <div class="config hide">
+        <div class="label">WiseMED API Key</div>
+        <div>
+            <input type="text" name="cfg_wisemed_key" value="{{cfg_wisemed_key}}">
+        </div>
+    </div>
+    <div class="config hide">
+        <div class="label">Admin pass</div>
+        <div>
+            <input type="password" name="cfg_wisemed_pass">
+        </div>
+    </div>
+    <div class="config hide">
+        <br>
+        <input type="button" name="SaveCfgBtn" value="Save WiseMED API data">
+    </div>
+    </div>
+</form>
+<script>
+    $( document ).ready(function() {
+        $('input[value=""]').parents('.config').removeClass('hide');
+        $('#show-wmapi').click(function () {
+            if ($('#show-wmapi').is(':checked')) {
+                $('.config').removeClass('hide');
+            }
+            else {
+                $('.config').addClass('hide');
+            }
+        });
+
+        $('input[name="Login"]').click(function(){
+            tryToLogin();
+        });
+        $('input[name="SaveCfgBtn"]').click(function(){
+            saveWMConfig();
+        });
+        $('input').keydown(function( event ) {
+            if ( event.which == 13 ) {
+                event.preventDefault();
+
+                if ($("[name='APP_login']").val() == "") {
+                    $("[name='APP_login']").focus();
+                }
+                else
+                if ($("[name='APP_pass']").val() == "") {
+                    $("[name='APP_pass']").focus();
+                }
+                else {
+                    tryToLogin();
+                }
+            }
+        });
+    });
+    function tryToLogin() {
+        var haveErr = false;
+
+        $('#login-form input').each(function() {
+            if ($(this).val() != "") return;
+
+            $(this).parents('.config').find('.label').addClass('error');
+            haveErr = true;
+        })
+        if (haveErr) {
+            setApplicationError('Please provide your username and password');
+            return;
+        }
+        $('#login-form').submit();
+    }
+
+    function saveWMConfig() {
+        var haveErr = false;
+
+        $('#wmcfg-form input').each(function() {
+            if ($(this).val() != "") return;
+
+            $(this).parents('.config').find('.label').addClass('error');
+            haveErr = true;
+        })
+        if (haveErr) {
+            setApplicationError('First fill in all configuration data including the admin pass');
+            return;
+        }
+        $('#wmcfg-form').submit();
+    }
+</script>
