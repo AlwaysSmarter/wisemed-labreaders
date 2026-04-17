@@ -1,0 +1,331 @@
+{
+  "info": {
+    "_postman_id": "7fd1675c-e77c-4bdf-a7db-e3d03cad527a",
+    "name": "Generic Test Reader Local",
+    "description": "Colection de test pentru local HTTP UI / API din generic-test-reader.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Session",
+      "item": [
+        {
+          "name": "GET Session Status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/session",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "session"
+              ]
+            }
+          }
+        },
+        {
+          "name": "POST Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('login ok', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{username}}\",\n  \"password\": \"{{password}}\",\n  \"medical_unit_id\": {{medical_unit_id}}\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/session/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "session",
+                "login"
+              ]
+            }
+          }
+        },
+        {
+          "name": "POST Logout",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/session/logout",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "session",
+                "logout"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reader",
+      "item": [
+        {
+          "name": "GET Status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/status",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "status"
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET Dashboard",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/dashboard",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "dashboard"
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET Logs",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/logs?limit={{logs_limit}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "logs"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "{{logs_limit}}"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Orders",
+      "item": [
+        {
+          "name": "GET Orders By Date And Round",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/orders?order_date={{order_date}}&round_no={{round_no}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "orders"
+              ],
+              "query": [
+                {
+                  "key": "order_date",
+                  "value": "{{order_date}}"
+                },
+                {
+                  "key": "round_no",
+                  "value": "{{round_no}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET Orders By Date",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/orders?order_date={{order_date}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "orders"
+              ],
+              "query": [
+                {
+                  "key": "order_date",
+                  "value": "{{order_date}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "POST New Round",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('new round created', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "try {",
+                  "  var json = pm.response.json();",
+                  "  if (json && json.round_no) {",
+                  "    pm.environment.set('round_no', String(json.round_no));",
+                  "  }",
+                  "} catch (e) {}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"order_date\": \"{{order_date}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/orders/rounds",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "orders",
+                "rounds"
+              ]
+            }
+          }
+        },
+        {
+          "name": "POST Export Orders",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"order_ids\": [],\n  \"order_date\": \"{{order_date}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/orders/export",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "orders",
+                "export"
+              ]
+            }
+          }
+        },
+        {
+          "name": "POST Import Orders File",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "{{import_file_path}}"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/api/orders/import",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "orders",
+                "import"
+              ]
+            },
+            "description": "Seteaza `import_file_path` catre fisierul CSV pe care vrei sa-l incarci."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Analytes",
+      "item": [
+        {
+          "name": "GET Analytes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/analytes",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "analytes"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

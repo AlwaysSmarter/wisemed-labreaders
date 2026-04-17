@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Test B</title>
+  <style>
+    body { font-family: sans-serif; margin: 20px; max-width: 1100px; }
+    .row { display: flex; gap: 12px; margin-bottom: 10px; }
+    .row > div { flex: 1; }
+    input, button, textarea, select { width: 100%; padding: 8px; box-sizing: border-box; }
+    textarea { font-family: monospace; min-height: 130px; }
+    #log { min-height: 320px; }
+  </style>
+</head>
+<body>
+  <h2>WSM Browser Test B v2</h2>
+  <div class="row">
+    <div><label>WS URL</label><input id="wsUrl" /></div>
+    <div><label>Client Type</label><input id="clientType" /></div>
+    <div><label>Client ID</label><input id="clientId" /></div>
+    <div><label>Label</label><input id="label" /></div>
+  </div>
+  <div class="row">
+    <div><label>Reader ID</label><input id="readerId" /></div>
+    <div><label>My Connection ID</label><input id="myConnectionId" readonly /></div>
+    <div><label>Status</label><input id="status" readonly /></div>
+  </div>
+  <div class="row">
+    <div><button id="connect">Connect</button></div>
+    <div><button id="disconnect">Disconnect</button></div>
+  </div>
+  <div class="row">
+    <div><label>Message</label><textarea id="message">Salut din Test B</textarea></div>
+    <div><label>Target Connection ID</label><textarea id="targetConnectionId"></textarea></div>
+  </div>
+  <div class="row">
+    <div><button id="sendPing">Ping</button></div>
+    <div><button id="sendToAll">Send To All</button></div>
+    <div><button id="sendToOne">Send To One</button></div>
+    <div><button id="sendToReaders">Send To Readers</button></div>
+  </div>
+  <div class="row">
+    <div><button id="refreshConnections">Refresh Connections</button></div>
+  </div>
+  <div class="row">
+    <div><label>Connections Snapshot</label><textarea id="connections" readonly></textarea></div>
+  </div>
+  <div class="row">
+    <div><label>Log</label><textarea id="log" readonly></textarea></div>
+  </div>
+  <script src="/test/app.js?v=2"></script>
+  <script>mountTestPage();</script>
+</body>
+</html>

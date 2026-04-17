@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="ro">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>WiseMED Reader Console</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div id="app" class="shell">
+    <section id="login-view" class="login-view">
+      <div class="login-card">
+        <div class="langbar">
+          <label class="langbox">
+            <span id="login-language-label">Language</span>
+            <select id="language-select-login">
+              <option value="ro">Romana</option>
+              <option value="en">English</option>
+            </select>
+          </label>
+        </div>
+        <img class="brand-logo" src="https://www.wisemed.eu/wp-content/uploads/2024/09/WiseMED-thinkIT-logo-2.png" alt="WiseMED">
+          <p id="login-eyebrow" class="eyebrow">LOCAL ADMIN</p>
+        <h1 id="login-title">WiseMED Reader Console</h1>
+        <p id="login-subtitle" class="muted">Login cu utilizator WiseMED pentru administrarea locală a readerului.</p>
+        <form id="login-form" class="stack">
+          <label>
+            <span id="label-username">Username</span>
+            <input id="username" name="username" type="text" autocomplete="username" required>
+          </label>
+          <label>
+            <span id="label-password">Password</span>
+            <input id="password" name="password" type="password" autocomplete="current-password" required>
+          </label>
+          <button id="login-submit" type="submit" class="primary">Login</button>
+          <p id="login-error" class="error-text" hidden></p>
+        </form>
+      </div>
+    </section>
+    <section id="dashboard-view" class="dashboard" hidden>
+      <aside class="sidebar">
+        <div>
+          <img class="brand-logo brand-logo-small" src="https://www.wisemed.eu/wp-content/uploads/2024/09/WiseMED-thinkIT-logo-2.png" alt="WiseMED">
+          <p id="reader-eyebrow" class="eyebrow">READER</p>
+          <h2 id="reader-title">Reader</h2>
+          <p id="reader-subtitle" class="muted small"></p>
+        </div>
+        <section id="reader-identity-card" class="reader-card">
+          <p id="reader-identity-label" class="reader-card-label">Categorie</p>
+          <div id="reader-identity-badge" class="reader-identity-badge">
+            <span id="reader-identity-icon" class="reader-identity-icon">R</span>
+            <div class="reader-identity-copy">
+              <strong id="reader-identity-title">Reader</strong>
+              <span id="reader-identity-subtitle">Generic</span>
+            </div>
+          </div>
+        </section>
+        <nav class="nav">
+          <button class="nav-link active" data-view="overview" data-i18n="nav_overview">Overview</button>
+          <button class="nav-link" data-view="analytes" data-i18n="nav_analytes">Analytes</button>
+          <button class="nav-link" data-view="orders" data-i18n="nav_orders">Orders</button>
+          <button class="nav-link" data-view="help" data-i18n="nav_help">Help</button>
+        </nav>
+        <section id="reader-summary-card" class="reader-card reader-summary-card">
+          <p id="reader-summary-title" class="reader-card-label">Rezumat reader</p>
+          <div id="reader-summary-list" class="reader-summary-list"></div>
+        </section>
+        <div class="session-box">
+          <p id="session-label" class="small muted">Autentificat ca</p>
+          <strong id="session-user">-</strong>
+        </div>
+        <label class="langbox sidebar-langbox">
+          <span id="dashboard-language-label">Language</span>
+          <select id="language-select-dashboard">
+            <option value="ro">Romana</option>
+            <option value="en">English</option>
+          </select>
+        </label>
+        <button id="logout-btn" class="logout-button" data-i18n="logout">Logout</button>
+      </aside>
+      <main class="content">
+        <section class="topbar">
+          <div class="topbar-main">
+            <div class="topbar-title">
+              <p id="topbar-eyebrow" class="eyebrow">LOCAL HTTP</p>
+              <h1 id="dashboard-title">Control Panel</h1>
+            </div>
+            <div class="status-cluster">
+              <div id="wisemedws-pill" class="status-pill">
+                <span id="ws-dot" class="dot"></span>
+                <span id="wisemedws-status-label">WiseMEDWS</span>
+              </div>
+              <div id="analyzer-pill" class="status-pill">
+                <span id="analyzer-dot" class="dot"></span>
+                <span id="analyzer-status-label">Analyzer</span>
+              </div>
+            </div>
+          </div>
+          <div id="app-toast" class="app-toast" hidden>
+            <div id="app-toast-body" class="app-toast-body"></div>
+            <button id="app-toast-close" class="app-toast-close" type="button" aria-label="Close">×</button>
+          </div>
+        </section>
+        <section id="view-overview" class="panel-grid">
+          <article class="panel hero">
+            <h3 id="status-title">Status</h3>
+            <div id="status-cards" class="metrics"></div>
+          </article>
+          <article class="panel">
+            <div class="panel-head">
+              <h3 id="today-chart-title">Astazi rezultate</h3>
+            </div>
+            <div class="chart-wrap">
+              <div id="today-donut" class="donut-chart"></div>
+              <div id="today-legend" class="chart-legend"></div>
+            </div>
+          </article>
+          <article class="panel full-span">
+            <div class="panel-head">
+              <h3 id="trend-chart-title">Evolutie pe zile</h3>
+            </div>
+            <svg id="line-chart" class="line-chart" viewBox="0 0 640 260" preserveAspectRatio="none"></svg>
+            <div id="line-legend" class="chart-legend"></div>
+          </article>
+          <article id="logs-panel" class="panel logs-panel full-span">
+            <div class="panel-head">
+              <h3 id="logs-title">Recent Logs</h3>
+              <div class="inline-actions">
+                <label class="poll-box">
+                  <span id="log-polling-label">Polling (s)</span>
+                  <input id="log-poll-seconds" type="number" min="0.1" step="0.1" value="1">
+                </label>
+                <button id="refresh-logs" class="ghost" data-i18n="refresh">Refresh</button>
+              </div>
+            </div>
+            <div id="logs-list" class="logs-list"></div>
+          </article>
+        </section>
+        <section id="view-analytes" class="panel-grid" hidden>
+          <article class="panel full-span">
+            <h3 id="analytes-title">Analytes</h3>
+            <div class="orders-toolbar">
+              <div class="orders-filters">
+                <label class="poll-box analyte-search-box">
+                  <span>Search</span>
+                  <input id="analyte-search" type="search" placeholder="Caută după tag, code, nume">
+                </label>
+              </div>
+              <div class="orders-buttons">
+                <button id="new-analyte" class="ghost" data-i18n="new">Nou</button>
+                <button id="refresh-analytes" class="ghost" data-i18n="refresh">Refresh</button>
+              </div>
+            </div>
+            <div id="analyte-list" class="analyte-list"></div>
+          </article>
+        </section>
+        <section id="view-orders" class="orders-workspace" hidden>
+          <article class="panel orders-stage">
+            <h3 id="orders-title">Orders</h3>
+            <div class="orders-toolbar">
+              <div class="orders-filters">
+                <label class="poll-box poll-box-date">
+                  <span id="order-date-label">Data</span>
+                  <input id="order-date" type="date">
+                </label>
+                <label class="poll-box poll-box-round">
+                  <span id="round-label">Runda</span>
+                  <select id="round-select"></select>
+                </label>
+                <label id="orders-select-all-box" class="toggle">
+                  <input id="orders-select-all" type="checkbox">
+                  <span id="orders-select-all-label">Selecteaza tot</span>
+                </label>
+              </div>
+              <div class="orders-buttons">
+                <button id="import-orders" class="ghost">Import fisier</button>
+                <button id="export-orders" class="ghost">Export</button>
+                <button id="worklist-orders" class="ghost">Get worklist</button>
+                <button id="new-round" class="ghost">Runda noua</button>
+                <button id="refresh-orders" class="ghost" data-i18n="refresh">Refresh</button>
+              </div>
+            </div>
+            <input id="orders-import-file" type="file" accept=".csv,text/csv" hidden>
+            <div id="orders-layout" class="orders-layout"></div>
+          </article>
+          <article class="panel order-inspector">
+            <div class="panel-head">
+              <h3 id="order-details-title">Order details</h3>
+            </div>
+            <div id="order-details" class="order-details"></div>
+          </article>
+        </section>
+        <section id="view-help" class="panel-grid" hidden>
+          <article class="panel help-panel">
+            <div class="panel-head">
+              <h3 id="help-title">How To</h3>
+              <a id="help-open" class="ghost link-button" href="/help/" target="_blank" rel="noreferrer">Deschide separat</a>
+            </div>
+            <iframe class="help-frame" src="/help/"></iframe>
+          </article>
+        </section>
+      </main>
+    </section>
+  </div>
+  <div id="analyte-modal" class="modal-shell" hidden>
+    <div id="analyte-modal-backdrop" class="modal-backdrop"></div>
+    <section class="modal-card form-panel" role="dialog" aria-modal="true" aria-labelledby="editor-title">
+      <div class="modal-window-bar">
+        <div class="modal-window-dots" aria-hidden="true">
+          <span></span>
+          <span></span>
+          <span></span>
+        </div>
+      </div>
+      <div class="panel-head modal-head">
+        <h3 id="editor-title">Editor analyte</h3>
+        <button id="close-analyte-modal" class="ghost modal-close-btn" type="button" aria-label="Close">Close</button>
+      </div>
+      <div class="modal-body">
+        <form id="analyte-form" class="stack">
+          <label><span data-i18n="field_tag">Tag</span><input name="tag" required></label>
+          <label><span data-i18n="field_code">Code</span><input name="code"></label>
+          <label><span data-i18n="field_name">Name</span><input name="name" required></label>
+          <label><span data-i18n="field_description">Description</span><textarea name="description" rows="3"></textarea></label>
+          <div class="two-col">
+            <label>
+              <span data-i18n="field_result_type">Result Type</span>
+              <select name="result_type">
+                <option value="text">text</option>
+                <option value="numeric">numeric</option>
+              </select>
+            </label>
+            <label>
+              <span data-i18n="field_formatting">Formatting</span>
+              <select name="result_formatting">
+                <option value="raw">raw</option>
+                <option value="text">text</option>
+                <option value="numeric">numeric</option>
+                <option value="decimal_1">decimal_1</option>
+                <option value="decimal_2">decimal_2</option>
+                <option value="decimal_3">decimal_3</option>
+              </select>
+            </label>
+          </div>
+          <div class="two-col">
+            <label><span data-i18n="field_weighting">Weighting</span><input name="result_weighting" type="number" step="0.01" value="1"></label>
+            <label><span data-i18n="field_measure_unit">Measure Unit</span><input name="result_measure_unit"></label>
+          </div>
+          <label><span data-i18n="field_reagents_set">Reagents Set</span><input name="result_reagents_set"></label>
+          <label class="toggle"><input name="active" type="checkbox" checked><span data-i18n="field_active">Active</span></label>
+          <div class="actions">
+            <button id="save-analyte" type="submit" class="primary">Save</button>
+            <button type="button" id="delete-analyte" class="danger" hidden data-i18n="delete">Delete</button>
+          </div>
+          <p id="analyte-message" class="small muted"></p>
+        </form>
+      </div>
+    </section>
+  </div>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

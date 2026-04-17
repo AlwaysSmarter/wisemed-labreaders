@@ -1,0 +1,27 @@
+server:
+  address: "0.0.0.0"
+  port: 8090
+
+security:
+  # Optional direct secret for local/dev
+  admin_jwt_secret: ""
+  admin_jwt_secret_ref: "WISEMEDWS_ADMIN_JWT_SECRET"
+
+readers:
+  api_keys:
+    reader-maglumi-001: "reader-key-demo-001"
+    reader-cobas-pro-001: "reader-key-demo-002"
+  profiles:
+    reader-maglumi-001:
+      reader_id: "reader-maglumi-001"
+      medical_unit_id: "MU-DEMO-01"
+      department_id: "LAB"
+      device_label: "Maglumi Main Lab"
+      allowed_tags: ["TSH", "FT4", "CEA"]
+
+control:
+  default_timeout_ms: 10000
+
+worklist:
+  sample_tag_overrides:
+    SAMPLE-001: ["TSH", "FT4"]

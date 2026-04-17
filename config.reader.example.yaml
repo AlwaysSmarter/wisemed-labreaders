@@ -1,0 +1,16 @@
+reader:
+  id: "reader-cobas-pro-001"
+  analyzer_type: "biochemistry"
+
+wisemed:
+  api_base_url: "https://api.wisemed.eu"
+  ws_url: "wss://ws.wisemed.eu/reader"
+  auth_url: "https://api.wisemed.eu/auth/token"
+
+auth:
+  client_id: "reader-cobas-pro-001"
+  secret_ref: "WMR_READER_CLIENT_SECRET"
+
+control:
+  reconnect_seconds: 5
+  heartbeat_seconds: 20

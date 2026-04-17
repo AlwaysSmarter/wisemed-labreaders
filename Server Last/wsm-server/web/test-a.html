@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Test A</title>
+  <style>
+    body { font-family: sans-serif; margin: 20px; max-width: 1100px; }
+    .row { display: flex; gap: 12px; margin-bottom: 10px; }
+    .row > div { flex: 1; }
+    input, button, textarea, select { width: 100%; padding: 8px; box-sizing: border-box; }
+    textarea { font-family: monospace; min-height: 130px; }
+    #log { min-height: 320px; }
+    .panel { border: 1px solid #ccc; padding: 12px; margin-bottom: 14px; border-radius: 8px; }
+    .panel h3 { margin-top: 0; }
+  </style>
+</head>
+<body>
+  <h2>WSM Browser Test A v2</h2>
+  <div class="row">
+    <div><label>WS URL</label><input id="wsUrl" /></div>
+    <div><label>Client Type</label><input id="clientType" /></div>
+    <div><label>Client ID</label><input id="clientId" /></div>
+    <div><label>Label</label><input id="label" /></div>
+  </div>
+  <div class="row">
+    <div><label>Reader ID</label><input id="readerId" /></div>
+    <div><label>My Connection ID</label><input id="myConnectionId" readonly /></div>
+    <div><label>Status</label><input id="status" readonly /></div>
+  </div>
+  <div class="row">
+    <div><button id="connect">Connect</button></div>
+    <div><button id="disconnect">Disconnect</button></div>
+  </div>
+  <div class="row">
+    <div><label>Message</label><textarea id="message">Salut din Test A</textarea></div>
+    <div><label>Target Connection ID</label><textarea id="targetConnectionId"></textarea></div>
+  </div>
+  <div class="row">
+    <div><button id="sendPing">Ping</button></div>
+    <div><button id="sendToAll">Send To All</button></div>
+    <div><button id="sendToOne">Send To One</button></div>
+    <div><button id="sendToReaders">Send To Readers</button></div>
+  </div>
+  <div class="row">
+    <div><button id="refreshConnections">Refresh Connections</button></div>
+  </div>
+  <div class="panel">
+    <h3>Reader API Test</h3>
+    <div class="row">
+      <div>
+        <label>Target Reader ID</label>
+        <input id="apiTargetReaderId" value="reader-file-001" />
+      </div>
+      <div>
+        <label>Reader Command</label>
+        <select id="readerCommand"></select>
+      </div>
+      <div>
+        <label>&nbsp;</label>
+        <button id="loadReaderSample">Load Sample Payload</button>
+      </div>
+      <div>
+        <label>&nbsp;</label>
+        <button id="sendReaderCommand">Send Reader Command</button>
+      </div>
+    </div>
+    <div class="row">
+      <div>
+        <label>Command Args JSON</label>
+        <textarea id="readerCommandArgs"></textarea>
+      </div>
+      <div>
+        <label>Last Reader Response</label>
+        <textarea id="readerApiResponse" readonly></textarea>
+      </div>
+    </div>
+    <div class="row">
+      <div><button class="reader-sample-btn" data-command="reader.status">reader.status</button></div>
+      <div><button class="reader-sample-btn" data-command="stats.get">stats.get</button></div>
+      <div><button class="reader-sample-btn" data-command="stats.series">stats.series</button></div>
+      <div><button class="reader-sample-btn" data-command="config.get">config.get</button></div>
+    </div>
+    <div class="row">
+      <div><button class="reader-sample-btn" data-command="config.set">config.set</button></div>
+      <div></div>
+      <div></div>
+      <div></div>
+    </div>
+    <div class="row">
+      <div><button class="reader-sample-btn" data-command="logs.tail">logs.tail</button></div>
+      <div><button class="reader-sample-btn" data-command="logs.activate">logs.activate</button></div>
+      <div><button class="reader-sample-btn" data-command="logs.deactivate">logs.deactivate</button></div>
+      <div><button class="reader-sample-btn" data-command="results.activate">results.activate</button></div>
+    </div>
+    <div class="row">
+      <div><button class="reader-sample-btn" data-command="results.deactivate">results.deactivate</button></div>
+      <div></div>
+      <div></div>
+      <div></div>
+    </div>
+    <div class="row">
+      <div><button class="reader-sample-btn" data-command="analytes.list">analytes.list</button></div>
+      <div><button class="reader-sample-btn" data-command="analytes.get">analytes.get</button></div>
+      <div><button class="reader-sample-btn" data-command="analytes.create">analytes.create</button></div>
+      <div><button class="reader-sample-btn" data-command="analytes.update">analytes.update</button></div>
+    </div>
+    <div class="row">
+      <div><button class="reader-sample-btn" data-command="analytes.delete">analytes.delete</button></div>
+      <div><button class="reader-sample-btn" data-command="orders.list">orders.list</button></div>
+      <div><button class="reader-sample-btn" data-command="orders.rounds">orders.rounds</button></div>
+      <div><button class="reader-sample-btn" data-command="orders.get">orders.get</button></div>
+    </div>
+    <div class="row">
+      <div><button class="reader-sample-btn" data-command="orders.create">orders.create</button></div>
+      <div><button class="reader-sample-btn" data-command="orders.update">orders.update</button></div>
+      <div><button class="reader-sample-btn" data-command="orders.delete">orders.delete</button></div>
+      <div><button class="reader-sample-btn" data-command="order_analysis.list">order_analysis.list</button></div>
+      <div><button class="reader-sample-btn" data-command="order_analysis.get">order_analysis.get</button></div>
+    </div>
+    <div class="row">
+      <div><button class="reader-sample-btn" data-command="order_analysis.create">order_analysis.create</button></div>
+      <div><button class="reader-sample-btn" data-command="order_analysis.update">order_analysis.update</button></div>
+      <div><button class="reader-sample-btn" data-command="order_analysis.delete">order_analysis.delete</button></div>
+      <div><button class="reader-sample-btn" data-command="results.list">results.list</button></div>
+    </div>
+    <div class="row">
+      <div><button class="reader-sample-btn" data-command="comm.get">comm.get</button></div>
+      <div><button class="reader-sample-btn" data-command="comm.set">comm.set</button></div>
+      <div><button class="reader-sample-btn" data-command="imports.run_file">imports.run_file</button></div>
+      <div></div>
+    </div>
+  </div>
+  <div class="row">
+    <div><label>Connections Snapshot</label><textarea id="connections" readonly></textarea></div>
+  </div>
+  <div class="row">
+    <div><label>Log</label><textarea id="log" readonly></textarea></div>
+  </div>
+  <script src="/test/app.js?v=3"></script>
+  <script>mountTestPage();</script>
+</body>
+</html>

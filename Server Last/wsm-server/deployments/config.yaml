@@ -1,0 +1,21 @@
+server:
+  address: "0.0.0.0"
+  port: 8090
+  write_timeout_ms: 5000
+  read_timeout_ms: 60000
+  ping_interval_ms: 25000
+  send_queue_size: 128
+  max_message_bytes: 1048576
+
+security:
+  accepted_keys:
+    reader-generic-001: "reader-key-demo-001"
+    reader-file-001: "gnXooDkx5En2fU1KQL7zOJDPWzp86l0z"
+    browser-test-a: "browser-test-key-a"
+    browser-test-b: "browser-test-key-b"
+    wisemed-gui: "2ZUC5Ql5oL479YauF1b7G7vP1uaQhNgq"
+
+wisemed:
+  base_url: "https://example.wisemed.local/api"
+  api_key: ""
+  api_key_ref: "WISEMED_API_KEY"

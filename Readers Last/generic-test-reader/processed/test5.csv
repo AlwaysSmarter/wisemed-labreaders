@@ -1,0 +1,13 @@
+#IR Biotyper Server 4.1.1.121-20250122-1003;;;;;
+#c969a2ef-9195-4766-98af-8a23d2c57ec4;;;;;
+#251015-salmo;;;;;
+isolateIdentifier;;modelKey;bestValue;rating;scorePercent
+233939;233939;Salmonella B-groups v4;O:9 (D1);A;100
+233940;233940;Salmonella O-groups v3;O:4 (B);A;100
+233941;233941;Salmonella O-groups v3;O:9 (D1);A;100
+233941;233941;Salmonella C-groups v5;O:97(E1);A;100
+233945;233945;Salmonella B-groups v4;O:9 (D1);A;100
+233946;233946;Salmonella O-groups v3;O:9 (D1);A;100
+233947;233947;Salmonella O-groups v3;O:4 (B);A;100
+233948;233948;Salmonella O-groups v3;O:4 (B);A;100
+233949;233949;Salmonella B-groups v3;O:1 (F);A;100

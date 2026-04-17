@@ -1,0 +1,35 @@
+# Reader agent configuration
+# This file is auto-generated at first run.
+#
+# Secrets policy:
+# - do NOT put API keys directly in this file
+# - set env var from reader.api_key_ref
+
+reader:
+  # Unique reader id in WiseMED ecosystem
+  id: "reader-maglumi-001"
+  # Analyzer implementation code (must exist in adapter registry)
+  analyzer_code: "maglumi-800"
+  # Display name
+  analyzer_name: "Maglumi 800"
+  # Business type/category
+  analyzer_type: "immunology"
+  # License marker used by provisioning flow
+  license_code: "DEMO-LICENSE"
+  # Environment variable name containing reader API key
+  api_key_ref: "WMR_READER_APIKEY"
+  api_key: "reader-key-demo-001"
+
+webservice:
+  # WiseMEDWS websocket endpoint (same VLAN with WiseMED)
+  ws_url: "ws://127.0.0.1:8090/ws/readers"
+
+storage:
+  # Local SQLite DB path for offline-first operation
+  local_db_path: "./reader.db"
+
+control:
+  # Reconnect interval to WiseMEDWS
+  reconnect_seconds: 5
+  # Heartbeat interval to WiseMEDWS
+  heartbeat_seconds: 20
