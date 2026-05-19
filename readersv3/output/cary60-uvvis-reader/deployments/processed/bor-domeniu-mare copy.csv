@@ -1,0 +1,37 @@
+Centrul Regional de Sanatate Publica Iasi
+Laborator de Igiena Mediului
+Concentration Analysis Report
+ 	 
+Report time	05/17/2026 12:35:04 PM	
+Method	C:\Users\Public\Documents\Agilent\Cary WinUV\Bor\2022_metode\20_07_2022\20_07_2022.MCN	
+Batch name	C:\Users\Public\Documents\Agilent\Cary WinUV\Bor\2025_Probe\9_07_2025_Dmare.BCN	
+Application	Concentration 5.0.0.999	
+Operator	 	
+Instrument Settings
+ 	 
+Instrument	Cary 60	
+Instrument version no.	2.00	
+Wavelength (nm)	410.0	
+Ordinate Mode	Abs	
+Ave Time (sec)	0.1000	
+Replicates	1	
+Standard/Sample averaging	OFF	
+Weight and volume corrections	OFF	
+Fit type	Linear	
+Min R�	0.95000	
+Concentration units	mg/L	
+Zero Report
+Read	Abs (410.0 nm)
+Zero	0.2833
+ 	 
+Analysis
+ 	 
+Collection time	05/17/2026 12:35:04 PM	
+Sample	Concentration mg/L	F	Readings
+PC0.5	0.4833	 	 0.1966
+C_AC_510	0.4616	 	 0.1866
+C_AC_511	0.7922	 	 0.3477
+Results Flags Legend
+ 	 
+U = Uncalibrated	O = Overrange
+N = Not used in calibration	R = Repeat reading

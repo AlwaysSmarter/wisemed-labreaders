@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="ro">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ajutor WiseMED Barcode Printer</title>
+  <style>
+    :root{
+      --bg:#f7faf7;
+      --panel:#ffffff;
+      --ink:#193126;
+      --muted:#5f7569;
+      --line:#d9e5dd;
+      --accent:#0d6b4d;
+      --accent-soft:#e7f5ee;
+      --warn:#8f5a00;
+      --shadow:0 18px 42px rgba(20,48,35,.08);
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font:16px/1.6 Arial,sans-serif;background:linear-gradient(180deg,#fbfdfb 0%,var(--bg) 100%);color:var(--ink)}
+    .wrap{max-width:1100px;margin:0 auto;padding:32px 20px 80px}
+    .hero,.section{background:var(--panel);border:1px solid var(--line);border-radius:28px;padding:28px;box-shadow:var(--shadow);margin-bottom:24px}
+    .eyebrow{margin:0 0 8px;color:var(--accent);font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-size:12px}
+    h1,h2,h3{line-height:1.2;margin:0 0 14px}
+    h1{font-size:34px}
+    h2{font-size:24px;margin-top:28px}
+    h3{font-size:18px;margin-top:22px}
+    p,li{color:var(--ink)}
+    .muted{color:var(--muted)}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px;margin:24px 0}
+    .card{background:var(--panel);border:1px solid var(--line);border-radius:22px;padding:20px;box-shadow:var(--shadow)}
+    .chip{display:inline-block;background:var(--accent-soft);color:var(--accent);border-radius:999px;padding:6px 12px;font-size:13px;font-weight:700;margin:0 8px 8px 0}
+    code{background:#f1f5f2;border:1px solid var(--line);padding:2px 6px;border-radius:8px;color:#224433}
+    pre{background:#102118;color:#dff5e7;padding:16px;border-radius:18px;overflow:auto}
+    pre code{background:none;border:none;padding:0;color:inherit}
+    .ok{border-left:4px solid var(--accent);padding-left:14px}
+    .warn{border-left:4px solid #d17b00;padding-left:14px;color:var(--warn)}
+    ol,ul{padding-left:22px}
+    table{width:100%;border-collapse:collapse;margin-top:12px}
+    th,td{padding:10px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+    th{color:var(--muted);font-size:13px;text-transform:uppercase;letter-spacing:.04em}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="hero">
+      <p class="eyebrow">Ajutor</p>
+      <h1>WiseMED Barcode Printer</h1>
+      <p class="muted">Ghid complet pentru configurarea imprimantei Zebra, API-ul de tiparire, setarile de pozitionare a etichetei, diagnosticul ZPL si troubleshooting pentru spooler.</p>
+      <div>
+        <span class="chip">Zebra ZPL</span>
+        <span class="chip">API local</span>
+        <span class="chip">WS action</span>
+        <span class="chip">Istoric tipariri</span>
+        <span class="chip">Debug payload</span>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>1. Ce face aplicatia</h2>
+      <p>Barcode Printer este utilitarul WiseMED pentru tiparirea de etichete pe imprimante compatibile ZPL. Aplicatia expune un API local simplu, un endpoint legacy compatibil cu integrari mai vechi, o interfata web de administrare si suport pentru comenzi venite prin WiseMED WebSocket.</p>
+      <ul>
+        <li>tiparire etichete din request HTTP sau WS</li>
+        <li>lista imprimantelor disponibile</li>
+        <li>pagina de setari pentru layout si selectie imprimanta</li>
+        <li>test print</li>
+        <li>istoric si statistici de tiparire</li>
+        <li>log al payload-ului ZPL trimis catre imprimanta pentru diagnostic</li>
+      </ul>
+    </section>
+
+    <section class="section">
+      <h2>2. Meniul aplicatiei</h2>
+      <div class="grid">
+        <article class="card">
+          <h3>Dashboard</h3>
+          <p>Afiseaza statistica zilnica de tipariri, numarul total de etichete si numarul de joburi reusite sau esuate.</p>
+        </article>
+        <article class="card">
+          <h3>Setari</h3>
+          <p>Configureaza imprimanta selectata, rezolutia, coordonatele elementelor, autentificarea locala si adresa HTTP pe care ruleaza aplicatia.</p>
+        </article>
+        <article class="card">
+          <h3>Istoric</h3>
+          <p>Afiseaza joburile de tiparire salvate in baza locala, inclusiv IP client, codul tiparit, statusul si eventualele erori.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>3. Endpoint-uri disponibile</h2>
+      <table>
+        <thead>
+          <tr><th>Endpoint</th><th>Rol</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>GET/POST /barcode/print</code></td><td>Endpoint legacy compatibil cu integrari vechi.</td></tr>
+          <tr><td><code>GET /api/barcode/printers</code></td><td>Returneaza lista imprimantelor detectate in contextul curent de rulare al aplicatiei.</td></tr>
+          <tr><td><code>POST /api/barcode/print</code></td><td>Tipareste o eticheta pe baza unui payload JSON.</td></tr>
+          <tr><td><code>POST /api/barcode/test-print</code></td><td>Genereaza si trimite o eticheta de test.</td></tr>
+          <tr><td><code>GET /api/barcode/settings</code></td><td>Citeste setarile curente ale modulului.</td></tr>
+          <tr><td><code>PUT /api/barcode/settings</code></td><td>Salveaza setarile si actualizeaza runtime-ul.</td></tr>
+          <tr><td><code>GET /api/barcode/jobs</code></td><td>Listeaza joburile de tiparire salvate.</td></tr>
+          <tr><td><code>GET /api/barcode/stats/daily</code></td><td>Afiseaza statistici zilnice agregate.</td></tr>
+        </tbody>
+      </table>
+      <p>Prin WebSocket sunt suportate actiunile <code>barcode.print</code>, <code>barcode/print</code>, <code>print_barcode</code>, <code>barcode.printers</code> si <code>barcode/list_printers</code>.</p>
+    </section>
+
+    <section class="section">
+      <h2>4. Exemple de tiparire</h2>
+      <h3>Request JSON</h3>
+      <pre><code>POST /api/barcode/print
+Content-Type: application/json
+
+{
+  "bc": "TEST-93389",
+  "pn": "TEST PRINT",
+  "tc": "T",
+  "no": "1"
+}</code></pre>
+      <h3>Request legacy</h3>
+      <pre><code>GET /barcode/print?bc=TEST-93389&amp;pn=TEST%20PRINT&amp;tc=T&amp;no=1</code></pre>
+      <p class="ok">Campul principal de cod se poate transmite si ca <code>bc</code>, <code>fileid</code> sau <code>code</code>, in functie de integrarea existenta.</p>
+    </section>
+
+    <section class="section">
+      <h2>5. Setari importante</h2>
+      <table>
+        <thead>
+          <tr><th>Setare</th><th>Rol</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>Selected printer</code></td><td>Imprimanta pe care se trimite payload-ul. Daca este gol, se foloseste imprimanta default. Campul accepta selectie din lista sau introducere manuala a unui nume de printer, inclusiv <code>\\server\printer</code>.</td></tr>
+          <tr><td><code>Printer resolution (dpi)</code></td><td>Rezolutia folosita pentru conversia mm in puncte. In mod uzual 200 sau 300 dpi.</td></tr>
+          <tr><td><code>Barcode type</code></td><td>Comanda ZPL folosita pentru codul de bare, de exemplu <code>B3</code> sau alta comanda compatibila.</td></tr>
+          <tr><td><code>Label width / height</code></td><td>Dimensiuni de baza pentru eticheta.</td></tr>
+          <tr><td><code>Barcode X / Y</code></td><td>Pozitia codului de bare.</td></tr>
+          <tr><td><code>Barcode text X / Y</code></td><td>Pozitia textului de sub sau de langa cod.</td></tr>
+          <tr><td><code>Patient name X / Y</code></td><td>Pozitia numelui pacientului.</td></tr>
+          <tr><td><code>Tube code X / Y</code></td><td>Pozitia casetei si a literei pentru tipul tubului.</td></tr>
+          <tr><td><code>HTTP local address</code></td><td>Adresa pe care ruleaza UI-ul si API-ul local. Se aplica live fara restart manual.</td></tr>
+          <tr><td><code>HTTP local language</code></td><td>Limba interfetei locale.</td></tr>
+          <tr><td><code>Log DB path</code></td><td>Baza de date locala in care se salveaza istoricul tiparirilor.</td></tr>
+        </tbody>
+      </table>
+      <h3>Cum configurezi imprimanta din Settings</h3>
+      <ol>
+        <li>Deschide pagina <strong>Setari</strong> si identifica campul <code>Selected printer</code>.</li>
+        <li>Daca imprimanta apare in sugestii, selecteaz-o direct.</li>
+        <li>Daca imprimanta shared nu apare, introdu manual numele exact al printer-ului sau calea UNC:
+          <pre><code>\\server\printer</code></pre>
+        </li>
+        <li>Salveaza setarile din butonul <strong>Salveaza</strong>.</li>
+        <li>Ruleaza imediat <strong>Test print</strong> pentru confirmare.</li>
+      </ol>
+      <p class="ok">Campul de printer poate fi folosit acum atat ca lista de sugestii, cat si ca input manual pentru imprimante shared care nu sunt enumerate automat.</p>
+      <h3>Cum interpretezi rezultatul</h3>
+      <ul>
+        <li>daca <strong>Test print</strong> merge, inseamna ca numele introdus este corect si contul curent are acces la imprimanta</li>
+        <li>daca numele se salveaza dar testul esueaza, problema nu este in UI, ci in accesul sistemului sau al contului de serviciu la acel printer</li>
+        <li>daca aplicatia ruleaza ca Windows Service, verifica imprimantele disponibile pentru contul serviciului, nu doar pentru utilizatorul conectat interactiv</li>
+      </ul>
+    </section>
+
+    <section class="section">
+      <h2>6. Adresa HTTP locala</h2>
+      <p>Aplicatia foloseste modulul comun <code>local-http</code>. Daca modifici <code>HTTP local address</code> din pagina de setari, listener-ul local este rebind-uit automat pe noua adresa dupa salvare.</p>
+      <ul>
+        <li>nu este necesar restart manual al aplicatiei</li>
+        <li>dupa salvare trebuie doar sa te reconectezi la noul URL</li>
+        <li>setarea este persistata atat in <code>local_http</code>, cat si in <code>modules.local-http</code></li>
+      </ul>
+      <pre><code>Exemplu:
+127.0.0.1:8010
+0.0.0.0:8010
+192.168.1.50:8010</code></pre>
+    </section>
+
+    <section class="section">
+      <h2>7. Cum este generat ZPL-ul</h2>
+      <p>Payload-ul ZPL este compus din blocuri standard:</p>
+      <ul>
+        <li><code>^XA</code> inceput eticheta</li>
+        <li><code>^PW...</code> latime tiparire</li>
+        <li><code>^FO...</code> pozitionare campuri</li>
+        <li><code>^BY...</code> parametri cod de bare</li>
+        <li><code>^FD...</code> date efective</li>
+        <li><code>^FS</code> sfarsit camp</li>
+        <li><code>^XZ</code> sfarsit eticheta</li>
+      </ul>
+      <p class="warn">Pentru ZPL valid, comenzile de pozitionare trebuie sa fie <code>^FO</code>, nu <code>^F0</code> sau alte variante corupte. Daca payload-ul este gresit, imprimanta poate ignora jobul sau poate afisa simptome neasteptate in spooler.</p>
+    </section>
+
+    <section class="section">
+      <h2>8. Debug si loguri</h2>
+      <p>Pentru fiecare job, aplicatia poate salva:</p>
+      <ul>
+        <li>IP-ul clientului care a cerut tiparirea</li>
+        <li>codul tiparit si numele pacientului</li>
+        <li>tipul de cod de bare</li>
+        <li>imprimanta folosita</li>
+        <li>status <code>ok</code> sau <code>fail</code></li>
+      </ul>
+      <p>In plus, logul runtime include payload-ul ZPL trimis catre imprimanta, inclusiv varianta Base64 pentru comparatie byte-cu-byte.</p>
+      <p class="ok">Acest lucru este util cand vrei sa compari exact payload-ul generat de aplicatie cu un payload trimis manual care functioneaza corect.</p>
+    </section>
+
+    <section class="section">
+      <h2>9. Comportament pe platforme</h2>
+      <table>
+        <thead>
+          <tr><th>Platforma</th><th>Comportament</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Windows</td><td>Payload-ul este trimis raw catre spoolerul de imprimare prin API-ul WinSpool <code>WritePrinter</code>.</td></tr>
+          <tr><td>Linux</td><td>Se incearca <code>lp -o raw</code>, apoi fallback pe <code>lpr -l</code>.</td></tr>
+          <tr><td>macOS</td><td>Se foloseste acelasi model raw prin <code>lp</code> sau <code>lpr</code>.</td></tr>
+        </tbody>
+      </table>
+      <p>Scopul este ca imprimanta Zebra sa primeasca bytes ZPL direct, nu document text formatat de sistemul de printare.</p>
+    </section>
+
+    <section class="section">
+      <h2>10. Imprimante shared pe Windows</h2>
+      <p>Aplicatia poate folosi si imprimante shared din sistem, dar trebuie facuta diferenta intre imprimantele vizibile pentru utilizatorul curent si imprimantele vizibile pentru contul sub care ruleaza serviciul.</p>
+      <ul>
+        <li>daca aplicatia ruleaza interactiv, vede imprimantele instalate pentru acel utilizator Windows</li>
+        <li>daca aplicatia ruleaza ca Windows Service, vede imprimantele disponibile pentru contul serviciului, nu neaparat pe cele instalate doar in profilul utilizatorului tau</li>
+        <li>daca imprimanta shared nu apare in lista, poti introduce manual numele exact al queue-ului, de exemplu <code>\\printserver\zebra_lab</code></li>
+        <li>daca numele este acceptat dar printul tot esueaza, de regula contul serviciului nu are acces la acea conexiune de printer</li>
+      </ul>
+      <p class="warn">Faptul ca vezi imprimanta in Windows pe sesiunea ta nu garanteaza ca o vede si serviciul. Pentru servicii, imprimanta trebuie sa fie accesibila si pentru contul efectiv de rulare.</p>
+    </section>
+
+    <section class="section">
+      <h2>11. Troubleshooting</h2>
+      <h3>Spoolerul creeaza multe etichete, dar imprimanta nu incepe efectiv printul</h3>
+      <ul>
+        <li>verifica daca payload-ul ZPL este valid</li>
+        <li>verifica daca jobul ajunge raw, nu ca document text</li>
+        <li>compara payload-ul logat cu cel trimis manual care functioneaza</li>
+      </ul>
+      <h3>Nu apare imprimanta in lista</h3>
+      <ul>
+        <li>verifica daca imprimanta este instalata in sistemul de operare</li>
+        <li>pe Windows verifica daca serviciul de printare este activ</li>
+        <li>daca aplicatia ruleaza ca serviciu, verifica daca imprimanta este disponibila pentru contul serviciului</li>
+        <li>introdu manual numele queue-ului shared daca nu apare in sugestii</li>
+        <li>pe Linux/macOS verifica daca <code>lpstat</code> vede imprimanta</li>
+      </ul>
+      <h3>Tiparirea esueaza cu eroare</h3>
+      <ul>
+        <li>verifica numele exact al imprimantei selectate</li>
+        <li>verifica permisiunile utilizatorului sub care ruleaza serviciul</li>
+        <li>verifica jurnalul aplicatiei si istoricul de joburi</li>
+      </ul>
+      <h3>Nu mai poti accesa UI-ul dupa schimbarea portului</h3>
+      <ul>
+        <li>conecteaza-te la noua adresa configurata</li>
+        <li>daca ai ales un IP invalid, corecteaza <code>deployments/config.yaml</code></li>
+      </ul>
+    </section>
+
+    <section class="section">
+      <h2>12. Bune practici</h2>
+      <ul>
+        <li>foloseste valori in mm coerente cu dimensiunea reala a etichetei</li>
+        <li>testeaza intotdeauna cu <strong>Test print</strong> dupa schimbarea layout-ului</li>
+        <li>pastreaza o imprimanta default corect configurata daca nu vrei selectie explicita</li>
+        <li>nu salva valori contradictorii intre DPI si coordonate</li>
+        <li>foloseste istoricul si logurile ZPL pentru orice problema de randare</li>
+      </ul>
+    </section>
+  </div>
+</body>
+</html>

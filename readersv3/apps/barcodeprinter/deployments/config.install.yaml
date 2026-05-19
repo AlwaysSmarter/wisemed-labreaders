@@ -1,0 +1,65 @@
+reader:
+  id: barcodeprinter-v3
+  label: Barcode Printer
+  analyzer_name: WiseMED Barcode Utility
+  analyzer_code: barcodeprinter-v3
+  db_name: barcodeprinter-v3.db
+local_http:
+  enabled: true
+  address: 127.0.0.1:8010
+  language: ro
+  tls: false
+wisemed_ws:
+  enabled: true
+  url: wss://wslocal.wisemed.eu/ws
+  heartbeat_ms: 15000
+  reconnect_delay_ms: 5000
+analyzer:
+  comm_type: utility
+  protocol: barcodeprinter
+modules:
+  app-updates:
+    enabled: true
+    app_id: barcodeprinter-v3
+    channel: stable
+    base_url: http://127.0.0.1:19090
+    auto_download: true
+    download_dir: ./updates
+  barcode-printer:
+    auth_username: admin
+    auth_password: admin
+    bcp_type: zebrazpl
+    log_db_path: ./barcodeprinter-log.db
+    othercfg_printer_type: zebrazpl
+    othercfg_printer_resolution: "200"
+    othercfg_sel_printer: ""
+  local-http:
+    enabled: true
+    address: 127.0.0.1:8010
+    language: ro
+    tls: false
+  storage-sqlite:
+    path: ./barcodeprinter-v3.db
+  transport-file:
+    import_dir: ./inbox
+    processed_dir: ./processed
+    failed_dir: ./failed
+    export_dir: ./outbox
+    pattern: "*.csv"
+  wisemed-api:
+    cfg_wisemed_protocol: https
+    cfg_wisemed_ip: ldse.wisemed.eu
+    cfg_wisemed_port: "443"
+    cfg_wisemed_path: /wisemed-api/apiv2
+    cfg_wisemed_key: 27c490bb-c9e4-47aa-bf6d-ebd2a1add35e
+    cod_echipament: ""
+    numar_serial_echipament: ""
+    echipament_id: ""
+    unitate_medicala_id: ""
+    tip_de_echipament_id: ""
+    api_key_echipament: ""
+  wisemed-ws:
+    enabled: true
+    url: wss://wslocal.wisemed.eu/ws
+    heartbeat_ms: 15000
+    reconnect_delay_ms: 5000

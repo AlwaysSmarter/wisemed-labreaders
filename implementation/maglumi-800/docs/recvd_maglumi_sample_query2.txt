@@ -1,38 +1,0 @@
-﻿Debug Output: ===> Process Maglumi600Reader.exe (3860)
-Debug Output: got ENQ Process Maglumi600Reader.exe (3860)
-Debug Output: out: Process Maglumi600Reader.exe (3860)
-Debug Output: ===>H|\^&||PSWD|Maglumi User|||||Lis||P|E1394-97|20180224Q|1|^32 Process Maglumi600Reader.exe (3860)
-Debug Output: got STX Process Maglumi600Reader.exe (3860)
-Debug Output: ===>8873||ALL||||||||OL|1|N Process Maglumi600Reader.exe (3860)
-Debug Output: Parse Record:| Process Maglumi600Reader.exe (3860)
-Debug Output: Parse Record:Q Process Maglumi600Reader.exe (3860)
-Debug Output: Parse Record:L Process Maglumi600Reader.exe (3860)
-Debug Output: Parse Record: Process Maglumi600Reader.exe (3860)
-Debug Output: out: Process Maglumi600Reader.exe (3860)
-Debug Output: got EOT Process Maglumi600Reader.exe (3860)
-Debug Output: ordreq_queue Process Maglumi600Reader.exe (3860)
-Debug Output: prepareOrder: enter date:2018-02-24 id:328873rack: pos: Process Maglumi600Reader.exe (3860)
-Debug Output: prepareOrder: find Process Maglumi600Reader.exe (3860)
-Debug Output: push send patient:328873 orderid: 16 Process Maglumi600Reader.exe (3860)
-Debug Output: prepareOrder: Create pacient ID: 328873 Name: CALCAN RADU Pos: 15 Round: 0 Rack: 0 Process Maglumi600Reader.exe (3860)
-Debug Output: prepareOrder: push Process Maglumi600Reader.exe (3860)
-Debug Output: sendord_queue Process Maglumi600Reader.exe (3860)
-Debug Output: send order all Process Maglumi600Reader.exe (3860)
-Debug Output: out: Process Maglumi600Reader.exe (3860)
-Debug Output: SendStr_queue ENQ Process Maglumi600Reader.exe (3860)
-Debug Output: start beacon: Process Maglumi600Reader.exe (3860)
-Debug Output: out: Process Maglumi600Reader.exe (3860)
-Debug Output: ===> Process Maglumi600Reader.exe (3860)
-Debug Output: got ACK Process Maglumi600Reader.exe (3860)
-Source Breakpoint at $008D257E: \\VBOXSVR\Aparate\CommIntFramework\Maglumi600_CIF\maglumi600_comm.pas line 627. Process Maglumi600Reader.exe (3860)
-Thread Start: Thread ID: 6312. Process Maglumi600Reader.exe (3860)
-Debug Output: out:1H|\^&|||host|||||MAGLUMI600||P|LIS2A|20180224213644P|1||328873||CALCAN^RADU|||||||||||||||||||||||||||||L|1|NC8  Process Maglumi600Reader.exe (3860)
-Thread Start: Thread ID: 1284. Process Maglumi600Reader.exe (3860)
-Debug Output: start beacon: Process Maglumi600Reader.exe (3860)
-Debug Output: out: Process Maglumi600Reader.exe (3860)
-Debug Output: ===> Process Maglumi600Reader.exe (3860)
-Debug Output: got ACK Process Maglumi600Reader.exe (3860)
-Source Breakpoint at $008D257E: \\VBOXSVR\Aparate\CommIntFramework\Maglumi600_CIF\maglumi600_comm.pas line 627. Process Maglumi600Reader.exe (3860)
-Debug Output: out: Process Maglumi600Reader.exe (3860)
-Debug Output: ===> Process Maglumi600Reader.exe (3860)
-Debug Output: got ACK Process Maglumi600Reader.exe (3860)

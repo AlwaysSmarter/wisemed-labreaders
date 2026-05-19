@@ -1,0 +1,72 @@
+[
+  {
+    "id": "barcodeprinter",
+    "title": "Barcode Printer",
+    "binaryName": "BarcodePrinter",
+    "serviceName": "wisemed-barcodeprinter",
+    "displayName": "WiseMED Barcode Printer",
+    "description": "WiseMED readersv3 Barcode Printer background service",
+    "bundleId": "eu.wisemed.readersv3.barcodeprinter",
+    "supportsHeadless": true
+  },
+  {
+    "id": "beosl-reader",
+    "title": "Beosl Reader",
+    "binaryName": "beosl-reader",
+    "serviceName": "wisemed-beosl-reader",
+    "displayName": "WiseMED Beosl Reader",
+    "description": "WiseMED readersv3 Beosl Reader background service",
+    "bundleId": "eu.wisemed.readersv3.beosl.reader",
+    "supportsHeadless": true
+  },
+  {
+    "id": "cary60-uvvis-reader",
+    "title": "Cary60 UVVIS Reader",
+    "binaryName": "Cary60-UVVIS-Reader",
+    "serviceName": "wisemed-cary60-uvvis-reader",
+    "displayName": "WiseMED Cary60 UVVIS Reader",
+    "description": "WiseMED readersv3 Cary60 UVVIS Reader background service",
+    "bundleId": "eu.wisemed.readersv3.cary60.uvvis.reader",
+    "supportsHeadless": true
+  },
+  {
+    "id": "gemini-reader",
+    "title": "Gemini Reader",
+    "binaryName": "gemini-reader",
+    "serviceName": "wisemed-gemini-reader",
+    "displayName": "WiseMED Gemini Reader",
+    "description": "WiseMED readersv3 Gemini Reader background service",
+    "bundleId": "eu.wisemed.readersv3.gemini.reader",
+    "supportsHeadless": true
+  },
+  {
+    "id": "generic-test-reader",
+    "title": "Generic Test Reader",
+    "binaryName": "generic-test-reader",
+    "serviceName": "wisemed-generic-test-reader",
+    "displayName": "WiseMED Generic Test Reader",
+    "description": "WiseMED readersv3 Generic Test Reader background service",
+    "bundleId": "eu.wisemed.readersv3.generic.test.reader",
+    "supportsHeadless": true
+  },
+  {
+    "id": "seegene-reader",
+    "title": "Seegene Reader",
+    "binaryName": "seegene-reader",
+    "serviceName": "wisemed-seegene-reader",
+    "displayName": "WiseMED Seegene Reader",
+    "description": "WiseMED readersv3 Seegene Reader background service",
+    "bundleId": "eu.wisemed.readersv3.seegene.reader",
+    "supportsHeadless": true
+  },
+  {
+    "id": "update-server",
+    "title": "Update Server",
+    "binaryName": "Update_Server",
+    "serviceName": "wisemed-update-server",
+    "displayName": "WiseMED Update Server",
+    "description": "WiseMED readersv3 Update Server background service",
+    "bundleId": "eu.wisemed.readersv3.update.server",
+    "supportsHeadless": false
+  }
+]

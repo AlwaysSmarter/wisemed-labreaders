@@ -1,0 +1,38 @@
+reader:
+  id: beosl-v3
+  label: BEOSL Reader V3
+  analyzer_name: BEOSL
+  analyzer_code: beosl-v3
+
+local_http:
+  enabled: true
+  address: 127.0.0.1:18080
+  language: ro
+
+analyzer:
+  comm_type: file
+  protocol: beosl-csv
+
+modules:
+  qc:
+    levels: ["negativ", "pozitiv", "pcrescut", "pscazut", "nivel1", "nivel2", "nivel3", "nivel4", "nivel5"]
+  app-updates:
+    enabled: true
+    app_id: beosl-v3
+    current_version: 1.0.0
+    channel: stable
+    base_url: http://127.0.0.1:19090
+    auto_download: true
+    download_dir: ./updates
+  local-http:
+    address: 127.0.0.1:18080
+    language: ro
+  storage-sqlite:
+    path: ./beosl-reader-v3.db
+  wisemed-api:
+    base_url: https://api.wisemed.example
+  help:
+    help_dir: ./help
+  transport-file:
+    import_dir: ./inbox
+    pattern: "*.csv"

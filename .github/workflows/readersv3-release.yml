@@ -1,0 +1,86 @@
+name: readersv3-release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release version override (example: v1.2.3)
+        required: false
+        type: string
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: readersv3/go.mod
+      - name: Regenerate release scaffolding
+        run: |
+          cd readersv3
+          go run ./tools/releasectl sync
+      - name: Verify clean tree
+        run: git diff --exit-code
+
+  package:
+    needs: sync
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            packages: "linux-amd64 linux-arm64"
+          - os: windows-2022
+            packages: "windows-amd64 windows-arm64"
+          - os: macos-14
+            packages: "darwin-amd64 darwin-arm64"
+    runs-on: ${{ matrix.os }}
+    env:
+      VERSION: ${{ github.event.inputs.version || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: readersv3/go.mod
+      - name: Install Linux packaging tools
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y rpm dpkg-dev ruby ruby-dev build-essential
+          sudo gem install --no-document fpm
+      - name: Install Windows packaging tools
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          choco install wixtoolset --no-progress -y
+          choco install nsis --no-progress -y
+      - name: Build and package readersv3
+        shell: bash
+        run: |
+          cd readersv3
+          go run ./tools/releasectl package-all --version "${VERSION:-}"
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: readersv3-${{ runner.os }}
+          path: readersv3/release
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/**/*

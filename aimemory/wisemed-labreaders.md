@@ -6,6 +6,16 @@
 - Main active reader project in this thread:
   - `/Users/raduichim/work/gowork/wisemed-labreaders/Readers Last/generic-test-reader`
 
+## Project generation rules
+
+- When generating a new readersv3 application or a new related project, also generate an application icon.
+- The Windows delivery path should include a real `.ico` file derived from the WiseMED brand mark but made distinct for that specific app by color, label, or app-specific graphic accent.
+- Keep generated icon assets under the project resources tree so they can be reused by packaging/build automation.
+- Prefer a white rounded-card background for generated icons, with transparent outer corners.
+- On that white card, place the WiseMED logo and one clear application badge only.
+- Do not add extra text on the main canvas, and do not add extra colored geometric decorations beyond the badge itself.
+- Use a visible colored badge with high-contrast text; the `CARY60` `UV` badge style is the preferred reference for short app markers.
+
 ## High-level purpose
 
 `generic-test-reader` is a local WiseMED reader runtime that:

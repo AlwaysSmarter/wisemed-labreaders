@@ -1,0 +1,797 @@
+<!doctype html>
+<html lang="ro">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>WiseMED Reader Console</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div id="app" class="shell">
+    <section id="login-view" class="login-view">
+      <div class="login-card">
+        <div class="langbar">
+          <label class="langbox">
+            <span id="login-language-label">Language</span>
+            <select id="language-select-login">
+              <option value="ro">Romana</option>
+              <option value="en">English</option>
+            </select>
+          </label>
+        </div>
+        <img class="brand-logo" src="https://www.wisemed.eu/wp-content/uploads/2024/09/WiseMED-thinkIT-logo-2.png" alt="WiseMED">
+          <p id="login-eyebrow" class="eyebrow">LOCAL ADMIN</p>
+        <h1 id="login-title">WiseMED Reader Console</h1>
+        <p id="login-subtitle" class="muted">Login cu utilizator WiseMED pentru administrarea locală a readerului.</p>
+        <div class="app-version-row">
+          <a id="login-app-version-link" class="app-version-link" href="#">v0.0.0</a>
+          <button id="login-app-update-indicator" type="button" class="app-update-indicator off" aria-label="Update status">?</button>
+        </div>
+        <p id="login-app-update-message" class="small muted" hidden></p>
+        <form id="login-form" class="stack">
+          <label>
+            <span id="label-username">Username</span>
+            <input id="username" name="username" type="text" autocomplete="username" required>
+          </label>
+          <label>
+            <span id="label-password">Password</span>
+            <input id="password" name="password" type="password" autocomplete="current-password" required>
+          </label>
+          <button id="login-submit" type="submit" class="primary">Login</button>
+          <p id="login-error" class="error-text" hidden></p>
+        </form>
+        <div id="login-setup-host" class="login-setup-host"></div>
+      </div>
+    </section>
+    <section id="dashboard-view" class="dashboard" hidden>
+      <aside class="sidebar">
+        <div>
+          <img class="brand-logo brand-logo-small" src="https://www.wisemed.eu/wp-content/uploads/2024/09/WiseMED-thinkIT-logo-2.png" alt="WiseMED">
+          <p id="reader-eyebrow" class="eyebrow">READER</p>
+          <h2 id="reader-title">Reader</h2>
+          <p id="reader-subtitle" class="muted small"></p>
+          <div class="app-version-row sidebar-app-version-row">
+            <a id="dashboard-app-version-link" class="app-version-link" href="#">v0.0.0</a>
+            <button id="dashboard-app-update-indicator" type="button" class="app-update-indicator off" aria-label="Update status">?</button>
+          </div>
+          <p id="dashboard-app-update-message" class="small muted" hidden></p>
+        </div>
+        <section id="reader-identity-card" class="reader-card">
+          <p id="reader-identity-label" class="reader-card-label">Categorie</p>
+          <div id="reader-identity-badge" class="reader-identity-badge">
+            <span id="reader-identity-icon" class="reader-identity-icon">R</span>
+            <div class="reader-identity-copy">
+              <strong id="reader-identity-title">Reader</strong>
+              <span id="reader-identity-subtitle">Generic</span>
+            </div>
+          </div>
+        </section>
+        <nav class="nav">
+          <button class="nav-link active" data-view="overview" data-i18n="nav_overview">Overview</button>
+          <button class="nav-link" data-view="daily-details" data-i18n="nav_daily_details">Detalii zilnice</button>
+          <button class="nav-link" data-view="orders" data-i18n="nav_orders">Orders</button>
+          <button class="nav-link" data-view="qc" data-i18n="nav_qc">QC</button>
+          <button class="nav-link" data-view="analytes" data-i18n="nav_settings">Settings</button>
+          <div class="nav-submenu" id="settings-submenu">
+            <button class="nav-sublink" data-view="analytes" data-settings-subview="reader" data-i18n="settings_reader">Setari reader</button>
+            <button class="nav-sublink" data-view="analytes" data-settings-subview="analytes" data-i18n="settings_analytes">Analize</button>
+            <button class="nav-sublink" data-view="analytes" data-settings-subview="daily-details" data-i18n="settings_daily_details">Detalii zilnice</button>
+            <button class="nav-sublink" data-view="analytes" data-settings-subview="qc" data-i18n="settings_qc">Setari QC</button>
+          </div>
+          <button class="nav-link" data-view="help" data-i18n="nav_help">Help</button>
+        </nav>
+        <section id="reader-summary-card" class="reader-card reader-summary-card">
+          <p id="reader-summary-title" class="reader-card-label">Rezumat reader</p>
+          <div id="reader-summary-list" class="reader-summary-list"></div>
+        </section>
+        <div class="session-box">
+          <p id="session-label" class="small muted">Autentificat ca</p>
+          <strong id="session-user">-</strong>
+        </div>
+        <label class="langbox sidebar-langbox">
+          <span id="dashboard-language-label">Language</span>
+          <select id="language-select-dashboard">
+            <option value="ro">Romana</option>
+            <option value="en">English</option>
+          </select>
+        </label>
+        <button id="logout-btn" class="logout-button" data-i18n="logout">Logout</button>
+      </aside>
+      <main class="content">
+        <section class="topbar">
+          <div class="topbar-main">
+            <div class="topbar-title">
+              <p id="topbar-eyebrow" class="eyebrow">LOCAL HTTP</p>
+              <h1 id="dashboard-title">Control Panel</h1>
+            </div>
+            <div class="status-cluster">
+              <div id="wisemedws-pill" class="status-pill">
+                <span id="ws-dot" class="dot"></span>
+                <span id="wisemedws-status-label">WiseMEDWS</span>
+              </div>
+              <div id="analyzer-pill" class="status-pill">
+                <span id="analyzer-dot" class="dot"></span>
+                <span id="analyzer-status-label">Analyzer</span>
+              </div>
+            </div>
+          </div>
+          <div id="app-toast" class="app-toast" hidden>
+            <div id="app-toast-body" class="app-toast-body"></div>
+            <button id="app-toast-close" class="app-toast-close" type="button" aria-label="Close">×</button>
+          </div>
+        </section>
+        <section id="view-overview" class="panel-grid">
+          <article class="panel hero">
+            <h3 id="status-title">Status</h3>
+            <div id="status-cards" class="metrics"></div>
+          </article>
+          <article class="panel">
+            <div class="panel-head">
+              <h3 id="today-chart-title">Astazi rezultate</h3>
+            </div>
+            <div class="chart-wrap">
+              <div id="today-donut" class="donut-chart"></div>
+              <div id="today-legend" class="chart-legend"></div>
+            </div>
+          </article>
+          <article class="panel">
+            <div class="panel-head">
+              <h3 id="qc-summary-title">QC astazi</h3>
+            </div>
+            <div id="qc-summary" class="metrics"></div>
+          </article>
+          <article class="panel full-span">
+            <div class="panel-head">
+              <h3 id="trend-chart-title">Evolutie pe zile</h3>
+            </div>
+            <svg id="line-chart" class="line-chart" viewBox="0 0 640 260" preserveAspectRatio="none"></svg>
+            <div id="line-legend" class="chart-legend"></div>
+          </article>
+          <article id="logs-panel" class="panel logs-panel full-span">
+            <div class="panel-head">
+              <h3 id="logs-title">Recent Logs</h3>
+              <div class="inline-actions">
+                <label class="poll-box">
+                  <span id="log-polling-label">Polling (s)</span>
+                  <input id="log-poll-seconds" type="number" min="0.1" step="0.1" value="1">
+                </label>
+                <button id="refresh-logs" class="ghost" data-i18n="refresh">Refresh</button>
+              </div>
+            </div>
+            <div id="logs-list" class="logs-list"></div>
+          </article>
+        </section>
+        <section id="view-analytes" class="panel-grid" hidden>
+          <article id="settings-panel-reader" class="panel full-span">
+            <div class="panel-head">
+              <h3 id="reader-settings-title">Setari reader</h3>
+            </div>
+            <form id="reader-settings-form" class="stack reader-settings-form">
+              <div class="two-col">
+                <label class="reader-settings-field">
+                  <span>Reader ID</span>
+                  <input name="reader_id" type="text">
+                </label>
+                <label class="reader-settings-field">
+                  <span>Eticheta</span>
+                  <input name="reader_label" type="text">
+                </label>
+              </div>
+              <div class="two-col">
+                <label class="reader-settings-field">
+                  <span>Nume analizor</span>
+                  <input name="analyzer_name" type="text">
+                </label>
+                <label class="reader-settings-field">
+                  <span>Cod analizor</span>
+                  <input name="analyzer_code" type="text">
+                </label>
+              </div>
+              <div class="two-col">
+                <label class="reader-settings-field">
+                  <span>Baza de date</span>
+                  <input name="db_name" type="text">
+                </label>
+                <label class="reader-settings-field">
+                  <span>SQLite path</span>
+                  <input name="sqlite_path" type="text">
+                </label>
+              </div>
+              <div class="two-col">
+                <label class="reader-settings-field">
+                  <span>HTTP local address</span>
+                  <input name="local_http_address" type="text">
+                </label>
+                <label class="reader-settings-field">
+                  <span>Limba</span>
+                  <select name="local_http_language">
+                    <option value="ro">Romana</option>
+                    <option value="en">English</option>
+                  </select>
+                </label>
+              </div>
+              <div class="two-col">
+                <label class="reader-settings-field">
+                  <span>HTTPS local</span>
+                  <select name="local_http_tls">
+                    <option value="false">Nu</option>
+                    <option value="true">Da</option>
+                  </select>
+                </label>
+                <div class="reader-settings-field">
+                  <span>Certificat local</span>
+                  <p class="small muted">Daca este activat, aplicatia foloseste certificat local existent daca este valid; altfel il regenereaza automat la pornire.</p>
+                </div>
+              </div>
+              <div class="two-col">
+                <label class="reader-settings-field">
+                  <span>Origin-uri CORS permise</span>
+                  <input name="local_http_cors_allowed_origins" type="text">
+                </label>
+                <div class="reader-settings-field">
+                  <span>Format</span>
+                  <p class="small muted">Lista separata prin virgula, punct si virgula sau linie noua. Implicit: https://ldse.wisemed.eu</p>
+                </div>
+              </div>
+              <div class="two-col">
+                <label class="reader-settings-field">
+                  <span>Analyzer comm type</span>
+                  <input name="analyzer_comm_type" type="text">
+                </label>
+                <label class="reader-settings-field">
+                  <span>Analyzer protocol</span>
+                  <input name="analyzer_protocol" type="text">
+                </label>
+              </div>
+              <div class="panel-head compact-head">
+                <h3>Update server</h3>
+              </div>
+              <div class="two-col">
+                <label class="reader-settings-field">
+                  <span>Update enabled</span>
+                  <select name="app_updates_enabled">
+                    <option value="true">Da</option>
+                    <option value="false">Nu</option>
+                  </select>
+                </label>
+                <label class="reader-settings-field">
+                  <span>App ID update</span>
+                  <input name="app_updates_app_id" type="text">
+                </label>
+              </div>
+              <div class="two-col">
+                <label class="reader-settings-field">
+                  <span>Versiune curenta</span>
+                  <input name="app_updates_current_version" type="text" readonly>
+                </label>
+                <label class="reader-settings-field">
+                  <span>Canal</span>
+                  <select name="app_updates_channel">
+                    <option value="stable">stable</option>
+                  </select>
+                </label>
+              </div>
+              <div class="two-col">
+                <label class="reader-settings-field">
+                  <span>Update server URL</span>
+                  <input name="app_updates_base_url" type="text">
+                </label>
+                <label class="reader-settings-field">
+                  <span>Auto download</span>
+                  <select name="app_updates_auto_download">
+                    <option value="true">Da</option>
+                    <option value="false">Nu</option>
+                  </select>
+                </label>
+              </div>
+              <label class="reader-settings-field">
+                <span>Director download update</span>
+                <input name="app_updates_download_dir" type="text">
+              </label>
+              <div class="panel-head compact-head">
+                <h3>Sincronizare rezultate WiseMED</h3>
+              </div>
+              <div class="two-col">
+                <label class="reader-settings-field">
+                  <span>Sync activ</span>
+                  <select name="result_sync_enabled">
+                    <option value="true">Da</option>
+                    <option value="false">Nu</option>
+                  </select>
+                </label>
+                <label class="reader-settings-field">
+                  <span>Interval cron (minute)</span>
+                  <input name="result_sync_interval_minutes" type="number" min="1" step="1">
+                </label>
+              </div>
+              <label class="reader-settings-field">
+                <span>Prefixe probe de eliminat</span>
+                <input name="result_sync_sample_prefixes" type="text" placeholder="C_AC_, M_AP_">
+              </label>
+              <label class="reader-settings-field">
+                <span>Sufixe probe de eliminat</span>
+                <input name="result_sync_sample_suffixes" type="text" placeholder="_PB, _PV">
+              </label>
+              <label class="reader-settings-field">
+                <span>Separatoare acceptate</span>
+                <input name="result_sync_separators" type="text" placeholder="-, _">
+              </label>
+              <label class="reader-settings-field">
+                <span>Prefixe QC (`prefix:true|false`)</span>
+                <input name="result_sync_qc_prefixes" type="text" placeholder="PC35:true, PC0.5:true">
+              </label>
+              <div class="orders-buttons">
+                <button id="run-result-sync" class="ghost" type="button">Ruleaza acum</button>
+                <button id="reset-result-sync" class="ghost" type="button">Reseteaza stare sync</button>
+              </div>
+              <p id="result-sync-status" class="small muted"></p>
+              <label class="reader-settings-field">
+                <span id="repeat-mode-label">Mod tratare repetari</span>
+                <select id="repeat-mode-select" name="repeat_mode">
+                  <option value="individual">Repetari individuale pe analiza</option>
+                  <option value="grouped">Repetari grupate pe lot de rezultate</option>
+                </select>
+              </label>
+              <p id="repeat-mode-help" class="small muted">Schimbarea rezultatului implicit poate afecta doar analiza selectata sau intreg grupul de rezultate primit simultan pentru aceeasi proba.</p>
+              <div class="orders-buttons">
+                <button id="save-reader-settings" class="ghost" type="submit">Salveaza</button>
+              </div>
+              <p id="reader-settings-message" class="small muted"></p>
+            </form>
+          </article>
+          <article id="settings-panel-analytes" class="panel full-span">
+            <div class="orders-toolbar">
+              <div class="orders-filters">
+                <label class="poll-box analyte-search-box">
+                  <span data-i18n="search">Search</span>
+                  <input id="analyte-search" type="search" placeholder="Caută după tag, code, nume">
+                </label>
+              </div>
+              <div class="orders-buttons">
+                <button id="new-analyte" class="ghost" data-i18n="new">Nou</button>
+                <button id="refresh-analytes" class="ghost" data-i18n="refresh">Refresh</button>
+              </div>
+            </div>
+            <div id="analyte-list" class="analyte-list"></div>
+          </article>
+          <article id="settings-panel-qc-editor" class="panel full-span" hidden>
+            <div class="orders-toolbar">
+              <div class="orders-filters">
+                <label class="poll-box analyte-search-box">
+                  <span id="qc-target-filter-label">Analiza</span>
+                  <select id="qc-target-filter-analyte"></select>
+                </label>
+              </div>
+              <div class="orders-buttons">
+                <button id="new-qc-target" class="ghost">Nou</button>
+                <button id="refresh-qc-targets" class="ghost" data-i18n="refresh">Refresh</button>
+              </div>
+            </div>
+            <div id="qc-target-list" class="analyte-list"></div>
+          </article>
+          <article id="settings-panel-daily-details" class="panel full-span" hidden>
+            <div class="orders-toolbar">
+              <div class="orders-filters">
+                <label class="poll-box analyte-search-box">
+                  <span data-i18n="search">Search</span>
+                  <input id="daily-detail-search" type="search" placeholder="Caută după cheie sau etichetă">
+                </label>
+              </div>
+              <div class="orders-buttons">
+                <button id="new-daily-detail-definition" class="ghost" type="button">Nou</button>
+                <button id="refresh-daily-detail-definitions" class="ghost" type="button">Refresh</button>
+              </div>
+            </div>
+            <div id="daily-detail-definition-list" class="analyte-list"></div>
+          </article>
+        </section>
+        <section id="view-daily-details" class="panel-grid" hidden>
+          <article class="panel full-span">
+            <div class="orders-toolbar">
+              <div class="orders-filters">
+                <label class="poll-box poll-box-date">
+                  <span id="daily-details-date-label">Data</span>
+                  <input id="daily-details-date" type="date">
+                </label>
+                <label class="poll-box analyte-search-box">
+                  <span data-i18n="search">Search</span>
+                  <input id="daily-details-value-search" type="search" placeholder="Caută după nume variabilă">
+                </label>
+                <label id="daily-details-round-box" class="poll-box poll-box-round" hidden>
+                  <span id="daily-details-round-label">Runda</span>
+                  <select id="daily-details-round"></select>
+                </label>
+                <label id="daily-details-analyte-box" class="poll-box analyte-search-box" hidden>
+                  <span id="daily-details-analyte-label">Analiza</span>
+                  <select id="daily-details-analyte"></select>
+                </label>
+              </div>
+              <div class="orders-buttons">
+                <button id="refresh-daily-detail-values" class="ghost" type="button">Refresh</button>
+              </div>
+            </div>
+            <div class="nav-submenu daily-details-tabs" id="daily-details-tabs">
+              <button class="daily-details-tab active" type="button" data-daily-scope="day" data-i18n="daily_details_day">Pe zi</button>
+              <button class="daily-details-tab" type="button" data-daily-scope="day_round" data-i18n="daily_details_day_round">Pe zi si runda</button>
+              <button class="daily-details-tab" type="button" data-daily-scope="day_analyte" data-i18n="daily_details_day_analyte">Pe zi si analiza</button>
+              <button class="daily-details-tab" type="button" data-daily-scope="day_round_analyte" data-i18n="daily_details_day_round_analyte">Pe zi, runda si analiza</button>
+            </div>
+            <div id="daily-detail-values-list" class="analyte-list"></div>
+          </article>
+        </section>
+        <section id="view-orders" class="orders-workspace" hidden>
+          <article class="panel orders-stage">
+            <h3 id="orders-title">Orders</h3>
+            <div class="orders-toolbar">
+              <div class="orders-filters">
+                <label class="poll-box poll-box-date">
+                  <span id="order-date-label">Data</span>
+                  <input id="order-date" type="date">
+                </label>
+                <label class="poll-box poll-box-round">
+                  <span id="round-label">Runda</span>
+                  <select id="round-select"></select>
+                </label>
+                <label id="orders-select-all-box" class="toggle">
+                  <input id="orders-select-all" type="checkbox">
+                  <span id="orders-select-all-label">Selecteaza tot</span>
+                </label>
+              </div>
+              <div class="orders-buttons">
+                <button id="import-orders" class="ghost">Import fisier</button>
+                <button id="export-orders" class="ghost">Export</button>
+                <button id="worklist-orders" class="ghost">Get worklist</button>
+                <button id="new-round" class="ghost">Runda noua</button>
+                <button id="refresh-orders" class="ghost" data-i18n="refresh">Refresh</button>
+              </div>
+            </div>
+            <input id="orders-import-file" type="file" accept=".csv,text/csv" hidden>
+            <div id="orders-layout" class="orders-layout"></div>
+          </article>
+          <article class="panel order-inspector">
+            <div class="panel-head">
+              <h3 id="order-details-title">Order details</h3>
+            </div>
+            <div id="order-details" class="order-details"></div>
+          </article>
+        </section>
+        <section id="view-qc" class="orders-workspace" hidden>
+          <article class="panel full-span">
+            <div class="orders-toolbar">
+              <div class="orders-filters">
+                <label class="poll-box poll-box-round">
+                  <span id="qc-period-label">Perioada</span>
+                  <select id="qc-period"></select>
+                </label>
+                <label class="poll-box poll-box-date">
+                  <span id="qc-date-from-label">De la</span>
+                  <input id="qc-date-from" type="date">
+                </label>
+                <label class="poll-box poll-box-date">
+                  <span id="qc-date-to-label">Pana la</span>
+                  <input id="qc-date-to" type="date">
+                </label>
+                <label class="poll-box poll-box-round" hidden>
+                  <span id="qc-round-label">Runda QC</span>
+                  <select id="qc-round-select"></select>
+                </label>
+                <label class="poll-box poll-box-round">
+                  <span id="qc-analyte-filter-label">Analiza</span>
+                  <select id="qc-analyte-filter"></select>
+                </label>
+                <label class="poll-box poll-box-round">
+                  <span id="qc-level-filter-label">Nivel QC</span>
+                  <select id="qc-level-filter"></select>
+                </label>
+              </div>
+              <div class="orders-buttons">
+                <button id="new-qc-record" class="ghost" type="button">Adauga QC</button>
+                <button id="qc-open-westgard" class="ghost" type="button">Diagrama Westgard</button>
+                <button id="refresh-qc" class="ghost" data-i18n="refresh">Refresh</button>
+              </div>
+            </div>
+            <div id="qc-layout" class="orders-layout"></div>
+          </article>
+          <article class="panel order-inspector">
+            <div class="panel-head">
+              <h3 id="qc-details-title">QC details</h3>
+            </div>
+            <div id="qc-details" class="order-details"></div>
+          </article>
+        </section>
+        <section id="view-help" class="panel-grid" hidden>
+          <article class="panel help-panel">
+            <div class="panel-head">
+              <h3 id="help-title">How To</h3>
+              <a id="help-open" class="ghost link-button" href="/help/" target="_blank" rel="noreferrer">Deschide separat</a>
+            </div>
+            <iframe class="help-frame" src="/help/"></iframe>
+          </article>
+        </section>
+      </main>
+    </section>
+  </div>
+  <div id="qc-record-modal" class="modal-shell" hidden>
+    <div id="qc-record-modal-backdrop" class="modal-backdrop"></div>
+    <section class="modal-card form-panel" role="dialog" aria-modal="true" aria-labelledby="qc-record-title">
+      <div class="modal-window-bar">
+        <div class="modal-window-dots" aria-hidden="true">
+          <span></span>
+          <span></span>
+          <span></span>
+        </div>
+      </div>
+      <div class="panel-head modal-head">
+        <h3 id="qc-record-title">Adaugare QC manuala</h3>
+        <button id="close-qc-record-modal" class="ghost modal-close-btn" type="button" aria-label="Close">Close</button>
+      </div>
+      <div class="modal-body">
+        <form id="qc-record-form" class="stack">
+          <div class="two-col">
+            <label>
+              <span id="qc-record-date-label">Data QC</span>
+              <input id="qc-record-date" type="date">
+            </label>
+            <label>
+              <span id="qc-record-analyte-label">Analiza</span>
+              <select id="qc-record-analyte"></select>
+            </label>
+          </div>
+          <div class="two-col">
+            <label>
+              <span id="qc-record-lot-label">Lot</span>
+              <select id="qc-record-lot"></select>
+            </label>
+            <label>
+              <span id="qc-record-level-label">Nivel QC</span>
+              <input id="qc-record-level" type="text" readonly>
+            </label>
+          </div>
+          <div class="two-col">
+            <label>
+              <span id="qc-record-label-label">Eticheta control</span>
+              <input id="qc-record-label" type="text">
+            </label>
+            <label>
+              <span id="qc-record-qualitative-label">Rezultat calitativ</span>
+              <input id="qc-record-qualitative" type="text">
+            </label>
+          </div>
+          <div class="two-col">
+            <label>
+              <span id="qc-record-quantitative-label">Rezultat cantitativ</span>
+              <input id="qc-record-quantitative" type="text">
+            </label>
+            <label>
+              <span id="qc-record-interpretation-label">Interpretare</span>
+              <input id="qc-record-interpretation" type="text">
+            </label>
+          </div>
+          <div class="actions">
+            <button id="save-qc-record" type="submit" class="primary">Salveaza QC</button>
+          </div>
+          <p id="qc-record-message" class="small muted"></p>
+        </form>
+      </div>
+    </section>
+  </div>
+  <div id="qc-westgard-modal" class="modal-shell" hidden>
+    <div id="qc-westgard-modal-backdrop" class="modal-backdrop"></div>
+    <section class="modal-card qc-westgard-modal-card" role="dialog" aria-modal="true" aria-labelledby="qc-westgard-title">
+      <div class="modal-window-bar">
+        <div class="modal-window-dots" aria-hidden="true">
+          <span></span>
+          <span></span>
+          <span></span>
+        </div>
+      </div>
+      <div class="panel-head modal-head">
+        <h3 id="qc-westgard-title">Diagrama Westgard</h3>
+        <button id="close-qc-westgard-modal" class="ghost modal-close-btn" type="button" aria-label="Close">Close</button>
+      </div>
+      <div class="modal-body qc-westgard-body">
+        <div class="orders-filters qc-westgard-filters">
+          <label>
+            <span id="qc-westgard-period-label">Perioada</span>
+            <select id="qc-westgard-period"></select>
+          </label>
+          <label id="qc-westgard-date-from-box">
+            <span id="qc-westgard-date-from-label">De la</span>
+            <input id="qc-westgard-date-from" type="date">
+          </label>
+          <label id="qc-westgard-date-to-box">
+            <span id="qc-westgard-date-to-label">Pana la</span>
+            <input id="qc-westgard-date-to" type="date">
+          </label>
+          <button id="qc-westgard-validate" class="danger" type="button" hidden>Invalid</button>
+        </div>
+        <div id="qc-westgard-summary" class="metrics"></div>
+        <svg id="qc-westgard-chart" class="line-chart" viewBox="0 0 960 320" preserveAspectRatio="none"></svg>
+        <div id="qc-westgard-rules" class="chart-legend"></div>
+      </div>
+    </section>
+  </div>
+  <div id="qc-target-modal" class="modal-shell" hidden>
+    <div id="qc-target-modal-backdrop" class="modal-backdrop"></div>
+    <section class="modal-card form-panel" role="dialog" aria-modal="true" aria-labelledby="qc-target-title">
+      <div class="modal-window-bar">
+        <div class="modal-window-dots" aria-hidden="true">
+          <span></span>
+          <span></span>
+          <span></span>
+        </div>
+      </div>
+      <div class="panel-head modal-head">
+        <h3 id="qc-target-title">Setari QC pentru analiza</h3>
+        <button id="close-qc-target-modal" class="ghost modal-close-btn" type="button" aria-label="Close">Close</button>
+      </div>
+      <div class="modal-body">
+        <form id="qc-target-form" class="stack">
+          <label>
+            <span id="qc-target-analyte-label">Analiza selectata</span>
+            <select id="qc-target-analyte"></select>
+          </label>
+          <div class="two-col">
+            <label>
+              <span id="qc-target-level-label">Nivel QC</span>
+              <select id="qc-target-level"></select>
+            </label>
+            <label>
+              <span id="qc-target-lot-label">Lot</span>
+              <input id="qc-target-lot" type="text" value="-">
+            </label>
+          </div>
+          <div class="two-col">
+            <label>
+              <span id="qc-target-mean-label">Medie</span>
+              <input id="qc-target-mean" type="number" step="any">
+            </label>
+            <label>
+              <span id="qc-target-sd-label">SD</span>
+              <input id="qc-target-sd" type="number" step="any">
+            </label>
+          </div>
+          <div class="two-col">
+            <label>
+              <span id="qc-target-1sd-label">1 SD</span>
+              <input id="qc-target-1sd" type="text" readonly>
+            </label>
+            <label>
+              <span id="qc-target-cv-label">CV %</span>
+              <input id="qc-target-cv" type="text" readonly>
+            </label>
+          </div>
+          <div class="two-col">
+            <label>
+              <span id="qc-target-2sd-label">2 SD</span>
+              <input id="qc-target-2sd" type="text" readonly>
+            </label>
+            <label>
+              <span id="qc-target-3sd-label">3 SD</span>
+              <input id="qc-target-3sd" type="text" readonly>
+            </label>
+          </div>
+          <div class="actions">
+            <button id="save-qc-target" type="submit" class="primary">Salveaza QC</button>
+            <button id="delete-qc-target" type="button" class="danger">Sterge QC</button>
+          </div>
+          <p id="qc-target-message" class="small muted"></p>
+        </form>
+      </div>
+    </section>
+  </div>
+  <div id="analyte-modal" class="modal-shell" hidden>
+    <div id="analyte-modal-backdrop" class="modal-backdrop"></div>
+    <section class="modal-card form-panel" role="dialog" aria-modal="true" aria-labelledby="editor-title">
+      <div class="modal-window-bar">
+        <div class="modal-window-dots" aria-hidden="true">
+          <span></span>
+          <span></span>
+          <span></span>
+        </div>
+      </div>
+      <div class="panel-head modal-head">
+        <h3 id="editor-title">Editor analyte</h3>
+        <button id="close-analyte-modal" class="ghost modal-close-btn" type="button" aria-label="Close">Close</button>
+      </div>
+      <div class="modal-body">
+        <form id="analyte-form" class="stack">
+          <label><span data-i18n="field_tag">Tag</span><input name="tag" required></label>
+          <label><span data-i18n="field_code">Code</span><input name="code"></label>
+          <label><span data-i18n="field_name">Name</span><input name="name" required></label>
+          <label><span data-i18n="field_description">Description</span><textarea name="description" rows="3"></textarea></label>
+          <div class="two-col">
+            <label>
+              <span data-i18n="field_result_type">Result Type</span>
+              <select name="result_type">
+                <option value="text">text</option>
+                <option value="numeric">numeric</option>
+              </select>
+            </label>
+            <label>
+              <span data-i18n="field_formatting">Formatting</span>
+              <select name="result_formatting">
+                <option value="raw">raw</option>
+                <option value="text">text</option>
+                <option value="numeric">numeric</option>
+                <option value="decimal_1">decimal_1</option>
+                <option value="decimal_2">decimal_2</option>
+                <option value="decimal_3">decimal_3</option>
+              </select>
+            </label>
+          </div>
+          <div class="two-col">
+            <label><span data-i18n="field_weighting">Weighting</span><input name="result_weighting" type="number" step="0.01" value="1"></label>
+            <label><span data-i18n="field_measure_unit">Measure Unit</span><input name="result_measure_unit"></label>
+          </div>
+          <label><span data-i18n="field_reagents_set">Reagents Set</span><input name="result_reagents_set"></label>
+          <label><span>Domeniu de lucru / Unitate de măsură</span><input name="worklist_label"></label>
+          <label class="toggle"><input name="active" type="checkbox" checked><span data-i18n="field_active">Active</span></label>
+          <div class="actions">
+            <button id="save-analyte" type="submit" class="primary">Save</button>
+            <button type="button" id="delete-analyte" class="danger" hidden data-i18n="delete">Delete</button>
+          </div>
+          <p id="analyte-message" class="small muted"></p>
+        </form>
+      </div>
+    </section>
+  </div>
+  <div id="daily-detail-definition-modal" class="modal-shell" hidden>
+    <div id="daily-detail-definition-modal-backdrop" class="modal-backdrop"></div>
+    <section class="modal-card form-panel" role="dialog" aria-modal="true" aria-labelledby="daily-detail-definition-title">
+      <div class="modal-window-bar">
+        <div class="modal-window-dots" aria-hidden="true">
+          <span></span><span></span><span></span>
+        </div>
+      </div>
+      <div class="panel-head modal-head">
+        <h3 id="daily-detail-definition-title">Definitie detaliu zilnic</h3>
+        <button id="close-daily-detail-definition-modal" class="ghost modal-close-btn" type="button" aria-label="Close">Close</button>
+      </div>
+      <div class="modal-body">
+        <form id="daily-detail-definition-form" class="stack">
+          <div class="two-col">
+            <label><span>Cheie</span><input name="key" required></label>
+            <label><span>Eticheta</span><input name="label" required></label>
+          </div>
+          <div class="two-col">
+            <label>
+              <span>Scope</span>
+              <select name="scope">
+                <option value="day">Zi</option>
+                <option value="day_analyte">Zi + analiza</option>
+                <option value="day_round">Zi + runda</option>
+                <option value="day_round_analyte">Zi + runda + analiza</option>
+              </select>
+            </label>
+            <label>
+              <span>Tip camp</span>
+              <select name="field_type">
+                <option value="text">Text</option>
+                <option value="number">Numar</option>
+                <option value="select">Selectie</option>
+              </select>
+            </label>
+          </div>
+          <div class="two-col">
+            <label><span>Placeholder</span><input name="placeholder"></label>
+            <label><span>Valoare implicita</span><input name="default_value"></label>
+          </div>
+          <div class="two-col">
+            <label><span>Optiuni (virgula)</span><input name="options_csv"></label>
+            <label><span>Ordine</span><input name="sort_order" type="number" step="1"></label>
+          </div>
+          <label class="toggle"><input name="required" type="checkbox"><span>Obligatoriu</span></label>
+          <label class="toggle"><input name="active" type="checkbox" checked><span>Activ</span></label>
+          <div class="actions">
+            <button id="save-daily-detail-definition" type="submit" class="primary">Save</button>
+            <button type="button" id="delete-daily-detail-definition" class="danger" hidden>Sterge</button>
+          </div>
+          <p id="daily-detail-definition-message" class="small muted"></p>
+        </form>
+      </div>
+    </section>
+  </div>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

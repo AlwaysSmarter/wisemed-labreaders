@@ -1,0 +1,139 @@
+analyzer:
+    comm_type: utility
+    protocol: barcodeprinter
+local_http:
+    address: 127.0.0.1:8010
+    enabled: true
+    language: ro
+    tls: false
+modules:
+    app-updates:
+        app_id: barcodeprinter-v3
+        auto_download: true
+        base_url: http://127.0.0.1:19090
+        channel: stable
+        current_version: 1.0.0
+        download_dir: ./updates
+        enabled: true
+    barcode-printer:
+        auth_password: admin
+        auth_username: admin
+        bcp_type: zebrazpl
+        log_db_path: ./barcodeprinter-log.db
+        othercfg_bc_widenarowr: "3.0"
+        othercfg_bc_width: "2"
+        othercfg_label_height: "25"
+        othercfg_label_ox: "0"
+        othercfg_label_oy: "0"
+        othercfg_label_width: "50"
+        othercfg_print_bcodeopt_b: "N"
+        othercfg_print_bcodeopt_c: "N"
+        othercfg_print_bcodeopt_cbm: F
+        othercfg_print_bcodeopt_cdm: "N"
+        othercfg_print_bcodeopt_ce: "0"
+        othercfg_print_bcodeopt_ctnwn: "3"
+        othercfg_print_bcodeopt_d: "0"
+        othercfg_print_bcodeopt_dma: "1"
+        othercfg_print_bcodeopt_dme: ""
+        othercfg_print_bcodeopt_dmf: "6"
+        othercfg_print_bcodeopt_dmq: "0"
+        othercfg_print_bcodeopt_e: "N"
+        othercfg_print_bcodeopt_ec: Q
+        othercfg_print_bcodeopt_f: "N"
+        othercfg_print_bcodeopt_g: "N"
+        othercfg_print_bcodeopt_gwc: "N"
+        othercfg_print_bcodeopt_h: "70"
+        othercfg_print_bcodeopt_m: "N"
+        othercfg_print_bcodeopt_mv: "0"
+        othercfg_print_bcodeopt_n: "1"
+        othercfg_print_bcodeopt_nbw: "2"
+        othercfg_print_bcodeopt_nmod: "0"
+        othercfg_print_bcodeopt_o: "N"
+        othercfg_print_bcodeopt_pct: "0"
+        othercfg_print_bcodeopt_qm: "2"
+        othercfg_print_bcodeopt_rc: "0"
+        othercfg_print_bcodeopt_re: "0"
+        othercfg_print_bcodeopt_rh: "10"
+        othercfg_print_bcodeopt_s: "0"
+        othercfg_print_bcodeopt_sh: "1"
+        othercfg_print_bcodeopt_sl: "0"
+        othercfg_print_bcodeopt_sm: A
+        othercfg_print_bcodeopt_ssc: A
+        othercfg_print_bcodeopt_stc: B
+        othercfg_print_bcodeopt_sw: "2"
+        othercfg_print_bcodeopt_sym: "1"
+        othercfg_print_bcodeopt_syn: "2"
+        othercfg_print_bcodeopt_tr: "N"
+        othercfg_print_bcodeopt_upsm: "2"
+        othercfg_print_bcodeopt_w: "2"
+        othercfg_print_bcodetxtf: D
+        othercfg_print_bcodetxth: "6"
+        othercfg_print_bcodetxto: "N"
+        othercfg_print_bcodetxtw: "6"
+        othercfg_print_bcodetxtx: "20"
+        othercfg_print_bcodetxty: "40"
+        othercfg_print_bcodex: "5"
+        othercfg_print_bcodey: "5"
+        othercfg_print_namef: B
+        othercfg_print_nameh: "8"
+        othercfg_print_nameo: "N"
+        othercfg_print_namew: "6"
+        othercfg_print_namex: "5"
+        othercfg_print_namey: "17"
+        othercfg_print_tubecode_boxc: B
+        othercfg_print_tubecode_boxh: "3.8"
+        othercfg_print_tubecode_boxr: "4"
+        othercfg_print_tubecode_boxt: "1"
+        othercfg_print_tubecode_boxw: "3.8"
+        othercfg_print_tubecodef: B
+        othercfg_print_tubecodeh: "6"
+        othercfg_print_tubecodeo: "N"
+        othercfg_print_tubecodew: "6"
+        othercfg_print_tubecodex: "40"
+        othercfg_print_tubecodey: "22"
+        othercfg_printer_barcode: BC
+        othercfg_printer_resolution: "200"
+        othercfg_printer_type: zebrazpl
+        othercfg_sel_printer: Zebra_Technologies_ZTC_ZD410_203dpi_ZPL
+    local-http:
+        address: 127.0.0.1:8010
+        enabled: true
+        language: ro
+        tls: false
+    storage-sqlite:
+        path: ./barcodeprinter-v3.db
+    transport-file:
+        export_dir: ./outbox
+        failed_dir: ./failed
+        import_dir: ./inbox
+        pattern: '*.csv'
+        processed_dir: ./processed
+    wisemed-api:
+        api_key_echipament: ""
+        cfg_wisemed_ip: ldse.wisemed.eu
+        cfg_wisemed_key: 27c490bb-c9e4-47aa-bf6d-ebd2a1add35e
+        cfg_wisemed_path: /wisemed-api/apiv2
+        cfg_wisemed_port: "443"
+        cfg_wisemed_protocol: https
+        cod_echipament: TGMURES1
+        echipament_id: "159"
+        login_token: 813-7534a1f6d1226ba75177348882f005bd
+        numar_serial_echipament: TGMURES1-001
+        tip_de_echipament_id: "2"
+        unitate_medicala_id: "19"
+    wisemed-ws:
+        enabled: true
+        heartbeat_ms: 15000
+        reconnect_delay_ms: 5000
+        url: wss://wslocal.wisemed.eu/ws
+reader:
+    analyzer_code: TGMURES1
+    analyzer_name: WiseMED Barcode Utility
+    db_name: barcodeprinter-v3.db
+    id: barcodeprinter-v3
+    label: Barcode Printer
+wisemed_ws:
+    enabled: true
+    heartbeat_ms: 15000
+    reconnect_delay_ms: 5000
+    url: wss://wslocal.wisemed.eu/ws

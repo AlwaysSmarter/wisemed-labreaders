@@ -1,0 +1,99 @@
+analyzer:
+    comm_type: file
+    protocol: cary60-uvvis
+local_http:
+    address: 127.0.0.1:18080
+    enabled: true
+    language: ro
+    tls: false
+modules:
+    app-updates:
+        app_id: cary60-uvvis-v3
+        auto_download: true
+        base_url: http://127.0.0.1:19090
+        channel: stable
+        current_version: 1.0.5
+        download_dir: ./updates
+        enabled: true
+    daily-details:
+        allow_dynamic_definitions: true
+        definitions de:
+            - active: true
+              field_type: number
+              key: amartor
+              label: A martor
+              placeholder: Absorbanta martor
+              scope: day_analyte
+              sort_order: 1
+            - active: true
+              field_type: number
+              key: zero_report
+              label: Zero Report
+              placeholder: Citire Zero
+              scope: day_analyte
+              sort_order: 2
+            - active: true
+              field_type: text
+              key: concentration_units
+              label: Concentration Units
+              placeholder: UM din import
+              scope: day_analyte
+              sort_order: 3
+    help:
+        help_dir: ./help
+    local-http:
+        address: 0.0.0.0:18080
+        enabled: true
+        language: ro
+        repeat_mode: individual
+        tls: false
+    protocol-cary60-uvvis:
+        poll_seconds: 2
+    qc:
+        levels:
+            - negativ
+            - pozitiv
+            - pcrescut
+            - pscazut
+            - nivel1
+            - nivel2
+            - nivel3
+            - nivel4
+            - nivel5
+    storage-sqlite:
+        path: ./cary60-uvvis-reader-v3.db
+    transport-file:
+        export_dir: ./outbox
+        failed_dir: ./failed
+        import_dir: ./inbox
+        pattern: '*.csv'
+        processed_dir: ./processed
+    wisemed-api:
+        base_url: https://api.wisemed.example
+        cfg_wisemed_ip: ldse.wisemed.eu
+        cfg_wisemed_key: 27c490bb-c9e4-47aa-bf6d-ebd2a1add35e
+        cfg_wisemed_path: /wisemed-api/apiv2
+        cfg_wisemed_port: "443"
+        cfg_wisemed_protocol: https
+        cod_echipament: cary60-uvvis
+        echipament_id: "158"
+        login_token: 786-228d9f44f9a272c3bf0e8e9e66b9306a
+        numar_serial_echipament: cary60-uvvis-001
+        tip_de_echipament_id: "1"
+        unitate_medicala_id: "19"
+    wisemed-ws:
+        enabled: false
+        heartbeat_ms: 15000
+        reconnect_delay_ms: 5000
+        url: wss://wslocal.wisemed.eu/ws
+reader:
+    analyzer_code: cary60-uvvis
+    analyzer_name: Cary60 UV-VIS
+    db_name: cary60-uvvis-reader-v3.db
+    id: cary60-uvvis-v3
+    label: Cary60 UV-VIS
+wisemed_ws:
+    enabled: false
+    heartbeat_ms: 15000
+    reconnect_delay_ms: 5000
+    url: wss://wslocal.wisemed.eu/ws

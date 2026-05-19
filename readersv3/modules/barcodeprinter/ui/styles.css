@@ -1,0 +1,20 @@
+body { margin: 0; background: #ebf1eb; font-family: Georgia, "Times New Roman", serif; color: #1f2a23; }
+.login { min-height: 100vh; display: grid; place-items: center; }
+.app { min-height: 100vh; display: grid; grid-template-columns: 240px 1fr; }
+.menu { background: #dfe9df; border-right: 1px solid #c4d3c4; padding: 16px; display: grid; gap: 8px; align-content: start; }
+.menu h2 { margin: 0 0 8px; }
+.menu-btn { font: inherit; padding: 10px 12px; border: 1px solid #afc0af; border-radius: 8px; background: #f8fbf8; cursor: pointer; text-align: left; }
+.menu-btn.active { background: #cde5cd; border-color: #88b088; }
+.menu-btn.danger { margin-top: 12px; background: #ffeaea; border-color: #d39d9d; }
+.content { padding: 16px; display: grid; gap: 16px; align-content: start; }
+.card { background: #f8fbf8; border: 1px solid #c4d3c4; border-radius: 12px; padding: 16px; }
+.login-card { width: 360px; display: grid; gap: 8px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px 12px; }
+label { display: grid; gap: 4px; font-size: 14px; }
+input, select, button { font: inherit; padding: 8px 10px; border-radius: 8px; border: 1px solid #b7c7b7; background: #fff; }
+button { cursor: pointer; background: #e3f0e3; }
+.actions, .filters { display: flex; gap: 8px; align-items: end; margin-top: 12px; }
+.msg { min-height: 20px; margin: 8px 0 0; color: #8f1d1d; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { border-bottom: 1px solid #d2ddd2; padding: 8px 6px; text-align: left; }
+th { background: #edf5ed; }

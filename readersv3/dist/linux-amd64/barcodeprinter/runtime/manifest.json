@@ -1,0 +1,22 @@
+{
+  "app": {
+    "id": "barcodeprinter",
+    "title": "Barcode Printer",
+    "binaryName": "BarcodePrinter",
+    "serviceName": "wisemed-barcodeprinter",
+    "displayName": "WiseMED Barcode Printer",
+    "description": "WiseMED readersv3 Barcode Printer background service",
+    "bundleId": "eu.wisemed.readersv3.barcodeprinter",
+    "supportsHeadless": true
+  },
+  "target": "linux-amd64",
+  "goos": "linux",
+  "goarch": "amd64",
+  "version": "b65e269",
+  "packageVersion": "b65e269",
+  "commit": "b65e2691d97b",
+  "sourceDateEpoch": 1777045765,
+  "binaryPath": "/Users/raduichim/work/gowork/wisemed-labreaders/readersv3/dist/linux-amd64/barcodeprinter/runtime/BarcodePrinter",
+  "deploymentsPath": "/Users/raduichim/work/gowork/wisemed-labreaders/readersv3/dist/linux-amd64/barcodeprinter/runtime/deployments",
+  "serviceArguments": "-config deployments/config.yaml -headless"
+}

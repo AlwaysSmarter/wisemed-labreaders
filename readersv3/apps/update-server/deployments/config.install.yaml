@@ -1,0 +1,36 @@
+reader:
+  id: app-update-server
+  label: App Update Server
+  analyzer_name: App Update Server
+  analyzer_code: app-update-server
+  db_name: app-update-server.db
+local_http:
+  enabled: true
+  address: 0.0.0.0:19090
+  language: ro
+  tls: false
+wisemed_ws:
+  enabled: false
+  url: ""
+  heartbeat_ms: 15000
+  reconnect_delay_ms: 5000
+analyzer:
+  comm_type: utility
+  protocol: app-update-server
+modules:
+  app-update-server:
+    allowed_user_types: "1,9,10"
+    db_path: ./app-update-server.db
+    files_dir: ./files
+    public_base_url: http://127.0.0.1:19090
+  help:
+    help_dir: ./help
+  local-http:
+    enabled: true
+    address: 0.0.0.0:19090
+  wisemed-api:
+    cfg_wisemed_protocol: https
+    cfg_wisemed_ip: ldse.wisemed.eu
+    cfg_wisemed_port: "443"
+    cfg_wisemed_path: /wisemed-api/apiv2
+    cfg_wisemed_key: 27c490bb-c9e4-47aa-bf6d-ebd2a1add35e

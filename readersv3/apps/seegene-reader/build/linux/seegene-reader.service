@@ -1,0 +1,17 @@
+[Unit]
+Description=WiseMED readersv3 Seegene Reader background service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/seegene-reader
+ExecStart=/opt/seegene-reader/seegene-reader -config deployments/config.yaml -headless
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

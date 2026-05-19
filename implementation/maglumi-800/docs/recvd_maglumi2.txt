@@ -1,31 +1,0 @@
-﻿Thread Start: Thread ID: 6940. Process Maglumi600Reader.exe (3412)
-Thread Start: Thread ID: 2360. Process Maglumi600Reader.exe (3412)
-Debug Output: ===> Process Maglumi600Reader.exe (3412)
-Debug Output: got ENQ Process Maglumi600Reader.exe (3412)
-Debug Output: out: Process Maglumi600Reader.exe (3412)
-Debug Output: ===>H|\^&||PSWD|Maglumi User|||||Lis||P|E1394-97|20180224P|1 Process Maglumi600Reader.exe (3412)
-Debug Output: got STX Process Maglumi600Reader.exe (3412)
-Debug Output: ===>O|1|328494||^^^PSAR|1|^^^PSA|0.387|ng/mL|0 to 4|N||||||20180222141110L|1|N Process Maglumi600Reader.exe (3412)
-Debug Output: Parse Record:| Process Maglumi600Reader.exe (3412)
-Debug Output: Parse Record:P Process Maglumi600Reader.exe (3412)
-Debug Output: Parse Record:O Process Maglumi600Reader.exe (3412)
-Debug Output: SegReceived order Process Maglumi600Reader.exe (3412)
-Debug Output: Parse Record:R Process Maglumi600Reader.exe (3412)
-Debug Output: Parse Record:L Process Maglumi600Reader.exe (3412)
-Debug Output: saveresultsall:1 Process Maglumi600Reader.exe (3412)
-Debug Output: Parse Record: Process Maglumi600Reader.exe (3412)
-Debug Output: out: Process Maglumi600Reader.exe (3412)
-Debug Output: Result pacient::patient id:328494 runda:rack:position:cnt  results:1 Process Maglumi600Reader.exe (3412)
-Debug Output: determin position: select max(position_no) as max_pos from MAGLUMI600_ORDERS  where maglumi600_analysis_date="2018-02-24" and rack_no = "0" and runda_no = "0"  Process Maglumi600Reader.exe (3412)
-Debug Output: test: PSA , val:0.387 Process Maglumi600Reader.exe (3412)
-Debug Output: Test ID:PSA = 0.387 Process Maglumi600Reader.exe (3412)
-Debug Output: dbg: dupa transformare: Test ID:PSA = 0.387 Process Maglumi600Reader.exe (3412)
-Debug Output: SQL: insert into MAGLUMI600_ORDERS_ANALISYS_RESULTS  set maglumi600_order_analisys_id = "7" ,maglumi600_order_result = "0.387" ,maglumi600_order_interpretation = "" , group_no = "0"  Process Maglumi600Reader.exe (3412)
-Debug Output: SQL: update MAGLUMI600_ORDERS_ANALISYS  set maglumi600_order_result = "0.387"  ,maglumi600_order_interpretation = "" where maglumi600_order_analisys_id = "7"  Process Maglumi600Reader.exe (3412)
-Debug Output: ===> Process Maglumi600Reader.exe (3412)
-Debug Output: got EOT Process Maglumi600Reader.exe (3412)
-Debug Output: out: Process Maglumi600Reader.exe (3412)
-Debug Output: ===> Process Maglumi600Reader.exe (3412)
-Debug Output: got ACK Process Maglumi600Reader.exe (3412)
-Thread Exit: Thread ID: 5644. Process Maglumi600Reader.exe (3412)
-Thread Exit: Thread ID: 5552. Process Maglumi600Reader.exe (3412)

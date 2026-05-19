@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="ro">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ajutor WiseMED Cary60 UV-VIS</title>
+  <style>
+    :root{--bg:#f4f8fb;--panel:#ffffff;--ink:#173047;--muted:#5d7284;--line:#d7e3ec;--accent:#1f6ea6;--soft:#e9f4fb;--shadow:0 18px 42px rgba(23,48,71,.08)}
+    *{box-sizing:border-box} body{margin:0;font:16px/1.6 Arial,sans-serif;background:linear-gradient(180deg,#fbfdfe 0%,var(--bg) 100%);color:var(--ink)}
+    .wrap{max-width:1080px;margin:0 auto;padding:32px 20px 80px}.hero,.section{background:var(--panel);border:1px solid var(--line);border-radius:28px;padding:28px;box-shadow:var(--shadow);margin-bottom:24px}
+    h1,h2,h3{line-height:1.2;margin:0 0 14px} h1{font-size:34px} h2{font-size:24px} h3{font-size:18px}
+    .eyebrow{margin:0 0 8px;color:var(--accent);font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-size:12px}
+    .muted{color:var(--muted)} .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px}.card{background:var(--panel);border:1px solid var(--line);border-radius:22px;padding:20px}
+    .chip{display:inline-block;background:var(--soft);color:var(--accent);border-radius:999px;padding:6px 12px;font-size:13px;font-weight:700;margin:0 8px 8px 0}
+    code{background:#eef4f8;border:1px solid var(--line);padding:2px 6px;border-radius:8px} pre{background:#153247;color:#e9f7ff;padding:16px;border-radius:18px;overflow:auto} pre code{background:none;border:none;padding:0;color:inherit}
+    table{width:100%;border-collapse:collapse;margin-top:12px} th,td{padding:10px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top} th{color:var(--muted);font-size:13px;text-transform:uppercase}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="hero">
+      <p class="eyebrow">Ajutor</p>
+      <h1>WiseMED Cary60 UV-VIS</h1>
+      <p class="muted">Ghid pentru importul fișierelor Cary60 UV-VIS, folosirea detaliilor zilnice și verificarea rezultatelor sincronizate local.</p>
+      <div><span class="chip">UV-VIS</span><span class="chip">CSV/File import</span><span class="chip">Daily details</span><span class="chip">QC</span></div>
+    </section>
+
+    <section class="section">
+      <h2>1. Ce face aplicația</h2>
+      <p>Readerul Cary60 UV-VIS procesează fișierele generate de instrument, extrage rezultatele și le pune la dispoziție în consola locală WiseMED. În plus, aplicația include <strong>Daily Details</strong> pentru variabile de lucru care nu sunt strict rezultate finale, dar trebuie urmărite zilnic sau per analiză.</p>
+    </section>
+
+    <section class="section">
+      <h2>2. Fluxul de lucru</h2>
+      <ol>
+        <li>Instrumentul sau operatorul plasează fișierul în <code>transport-file.import_dir</code>.</li>
+        <li>Readerul îl citește și extrage rezultatele conform protocolului <code>protocol-cary60-uvvis</code>.</li>
+        <li>Rezultatele sunt salvate local și afișate în UI.</li>
+        <li>Detaliile zilnice pot fi completate sau verificate separat pentru contextul de laborator.</li>
+      </ol>
+    </section>
+
+    <section class="section">
+      <h2>3. Setări importante</h2>
+      <table>
+        <thead><tr><th>Setare</th><th>Rol</th></tr></thead>
+        <tbody>
+          <tr><td><code>transport-file.import_dir</code></td><td>Directorul urmărit pentru fișierele de intrare.</td></tr>
+          <tr><td><code>transport-file.processed_dir</code></td><td>Fișiere mutate după procesare reușită.</td></tr>
+          <tr><td><code>transport-file.failed_dir</code></td><td>Fișiere mutate dacă apar erori de parsare.</td></tr>
+          <tr><td><code>protocol-cary60-uvvis.poll_seconds</code></td><td>Frecvența de verificare a sursei de date.</td></tr>
+          <tr><td><code>daily-details</code></td><td>Definiții suplimentare precum <code>amartor</code>, <code>zero_report</code> și <code>concentration_units</code>.</td></tr>
+          <tr><td><code>local_http.address</code></td><td>Adresa UI local.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="section">
+      <h2>4. Daily Details</h2>
+      <p>Acest reader folosește explicit <strong>Detalii zilnice</strong> pentru a salva parametri auxiliari ai procesului de lucru.</p>
+      <ul>
+        <li><code>amartor</code>: absorbanta martor</li>
+        <li><code>zero_report</code>: citire zero</li>
+        <li><code>concentration_units</code>: unitatea de măsură observată în import</li>
+      </ul>
+      <p>În Settings, submeniul <strong>Detalii zilnice</strong> îți permite să vezi definițiile și valorile curente. Ele pot fi urmărite pe zi, pe rundă sau pe analiză.</p>
+    </section>
+
+    <section class="section">
+      <h2>5. Ce verifici în Settings</h2>
+      <ul>
+        <li><strong>Setări reader</strong>: IP/port local, update server, repeat mode.</li>
+        <li><strong>Analize</strong>: mapările de analiză trebuie să corespundă importului.</li>
+        <li><strong>Detalii zilnice</strong>: definițiile pentru absorbantă martor și zero report.</li>
+        <li><strong>QC</strong>: nivelurile QC dacă folosești control de calitate pe fluxul local.</li>
+      </ul>
+    </section>
+
+    <section class="section">
+      <h2>6. Troubleshooting</h2>
+      <ul>
+        <li>dacă nu apar rezultate, verifică dacă fișierul respectă formatul așteptat de protocol</li>
+        <li>dacă nu apar detalii zilnice, verifică definițiile active din modulul <code>daily-details</code></li>
+        <li>dacă fișierele rămân în import, verifică permisiunile pe directoare și logurile runtime</li>
+        <li>dacă schimbi portul local, reconectează-te la noul URL după salvare</li>
+      </ul>
+    </section>
+  </div>
+</body>
+</html>

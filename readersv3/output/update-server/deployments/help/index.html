@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="ro">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ajutor WiseMED App Update Server</title>
+  <style>
+    :root{
+      --bg:#f4f8f4;
+      --panel:#ffffff;
+      --ink:#173224;
+      --muted:#5b7466;
+      --line:#d6e3da;
+      --accent:#1b7f52;
+      --accent-soft:#e7f6ee;
+      --shadow:0 18px 44px rgba(21,53,38,.08);
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font:16px/1.6 Arial,sans-serif;background:linear-gradient(180deg,#f8fcf9 0%,var(--bg) 100%);color:var(--ink)}
+    .wrap{max-width:1100px;margin:0 auto;padding:32px 20px 80px}
+    .hero{background:var(--panel);border:1px solid var(--line);border-radius:28px;padding:28px;box-shadow:var(--shadow);margin-bottom:24px}
+    .eyebrow{margin:0 0 8px;color:var(--accent);font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-size:12px}
+    h1,h2,h3{line-height:1.2;margin:0 0 14px}
+    h1{font-size:34px}
+    h2{font-size:24px;margin-top:28px}
+    h3{font-size:18px;margin-top:22px}
+    p,li{color:var(--ink)}
+    .muted{color:var(--muted)}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px;margin:24px 0}
+    .card{background:var(--panel);border:1px solid var(--line);border-radius:22px;padding:20px;box-shadow:var(--shadow)}
+    .chip{display:inline-block;background:var(--accent-soft);color:var(--accent);border-radius:999px;padding:6px 12px;font-size:13px;font-weight:700;margin:0 8px 8px 0}
+    code{background:#f1f5f2;border:1px solid var(--line);padding:2px 6px;border-radius:8px;color:#234734}
+    pre{background:#0f2017;color:#dff5e8;padding:16px;border-radius:18px;overflow:auto}
+    pre code{background:none;border:none;padding:0;color:inherit}
+    .section{background:var(--panel);border:1px solid var(--line);border-radius:28px;padding:28px;box-shadow:var(--shadow);margin-bottom:22px}
+    .warn{border-left:4px solid #d17b00;padding-left:14px;color:#704400}
+    .ok{border-left:4px solid var(--accent);padding-left:14px}
+    ol,ul{padding-left:22px}
+    a{color:var(--accent);text-decoration:none}
+    a:hover{text-decoration:underline}
+    table{width:100%;border-collapse:collapse;margin-top:12px}
+    th,td{padding:10px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+    th{color:var(--muted);font-size:13px;text-transform:uppercase;letter-spacing:.04em}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="hero">
+      <p class="eyebrow">Ajutor</p>
+      <h1>WiseMED App Update Server</h1>
+      <p class="muted">Ghid complet pentru publicarea aplicațiilor, generarea versiunilor, distribuția linkurilor de download și configurarea serverului de update.</p>
+      <div>
+        <span class="chip">Aplicatii</span>
+        <span class="chip">Versiuni</span>
+        <span class="chip">Make release</span>
+        <span class="chip">Link public download</span>
+        <span class="chip">Setari server</span>
+      </div>
+    </section>
+    <section class="section">
+      <h2>1. Ce face aceasta aplicatie</h2>
+      <p>App Update Server este consola locala prin care administrezi pachetele de update pentru aplicatiile WiseMED Reader. Aplicatia ofera catalog de aplicatii, istoric de versiuni, generare automata de release, publicare pachete si linkuri publice de download.</p>
+    </section>
+    <section class="section">
+      <h2>2. Puncte importante</h2>
+      <ul>
+        <li>linkurile publice se bazeaza pe prefixul public configurat</li>
+        <li>release-ul automat foloseste sursele locale din repo</li>
+        <li>pachetul de update si installerul Windows sunt artefacte separate</li>
+        <li>reader-ele consuma arhiva de update, nu installerul interactiv</li>
+      </ul>
+    </section>
+    <section class="section">
+      <h2>3. Troubleshooting</h2>
+      <ul>
+        <li>daca lipsesc fisiere din output, reconstruieste runtime-ul din sursa curenta</li>
+        <li>verifica daca <code>deployments/help/index.html</code> exista in sursa aplicatiei</li>
+        <li>verifica logurile update-server pentru erori de acces la <code>files_dir</code> sau la repo</li>
+      </ul>
+    </section>
+  </div>
+</body>
+</html>

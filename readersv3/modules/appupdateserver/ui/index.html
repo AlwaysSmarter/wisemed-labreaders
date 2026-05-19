@@ -1,0 +1,342 @@
+<!doctype html>
+<html lang="ro">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>WiseMED App Update Server</title>
+  <link rel="stylesheet" href="/app-updates/styles.css">
+</head>
+<body>
+  <div class="shell">
+    <section id="login" class="login-view">
+      <div class="login-card">
+        <img class="brand-logo" src="https://www.wisemed.eu/wp-content/uploads/2024/09/WiseMED-thinkIT-logo-2.png" alt="WiseMED">
+        <p class="eyebrow">ADMIN LOCAL</p>
+        <h1>WiseMED App Update Server</h1>
+        <p class="muted">Login cu utilizator WiseMED administrator pentru administrarea update-urilor.</p>
+        <div class="stack">
+          <label>
+            <span>Utilizator</span>
+            <input id="username" autocomplete="username">
+          </label>
+          <label>
+            <span>Parola</span>
+            <input id="password" type="password" autocomplete="current-password">
+          </label>
+          <button id="login-btn" type="button" class="primary">Login</button>
+          <p id="login-msg" class="error-text"></p>
+        </div>
+      </div>
+    </section>
+
+    <section id="app" class="dashboard" hidden>
+      <aside class="sidebar">
+        <div>
+          <img class="brand-logo brand-logo-small" src="https://www.wisemed.eu/wp-content/uploads/2024/09/WiseMED-thinkIT-logo-2.png" alt="WiseMED">
+          <p class="eyebrow">UPDATE SERVER</p>
+          <h2>WiseMED Apps</h2>
+          <p class="muted small">Administrare aplicatii, versiuni si pachete de update.</p>
+        </div>
+        <section class="reader-card">
+          <p class="reader-card-label">Categorie</p>
+          <div class="reader-identity-badge">
+            <span class="reader-identity-icon">U</span>
+            <div class="reader-identity-copy">
+              <strong>Utility</strong>
+              <span>App Update Server</span>
+            </div>
+          </div>
+        </section>
+        <nav class="nav">
+          <button data-view="dashboard" class="nav-link active">Aplicatii</button>
+          <button data-view="history" class="nav-link">Versiuni</button>
+          <button data-view="settings" class="nav-link">Setari</button>
+          <button data-view="help" class="nav-link">Ajutor</button>
+        </nav>
+        <section class="reader-card reader-summary-card">
+          <p class="reader-card-label">Rezumat server</p>
+          <div class="reader-summary-list">
+            <div class="reader-summary-item">
+              <span class="label">Aplicatie selectata</span>
+              <span id="selected-app-label" class="value">-</span>
+            </div>
+            <div class="reader-summary-item">
+              <span class="label">Tipuri admin</span>
+              <span id="allowed-types-label" class="value">-</span>
+            </div>
+          </div>
+        </section>
+        <div class="session-box">
+          <p class="small muted">Autentificat ca</p>
+          <strong id="session-user">-</strong>
+        </div>
+        <button id="logout-btn" class="logout-button" type="button">Logout</button>
+      </aside>
+
+      <main class="content">
+        <section class="topbar">
+          <div class="topbar-main">
+            <div class="topbar-title">
+              <p class="eyebrow">HTTP LOCAL</p>
+              <h1 id="dashboard-title">Aplicatii</h1>
+            </div>
+            <div class="status-cluster">
+              <div class="status-pill connected">
+                <span class="dot"></span>
+                <span>WiseMED Admin</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="view-dashboard" class="panel-grid">
+          <article class="panel full-span">
+            <div class="panel-head">
+              <h3>Aplicatii publicate</h3>
+              <div class="inline-actions">
+                <button id="save-app" class="ghost" type="button">Salveaza aplicatia</button>
+                <button id="reset-app" class="ghost" type="button">Noua</button>
+                <button id="refresh-apps" class="ghost" type="button">Refresh</button>
+              </div>
+            </div>
+            <form id="app-form" class="reader-settings-form">
+              <input type="hidden" name="id">
+              <div class="two-col">
+                <label class="reader-settings-field">
+                  <span>App ID</span>
+                  <input name="app_id" required>
+                </label>
+                <label class="reader-settings-field">
+                  <span>Nume afisat</span>
+                  <input name="display_name" required>
+                </label>
+              </div>
+              <div class="two-col">
+                <label class="reader-settings-field">
+                  <span>Activ</span>
+                  <select name="active">
+                    <option value="true">Da</option>
+                    <option value="false">Nu</option>
+                  </select>
+                </label>
+              </div>
+              <label class="reader-settings-field">
+                <span>Descriere</span>
+                <textarea name="description" rows="3"></textarea>
+              </label>
+            </form>
+            <p id="app-msg" class="error-text"></p>
+            <div class="analyte-table-wrap">
+              <table id="apps-table" class="analyte-table">
+                <thead><tr><th>App ID</th><th>Nume</th><th>Activ</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+
+        <section id="view-history" class="panel-grid" hidden>
+          <article class="panel full-span">
+            <div class="panel-head">
+              <h3 id="versions-title">Versiuni publicate</h3>
+              <div class="inline-actions">
+                <button id="make-release" class="ghost" type="button">Make release</button>
+                <button id="save-version" class="ghost" type="button">Salveaza versiunea</button>
+                <button id="delete-version" class="ghost" type="button">Sterge versiunea</button>
+                <button id="reset-version" class="ghost" type="button">Noua versiune</button>
+                <button id="refresh-versions" class="ghost" type="button">Refresh versiuni</button>
+              </div>
+            </div>
+            <div class="version-selector-row version-filters-row">
+              <label class="reader-settings-field">
+                <span>Aplicatie</span>
+                <select id="version-app-select" name="application_id"></select>
+              </label>
+              <label class="reader-settings-field">
+                <span>Canal</span>
+                <select id="version-channel-filter" name="version_channel_filter">
+                  <option value="">Toate canalele</option>
+                  <option value="stable">stable</option>
+                </select>
+              </label>
+              <label class="reader-settings-field">
+                <span>SO</span>
+                <select id="version-os-filter" name="version_os_filter">
+                  <option value="">Toate sistemele</option>
+                  <option value="windows">Windows</option>
+                  <option value="linux">Linux</option>
+                  <option value="darwin">Mac</option>
+                </select>
+              </label>
+              <label class="reader-settings-field">
+                <span>Arhitectura</span>
+                <select id="version-arch-filter" name="version_arch_filter">
+                  <option value="">Toate arhitecturile</option>
+                  <option value="amd64">amd64</option>
+                  <option value="arm64">arm64</option>
+                </select>
+              </label>
+            </div>
+            <div id="release-progress" class="release-progress" hidden aria-live="polite" aria-busy="false">
+              <div class="release-progress-head">
+                <div class="release-progress-spinner" aria-hidden="true"></div>
+                <div class="release-progress-copy">
+                  <strong id="release-progress-title">Se pregateste release-ul</strong>
+                  <span id="release-progress-detail">Operatia poate dura cateva zeci de secunde.</span>
+                </div>
+              </div>
+            </div>
+            <p id="version-msg" class="error-text"></p>
+            <div class="version-workspace">
+              <div class="analyte-table-wrap version-table-pane">
+                <table id="versions-table" class="analyte-table">
+                  <thead><tr><th>Versiune</th><th>Tinta</th><th>Mandatory</th><th>Update</th><th>Installer</th></tr></thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+              <form id="version-form" class="reader-settings-form version-editor-pane" enctype="multipart/form-data">
+                <input type="hidden" name="id">
+                <label class="reader-settings-field">
+                  <span>Versiune</span>
+                  <input name="version" placeholder="1.0.0" required>
+                </label>
+                <label class="reader-settings-field">
+                  <span>Canal</span>
+                  <select name="channel">
+                    <option value="stable">stable</option>
+                  </select>
+                </label>
+                <label class="reader-settings-field">
+                  <span>OS tinta</span>
+                  <select name="target_os">
+                    <option value="">Toate sistemele</option>
+                    <option value="windows">Windows</option>
+                    <option value="linux">Linux</option>
+                    <option value="darwin">Mac</option>
+                  </select>
+                </label>
+                <label class="reader-settings-field">
+                  <span>Arhitectura</span>
+                  <select name="target_arch">
+                    <option value="">Toate arhitecturile</option>
+                    <option value="amd64">amd64</option>
+                    <option value="arm64">arm64</option>
+                  </select>
+                </label>
+                <label class="reader-settings-field">
+                  <span>Mandatory</span>
+                  <select name="mandatory">
+                    <option value="false">Nu</option>
+                    <option value="true">Da</option>
+                  </select>
+                </label>
+                <label class="reader-settings-field">
+                  <span>Link download generat</span>
+                  <div class="generated-link-row">
+                    <input name="download_preview" readonly placeholder="Se genereaza automat">
+                    <button id="generate-download-link" class="ghost" type="button">Genereaza one-time-token</button>
+                  </div>
+                </label>
+                <div id="download-link-preview" class="generated-link-preview" hidden></div>
+                <label class="reader-settings-field">
+                  <span>Installer Windows generat</span>
+                  <input name="installer_preview" readonly placeholder="Se genereaza automat la release Windows">
+                </label>
+                <div id="installer-link-preview" class="generated-link-preview" hidden></div>
+                <label class="reader-settings-field">
+                  <span>Release notes</span>
+                  <textarea name="release_notes" rows="4"></textarea>
+                </label>
+                <label class="reader-settings-field">
+                  <span>Installer / pachet upload</span>
+                  <input name="package" type="file">
+                </label>
+              </form>
+            </div>
+          </article>
+        </section>
+
+        <section id="view-settings" class="panel-grid" hidden>
+          <article class="panel full-span">
+            <div class="panel-head">
+              <h3>Setari server update</h3>
+              <div class="inline-actions">
+                <button id="save-settings" class="ghost" type="button">Salveaza setarile</button>
+              </div>
+            </div>
+            <form id="settings-form" class="reader-settings-form">
+              <div class="two-col">
+                <label class="reader-settings-field">
+                  <span>Prefix public link download</span>
+                  <input name="public_base_url" placeholder="https://download.exemplu.ro sau http://127.0.0.1:19090">
+                </label>
+                <label class="reader-settings-field">
+                  <span>Allowed user types</span>
+                  <input name="allowed_user_types">
+                </label>
+              </div>
+              <p class="small muted">Acest prefix reprezinta tot ce este inainte de <code>/api/public/download/...</code>. Daca este completat, are prioritate fata de protocol, host si port.</p>
+              <div class="two-col">
+                <label class="reader-settings-field">
+                  <span>Protocol download</span>
+                  <select name="public_protocol">
+                    <option value="http">http</option>
+                    <option value="https">https</option>
+                  </select>
+                </label>
+                <label class="reader-settings-field">
+                  <span>Nume server download</span>
+                  <input name="public_host">
+                </label>
+              </div>
+              <div class="two-col">
+                <label class="reader-settings-field">
+                  <span>Port server download</span>
+                  <input name="public_port">
+                </label>
+              </div>
+              <div class="two-col">
+                <label class="reader-settings-field">
+                  <span>Director fisiere</span>
+                  <input name="files_dir">
+                </label>
+                <label class="reader-settings-field">
+                  <span>Baza date</span>
+                  <input name="db_path" readonly>
+                </label>
+              </div>
+              <div class="two-col">
+                <label class="reader-settings-field">
+                  <span>WiseMED protocol</span>
+                  <input name="cfg_wisemed_protocol">
+                </label>
+                <label class="reader-settings-field">
+                  <span>WiseMED host</span>
+                  <input name="cfg_wisemed_ip">
+                </label>
+              </div>
+              <div class="two-col">
+                <label class="reader-settings-field">
+                  <span>WiseMED port</span>
+                  <input name="cfg_wisemed_port">
+                </label>
+                <label class="reader-settings-field">
+                  <span>WiseMED path</span>
+                  <input name="cfg_wisemed_path">
+                </label>
+              </div>
+              <label class="reader-settings-field">
+                <span>WiseMED API key</span>
+                <input name="cfg_wisemed_key">
+              </label>
+            </form>
+            <p id="settings-msg" class="error-text"></p>
+          </article>
+        </section>
+      </main>
+    </section>
+  </div>
+
+  <script src="/app-updates/app.js"></script>
+</body>
+</html>

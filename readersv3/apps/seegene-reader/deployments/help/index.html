@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="ro">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ajutor WiseMED Seegene Reader</title>
+  <style>
+    :root{--bg:#f7f8fc;--panel:#ffffff;--ink:#1d2947;--muted:#60708b;--line:#dbe2ef;--accent:#355aa8;--soft:#edf2fd;--shadow:0 18px 42px rgba(29,41,71,.08)}
+    *{box-sizing:border-box} body{margin:0;font:16px/1.6 Arial,sans-serif;background:linear-gradient(180deg,#fcfcfe 0%,var(--bg) 100%);color:var(--ink)}
+    .wrap{max-width:1080px;margin:0 auto;padding:32px 20px 80px}.hero,.section{background:var(--panel);border:1px solid var(--line);border-radius:28px;padding:28px;box-shadow:var(--shadow);margin-bottom:24px}
+    h1,h2,h3{line-height:1.2;margin:0 0 14px} h1{font-size:34px} h2{font-size:24px}.eyebrow{margin:0 0 8px;color:var(--accent);font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-size:12px}
+    .muted{color:var(--muted)} .chip{display:inline-block;background:var(--soft);color:var(--accent);border-radius:999px;padding:6px 12px;font-size:13px;font-weight:700;margin:0 8px 8px 0}
+    code{background:#eef3fb;border:1px solid var(--line);padding:2px 6px;border-radius:8px} pre{background:#1a2846;color:#edf2ff;padding:16px;border-radius:18px;overflow:auto} pre code{background:none;border:none;padding:0;color:inherit}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="hero">
+      <p class="eyebrow">Ajutor</p>
+      <h1>WiseMED Seegene Reader</h1>
+      <p class="muted">Ghid pentru importul fișierelor Excel Seegene, verificarea rezultatelor locale și depanarea fluxului bazat pe fișiere.</p>
+      <div><span class="chip">Excel import</span><span class="chip">Seegene</span><span class="chip">File transport</span></div>
+    </section>
+
+    <section class="section">
+      <h2>1. Ce face aplicația</h2>
+      <p>Seegene Reader procesează fișiere Excel generate de fluxul Seegene și le transformă în rezultate vizibile în consola locală WiseMED. Transportul este pe fișier, iar protocolul activ este <code>seegene-excel</code>.</p>
+    </section>
+
+    <section class="section">
+      <h2>2. Configurare principală</h2>
+      <ul>
+        <li><code>transport-file.import_dir</code>: directorul de intrare</li>
+        <li><code>transport-file.processed_dir</code>: fișiere procesate</li>
+        <li><code>transport-file.failed_dir</code>: fișiere cu erori tehnice</li>
+        <li><code>transport-file.pattern</code>: în mod normal <code>*.xlsx</code></li>
+      </ul>
+    </section>
+
+    <section class="section">
+      <h2>3. Cum lucrezi din Settings</h2>
+      <ul>
+        <li><strong>Setări reader</strong>: IP/port local și update server.</li>
+        <li><strong>Analize</strong>: mapările pentru analizele extrase din fișierul Excel.</li>
+        <li><strong>QC</strong>: dacă vrei să filtrezi sau validezi rezultate de control local.</li>
+      </ul>
+    </section>
+
+    <section class="section">
+      <h2>4. Pași tipici</h2>
+      <ol>
+        <li>Copiezi fișierul Excel în <code>import_dir</code>.</li>
+        <li>Readerul îl procesează și îl mută în <code>processed_dir</code> sau <code>failed_dir</code>.</li>
+        <li>Verifici în UI secțiunea <strong>Orders</strong> și <strong>Results</strong>.</li>
+        <li>Dacă unele câmpuri nu se leagă, ajustezi tag-urile din <strong>Analize</strong>.</li>
+      </ol>
+    </section>
+
+    <section class="section">
+      <h2>5. Troubleshooting</h2>
+      <ul>
+        <li>dacă fișierul nu este luat în calcul, verifică extensia și directoarele configurate</li>
+        <li>dacă importul eșuează, verifică structura Excel și logurile runtime</li>
+        <li>dacă rezultatele sunt incomplete, verifică mapările de analiză și denumirile din fișier</li>
+      </ul>
+    </section>
+  </div>
+</body>
+</html>

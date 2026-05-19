@@ -1,9 +1,0 @@
-server:
-  address: "0.0.0.0"
-  port: 8090
-
-security:
-  jwt_secret_ref: "WMWS_JWT_SECRET"
-
-control:
-  command_timeout_ms: 10000

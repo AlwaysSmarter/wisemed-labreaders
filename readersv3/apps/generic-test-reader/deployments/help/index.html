@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="ro">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ajutor WiseMED Generic Test Reader</title>
+  <style>
+    :root{--bg:#f5f7f5;--panel:#ffffff;--ink:#203024;--muted:#607164;--line:#d8e1d9;--accent:#3f7c4f;--soft:#ebf6ee;--shadow:0 18px 42px rgba(32,48,36,.08)}
+    *{box-sizing:border-box} body{margin:0;font:16px/1.6 Arial,sans-serif;background:linear-gradient(180deg,#fbfcfb 0%,var(--bg) 100%);color:var(--ink)}
+    .wrap{max-width:1080px;margin:0 auto;padding:32px 20px 80px}.hero,.section{background:var(--panel);border:1px solid var(--line);border-radius:28px;padding:28px;box-shadow:var(--shadow);margin-bottom:24px}
+    h1,h2,h3{line-height:1.2;margin:0 0 14px} h1{font-size:34px} h2{font-size:24px}.eyebrow{margin:0 0 8px;color:var(--accent);font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-size:12px}
+    .muted{color:var(--muted)} .chip{display:inline-block;background:var(--soft);color:var(--accent);border-radius:999px;padding:6px 12px;font-size:13px;font-weight:700;margin:0 8px 8px 0}
+    code{background:#eef3ef;border:1px solid var(--line);padding:2px 6px;border-radius:8px} pre{background:#1e2f23;color:#eaf7ed;padding:16px;border-radius:18px;overflow:auto} pre code{background:none;border:none;padding:0;color:inherit}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="hero">
+      <p class="eyebrow">Ajutor</p>
+      <h1>WiseMED Generic Test Reader</h1>
+      <p class="muted">Reader generic pentru testare și validarea fluxurilor de import fișiere, mapare analize și comportament local al consolei WiseMED.</p>
+      <div><span class="chip">Testing</span><span class="chip">Generic file</span><span class="chip">Sandbox reader</span></div>
+    </section>
+
+    <section class="section">
+      <h2>1. Pentru ce se folosește</h2>
+      <p>Generic Test Reader este aplicația de test pentru scenarii de integrare pe fișier. Este utilă când vrei să validezi rapid importul local, mapările de analize, fluxul de orders/results și comportamentul UI fără un analizor hardware dedicat.</p>
+    </section>
+
+    <section class="section">
+      <h2>2. Configurarea de fișier</h2>
+      <ul>
+        <li><code>transport-file.import_dir</code>: directorul din care sunt citite fișierele de test</li>
+        <li><code>transport-file.processed_dir</code>: fișiere mutate după procesare</li>
+        <li><code>transport-file.failed_dir</code>: fișiere care nu au putut fi parse-ate</li>
+        <li><code>transport-file.pattern</code>: în mod normal <code>*.txt</code></li>
+      </ul>
+      <pre><code>inbox/
+processed/
+failed/
+outbox/</code></pre>
+    </section>
+
+    <section class="section">
+      <h2>3. Ce verifici în Settings</h2>
+      <ul>
+        <li><strong>Setări reader</strong>: adresa HTTP locală și setările de update.</li>
+        <li><strong>Analize</strong>: folosește-le pentru a testa rapid tag-uri, coduri și formatări.</li>
+        <li><strong>QC</strong>: doar dacă vrei să simulezi și control de calitate.</li>
+      </ul>
+    </section>
+
+    <section class="section">
+      <h2>4. Cum faci un test minim</h2>
+      <ol>
+        <li>Pui un fișier de test în <code>import_dir</code>.</li>
+        <li>Verifici în loguri dacă a fost procesat.</li>
+        <li>Deschizi <strong>Orders</strong> și verifici dacă proba și analizele au apărut.</li>
+        <li>Ajustezi mapările din <strong>Analize</strong> dacă rezultatele nu se leagă corect.</li>
+      </ol>
+    </section>
+
+    <section class="section">
+      <h2>5. Troubleshooting</h2>
+      <ul>
+        <li>dacă nu se întâmplă nimic, verifică extensia față de <code>pattern</code></li>
+        <li>dacă importul pică, verifică dacă fișierul ajunge în <code>failed_dir</code></li>
+        <li>dacă UI-ul nu mai răspunde după schimbarea portului, conectează-te la noua adresă</li>
+      </ul>
+    </section>
+  </div>
+</body>
+</html>

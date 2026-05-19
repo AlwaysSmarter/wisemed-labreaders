@@ -11,3 +11,6 @@
 /old-src/
 /common/output/certs/
 *.log
+readersv3/dist/
+readersv3/release/
+readersv3/build/apps.json

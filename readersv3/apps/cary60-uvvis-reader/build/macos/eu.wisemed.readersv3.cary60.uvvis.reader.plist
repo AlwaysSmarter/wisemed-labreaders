@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>eu.wisemed.readersv3.cary60.uvvis.reader</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/local/cary60-uvvis-reader/Cary60-UVVIS-Reader</string>
+    <string>-config</string>
+    <string>deployments/config.yaml</string>
+    <string>-headless</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>WorkingDirectory</key>
+  <string>/usr/local/cary60-uvvis-reader</string>
+  <key>StandardOutPath</key>
+  <string>/var/log/cary60-uvvis-reader.log</string>
+  <key>StandardErrorPath</key>
+  <string>/var/log/cary60-uvvis-reader.log</string>
+</dict>
+</plist>

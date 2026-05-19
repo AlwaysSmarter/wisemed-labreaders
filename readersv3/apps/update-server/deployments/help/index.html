@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="ro">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ajutor WiseMED App Update Server</title>
+  <style>
+    :root{
+      --bg:#f4f8f4;
+      --panel:#ffffff;
+      --ink:#173224;
+      --muted:#5b7466;
+      --line:#d6e3da;
+      --accent:#1b7f52;
+      --accent-soft:#e7f6ee;
+      --shadow:0 18px 44px rgba(21,53,38,.08);
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font:16px/1.6 Arial,sans-serif;background:linear-gradient(180deg,#f8fcf9 0%,var(--bg) 100%);color:var(--ink)}
+    .wrap{max-width:1100px;margin:0 auto;padding:32px 20px 80px}
+    .hero{background:var(--panel);border:1px solid var(--line);border-radius:28px;padding:28px;box-shadow:var(--shadow);margin-bottom:24px}
+    .eyebrow{margin:0 0 8px;color:var(--accent);font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-size:12px}
+    h1,h2,h3{line-height:1.2;margin:0 0 14px}
+    h1{font-size:34px}
+    h2{font-size:24px;margin-top:28px}
+    h3{font-size:18px;margin-top:22px}
+    p,li{color:var(--ink)}
+    .muted{color:var(--muted)}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px;margin:24px 0}
+    .card{background:var(--panel);border:1px solid var(--line);border-radius:22px;padding:20px;box-shadow:var(--shadow)}
+    .chip{display:inline-block;background:var(--accent-soft);color:var(--accent);border-radius:999px;padding:6px 12px;font-size:13px;font-weight:700;margin:0 8px 8px 0}
+    code{background:#f1f5f2;border:1px solid var(--line);padding:2px 6px;border-radius:8px;color:#234734}
+    pre{background:#0f2017;color:#dff5e8;padding:16px;border-radius:18px;overflow:auto}
+    pre code{background:none;border:none;padding:0;color:inherit}
+    .section{background:var(--panel);border:1px solid var(--line);border-radius:28px;padding:28px;box-shadow:var(--shadow);margin-bottom:22px}
+    .warn{border-left:4px solid #d17b00;padding-left:14px;color:#704400}
+    .ok{border-left:4px solid var(--accent);padding-left:14px}
+    ol,ul{padding-left:22px}
+    a{color:var(--accent);text-decoration:none}
+    a:hover{text-decoration:underline}
+    table{width:100%;border-collapse:collapse;margin-top:12px}
+    th,td{padding:10px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+    th{color:var(--muted);font-size:13px;text-transform:uppercase;letter-spacing:.04em}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="hero">
+      <p class="eyebrow">Ajutor</p>
+      <h1>WiseMED App Update Server</h1>
+      <p class="muted">Ghid complet pentru publicarea aplicațiilor, generarea versiunilor, distribuția linkurilor de download și configurarea serverului de update.</p>
+      <div>
+        <span class="chip">Aplicatii</span>
+        <span class="chip">Versiuni</span>
+        <span class="chip">Make release</span>
+        <span class="chip">Link public download</span>
+        <span class="chip">Setari server</span>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>1. Ce face aceasta aplicatie</h2>
+      <p>App Update Server este consola locala prin care administrezi pachetele de update pentru aplicatiile WiseMED Reader. Aplicatia ofera:</p>
+      <ul>
+        <li>catalog de aplicatii publicate</li>
+        <li>istoric de versiuni pe OS si arhitectura</li>
+        <li>generare automata de release din sursele locale</li>
+        <li>publicare pachete manuale sau generate</li>
+        <li>linkuri publice de download cu token unic</li>
+        <li>endpoint public de check-update pentru readere</li>
+      </ul>
+    </section>
+
+    <section class="section">
+      <h2>2. Meniul principal</h2>
+      <div class="grid">
+        <article class="card">
+          <h3>Aplicatii</h3>
+          <p>Defineste aplicatiile pentru care serverul publica update-uri. Fiecare aplicatie are un <code>App ID</code>, nume afisat si descriere.</p>
+        </article>
+        <article class="card">
+          <h3>Versiuni</h3>
+          <p>Administreaza versiunile publicate, filtreaza pe canal, sistem de operare si arhitectura, creeaza release-uri noi si genereaza linkuri publice.</p>
+        </article>
+        <article class="card">
+          <h3>Setari</h3>
+          <p>Configureaza prefixul public de download, directoarele de lucru si credentialele WiseMED API folosite pentru autentificare si verificare.</p>
+        </article>
+        <article class="card">
+          <h3>Ajutor</h3>
+          <p>Deschide acest ghid direct din meniul principal atunci cand ai nevoie de documentatie operationala sau de troubleshooting.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>3. Flux recomandat de lucru</h2>
+      <ol>
+        <li>Deschide <strong>Aplicatii</strong> si verifica daca aplicatia exista deja in catalog.</li>
+        <li>Selecteaza aplicatia si mergi in <strong>Versiuni</strong>.</li>
+        <li>Alege <code>Canal</code>, <code>OS tinta</code> si <code>Arhitectura</code>.</li>
+        <li>Apasa <strong>Make release</strong> daca vrei sa generezi automat pachetul din sursele locale.</li>
+        <li>Alternativ, foloseste <strong>Salveaza versiunea</strong> si incarca manual un pachet in campul <code>Installer / pachet upload</code>.</li>
+        <li>Dupa creare, selecteaza versiunea si apasa <strong>Genereaza one-time-token</strong> pentru un link public de download.</li>
+      </ol>
+      <p class="ok">Fluxul automat foloseste versiunea embedded in binar si genereaza pachetul de update fara a include <code>config.yaml</code>, baze de date sau fisiere runtime.</p>
+    </section>
+
+    <section class="section">
+      <h2>4. Pagina Aplicatii</h2>
+      <p>Pagina <strong>Aplicatii</strong> defineste identitatea logica a fiecarui produs publicat de update-server.</p>
+      <table>
+        <thead>
+          <tr><th>Camp</th><th>Rol</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>App ID</code></td><td>Identificatorul folosit de reader cand verifica update-uri. Trebuie sa corespunda cu <code>modules.app-updates.app_id</code> din reader.</td></tr>
+          <tr><td><code>Nume afisat</code></td><td>Eticheta umana afisata in consola de administrare.</td></tr>
+          <tr><td><code>Activ</code></td><td>Daca este dezactivata, aplicatia ramane in baza de date dar nu ar trebui folosita pentru publicari noi.</td></tr>
+          <tr><td><code>Descriere</code></td><td>Text informativ pentru operatori.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="section">
+      <h2>5. Pagina Versiuni</h2>
+      <p>Aici administrezi pachetele efective livrate catre clienti.</p>
+      <h3>Filtre</h3>
+      <ul>
+        <li><strong>Aplicatie</strong>: selecteaza produsul pentru care vezi sau creezi versiuni.</li>
+        <li><strong>Canal</strong>: in prezent este disponibil <code>stable</code>.</li>
+        <li><strong>SO</strong>: filtreaza pe <code>windows</code>, <code>linux</code> sau <code>darwin</code>.</li>
+        <li><strong>Arhitectura</strong>: filtreaza pe <code>amd64</code> sau <code>arm64</code>.</li>
+      </ul>
+      <h3>Actiuni</h3>
+      <ul>
+        <li><strong>Make release</strong>: construieste automat binarul si arhiva de update pentru tinta selectata.</li>
+        <li><strong>Salveaza versiunea</strong>: salveaza o versiune manuala sau editeaza metadatele celei selectate.</li>
+        <li><strong>Sterge versiunea</strong>: elimina inregistrarea si fisierul asociat.</li>
+        <li><strong>Noua versiune</strong>: reseteaza formularul din dreapta.</li>
+        <li><strong>Refresh versiuni</strong>: reincarca lista din baza de date.</li>
+      </ul>
+      <h3>Campuri</h3>
+      <table>
+        <thead>
+          <tr><th>Camp</th><th>Rol</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>Versiune</code></td><td>Versiunea logica publicata. Pentru release-ul automat este calculata de server.</td></tr>
+          <tr><td><code>OS tinta</code></td><td>Sistemul de operare pentru care este produs pachetul.</td></tr>
+          <tr><td><code>Arhitectura</code></td><td>Arhitectura hardware pentru care este produs pachetul.</td></tr>
+          <tr><td><code>Mandatory</code></td><td>Daca este activ, readerul trateaza update-ul ca obligatoriu.</td></tr>
+          <tr><td><code>Link download generat</code></td><td>Preview si link public cu token unic pentru distribuire.</td></tr>
+          <tr><td><code>Release notes</code></td><td>Text informativ pentru operatori si audit intern.</td></tr>
+          <tr><td><code>Installer / pachet upload</code></td><td>Fisier incarcat manual daca nu folosesti <strong>Make release</strong>.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="section">
+      <h2>6. Make release</h2>
+      <p><strong>Make release</strong> foloseste sursele locale ale proiectului <code>readersv3</code> pentru a genera automat un pachet publicabil.</p>
+      <ul>
+        <li>foloseste binarul compilat cu versiune embedded</li>
+        <li>genereaza payload curat pentru update</li>
+        <li>pentru Windows genereaza automat si installerul NSIS <code>.exe</code></li>
+        <li>include binarul si <code>deployments/config.install.yaml</code></li>
+        <li>exclude <code>config.yaml</code>, baze de date, loguri, cache si fisiere runtime</li>
+      </ul>
+      <p>Installerul Windows generat automat ramane separat de pachetul de update. Reader-ele folosesc in continuare arhiva de update, iar operatorul poate descarca installerul din formularul versiunii create.</p>
+      <p class="warn">Pentru ca fluxul sa functioneze, serverul trebuie sa ruleze pe o masina care are acces la repo-ul local si la toolchain-ul Go necesar pentru build.</p>
+    </section>
+
+    <section class="section">
+      <h2>7. Linkuri publice de download</h2>
+      <p>Linkurile de download sunt generate sub forma:</p>
+      <pre><code>https://prefix-exemplu.ro/api/public/download/11?token=...</code></pre>
+      <p>Partea configurabila este tot ce se afla inainte de <code>/api/public/download/...</code>.</p>
+      <h3>Setarea corecta</h3>
+      <ul>
+        <li>Daca serverul este accesibil local, poti folosi de exemplu <code>http://127.0.0.1:19090</code>.</li>
+        <li>Daca serverul este publicat in retea sau prin reverse proxy, seteaza URL-ul extern, de exemplu <code>https://updates.exemplu.ro</code>.</li>
+      </ul>
+      <p>Campul din setari care controleaza acest lucru este <strong>Prefix public link download</strong>. Daca este completat, are prioritate fata de protocol, host si port.</p>
+    </section>
+
+    <section class="section">
+      <h2>8. Pagina Setari</h2>
+      <table>
+        <thead>
+          <tr><th>Setare</th><th>Rol</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>Prefix public link download</code></td><td>Tot ce apare inainte de <code>/api/public/download/...</code>. Este setarea recomandata pentru linkuri publice corecte.</td></tr>
+          <tr><td><code>Allowed user types</code></td><td>Tipurile de utilizator WiseMED care au voie sa se autentifice in consola locala.</td></tr>
+          <tr><td><code>Protocol download</code>, <code>Nume server download</code>, <code>Port server download</code></td><td>Fallback folosit daca prefixul public nu este completat.</td></tr>
+          <tr><td><code>Director fisiere</code></td><td>Locatia in care sunt stocate pachetele publicate.</td></tr>
+          <tr><td><code>Baza date</code></td><td>Baza de date locala a serverului de update.</td></tr>
+          <tr><td><code>WiseMED protocol / host / port / path / API key</code></td><td>Credentiale si endpoint-uri WiseMED folosite pentru autentificare si verificare.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="section">
+      <h2>9. Configurare minima recomandata</h2>
+      <pre><code>modules:
+  app-update-server:
+    files_dir: ./files
+    db_path: ./app-update-server.db
+    public_base_url: https://updates.exemplu.ro
+    allowed_user_types: "1,9,10"
+  wisemed-api:
+    cfg_wisemed_protocol: https
+    cfg_wisemed_ip: ldse.wisemed.eu
+    cfg_wisemed_port: "443"
+    cfg_wisemed_path: /wisemed-api/apiv2
+    cfg_wisemed_key: ...</code></pre>
+    </section>
+
+    <section class="section">
+      <h2>10. Troubleshooting</h2>
+      <h3>Nu se pot genera linkuri corecte</h3>
+      <ul>
+        <li>Completeaza <code>Prefix public link download</code> cu URL-ul exact prin care clientii ajung la server.</li>
+        <li>Daca folosesti reverse proxy, nu lasa doar <code>127.0.0.1</code>, pentru ca linkul va fi inutil in afara masinii locale.</li>
+      </ul>
+      <h3>Make release esueaza</h3>
+      <ul>
+        <li>Verifica existenta repo-ului local <code>readersv3</code> pe masina serverului.</li>
+        <li>Verifica toolchain-ul Go si permisiunile pe directoarele temporare si pe <code>files_dir</code>.</li>
+      </ul>
+      <h3>Readerul nu vede update-ul</h3>
+      <ul>
+        <li>Verifica daca <code>app_id</code> din reader corespunde cu <code>App ID</code> din update-server.</li>
+        <li>Verifica daca versiunea publicata corespunde cu OS-ul si arhitectura readerului.</li>
+        <li>Verifica daca versiunea embedded in binarul readerului este mai mica decat cea publicata.</li>
+      </ul>
+      <h3>Download-ul esueaza</h3>
+      <ul>
+        <li>Verifica daca fisierul exista in <code>files_dir</code>.</li>
+        <li>Verifica daca prefixul public de download este accesibil din reteaua clientului.</li>
+        <li>Verifica logurile pentru erori la token, acces sau checksum.</li>
+      </ul>
+    </section>
+
+    <section class="section">
+      <h2>11. Bune practici</h2>
+      <ul>
+        <li>Pastreaza <code>App ID</code> stabil pe toata durata de viata a produsului.</li>
+        <li>Publica separat pe fiecare combinatie de OS si arhitectura necesara.</li>
+        <li>Foloseste <code>Mandatory</code> doar pentru update-uri care chiar trebuie aplicate imediat.</li>
+        <li>Seteaza un URL public real in <code>Prefix public link download</code> daca linkul ajunge la clienti externi.</li>
+        <li>Nu publica in pachete fisiere runtime sau configuratii active ale clientului.</li>
+      </ul>
+    </section>
+  </div>
+</body>
+</html>

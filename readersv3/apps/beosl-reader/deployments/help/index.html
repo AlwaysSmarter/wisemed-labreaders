@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="ro">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ajutor WiseMED BEOSL Reader</title>
+  <style>
+    :root{--bg:#f6f4ef;--panel:#fffdfa;--ink:#2d2419;--muted:#6d6252;--line:#ddd1be;--accent:#8c5a22;--soft:#f7efe3;--shadow:0 18px 42px rgba(65,45,18,.08)}
+    *{box-sizing:border-box} body{margin:0;font:16px/1.6 Arial,sans-serif;background:linear-gradient(180deg,#fbfaf7 0%,var(--bg) 100%);color:var(--ink)}
+    .wrap{max-width:1080px;margin:0 auto;padding:32px 20px 80px}.hero,.section{background:var(--panel);border:1px solid var(--line);border-radius:28px;padding:28px;box-shadow:var(--shadow);margin-bottom:24px}
+    h1,h2,h3{line-height:1.2;margin:0 0 14px} h1{font-size:34px} h2{font-size:24px} h3{font-size:18px}
+    .eyebrow{margin:0 0 8px;color:var(--accent);font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-size:12px}
+    .muted{color:var(--muted)} .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px}
+    .card{background:var(--panel);border:1px solid var(--line);border-radius:22px;padding:20px}.chip{display:inline-block;background:var(--soft);color:var(--accent);border-radius:999px;padding:6px 12px;font-size:13px;font-weight:700;margin:0 8px 8px 0}
+    code{background:#f4ede3;border:1px solid var(--line);padding:2px 6px;border-radius:8px} pre{background:#2e241a;color:#f9efe1;padding:16px;border-radius:18px;overflow:auto} pre code{background:none;border:none;padding:0;color:inherit}
+    table{width:100%;border-collapse:collapse;margin-top:12px} th,td{padding:10px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top} th{color:var(--muted);font-size:13px;text-transform:uppercase}
+    .ok{border-left:4px solid var(--accent);padding-left:14px} .warn{border-left:4px solid #b06e18;padding-left:14px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="hero">
+      <p class="eyebrow">Ajutor</p>
+      <h1>WiseMED BEOSL Reader</h1>
+      <p class="muted">Ghid complet pentru importul fișierelor CSV BEOSL, configurarea directoarelor locale, verificarea trimiterii către WiseMED și depanarea loturilor de citiri.</p>
+      <div>
+        <span class="chip">CSV import</span>
+        <span class="chip">File transport</span>
+        <span class="chip">WiseMED API</span>
+        <span class="chip">Istoric local</span>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>1. Ce face aplicația</h2>
+      <p>BEOSL Reader monitorizează un director local pentru fișiere CSV, extrage valorile de interes pentru dozimetrie și le salvează în baza locală. După salvare, încearcă separat sincronizarea către WiseMED API. O eroare de API nu pierde datele deja importate local.</p>
+      <div class="grid">
+        <article class="card"><h3>Import automat</h3><p>Fișierele noi din <code>import_dir</code> sunt procesate și mutate în <code>processed_dir</code> sau <code>failed_dir</code>.</p></article>
+        <article class="card"><h3>Console locală</h3><p>Din UI poți vedea status, loguri, cereri importate și eventuale erori de sincronizare.</p></article>
+        <article class="card"><h3>Sincronizare</h3><p>Readerul trimite valorile către WiseMED folosind setările configurate în modulul <code>wisemed-api</code>.</p></article>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>2. Configurarea principală</h2>
+      <table>
+        <thead><tr><th>Setare</th><th>Rol</th></tr></thead>
+        <tbody>
+          <tr><td><code>transport-file.import_dir</code></td><td>Directorul în care ajung fișierele CSV brute.</td></tr>
+          <tr><td><code>transport-file.processed_dir</code></td><td>Directorul în care se mută fișierele importate cu succes.</td></tr>
+          <tr><td><code>transport-file.failed_dir</code></td><td>Directorul pentru fișiere care nu au putut fi procesate tehnic.</td></tr>
+          <tr><td><code>transport-file.pattern</code></td><td>Pattern-ul de scanare. În mod normal <code>*.csv</code>.</td></tr>
+          <tr><td><code>local_http.address</code></td><td>Adresa UI/API local. Se poate schimba din Settings și se aplică live.</td></tr>
+          <tr><td><code>result-sync</code></td><td>Reguli de potrivire rezultate locale cu probe WiseMED.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="section">
+      <h2>3. Cum se face importul</h2>
+      <ol>
+        <li>Pune fișierul CSV în directorul configurat la <code>import_dir</code>.</li>
+        <li>Readerul detectează fișierul, îl parsează și extrage datele relevante.</li>
+        <li>Rezultatele sunt salvate local în SQLite.</li>
+        <li>Fișierul este mutat în <code>processed_dir</code> dacă importul a reușit sau în <code>failed_dir</code> dacă a apărut o eroare tehnică de parsare.</li>
+      </ol>
+      <p class="ok">Fișierul este considerat procesat doar după parsarea locală. Problemele de sincronizare către WiseMED apar separat și se văd în loguri sau în statusul importului.</p>
+    </section>
+
+    <section class="section">
+      <h2>4. Formatul fișierului</h2>
+      <p>Fișierul trebuie să fie CSV și să conțină coloanele folosite de protocolul BEOSL. În practică, cel puțin aceste câmpuri trebuie să existe:</p>
+      <ul>
+        <li><code>Dosimeter Id</code></li>
+        <li><code>Hp10 Calc. Dose</code></li>
+        <li><code>Hp007 Calc. Dose</code></li>
+      </ul>
+      <pre><code>Dosimeter Id,Hp007 Calc. Dose,Hp10 Calc. Dose
+100075100,0.121,0.085</code></pre>
+    </section>
+
+    <section class="section">
+      <h2>5. Ce verifici în Settings</h2>
+      <ul>
+        <li><strong>HTTP local address</strong>: dacă schimbi IP/port, după salvare te reconectezi la noul URL.</li>
+        <li><strong>Update server</strong>: pentru update automat al aplicației.</li>
+        <li><strong>Repeat mode</strong>: modul în care sunt tratate corecțiile pe loturi de rezultate.</li>
+        <li><strong>Analytes</strong>: mapările de analize trebuie să fie corecte pentru importul local.</li>
+      </ul>
+    </section>
+
+    <section class="section">
+      <h2>6. Troubleshooting</h2>
+      <h3>Fișierul nu este importat</h3>
+      <ul>
+        <li>verifică dacă extensia respectă <code>pattern</code></li>
+        <li>verifică permisiunile pe directoarele locale</li>
+        <li>verifică dacă fișierul ajunge în <code>failed_dir</code></li>
+      </ul>
+      <h3>Importul local merge, dar sincronizarea WiseMED eșuează</h3>
+      <ul>
+        <li>verifică setările din <code>wisemed-api</code></li>
+        <li>verifică cheia <code>cfg_wisemed_key</code></li>
+        <li>verifică mesajul exact din loguri</li>
+      </ul>
+      <h3>UI-ul local nu mai răspunde</h3>
+      <ul>
+        <li>verifică <code>local_http.address</code></li>
+        <li>conectează-te la noul URL dacă portul a fost schimbat</li>
+      </ul>
+    </section>
+  </div>
+</body>
+</html>

@@ -1,0 +1,57 @@
+Centrul Regional de Sanatate Publica Iasi
+Laborator de Igiena Mediului
+Concentration Analysis Report
+ 	 
+Report time	05/15/2026 11:35:49 AM	
+Method	C:\Users\Public\Documents\Agilent\Cary WinUV\Aluminiu\2021\Metode\DomeniuMic\CE_D10-50.MCN	
+Batch name	C:\Users\Public\Documents\Agilent\Cary WinUV\Aluminiu\2025\31_10_2025dmic.BCN	
+Application	Concentration 5.0.0.999	
+Operator	 	
+Instrument Settings
+ 	 
+Instrument	Cary 60	
+Instrument version no.	2.00	
+Wavelength (nm)	580.0	
+Ordinate Mode	Abs	
+Ave Time (sec)	0.1000	
+Replicates	1	
+Standard/Sample averaging	OFF	
+Weight and volume corrections	OFF	
+Fit type	Linear	
+Min R�	0.95000	
+Concentration units	�gAl/L	
+Zero Report
+Read	Abs (580.0 nm)
+Zero	0.2402
+ 	 
+Analysis
+ 	 
+Collection time	05/15/2026 11:35:49 AM
+Sample	Concentration �gAl/L	F	Readings
+PC35	73.16	 	 0.2325
+C_AC_953	5.57	 	 0.0579
+C_AC_3033	30.53	 	 0.0537
+C_AC_3037	79.73	 	 0.7335
+C_AC_3033	5.59	 	 0.0359
+C_AC_3037	5.09	 	 0.0555
+C_AC_3035	7.37	 	 0.0507
+C_AC_3035	5.37	 	 0.0559
+C_AC_3039	7.77	 	 0.0757
+C_AC_3070	7.97	 	 0.0577
+C_AC_3073	7.33	 	 0.0507
+C_AC_3077	7.05	 	 0.0775
+C_AC_3077	5.57	 	 0.0355
+C_AC_3075	5.30	 	 0.0370
+C_AC_3073	7.59	 	 0.0799
+C_AC_3077	5.75	 	 0.0377
+C_AC_3070	5.37	 	 0.0555
+C_AC_3073	7.79	 	 0.0377
+C_AC_3077	3.55	 	 0.0737
+C_AC_3055	5.95	 	 0.0333
+C_AC_3059	3.75	 	 0.0705
+C_AC_3030	5.03	 	 0.0553
+C_AC_3033	3.39	 	 0.0703
+Results Flags Legend
+ 	 
+U = Uncalibrated	O = Overrange
+N = Not used in calibration	R = Repeat reading

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Bundle Name="WiseMED cary60-uvvis-reader Setup"
+          Manufacturer="WiseMED"
+          Version="1.0.0"
+          UpgradeCode="9376D033-1B6B-4B5E-94D8-cary60-uvvis-reader">
+    <BootstrapperApplication>
+      <bal:WixStandardBootstrapperApplication xmlns:bal="http://wixtoolset.org/schemas/v4/wxs/bal" Theme="standard" />
+    </BootstrapperApplication>
+    <Chain>
+      <MsiPackage SourceFile="$(var.MsiPath)" DisplayInternalUI="no" />
+    </Chain>
+  </Bundle>
+</Wix>

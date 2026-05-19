@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="ro">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>WiseMED Barcode Printer</title>
+  <link rel="stylesheet" href="/barcode/styles.css">
+</head>
+<body>
+  <section id="login" class="login">
+    <div class="card login-card">
+      <h1>WiseMED Barcode Printer</h1>
+      <p>Login local</p>
+      <label>Utilizator<input id="username" value="admin"></label>
+      <label>Parola<input id="password" type="password" value="admin"></label>
+      <button id="login-btn" type="button">Login</button>
+      <p id="login-msg" class="msg"></p>
+    </div>
+  </section>
+
+  <section id="app" class="app" hidden>
+    <aside class="menu">
+      <h2>BarcodePrinter</h2>
+      <button data-view="dashboard" class="menu-btn active">Dashboard</button>
+      <button data-view="settings" class="menu-btn">Setari</button>
+      <button data-view="history" class="menu-btn">Istoric</button>
+      <button id="logout-btn" class="menu-btn danger">Logout</button>
+    </aside>
+
+    <main class="content">
+      <section id="view-dashboard" class="card view">
+        <h3>Statistici tiparire pe zile</h3>
+        <div class="filters">
+          <label>De la <input id="date-from" type="date"></label>
+          <label>Pana la <input id="date-to" type="date"></label>
+          <button id="refresh-stats" type="button">Refresh</button>
+        </div>
+        <table id="stats-table">
+          <thead><tr><th>Zi</th><th>Tipariri</th><th>Etichete</th><th>OK</th><th>Fail</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </section>
+
+      <section id="view-settings" class="card view" hidden>
+        <h3>Printer settings</h3>
+        <form id="settings-form" class="grid">
+          <label>Printer type<input name="bcp_type" value="zebrazpl"></label>
+          <label>Selected printer<select id="printer-select" name="othercfg_sel_printer"></select></label>
+          <label>Printer resolution (dpi)<input name="othercfg_printer_resolution" type="number" value="200"></label>
+          <label>Barcode type<input name="othercfg_printer_barcode" value="B3"></label>
+          <label>Label width (mm)<input name="othercfg_label_width" value="50"></label>
+          <label>Label height (mm)<input name="othercfg_label_height" value="25"></label>
+          <label>Barcode X (mm)<input name="othercfg_print_bcodex" value="5"></label>
+          <label>Barcode Y (mm)<input name="othercfg_print_bcodey" value="5"></label>
+          <label>Barcode text X (mm)<input name="othercfg_print_bcodetxtx" value="20"></label>
+          <label>Barcode text Y (mm)<input name="othercfg_print_bcodetxty" value="40"></label>
+          <label>Patient name X (mm)<input name="othercfg_print_namex" value="5"></label>
+          <label>Patient name Y (mm)<input name="othercfg_print_namey" value="12"></label>
+          <label>Tube code X (mm)<input name="othercfg_print_tubecodex" value="40"></label>
+          <label>Tube code Y (mm)<input name="othercfg_print_tubecodey" value="22"></label>
+          <label>HTTP local address<input name="local_http_address" value="127.0.0.1:18080"></label>
+          <label>HTTP local language<select name="local_http_language"><option value="ro">Romana</option><option value="en">English</option></select></label>
+          <label>HTTPS local<select name="local_http_tls"><option value="false">Nu</option><option value="true">Da</option></select></label>
+          <label>Origin-uri CORS permise<input name="local_http_cors_allowed_origins" value="https://ldse.wisemed.eu"></label>
+          <label>Log DB path<input name="log_db_path" value="./barcodeprinter-log.db"></label>
+          <label>Auth user<input name="auth_username" value="admin"></label>
+          <label>Auth pass<input name="auth_password" value="admin"></label>
+        </form>
+        <div class="actions">
+          <button id="save-settings" type="button">Salveaza setarile</button>
+          <button id="test-print" type="button">Test print</button>
+          <button id="reload-settings" type="button">Reload</button>
+        </div>
+        <p id="settings-msg" class="msg"></p>
+      </section>
+
+      <section id="view-history" class="card view" hidden>
+        <h3>Istoric tipariri</h3>
+        <table id="jobs-table">
+          <thead><tr><th>Data</th><th>IP</th><th>FileID</th><th>Name</th><th>BCType</th><th>Etichete</th><th>Status</th><th>Eroare</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </section>
+    </main>
+  </section>
+
+  <script src="/barcode/app.js"></script>
+</body>
+</html>

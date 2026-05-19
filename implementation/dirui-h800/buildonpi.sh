@@ -1,1 +1,0 @@
-env GOOS=linux GOARCH=arm64 GO111MODULE=on CGO_ENABLED=1 go build -o ../../output/sysmex-ca600/WMSysmexReader

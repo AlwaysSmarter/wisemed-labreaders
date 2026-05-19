@@ -1,13 +1,0 @@
-﻿Thread Exit: Thread ID: 3068. Process Maglumi600Reader.exe (6656)
-Thread Exit: Thread ID: 3676. Process Maglumi600Reader.exe (6656)
-Debug Output: ===> Process Maglumi600Reader.exe (6656)
-Debug Output: got ENQ Process Maglumi600Reader.exe (6656)
-Debug Output: out: Process Maglumi600Reader.exe (6656)
-Debug Output: ===>H|\^&||PSWD|Maglumi User|||||Lis||P|E1394-97|20180224Q|1|^328873||ALL||||| Process Maglumi600Reader.exe (6656)
-Debug Output: got STX Process Maglumi600Reader.exe (6656)
-Debug Output: ===>|||OL|1|N Process Maglumi600Reader.exe (6656)
-Debug Output: Parse Record:| Process Maglumi600Reader.exe (6656)
-Debug Output: Parse Record:Q Process Maglumi600Reader.exe (6656)
-Debug Output: Parse Record:L Process Maglumi600Reader.exe (6656)
-Debug Output: Parse Record: Process Maglumi600Reader.exe (6656)
-Debug Output: out: Process Maglumi600Reader.exe (6656)

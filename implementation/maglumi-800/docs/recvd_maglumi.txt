@@ -1,15 +1,0 @@
-﻿Thread Start: Thread ID: 5860. Process Maglumi600Reader.exe (4716)
-Thread Start: Thread ID: 4356. Process Maglumi600Reader.exe (4716)
-Debug Output: ===> Process Maglumi600Reader.exe (4716)
-Debug Output: Parsing: ===> Process Maglumi600Reader.exe (4716)
-Debug Output: got ENQ Process Maglumi600Reader.exe (4716)
-Debug Output: out: Process Maglumi600Reader.exe (4716)
-Debug Output: ===>H|\^&||PSWD|Maglumi User|||||Lis||P|E1394-97|20180224P|1O|1|328 Process Maglumi600Reader.exe (4716)
-Debug Output: Parsing: ===>H|\^&||PSWD|Maglumi User|||||Lis||P|E1394-97|20180224P|1O|1|328 Process Maglumi600Reader.exe (4716)
-Debug Output: got STX Process Maglumi600Reader.exe (4716)
-Debug Output: Parse Record:| Process Maglumi600Reader.exe (4716)
-Debug Output: Parse Record:P Process Maglumi600Reader.exe (4716)
-Debug Output: Parse Record:O Process Maglumi600Reader.exe (4716)
-Debug Output: out: Process Maglumi600Reader.exe (4716)
-Debug Output: ===>485||^^^TSHR|1|^^^TSH|3.209|uIU/mL|0.3 to 4.5|N||||||20180222140904L|1|N Process Maglumi600Reader.exe (4716)
-Debug Output: Parsing: ===>48O|5||^^^TSHR|1|^^^TSH|3.209|uIU/mL|0.3 to 4.5|N||||||20180222140904L|1|N Process Maglumi600Reader.exe (4716)

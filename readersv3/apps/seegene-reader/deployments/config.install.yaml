@@ -1,0 +1,59 @@
+reader:
+  id: seegene-v3
+  label: Seegene Reader V3
+  analyzer_name: Seegene Viewer
+  analyzer_code: seegene-v3
+  db_name: seegene-reader-v3.db
+local_http:
+  enabled: true
+  address: 127.0.0.1:18080
+  language: ro
+  tls: false
+wisemed_ws:
+  enabled: true
+  url: wss://wslocal.wisemed.eu/ws
+  heartbeat_ms: 15000
+  reconnect_delay_ms: 5000
+analyzer:
+  comm_type: file
+  protocol: seegene-excel
+modules:
+  app-updates:
+    enabled: true
+    app_id: seegene-v3
+    channel: stable
+    base_url: http://127.0.0.1:19090
+    auto_download: true
+    download_dir: ./updates
+  qc:
+    levels: ["negativ", "pozitiv", "pcrescut", "pscazut", "nivel1", "nivel2", "nivel3", "nivel4", "nivel5"]
+  result-sync:
+    enabled: true
+    interval_minutes: 5
+    sample_prefixes: []
+    sample_suffixes: []
+    separators: ["-"]
+    qc_prefixes: []
+  local-http:
+    enabled: true
+    address: 127.0.0.1:18080
+    language: ro
+    repeat_mode: individual
+    tls: false
+  storage-sqlite:
+    path: ./seegene-reader-v3.db
+  wisemed-api:
+    base_url: https://api.wisemed.example
+    cfg_wisemed_protocol: https
+    cfg_wisemed_ip: ldse.wisemed.eu
+    cfg_wisemed_port: "443"
+    cfg_wisemed_path: /wisemed-api/apiv2
+    cfg_wisemed_key: 27c490bb-c9e4-47aa-bf6d-ebd2a1add35e
+  help:
+    help_dir: ./help
+  transport-file:
+    import_dir: ./inbox
+    processed_dir: ./processed
+    failed_dir: ./failed
+    export_dir: ./outbox
+    pattern: "*.xlsx"
