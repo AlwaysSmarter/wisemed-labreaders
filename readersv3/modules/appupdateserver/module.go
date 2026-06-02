@@ -101,6 +101,11 @@ type managedReaderRelease struct {
 	UpdateAppID string
 }
 
+var managedReaderUpdateAppIDAliases = map[string]string{
+	"labnovation-ld-560-reader-v3": "labnovation-ld-560",
+	"labnovatiob-ld-560-reader-v3": "labnovation-ld-560",
+}
+
 type releaseRequest struct {
 	Channel      string `json:"channel"`
 	TargetOS     string `json:"target_os"`
@@ -146,6 +151,7 @@ func (m *Module) Init(rt module.Runtime) error {
 	m.rt.Handle("/api/update-server/apps", m.withCORS(m.requireSession(http.HandlerFunc(m.handleApps))))
 	m.rt.Handle("/api/update-server/apps/", m.withCORS(m.requireSession(http.HandlerFunc(m.handleAppSubroutes))))
 	m.rt.Handle("/api/update-server/versions/", m.withCORS(m.requireSession(http.HandlerFunc(m.handleVersionByID))))
+	m.rt.Handle("/api/update-server/package-download/", m.withCORS(m.requireSession(http.HandlerFunc(m.handlePackageDownload))))
 	m.rt.Handle("/api/update-server/installer-download/", m.withCORS(m.requireSession(http.HandlerFunc(m.handleInstallerDownload))))
 	m.rt.Handle("/api/update-server/download-link/", m.withCORS(m.requireSession(http.HandlerFunc(m.handleAdminDownloadLink))))
 	m.rt.Handle("/api/public/check-update", m.withCORS(http.HandlerFunc(m.handlePublicCheckUpdate)))
@@ -487,22 +493,29 @@ func (m *Module) handleAppSubroutes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if len(parts) == 1 {
-		if r.Method != http.MethodPut {
+		switch r.Method {
+		case http.MethodPut:
+			var item application
+			if err := json.NewDecoder(r.Body).Decode(&item); err != nil {
+				writeJSON(w, http.StatusBadRequest, map[string]interface{}{"ok": false, "error": "invalid json body"})
+				return
+			}
+			item.ID = appID
+			saved, err := m.saveApplication(item)
+			if err != nil {
+				writeJSON(w, http.StatusBadRequest, map[string]interface{}{"ok": false, "error": err.Error()})
+				return
+			}
+			writeJSON(w, http.StatusOK, map[string]interface{}{"ok": true, "app": saved})
+		case http.MethodDelete:
+			if err := m.deleteApplication(appID); err != nil {
+				writeJSON(w, http.StatusBadRequest, map[string]interface{}{"ok": false, "error": err.Error()})
+				return
+			}
+			writeJSON(w, http.StatusOK, map[string]interface{}{"ok": true})
+		default:
 			writeJSON(w, http.StatusMethodNotAllowed, map[string]interface{}{"ok": false, "error": "method not allowed"})
-			return
 		}
-		var item application
-		if err := json.NewDecoder(r.Body).Decode(&item); err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]interface{}{"ok": false, "error": "invalid json body"})
-			return
-		}
-		item.ID = appID
-		saved, err := m.saveApplication(item)
-		if err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]interface{}{"ok": false, "error": err.Error()})
-			return
-		}
-		writeJSON(w, http.StatusOK, map[string]interface{}{"ok": true, "app": saved})
 		return
 	}
 	if len(parts) == 2 && parts[1] == "versions" {
@@ -611,6 +624,43 @@ func (m *Module) handleInstallerDownload(w http.ResponseWriter, r *http.Request)
 	w.Header().Set("Content-Type", "application/octet-stream")
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, escapeHeader(item.InstallerFileName)))
 	http.ServeContent(w, r, item.InstallerFileName, item.CreatedAt, f)
+}
+
+func (m *Module) handlePackageDownload(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]interface{}{"ok": false, "error": "method not allowed"})
+		return
+	}
+	id, err := strconv.ParseInt(strings.TrimPrefix(r.URL.Path, "/api/update-server/package-download/"), 10, 64)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]interface{}{"ok": false, "error": "invalid version id"})
+		return
+	}
+	item, err := m.getVersion(id)
+	if err != nil {
+		writeJSON(w, http.StatusNotFound, map[string]interface{}{"ok": false, "error": err.Error()})
+		return
+	}
+	artifact := m.preferredPublicArtifact(item)
+	if strings.TrimSpace(artifact.FilePath) == "" {
+		target := strings.TrimSpace(artifact.DownloadURL)
+		if target == "" {
+			writeJSON(w, http.StatusNotFound, map[string]interface{}{"ok": false, "error": "download is unavailable"})
+			return
+		}
+		http.Redirect(w, r, target, http.StatusTemporaryRedirect)
+		return
+	}
+	target := m.resolveFilesPath(artifact.FilePath)
+	f, err := os.Open(target)
+	if err != nil {
+		writeJSON(w, http.StatusNotFound, map[string]interface{}{"ok": false, "error": err.Error()})
+		return
+	}
+	defer f.Close()
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, escapeHeader(artifact.FileName)))
+	http.ServeContent(w, r, artifact.FileName, item.CreatedAt, f)
 }
 
 func (m *Module) handlePublicCheckUpdate(w http.ResponseWriter, r *http.Request) {
@@ -1082,6 +1132,25 @@ func (m *Module) findApplicationByAppID(appID string) (application, error) {
 	return item, nil
 }
 
+func (m *Module) deleteApplication(id int64) error {
+	if _, err := m.findApplicationByID(id); err != nil {
+		return err
+	}
+	versions, err := m.listVersions(id)
+	if err != nil {
+		return err
+	}
+	for _, item := range versions {
+		if err := m.deleteVersion(item.ID); err != nil {
+			return err
+		}
+	}
+	if _, err := m.db.Exec(`delete from applications where id=?`, id); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (m *Module) listVersions(appID int64) ([]versionRecord, error) {
 	rows, err := m.db.Query(`select id, application_id, version, channel, target_os, target_arch, mandatory, download_url, file_name, file_path, checksum_sha256, file_size, installer_file_name, installer_file_path, installer_checksum_sha256, installer_file_size, release_notes, uploaded_by, created_at, active from app_versions where application_id=? order by created_at desc, id desc`, appID)
 	if err != nil {
@@ -1443,7 +1512,7 @@ func discoverManagedReader(repoRoot, updateAppID string) (managedReaderRelease, 
 	if err != nil {
 		return managedReaderRelease{}, err
 	}
-	updateAppID = strings.TrimSpace(updateAppID)
+	updateAppID = canonicalManagedReaderUpdateAppID(updateAppID)
 	for _, entry := range entries {
 		if !entry.IsDir() {
 			continue
@@ -1462,7 +1531,7 @@ func discoverManagedReader(repoRoot, updateAppID string) (managedReaderRelease, 
 		if appUpdates == nil {
 			continue
 		}
-		appID := strings.TrimSpace(asString(appUpdates["app_id"]))
+		appID := canonicalManagedReaderUpdateAppID(asString(appUpdates["app_id"]))
 		if appID != updateAppID {
 			continue
 		}
@@ -1472,6 +1541,14 @@ func discoverManagedReader(repoRoot, updateAppID string) (managedReaderRelease, 
 		}, nil
 	}
 	return managedReaderRelease{}, fmt.Errorf("no readersv3 source mapping found for update app_id %q", updateAppID)
+}
+
+func canonicalManagedReaderUpdateAppID(appID string) string {
+	appID = strings.TrimSpace(appID)
+	if canonical, ok := managedReaderUpdateAppIDAliases[appID]; ok {
+		return canonical
+	}
+	return appID
 }
 
 func nextReleaseVersion(versions []versionRecord) string {

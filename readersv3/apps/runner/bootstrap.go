@@ -106,11 +106,11 @@ func ensureBootstrap(cfg *config.Config, reconfigure bool) (bool, error) {
 		changed = true
 	}
 	if reconfigure || cfg.Analyzer.CommType == "" {
-		promptTopLevelString(reader, "Communication type", &cfg.Analyzer.CommType, defaultCommType(cfg))
+		promptTopLevelChoice(reader, "Communication type", &cfg.Analyzer.CommType, supportedCommTypes(cfg), defaultCommType(cfg))
 		changed = true
 	}
 	if reconfigure || cfg.Analyzer.Protocol == "" {
-		promptTopLevelString(reader, "Protocol", &cfg.Analyzer.Protocol, defaultProtocol(cfg))
+		promptTopLevelChoice(reader, "Protocol", &cfg.Analyzer.Protocol, supportedProtocols(cfg), defaultProtocol(cfg))
 		changed = true
 	}
 
@@ -206,11 +206,23 @@ func bootstrapModuleSettings(reader *bufio.Reader, cfg *config.Config, reconfigu
 		if _, ok := cfg.Modules["transport-tcpip"]; !ok {
 			cfg.Modules["transport-tcpip"] = map[string]interface{}{}
 		}
-		if reconfigure || strSetting(cfg.Modules["transport-tcpip"], "host") == "" {
-			promptString(reader, "TCP/IP host", cfg.Modules["transport-tcpip"], "host", "127.0.0.1")
+		if supportsTCPModeSelection(cfg) && (reconfigure || strSetting(cfg.Modules["transport-tcpip"], "mode") == "") {
+			promptChoice(reader, "TCP/IP mode", cfg.Modules["transport-tcpip"], "mode", supportedTCPModes(cfg), defaultTCPMode(cfg))
 		}
-		if reconfigure || strSetting(cfg.Modules["transport-tcpip"], "port") == "" {
-			promptString(reader, "TCP/IP port", cfg.Modules["transport-tcpip"], "port", "9000")
+		if strings.EqualFold(strSetting(cfg.Modules["transport-tcpip"], "mode"), "client") {
+			if reconfigure || strSetting(cfg.Modules["transport-tcpip"], "remote_host") == "" {
+				promptString(reader, "TCP/IP remote host", cfg.Modules["transport-tcpip"], "remote_host", defaultTCPRemoteHost(cfg))
+			}
+			if reconfigure || strSetting(cfg.Modules["transport-tcpip"], "remote_port") == "" {
+				promptString(reader, "TCP/IP remote port", cfg.Modules["transport-tcpip"], "remote_port", defaultTCPRemotePort(cfg))
+			}
+		} else {
+			if reconfigure || strSetting(cfg.Modules["transport-tcpip"], "host") == "" {
+				promptString(reader, "TCP/IP listen host", cfg.Modules["transport-tcpip"], "host", defaultTCPHost(cfg))
+			}
+			if reconfigure || strSetting(cfg.Modules["transport-tcpip"], "port") == "" {
+				promptString(reader, "TCP/IP listen port", cfg.Modules["transport-tcpip"], "port", defaultTCPPort(cfg))
+			}
 		}
 	case "serial":
 		if _, ok := cfg.Modules["transport-serial"]; !ok {
@@ -428,6 +440,56 @@ func promptTopLevelString(reader *bufio.Reader, label string, target *string, fa
 	*target = text
 }
 
+func promptTopLevelChoice(reader *bufio.Reader, label string, target *string, choices []string, fallback string) {
+	if len(choices) == 0 {
+		promptTopLevelString(reader, label, target, fallback)
+		return
+	}
+	current := strings.TrimSpace(*target)
+	if current == "" {
+		current = fallback
+	}
+	if !containsChoice(choices, current) {
+		current = fallback
+	}
+	fmt.Printf("%s [%s] (%s): ", label, strings.Join(choices, "/"), current)
+	text, _ := reader.ReadString('\n')
+	text = strings.TrimSpace(text)
+	if text == "" {
+		*target = current
+		return
+	}
+	if containsChoice(choices, text) {
+		*target = text
+		return
+	}
+	fmt.Printf("Invalid choice, keeping %s\n", current)
+	*target = current
+}
+
+func promptChoice(reader *bufio.Reader, label string, section map[string]interface{}, key string, choices []string, fallback string) {
+	current := strSetting(section, key)
+	if current == "" {
+		current = fallback
+	}
+	if !containsChoice(choices, current) {
+		current = fallback
+	}
+	fmt.Printf("%s [%s] (%s): ", label, strings.Join(choices, "/"), current)
+	text, _ := reader.ReadString('\n')
+	text = strings.TrimSpace(text)
+	if text == "" {
+		section[key] = current
+		return
+	}
+	if containsChoice(choices, text) {
+		section[key] = text
+		return
+	}
+	fmt.Printf("Invalid choice, keeping %s\n", current)
+	section[key] = current
+}
+
 func strSetting(section map[string]interface{}, key string) string {
 	if section == nil {
 		return ""
@@ -529,8 +591,13 @@ func defaultCommType(cfg *config.Config) string {
 	if strings.TrimSpace(cfg.Analyzer.CommType) != "" {
 		return cfg.Analyzer.CommType
 	}
+	if values := supportedCommTypes(cfg); len(values) == 1 {
+		return values[0]
+	}
 	switch strings.ToLower(strings.TrimSpace(cfg.Analyzer.Protocol)) {
 	case "astm":
+		return "tcpip"
+	case "hl7", "simple":
 		return "tcpip"
 	case "barcodeprinter":
 		return "utility"
@@ -543,5 +610,140 @@ func defaultProtocol(cfg *config.Config) string {
 	if strings.TrimSpace(cfg.Analyzer.Protocol) != "" {
 		return cfg.Analyzer.Protocol
 	}
+	if values := supportedProtocols(cfg); len(values) == 1 {
+		return values[0]
+	}
 	return "generic-file"
+}
+
+func supportedProtocols(cfg *config.Config) []string {
+	out := []string{}
+	add := func(value string) {
+		value = strings.TrimSpace(value)
+		if value == "" || containsChoice(out, value) {
+			return
+		}
+		out = append(out, value)
+	}
+	for _, moduleID := range cfg.EnabledModules {
+		switch strings.TrimSpace(moduleID) {
+		case "protocol-labnovation-ld560":
+			add("hl7")
+			add("simple")
+		case "protocol-astm":
+			add("astm")
+		case "protocol-ir-biotyper":
+			add("ir-biotyper")
+		case "protocol-cary60-uvvis":
+			add("cary60-uvvis")
+		case "protocol-seegene-excel":
+			add("seegene-excel")
+		case "protocol-beosl-csv":
+			add("beoslcsv")
+			add("beosl-csv")
+		case "protocol-generic-file":
+			add("generic-file")
+		}
+	}
+	if len(out) == 0 && strings.TrimSpace(cfg.Analyzer.Protocol) != "" {
+		add(cfg.Analyzer.Protocol)
+	}
+	return out
+}
+
+func supportedCommTypes(cfg *config.Config) []string {
+	out := []string{}
+	add := func(value string) {
+		value = strings.TrimSpace(value)
+		if value == "" || containsChoice(out, value) {
+			return
+		}
+		out = append(out, value)
+	}
+	for _, protocol := range supportedProtocols(cfg) {
+		switch strings.ToLower(strings.TrimSpace(protocol)) {
+		case "hl7", "simple", "astm", "ir-biotyper":
+			add("tcpip")
+		case "seegene-excel", "beosl-csv", "beoslcsv", "cary60-uvvis", "generic-file":
+			add("file")
+		case "barcodeprinter":
+			add("utility")
+		}
+	}
+	if len(out) == 0 && strings.TrimSpace(cfg.Analyzer.CommType) != "" {
+		add(cfg.Analyzer.CommType)
+	}
+	return out
+}
+
+func supportedTCPModes(cfg *config.Config) []string {
+	for _, item := range cfg.EnabledModules {
+		if strings.EqualFold(strings.TrimSpace(item), "protocol-labnovation-ld560") {
+			return []string{"server", "client"}
+		}
+	}
+	return []string{"server"}
+}
+
+func supportsTCPModeSelection(cfg *config.Config) bool {
+	return len(supportedTCPModes(cfg)) > 1
+}
+
+func defaultTCPMode(cfg *config.Config) string {
+	if value := strSetting(cfg.ModuleSettings("transport-tcpip"), "mode"); value != "" {
+		return value
+	}
+	return "server"
+}
+
+func defaultTCPHost(cfg *config.Config) string {
+	if value := strSetting(cfg.ModuleSettings("transport-tcpip"), "host"); value != "" {
+		return value
+	}
+	if hasEnabledModule(cfg, "protocol-labnovation-ld560") {
+		return "0.0.0.0"
+	}
+	return "127.0.0.1"
+}
+
+func defaultTCPPort(cfg *config.Config) string {
+	if value := strSetting(cfg.ModuleSettings("transport-tcpip"), "port"); value != "" {
+		return value
+	}
+	if hasEnabledModule(cfg, "protocol-labnovation-ld560") {
+		return "8000"
+	}
+	return "9000"
+}
+
+func defaultTCPRemoteHost(cfg *config.Config) string {
+	if value := strSetting(cfg.ModuleSettings("transport-tcpip"), "remote_host"); value != "" {
+		return value
+	}
+	return "127.0.0.1"
+}
+
+func defaultTCPRemotePort(cfg *config.Config) string {
+	if value := strSetting(cfg.ModuleSettings("transport-tcpip"), "remote_port"); value != "" {
+		return value
+	}
+	return defaultTCPPort(cfg)
+}
+
+func hasEnabledModule(cfg *config.Config, target string) bool {
+	for _, item := range cfg.EnabledModules {
+		if strings.EqualFold(strings.TrimSpace(item), strings.TrimSpace(target)) {
+			return true
+		}
+	}
+	return false
+}
+
+func containsChoice(items []string, target string) bool {
+	for _, item := range items {
+		if strings.EqualFold(strings.TrimSpace(item), strings.TrimSpace(target)) {
+			return true
+		}
+	}
+	return false
 }

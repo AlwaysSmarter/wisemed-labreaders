@@ -661,7 +661,7 @@ const state = {
   utilityMode: false,
   barcodeSettings: {},
   barcodePrinters: [],
-  readerSettings: { repeat_mode: "individual" },
+  readerSettings: { repeat_mode: "individual", available_comm_types: [], available_protocols: [], available_tcpip_modes: [] },
   appUpdateSettings: {},
   appUpdateStatus: null,
   wisemedSetup: { settings: {}, configured: false, setup_complete: false, equipment_registered: false },
@@ -888,6 +888,8 @@ function bindEvents() {
   els.newAnalyteBtn.addEventListener("click", () => openAnalyteModal());
   els.refreshAnalytesBtn.addEventListener("click", onRefreshAnalytesClick);
   if (els.readerSettingsForm) els.readerSettingsForm.addEventListener("submit", onSaveReaderSettings);
+  if (els.readerSettingsForm?.elements?.analyzer_comm_type) els.readerSettingsForm.elements.analyzer_comm_type.addEventListener("change", syncReaderSettingsTransportFields);
+  if (els.readerSettingsForm?.elements?.tcpip_mode) els.readerSettingsForm.elements.tcpip_mode.addEventListener("change", syncReaderSettingsTransportFields);
   if (els.runResultSyncBtn) els.runResultSyncBtn.addEventListener("click", onRunResultSync);
   if (els.resetResultSyncBtn) els.resetResultSyncBtn.addEventListener("click", onResetResultSync);
   els.deleteAnalyteBtn.addEventListener("click", onDeleteAnalyte);
@@ -1568,6 +1570,14 @@ async function loadReaderSettings() {
     local_http_cors_allowed_origins: String(resp.settings?.local_http_cors_allowed_origins || "https://ldse.wisemed.eu"),
     analyzer_comm_type: String(resp.settings?.analyzer_comm_type || ""),
     analyzer_protocol: String(resp.settings?.analyzer_protocol || ""),
+    available_comm_types: Array.isArray(resp.settings?.available_comm_types) ? resp.settings.available_comm_types : [],
+    available_protocols: Array.isArray(resp.settings?.available_protocols) ? resp.settings.available_protocols : [],
+    available_tcpip_modes: Array.isArray(resp.settings?.available_tcpip_modes) ? resp.settings.available_tcpip_modes : [],
+    tcpip_mode: String(resp.settings?.tcpip_mode || "server"),
+    tcpip_host: String(resp.settings?.tcpip_host || ""),
+    tcpip_port: String(resp.settings?.tcpip_port || ""),
+    tcpip_remote_host: String(resp.settings?.tcpip_remote_host || ""),
+    tcpip_remote_port: String(resp.settings?.tcpip_remote_port || ""),
     app_updates_enabled: String(resp.settings?.app_updates_enabled || "true"),
     app_updates_app_id: String(resp.settings?.app_updates_app_id || ""),
     app_updates_current_version: String(resp.settings?.app_updates_current_version || "0.0.0"),
@@ -1584,6 +1594,9 @@ async function loadReaderSettings() {
   };
   const form = els.readerSettingsForm;
   if (form) {
+    fillSelect(form.elements.analyzer_comm_type, state.readerSettings.available_comm_types, state.readerSettings.analyzer_comm_type);
+    fillSelect(form.elements.analyzer_protocol, state.readerSettings.available_protocols, state.readerSettings.analyzer_protocol);
+    fillSelect(form.elements.tcpip_mode, state.readerSettings.available_tcpip_modes, state.readerSettings.tcpip_mode);
     form.elements.reader_id.value = state.readerSettings.reader_id;
     form.elements.reader_label.value = state.readerSettings.reader_label;
     form.elements.analyzer_name.value = state.readerSettings.analyzer_name;
@@ -1596,6 +1609,11 @@ async function loadReaderSettings() {
     form.elements.local_http_cors_allowed_origins.value = state.readerSettings.local_http_cors_allowed_origins;
     form.elements.analyzer_comm_type.value = state.readerSettings.analyzer_comm_type;
     form.elements.analyzer_protocol.value = state.readerSettings.analyzer_protocol;
+    form.elements.tcpip_mode.value = state.readerSettings.tcpip_mode;
+    form.elements.tcpip_host.value = state.readerSettings.tcpip_host;
+    form.elements.tcpip_port.value = state.readerSettings.tcpip_port;
+    form.elements.tcpip_remote_host.value = state.readerSettings.tcpip_remote_host;
+    form.elements.tcpip_remote_port.value = state.readerSettings.tcpip_remote_port;
     form.elements.app_updates_enabled.value = state.readerSettings.app_updates_enabled;
     form.elements.app_updates_app_id.value = state.readerSettings.app_updates_app_id;
     form.elements.app_updates_current_version.value = state.readerSettings.app_updates_current_version;
@@ -1609,6 +1627,7 @@ async function loadReaderSettings() {
     form.elements.result_sync_sample_suffixes.value = state.readerSettings.result_sync_sample_suffixes;
     form.elements.result_sync_separators.value = state.readerSettings.result_sync_separators;
     form.elements.result_sync_qc_prefixes.value = state.readerSettings.result_sync_qc_prefixes;
+    syncReaderSettingsTransportFields();
   }
   els.repeatModeSelect.value = state.readerSettings.repeat_mode;
   await loadResultSyncStatus();
@@ -1634,6 +1653,11 @@ async function onSaveReaderSettings(event) {
     local_http_cors_allowed_origins: String(form.elements.local_http_cors_allowed_origins.value || "https://ldse.wisemed.eu").trim(),
     analyzer_comm_type: String(form.elements.analyzer_comm_type.value || "").trim(),
     analyzer_protocol: String(form.elements.analyzer_protocol.value || "").trim(),
+    tcpip_mode: String(form.elements.tcpip_mode.value || "server").trim(),
+    tcpip_host: String(form.elements.tcpip_host.value || "").trim(),
+    tcpip_port: String(form.elements.tcpip_port.value || "").trim(),
+    tcpip_remote_host: String(form.elements.tcpip_remote_host.value || "").trim(),
+    tcpip_remote_port: String(form.elements.tcpip_remote_port.value || "").trim(),
     app_updates_enabled: String(form.elements.app_updates_enabled.value || "true").trim(),
     app_updates_app_id: String(form.elements.app_updates_app_id.value || "").trim(),
     app_updates_current_version: String(form.elements.app_updates_current_version.value || "0.0.0").trim(),
@@ -1667,6 +1691,14 @@ async function onSaveReaderSettings(event) {
     local_http_cors_allowed_origins: String(resp.settings?.local_http_cors_allowed_origins || payload.local_http_cors_allowed_origins),
     analyzer_comm_type: String(resp.settings?.analyzer_comm_type || payload.analyzer_comm_type),
     analyzer_protocol: String(resp.settings?.analyzer_protocol || payload.analyzer_protocol),
+    available_comm_types: Array.isArray(resp.settings?.available_comm_types) ? resp.settings.available_comm_types : state.readerSettings.available_comm_types,
+    available_protocols: Array.isArray(resp.settings?.available_protocols) ? resp.settings.available_protocols : state.readerSettings.available_protocols,
+    available_tcpip_modes: Array.isArray(resp.settings?.available_tcpip_modes) ? resp.settings.available_tcpip_modes : state.readerSettings.available_tcpip_modes,
+    tcpip_mode: String(resp.settings?.tcpip_mode || payload.tcpip_mode),
+    tcpip_host: String(resp.settings?.tcpip_host || payload.tcpip_host),
+    tcpip_port: String(resp.settings?.tcpip_port || payload.tcpip_port),
+    tcpip_remote_host: String(resp.settings?.tcpip_remote_host || payload.tcpip_remote_host),
+    tcpip_remote_port: String(resp.settings?.tcpip_remote_port || payload.tcpip_remote_port),
     app_updates_enabled: String(resp.settings?.app_updates_enabled || payload.app_updates_enabled),
     app_updates_app_id: String(resp.settings?.app_updates_app_id || payload.app_updates_app_id),
     app_updates_current_version: String(resp.settings?.app_updates_current_version || payload.app_updates_current_version),
@@ -1682,6 +1714,7 @@ async function onSaveReaderSettings(event) {
     result_sync_qc_prefixes: String(resp.settings?.result_sync_qc_prefixes || payload.result_sync_qc_prefixes),
   };
   els.repeatModeSelect.value = state.readerSettings.repeat_mode;
+  syncReaderSettingsTransportFields();
   if (els.readerSettingsMessage) {
     els.readerSettingsMessage.textContent = t("readerSettingsSaved");
   }
@@ -1691,6 +1724,7 @@ async function onSaveReaderSettings(event) {
     label: state.readerSettings.reader_label || state.readerInfo?.label,
     analyzer_name: state.readerSettings.analyzer_name || state.readerInfo?.analyzer_name,
     analyzer_code: state.readerSettings.analyzer_code || state.readerInfo?.analyzer_code,
+    comm_type: state.readerSettings.analyzer_comm_type || state.readerInfo?.comm_type,
     protocol: state.readerSettings.analyzer_protocol || state.readerInfo?.protocol,
     repeat_mode: state.readerSettings.repeat_mode,
     app_version: state.readerSettings.app_updates_current_version || state.readerInfo?.app_version,
@@ -1706,6 +1740,7 @@ async function onSaveReaderSettings(event) {
   };
   syncAppVersionUI();
   refreshAppUpdateStatus(true).catch(() => {});
+  syncOrderControls();
   if (state.readerSettings.local_http_language && state.readerSettings.local_http_language !== state.language) {
     state.language = state.readerSettings.local_http_language;
     syncLanguageControls();
@@ -1713,6 +1748,27 @@ async function onSaveReaderSettings(event) {
   }
   showToast(t("readerSettingsSaved"), "success");
   await loadResultSyncStatus();
+}
+
+function fillSelect(select, values, currentValue) {
+  if (!select) return;
+  const options = Array.isArray(values) && values.length ? values : [currentValue || ""];
+  select.innerHTML = options.map((value) => `<option value="${escapeHtml(String(value || ""))}">${escapeHtml(String(value || ""))}</option>`).join("");
+  select.value = currentValue || options[0] || "";
+}
+
+function syncReaderSettingsTransportFields() {
+  const form = els.readerSettingsForm;
+  if (!form) return;
+  const commType = String(form.elements.analyzer_comm_type.value || state.readerSettings.analyzer_comm_type || "").toLowerCase();
+  const tcpMode = String(form.elements.tcpip_mode.value || state.readerSettings.tcpip_mode || "server").toLowerCase();
+  const tcpModeRow = document.getElementById("reader-settings-tcp-mode-row");
+  const tcpServerRow = document.getElementById("reader-settings-tcp-server-row");
+  const tcpClientRow = document.getElementById("reader-settings-tcp-client-row");
+  const showTCP = commType === "tcpip";
+  if (tcpModeRow) tcpModeRow.hidden = !showTCP;
+  if (tcpServerRow) tcpServerRow.hidden = !showTCP || tcpMode === "client";
+  if (tcpClientRow) tcpClientRow.hidden = !showTCP || tcpMode !== "client";
 }
 
 async function loadResultSyncStatus() {

@@ -18,6 +18,7 @@ const sessionUser = document.getElementById("session-user");
 const selectedAppLabel = document.getElementById("selected-app-label");
 const allowedTypesLabel = document.getElementById("allowed-types-label");
 const resetVersionBtn = document.getElementById("reset-version");
+const deleteAppBtn = document.getElementById("delete-app");
 const makeReleaseBtn = document.getElementById("make-release");
 const deleteVersionBtn = document.getElementById("delete-version");
 const generateDownloadLinkBtn = document.getElementById("generate-download-link");
@@ -46,6 +47,7 @@ const state = {
 document.getElementById("login-btn").addEventListener("click", onLogin);
 document.getElementById("logout-btn").addEventListener("click", onLogout);
 document.getElementById("save-app").addEventListener("click", saveApp);
+deleteAppBtn.addEventListener("click", deleteApp);
 document.getElementById("reset-app").addEventListener("click", resetAppForm);
 document.getElementById("refresh-apps").addEventListener("click", loadApps);
 document.getElementById("save-version").addEventListener("click", saveVersion);
@@ -152,6 +154,7 @@ function renderApps() {
   appsBody.innerHTML = "";
   if (!state.apps.length) {
     appsBody.innerHTML = `<tr><td colspan="3">Nu exista aplicatii</td></tr>`;
+    deleteAppBtn.disabled = true;
     return;
   }
   state.apps.forEach((row) => {
@@ -176,6 +179,7 @@ function fillAppForm(row) {
   appForm.elements.description.value = row.description || "";
   appForm.elements.active.value = row.active ? "true" : "false";
   versionAppSelect.value = String(row.id || "");
+  deleteAppBtn.disabled = !row.id;
 }
 
 function resetAppForm() {
@@ -183,6 +187,7 @@ function resetAppForm() {
   appForm.elements.id.value = "";
   appForm.elements.active.value = "true";
   appMsg.textContent = "";
+  deleteAppBtn.disabled = true;
 }
 
 async function saveApp() {
@@ -209,6 +214,38 @@ async function saveApp() {
   state.selectedAppId = resp.app?.id || state.selectedAppId;
   versionAppSelect.value = String(state.selectedAppId || "");
   await loadApps();
+}
+
+async function deleteApp() {
+  appMsg.textContent = "";
+  const appID = Number(appForm.elements.id.value || state.selectedAppId || 0);
+  if (!appID) {
+    appMsg.textContent = "Selecteaza mai intai o aplicatie";
+    return;
+  }
+  const row = state.apps.find((item) => item.id === appID);
+  const label = row?.display_name || row?.app_id || `#${appID}`;
+  if (!window.confirm(`Stergi aplicatia ${label} si toate release-urile asociate?`)) {
+    return;
+  }
+  deleteAppBtn.disabled = true;
+  const resp = await api(`/api/update-server/apps/${appID}`, {
+    method: "DELETE",
+    allowFail: true,
+  });
+  if (!resp || resp.ok === false) {
+    deleteAppBtn.disabled = false;
+    appMsg.textContent = resp?.error || "Delete failed";
+    return;
+  }
+  appMsg.textContent = "Aplicatia a fost stearsa";
+  state.selectedAppId = 0;
+  state.selectedVersionId = 0;
+  state.versions = [];
+  selectedAppLabel.textContent = "-";
+  resetAppForm();
+  await loadApps();
+  await loadVersions();
 }
 
 async function loadVersions() {
@@ -489,19 +526,12 @@ function resetVersionForm(resetFile = true) {
 
 function buildDownloadPreview(versionID) {
   if (!versionID) return "";
-  const publicBaseURL = String(state.settings.public_base_url || "").trim().replace(/\/+$/, "");
-  if (publicBaseURL) {
-    return `${publicBaseURL}/api/public/download/${versionID}?token=<one-time-token>`;
-  }
-  const protocol = state.settings.public_protocol || "http";
-  const host = state.settings.public_host || "127.0.0.1";
-  const port = state.settings.public_port || "19090";
-  return `${protocol}://${host}:${port}/api/public/download/${versionID}?token=<one-time-token>`;
+  return `/api/update-server/package-download/${versionID}`;
 }
 
 function buildInstallerPreview(row) {
   if (!row || !row.id || !row.installer_file_name) return "";
-  return `<one-time-token pentru installer>`;
+  return `/api/update-server/installer-download/${row.id}`;
 }
 
 async function generateDownloadLink() {
@@ -538,6 +568,7 @@ async function generateDownloadLink() {
 
 function setReleaseBusy(isBusy, progress = {}) {
   state.releaseBusy = isBusy;
+  deleteAppBtn.disabled = isBusy || !Number(appForm.elements.id.value || state.selectedAppId || 0);
   makeReleaseBtn.disabled = isBusy;
   saveVersionBtn.disabled = isBusy;
   deleteVersionBtn.disabled = isBusy;

@@ -18,6 +18,7 @@ import (
 	"wisemed-labreaders/readersv3/modules/protocols/cary60uvvis"
 	"wisemed-labreaders/readersv3/modules/protocols/genericfile"
 	"wisemed-labreaders/readersv3/modules/protocols/irbiotyper"
+	"wisemed-labreaders/readersv3/modules/protocols/labnovationld560"
 	"wisemed-labreaders/readersv3/modules/protocols/seegeneexcel"
 	"wisemed-labreaders/readersv3/modules/qc"
 	"wisemed-labreaders/readersv3/modules/resultsync"
@@ -55,6 +56,7 @@ func RegisterAll(reg *module.Registry) {
 	reg.Register("protocol-beosl-csv", beoslcsv.New)
 	reg.Register("protocol-ir-biotyper", irbiotyper.New)
 	reg.Register("protocol-astm", astmproto.New)
+	reg.Register("protocol-labnovation-ld560", labnovationld560.New)
 	reg.Register("barcode-printer", barcodeprinter.New)
 	reg.Register("app-update-server", appupdateserver.New)
 }

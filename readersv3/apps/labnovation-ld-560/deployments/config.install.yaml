@@ -1,0 +1,97 @@
+reader:
+  id: labnovation-ld-560
+  label: Labnovation LD-560 Reader
+  analyzer_name: Labnovation LD-560
+  analyzer_code: labnovation-ld-560
+  db_name: labnovation-ld-560.db
+local_http:
+  enabled: true
+  address: 127.0.0.1:18080
+  language: ro
+  tls: false
+wisemed_ws:
+  enabled: true
+  url: wss://wslocal.wisemed.eu/ws
+  heartbeat_ms: 15000
+  reconnect_delay_ms: 5000
+analyzer:
+  comm_type: tcpip
+  protocol: simple
+modules:
+  app-updates:
+    enabled: true
+    app_id: labnovation-ld-560
+    channel: stable
+    base_url: http://127.0.0.1:19090
+    auto_download: true
+    download_dir: ./updates
+  qc:
+    levels: ["nivel1", "nivel2", "nivel3", "control", "qc"]
+  result-sync:
+    enabled: true
+    interval_minutes: 5
+    sample_prefixes: []
+    sample_suffixes: []
+    separators: ["-"]
+    qc_prefixes: []
+  local-http:
+    enabled: true
+    address: 127.0.0.1:18080
+    language: ro
+    repeat_mode: individual
+    tls: false
+  storage-sqlite:
+    path: ./labnovation-ld-560.db
+  wisemed-api:
+    base_url: https://api.wisemed.example
+    cfg_wisemed_protocol: https
+    cfg_wisemed_ip: ldse.wisemed.eu
+    cfg_wisemed_port: "443"
+    cfg_wisemed_path: /wisemed-api/apiv2
+    cfg_wisemed_key: ""
+  help:
+    help_dir: ./help
+  transport-tcpip:
+    mode: server
+    host: 0.0.0.0
+    port: 8000
+    remote_host: 127.0.0.1
+    remote_port: 8000
+  protocol-labnovation-ld-560:
+    hl7:
+      framing: mllp
+      sample_id_path: OBR.3.1
+      sample_id_fallback_paths: [OBR.2.1, PID.3.1]
+      sample_no_path: OBR.3.1
+      rack_no_path: OBR.18.1
+      rack_position_path: OBR.19.1
+      run_date_path: OBR.7.1
+      patient_id_path: PID.3.1
+      patient_name_path: PID.5.1
+      qc_indicator_path: OBR.11.1
+      qc_indicator_values: [Q, QC, "1"]
+      result_identifier_path: OBX.3.1
+      result_name_path: OBX.3.2
+      result_value_path: OBX.5.1
+      result_unit_path: OBX.6.1
+      result_interpreted_path: OBX.8.1
+      analyte_mappings: {}
+      allowed_result_ids: []
+    simple:
+      sample_mode_qc_values: ["1"]
+      analyte_mappings:
+        HbA1a: HbA1a
+        HbA1b: HbA1b
+        HbF: HbF
+        L-A1C: L-A1C
+        HbA1c: HbA1c
+        HbA0: HbA0
+        eAG: eAG
+      analyte_units:
+        HbA1a: "%"
+        HbA1b: "%"
+        HbF: "%"
+        L-A1C: "%"
+        HbA1c: "%"
+        HbA0: "%"
+        eAG: ""

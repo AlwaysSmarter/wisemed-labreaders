@@ -44,6 +44,9 @@ func New(cfg *config.Config, logger *log.Logger, registry *module.Registry) *App
 		"comm_type": cfg.Analyzer.CommType,
 		"protocol":  cfg.Analyzer.Protocol,
 	}
+	app.services["app-config"] = map[string]interface{}{
+		"enabled_modules": append([]string(nil), cfg.EnabledModules...),
+	}
 	app.mux.HandleFunc("/healthz", app.handleHealth)
 	app.mux.HandleFunc("/api/menu", app.handleMenu)
 	app.mux.HandleFunc("/api/modules", app.handleModules)

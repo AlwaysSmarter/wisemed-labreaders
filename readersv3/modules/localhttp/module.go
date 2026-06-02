@@ -543,6 +543,11 @@ func (m *Module) handleReaderSettings(w http.ResponseWriter, r *http.Request) {
 			LocalHTTPCORSAllowed      string `json:"local_http_cors_allowed_origins"`
 			AnalyzerCommType          string `json:"analyzer_comm_type"`
 			AnalyzerProtocol          string `json:"analyzer_protocol"`
+			TCPIPMode                 string `json:"tcpip_mode"`
+			TCPIPHost                 string `json:"tcpip_host"`
+			TCPIPPort                 string `json:"tcpip_port"`
+			TCPIPRemoteHost           string `json:"tcpip_remote_host"`
+			TCPIPRemotePort           string `json:"tcpip_remote_port"`
 			SQLitePath                string `json:"sqlite_path"`
 			AppUpdatesEnabled         string `json:"app_updates_enabled"`
 			AppUpdatesAppID           string `json:"app_updates_app_id"`
@@ -563,6 +568,20 @@ func (m *Module) handleReaderSettings(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		mode := normalizeRepeatMode(req.RepeatMode)
+		commType := strings.TrimSpace(req.AnalyzerCommType)
+		protocol := strings.TrimSpace(req.AnalyzerProtocol)
+		if values := m.supportedCommTypes(); len(values) > 0 && !containsStringFold(values, commType) {
+			writeJSON(w, http.StatusBadRequest, map[string]interface{}{"ok": false, "error": "unsupported communication type for this application"})
+			return
+		}
+		if values := m.supportedProtocols(); len(values) > 0 && !containsStringFold(values, protocol) {
+			writeJSON(w, http.StatusBadRequest, map[string]interface{}{"ok": false, "error": "unsupported protocol for this application"})
+			return
+		}
+		tcpMode := normalizeTCPMode(req.TCPIPMode)
+		if tcpMode == "" {
+			tcpMode = "server"
+		}
 		if err := m.persistReaderSettings(map[string]interface{}{
 			"reader.id":                               strings.TrimSpace(req.ReaderID),
 			"reader.label":                            strings.TrimSpace(req.ReaderLabel),
@@ -577,9 +596,14 @@ func (m *Module) handleReaderSettings(w http.ResponseWriter, r *http.Request) {
 			"modules.local-http.language":             strings.TrimSpace(req.LocalHTTPLang),
 			"modules.local-http.tls":                  boolString(req.LocalHTTPTLS),
 			"modules.local-http.cors_allowed_origins": strings.TrimSpace(req.LocalHTTPCORSAllowed),
-			"analyzer.comm_type":                      strings.TrimSpace(req.AnalyzerCommType),
-			"analyzer.protocol":                       strings.TrimSpace(req.AnalyzerProtocol),
+			"analyzer.comm_type":                      commType,
+			"analyzer.protocol":                       protocol,
 			"modules.local-http.repeat_mode":          mode,
+			"modules.transport-tcpip.mode":            tcpMode,
+			"modules.transport-tcpip.host":            strings.TrimSpace(req.TCPIPHost),
+			"modules.transport-tcpip.port":            strings.TrimSpace(req.TCPIPPort),
+			"modules.transport-tcpip.remote_host":     strings.TrimSpace(req.TCPIPRemoteHost),
+			"modules.transport-tcpip.remote_port":     strings.TrimSpace(req.TCPIPRemotePort),
 			"modules.storage-sqlite.path":             strings.TrimSpace(req.SQLitePath),
 			"modules.app-updates.enabled":             boolString(req.AppUpdatesEnabled),
 			"modules.app-updates.app_id":              strings.TrimSpace(req.AppUpdatesAppID),
@@ -1850,6 +1874,14 @@ func (m *Module) readerSettingsPayload() map[string]interface{} {
 		"local_http_cors_allowed_origins": firstNonEmpty(asString(m.rt.ModuleSettings(m.ID())["cors_allowed_origins"]), "https://ldse.wisemed.eu"),
 		"analyzer_comm_type":              m.analyzerSetting("comm_type", ""),
 		"analyzer_protocol":               m.analyzerSetting("protocol", ""),
+		"available_comm_types":            m.supportedCommTypes(),
+		"available_protocols":             m.supportedProtocols(),
+		"available_tcpip_modes":           m.supportedTCPModes(),
+		"tcpip_mode":                      firstNonEmpty(asString(m.rt.ModuleSettings("transport-tcpip")["mode"]), "server"),
+		"tcpip_host":                      asString(m.rt.ModuleSettings("transport-tcpip")["host"]),
+		"tcpip_port":                      asString(m.rt.ModuleSettings("transport-tcpip")["port"]),
+		"tcpip_remote_host":               asString(m.rt.ModuleSettings("transport-tcpip")["remote_host"]),
+		"tcpip_remote_port":               asString(m.rt.ModuleSettings("transport-tcpip")["remote_port"]),
 		"sqlite_path":                     asString(m.rt.ModuleSettings("storage-sqlite")["path"]),
 		"app_updates_enabled":             asString(m.rt.ModuleSettings("app-updates")["enabled"]),
 		"app_updates_app_id":              firstNonEmpty(asString(m.rt.ModuleSettings("app-updates")["app_id"]), m.rt.ReaderID()),
@@ -1875,6 +1907,7 @@ func (m *Module) readerSettingsPayload() map[string]interface{} {
 	appUpdates := cfg.ModuleSettings("app-updates")
 	resultSync := cfg.ModuleSettings("result-sync")
 	storageSQLite := cfg.ModuleSettings("storage-sqlite")
+	transportTCPIP := cfg.ModuleSettings("transport-tcpip")
 
 	settings["repeat_mode"] = firstNonEmpty(asString(localHTTP["repeat_mode"]), asString(settings["repeat_mode"]))
 	settings["reader_id"] = firstNonEmpty(strings.TrimSpace(cfg.Reader.ID), asString(settings["reader_id"]))
@@ -1888,6 +1921,11 @@ func (m *Module) readerSettingsPayload() map[string]interface{} {
 	settings["local_http_cors_allowed_origins"] = firstNonEmpty(strings.TrimSpace(cfg.LocalHTTP.CORS), asString(localHTTP["cors_allowed_origins"]), asString(settings["local_http_cors_allowed_origins"]), "https://ldse.wisemed.eu")
 	settings["analyzer_comm_type"] = firstNonEmpty(strings.TrimSpace(cfg.Analyzer.CommType), asString(settings["analyzer_comm_type"]))
 	settings["analyzer_protocol"] = firstNonEmpty(strings.TrimSpace(cfg.Analyzer.Protocol), asString(settings["analyzer_protocol"]))
+	settings["tcpip_mode"] = firstNonEmpty(asString(transportTCPIP["mode"]), asString(settings["tcpip_mode"]), "server")
+	settings["tcpip_host"] = firstNonEmpty(asString(transportTCPIP["host"]), asString(settings["tcpip_host"]))
+	settings["tcpip_port"] = firstNonEmpty(asString(transportTCPIP["port"]), asString(settings["tcpip_port"]))
+	settings["tcpip_remote_host"] = firstNonEmpty(asString(transportTCPIP["remote_host"]), asString(settings["tcpip_remote_host"]))
+	settings["tcpip_remote_port"] = firstNonEmpty(asString(transportTCPIP["remote_port"]), asString(settings["tcpip_remote_port"]))
 	settings["sqlite_path"] = firstNonEmpty(asString(storageSQLite["path"]), asString(settings["sqlite_path"]))
 	settings["app_updates_enabled"] = firstNonEmpty(asString(appUpdates["enabled"]), asString(settings["app_updates_enabled"]))
 	settings["app_updates_app_id"] = firstNonEmpty(asString(appUpdates["app_id"]), asString(settings["app_updates_app_id"]))
@@ -2125,6 +2163,26 @@ func sameAppUpdateCache(left, right map[string]interface{}) bool {
 	return true
 }
 
+func containsStringFold(items []string, target string) bool {
+	for _, item := range items {
+		if strings.EqualFold(strings.TrimSpace(item), strings.TrimSpace(target)) {
+			return true
+		}
+	}
+	return false
+}
+
+func normalizeTCPMode(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "client":
+		return "client"
+	case "server":
+		return "server"
+	default:
+		return ""
+	}
+}
+
 func (m *Module) analyteStore() analyteStore {
 	service, ok := m.rt.Service("storage")
 	if !ok {
@@ -2298,6 +2356,103 @@ func (m *Module) saveAnalyte(item coremodel.Analyte) (coremodel.Analyte, error) 
 		return coremodel.Analyte{}, errors.New("storage service unavailable")
 	}
 	return store.SaveAnalyte(item)
+}
+
+func (m *Module) enabledModules() []string {
+	service, ok := m.rt.Service("app-config")
+	if !ok {
+		return nil
+	}
+	raw, ok := service.(map[string]interface{})
+	if !ok {
+		return nil
+	}
+	if values, ok := raw["enabled_modules"].([]string); ok {
+		return append([]string(nil), values...)
+	}
+	items, ok := raw["enabled_modules"].([]interface{})
+	if !ok {
+		return nil
+	}
+	out := make([]string, 0, len(items))
+	for _, item := range items {
+		if value := strings.TrimSpace(asString(item)); value != "" {
+			out = append(out, value)
+		}
+	}
+	return out
+}
+
+func (m *Module) supportedProtocols() []string {
+	out := []string{}
+	add := func(value string) {
+		value = strings.TrimSpace(value)
+		if value == "" || containsStringFold(out, value) {
+			return
+		}
+		out = append(out, value)
+	}
+	for _, moduleID := range m.enabledModules() {
+		switch strings.TrimSpace(moduleID) {
+		case "protocol-labnovation-ld560":
+			add("hl7")
+			add("simple")
+		case "protocol-astm":
+			add("astm")
+		case "protocol-ir-biotyper":
+			add("ir-biotyper")
+		case "protocol-cary60-uvvis":
+			add("cary60-uvvis")
+		case "protocol-seegene-excel":
+			add("seegene-excel")
+		case "protocol-beosl-csv":
+			add("beosl-csv")
+		case "protocol-generic-file":
+			add("generic-file")
+		}
+	}
+	if len(out) == 0 {
+		if value := strings.TrimSpace(m.analyzerSetting("protocol", "")); value != "" {
+			add(value)
+		}
+	}
+	return out
+}
+
+func (m *Module) supportedCommTypes() []string {
+	out := []string{}
+	add := func(value string) {
+		value = strings.TrimSpace(value)
+		if value == "" || containsStringFold(out, value) {
+			return
+		}
+		out = append(out, value)
+	}
+	for _, protocol := range m.supportedProtocols() {
+		switch strings.ToLower(strings.TrimSpace(protocol)) {
+		case "hl7", "simple", "astm", "ir-biotyper":
+			add("tcpip")
+		case "seegene-excel", "beosl-csv", "cary60-uvvis", "generic-file":
+			add("file")
+		case "barcodeprinter":
+			add("utility")
+		}
+	}
+	if len(out) == 0 {
+		if value := strings.TrimSpace(m.analyzerSetting("comm_type", "")); value != "" {
+			add(value)
+		}
+	}
+	return out
+}
+
+func (m *Module) supportedTCPModes() []string {
+	for _, item := range m.enabledModules() {
+		if strings.EqualFold(strings.TrimSpace(item), "protocol-labnovation-ld560") {
+			return []string{"server", "client"}
+		}
+	}
+	return []string{"server"}
 }
 
 func (m *Module) deleteAnalyte(id int64) error {

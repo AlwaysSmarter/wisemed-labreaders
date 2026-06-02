@@ -50,6 +50,16 @@
     "supportsHeadless": true
   },
   {
+    "id": "labnovation-ld-560",
+    "title": "Labnovation Ld 560",
+    "binaryName": "labnovation-ld-560",
+    "serviceName": "wisemed-labnovation-ld-560",
+    "displayName": "WiseMED Labnovation Ld 560",
+    "description": "WiseMED readersv3 Labnovation Ld 560 background service",
+    "bundleId": "eu.wisemed.readersv3.labnovation.ld.560",
+    "supportsHeadless": true
+  },
+  {
     "id": "seegene-reader",
     "title": "Seegene Reader",
     "binaryName": "seegene-reader",

@@ -236,11 +236,41 @@
               <div class="two-col">
                 <label class="reader-settings-field">
                   <span>Analyzer comm type</span>
-                  <input name="analyzer_comm_type" type="text">
+                  <select name="analyzer_comm_type"></select>
                 </label>
                 <label class="reader-settings-field">
                   <span>Analyzer protocol</span>
-                  <input name="analyzer_protocol" type="text">
+                  <select name="analyzer_protocol"></select>
+                </label>
+              </div>
+              <div class="two-col" id="reader-settings-tcp-mode-row">
+                <label class="reader-settings-field">
+                  <span>TCP/IP mode</span>
+                  <select name="tcpip_mode"></select>
+                </label>
+                <div class="reader-settings-field">
+                  <span>Transport</span>
+                  <p class="small muted">Sunt afisate doar modurile suportate de modulele active ale aplicatiei.</p>
+                </div>
+              </div>
+              <div class="two-col" id="reader-settings-tcp-server-row">
+                <label class="reader-settings-field">
+                  <span>TCP/IP listen host</span>
+                  <input name="tcpip_host" type="text">
+                </label>
+                <label class="reader-settings-field">
+                  <span>TCP/IP listen port</span>
+                  <input name="tcpip_port" type="text">
+                </label>
+              </div>
+              <div class="two-col" id="reader-settings-tcp-client-row">
+                <label class="reader-settings-field">
+                  <span>TCP/IP remote host</span>
+                  <input name="tcpip_remote_host" type="text">
+                </label>
+                <label class="reader-settings-field">
+                  <span>TCP/IP remote port</span>
+                  <input name="tcpip_remote_port" type="text">
                 </label>
               </div>
               <div class="panel-head compact-head">

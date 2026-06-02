@@ -58,9 +58,9 @@ func newZPLPrinterFromParams(params map[string]string) (*ZPLPrinter, error) {
 		return nil, fmt.Errorf("unknown barcode to print")
 	}
 	tubeCode := strings.TrimSpace(firstNonEmpty(params["tc"], params["vc"]))
-	if len(tubeCode) > 1 {
-		tubeCode = tubeCode[:1]
-	}
+	//if len(tubeCode) > 1 {
+	//	tubeCode = tubeCode[:1]
+	//}
 	return &ZPLPrinter{
 		Settings:    parseLayoutSettings(params),
 		Barcode:     barcodeValue,

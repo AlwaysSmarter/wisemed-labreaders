@@ -1,0 +1,25 @@
+services:
+  wisemed-update-server:
+    build:
+      context: ../../../../
+      dockerfile: apps/update-server/docker/ubuntu/Dockerfile
+      args:
+        GO_VERSION: "1.24.0"
+    container_name: wisemed-update-server
+    restart: unless-stopped
+    ports:
+      - "${WMLR_PORT:-19090}:19090"
+    environment:
+      WMLR_REPO: /opt/wmlr
+      UPDATE_SERVER_BIND: "0.0.0.0:19090"
+      PUBLIC_BASE_URL: "${PUBLIC_BASE_URL:-http://127.0.0.1:19090}"
+    volumes:
+      - /opt/wmlr:/opt/wmlr
+      - wisemed-update-server-deployments:/opt/update-server/deployments
+      - wisemed-update-server-gomod:/go/pkg/mod
+      - wisemed-update-server-gobuild:/root/.cache/go-build
+
+volumes:
+  wisemed-update-server-deployments:
+  wisemed-update-server-gomod:
+  wisemed-update-server-gobuild:
