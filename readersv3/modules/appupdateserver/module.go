@@ -2,6 +2,7 @@ package appupdateserver
 
 import (
 	"archive/zip"
+	"bufio"
 	"bytes"
 	"context"
 	"crypto/hmac"
@@ -1673,7 +1674,9 @@ func (m *Module) runReleaseCtlRelease(repoRoot, sourceAppID, target, version str
 		return releaseCtlResult{}, err
 	}
 	m.rt.Logf("update-server: compilez release source_app=%s version=%s target=%s repo=%s gocache=%s", sourceAppID, version, target, repoRoot, tmpCache)
-	output, err := runReleaseCtlReleaseCommand(repoRoot, sourceAppID, target, version, tmpCache, m.effectivePublicBaseURL())
+	output, err := runReleaseCtlReleaseCommand(repoRoot, sourceAppID, target, version, tmpCache, m.effectivePublicBaseURL(), func(line string) {
+		m.rt.Logf("update-server: %s", line)
+	})
 	if err == nil {
 		m.rt.Logf("update-server: releasectl a terminat source_app=%s version=%s target=%s", sourceAppID, version, target)
 		return output, nil
@@ -1684,7 +1687,9 @@ func (m *Module) runReleaseCtlRelease(repoRoot, sourceAppID, target, version str
 		if err := os.MkdirAll(tmpCache, 0o755); err != nil {
 			return releaseCtlResult{}, err
 		}
-		output, retryErr := runReleaseCtlReleaseCommand(repoRoot, sourceAppID, target, version, tmpCache, m.effectivePublicBaseURL())
+		output, retryErr := runReleaseCtlReleaseCommand(repoRoot, sourceAppID, target, version, tmpCache, m.effectivePublicBaseURL(), func(line string) {
+			m.rt.Logf("update-server: %s", line)
+		})
 		if retryErr == nil {
 			m.rt.Logf("update-server: releasectl a terminat dupa retry source_app=%s version=%s target=%s", sourceAppID, version, target)
 			return output, nil
@@ -1694,7 +1699,7 @@ func (m *Module) runReleaseCtlRelease(repoRoot, sourceAppID, target, version str
 	return releaseCtlResult{}, err
 }
 
-func runReleaseCtlReleaseCommand(repoRoot, sourceAppID, target, version, goCache, appUpdatesBaseURL string) (releaseCtlResult, error) {
+func runReleaseCtlReleaseCommand(repoRoot, sourceAppID, target, version, goCache, appUpdatesBaseURL string, progress func(string)) (releaseCtlResult, error) {
 	args := []string{"run", "-a", "./tools/releasectl", "release", "--json", "--app", sourceAppID, "--target", target, "--version", version}
 	if strings.TrimSpace(appUpdatesBaseURL) != "" {
 		args = append(args, "--app-updates-base-url", strings.TrimSpace(appUpdatesBaseURL))
@@ -1705,14 +1710,36 @@ func runReleaseCtlReleaseCommand(repoRoot, sourceAppID, target, version, goCache
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	if err := cmd.Run(); err != nil {
+	stderrPipe, err := cmd.StderrPipe()
+	if err != nil {
+		return releaseCtlResult{}, err
+	}
+	var stderrWG sync.WaitGroup
+	stderrWG.Add(1)
+	go func() {
+		defer stderrWG.Done()
+		scanner := bufio.NewScanner(stderrPipe)
+		for scanner.Scan() {
+			line := scanner.Text()
+			stderr.WriteString(line)
+			stderr.WriteByte('\n')
+			if progress != nil && strings.TrimSpace(line) != "" {
+				progress(line)
+			}
+		}
+	}()
+	if err := cmd.Start(); err != nil {
+		return releaseCtlResult{}, err
+	}
+	if err := cmd.Wait(); err != nil {
+		stderrWG.Wait()
 		text := strings.TrimSpace(stderr.String())
 		if text == "" {
 			text = strings.TrimSpace(stdout.String())
 		}
 		return releaseCtlResult{}, fmt.Errorf("releasectl release failed: %s", text)
 	}
+	stderrWG.Wait()
 	var payload struct {
 		Update    releaseCtlArtifact  `json:"update"`
 		Installer *releaseCtlArtifact `json:"installer"`

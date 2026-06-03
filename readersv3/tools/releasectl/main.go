@@ -411,6 +411,7 @@ func buildRuntime(root string, app appInfo, target string, ti targetInfo, versio
 	if version == "" {
 		version = discoverVersion(root)
 	}
+	logf("build start: app=%s target=%s version=%s", app.ID, target, version)
 	packageVersion := normalizePackageVersion(version)
 	commit := gitOutput(root, "rev-parse", "--short=12", "HEAD")
 	epoch := discoverSourceDateEpoch(root)
@@ -491,6 +492,7 @@ func buildRuntime(root string, app appInfo, target string, ti targetInfo, versio
 	if err := writeJSON(filepath.Join(runtimeDir, "manifest.json"), manifest); err != nil {
 		return runtimeManifest{}, err
 	}
+	logf("build finished: app=%s target=%s binary=%s", app.ID, target, binaryPath)
 	return manifest, nil
 }
 
