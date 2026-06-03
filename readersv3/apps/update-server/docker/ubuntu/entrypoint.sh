@@ -82,7 +82,7 @@ apply_runtime_config() {
   fi
 }
 
-REPO_ROOT="$(resolve_repo_root || true)"
+REPO_ROOT="$(resolve_repo_root || true)
 if [[ -z "${REPO_ROOT}" ]]; then
   log "Nu pot identifica repo-ul readersv3 în ${WMLR_REPO}."
   log "Montează clona wisemed-labreaders în /opt/wmlr sau setează WMLR_REPO corect."

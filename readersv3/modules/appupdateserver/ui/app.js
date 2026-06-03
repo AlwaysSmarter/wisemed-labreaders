@@ -392,7 +392,7 @@ async function makeRelease() {
     release_notes: String(versionForm.elements.release_notes.value || "").trim(),
   };
   try {
-    bumpReleaseProgress("Compilam binarul", `Serverul ruleaza releasectl pentru ${targetOS} / ${targetArch}. Aceasta etapa poate dura mai mult.`);
+    bumpReleaseProgress("Pregatesc release-ul", `Serverul compileaza si impacheteaza release-ul pentru ${targetOS} / ${targetArch}. Aceasta etapa poate dura mai mult.`);
     const resp = await api(`/api/update-server/apps/${state.selectedAppId}/make-release`, {
       method: "POST",
       body: JSON.stringify(payload),

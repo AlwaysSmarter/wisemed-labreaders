@@ -1312,10 +1312,14 @@ func (m *Module) makeReleaseFromRequest(r *http.Request, appID int64, actor stri
 	nextVersion := nextReleaseVersion(versions)
 	target := req.TargetOS + "-" + req.TargetArch
 
+	m.rt.Logf("update-server: pregatesc release-ul app_id=%s source_app=%s version=%s target=%s actor=%s", appItem.AppID, managed.SourceAppID, nextVersion, target, strings.TrimSpace(actor))
+
 	releaseResult, err := m.runReleaseCtlRelease(repoRoot, managed.SourceAppID, target, nextVersion)
 	if err != nil {
+		m.rt.Logf("update-server: release esuat app_id=%s version=%s target=%s err=%v", appItem.AppID, nextVersion, target, err)
 		return versionRecord{}, err
 	}
+	m.rt.Logf("update-server: compilarea s-a incheiat app_id=%s version=%s target=%s update_artifact=%s", appItem.AppID, nextVersion, target, strings.TrimSpace(releaseResult.Update.Path))
 	fileName := sanitizeFileName(releaseResult.Update.FileName)
 	if fileName == "" {
 		return versionRecord{}, errors.New("release did not produce a valid update artifact")
@@ -1323,8 +1327,10 @@ func (m *Module) makeReleaseFromRequest(r *http.Request, appID int64, actor stri
 	relFilePath := filepath.Join(appItem.AppID, nextVersion, fileName)
 	absFilePath := m.resolveFilesPath(relFilePath)
 	if err := copyManagedArtifact(releaseResult.Update.Path, absFilePath); err != nil {
+		m.rt.Logf("update-server: copiere update artifact esuata src=%s dst=%s err=%v", strings.TrimSpace(releaseResult.Update.Path), absFilePath, err)
 		return versionRecord{}, err
 	}
+	m.rt.Logf("update-server: update artifact copiat la %s", absFilePath)
 
 	item := versionRecord{
 		ApplicationID:  appID,
@@ -1347,12 +1353,14 @@ func (m *Module) makeReleaseFromRequest(r *http.Request, appID int64, actor stri
 			installerRelPath := filepath.Join(appItem.AppID, nextVersion, "installers", installerName)
 			installerAbsPath := m.resolveFilesPath(installerRelPath)
 			if err := copyManagedArtifact(releaseResult.Installer.Path, installerAbsPath); err != nil {
+				m.rt.Logf("update-server: copiere installer esuata src=%s dst=%s err=%v", strings.TrimSpace(releaseResult.Installer.Path), installerAbsPath, err)
 				return versionRecord{}, err
 			}
 			item.InstallerFileName = installerName
 			item.InstallerFilePath = installerRelPath
 			item.InstallerChecksumSHA256 = strings.TrimSpace(releaseResult.Installer.ChecksumSHA256)
 			item.InstallerFileSize = releaseResult.Installer.Size
+			m.rt.Logf("update-server: installer copiat la %s", installerAbsPath)
 		}
 	}
 	saved, err := m.saveVersion(item)
@@ -1363,6 +1371,7 @@ func (m *Module) makeReleaseFromRequest(r *http.Request, appID int64, actor stri
 		}
 		return versionRecord{}, err
 	}
+	m.rt.Logf("update-server: release finalizat app_id=%s version=%s target=%s saved_version_id=%d", appItem.AppID, saved.Version, target, saved.ID)
 	return saved, nil
 }
 
@@ -1663,16 +1672,24 @@ func (m *Module) runReleaseCtlRelease(repoRoot, sourceAppID, target, version str
 	if err := os.MkdirAll(tmpCache, 0o755); err != nil {
 		return releaseCtlResult{}, err
 	}
+	m.rt.Logf("update-server: compilez release source_app=%s version=%s target=%s repo=%s gocache=%s", sourceAppID, version, target, repoRoot, tmpCache)
 	output, err := runReleaseCtlReleaseCommand(repoRoot, sourceAppID, target, version, tmpCache, m.effectivePublicBaseURL())
 	if err == nil {
+		m.rt.Logf("update-server: releasectl a terminat source_app=%s version=%s target=%s", sourceAppID, version, target)
 		return output, nil
 	}
 	if strings.Contains(err.Error(), "does not match go tool version") {
+		m.rt.Logf("update-server: curat cache-ul Go si reiau compilarea pentru source_app=%s version=%s target=%s", sourceAppID, version, target)
 		_ = os.RemoveAll(tmpCache)
 		if err := os.MkdirAll(tmpCache, 0o755); err != nil {
 			return releaseCtlResult{}, err
 		}
-		return runReleaseCtlReleaseCommand(repoRoot, sourceAppID, target, version, tmpCache, m.effectivePublicBaseURL())
+		output, retryErr := runReleaseCtlReleaseCommand(repoRoot, sourceAppID, target, version, tmpCache, m.effectivePublicBaseURL())
+		if retryErr == nil {
+			m.rt.Logf("update-server: releasectl a terminat dupa retry source_app=%s version=%s target=%s", sourceAppID, version, target)
+			return output, nil
+		}
+		return releaseCtlResult{}, retryErr
 	}
 	return releaseCtlResult{}, err
 }
