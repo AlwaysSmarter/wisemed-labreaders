@@ -8,7 +8,15 @@ ENV GOPATH=/go
 ENV PATH=/usr/local/go/bin:/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates curl git bash rsync build-essential \
+    && apt-get install -y --no-install-recommends \
+        ca-certificates \
+        curl \
+        git \
+        bash \
+        rsync \
+        build-essential \
+        nsis \
+        binutils-mingw-w64 \
     && rm -rf /var/lib/apt/lists/*
 
 RUN curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" -o /tmp/go.tgz \

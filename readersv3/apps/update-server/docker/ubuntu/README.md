@@ -3,6 +3,8 @@
 Acest setup pornește un container `ubuntu:24.04` care:
 
 - are Go `1.24.0` instalat în container
+- are NSIS (`makensis`) pentru build de installer Windows
+- are MinGW binutils pentru `windres`
 - montează repo-ul host-ului în `/opt/wmlr`
 - compilează la fiecare pornire ultima versiune `./apps/update-server`
 - scrie runtime-ul în `output/update-server`
