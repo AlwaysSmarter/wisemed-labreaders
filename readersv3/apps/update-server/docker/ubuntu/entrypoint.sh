@@ -97,5 +97,5 @@ if [[ ! -x "${BUILD_OUTPUT}" ]]; then
   exit 1
 fi
 
-log "Pornesc update-server pe ${UPDATE_SERVER_BIND}."
+log "Pornesc update-server (1) pe ${UPDATE_SERVER_BIND}."
 exec "${BUILD_OUTPUT}" -config "${DEPLOYMENTS_DIR}/config.yaml"
