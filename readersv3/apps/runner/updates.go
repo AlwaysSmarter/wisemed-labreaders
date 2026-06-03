@@ -40,11 +40,12 @@ func checkForUpdates(cfg *config.Config, opts RunOptions) error {
 	currentVersion := appmeta.CurrentVersion()
 	channel := strSetting(settings, "channel")
 	startupConsolef("verific serverul de update: %s", baseURL)
+	startupConsolef("app_id pentru update: %s", appID)
 	client := appupdates.NewClient(baseURL, apiKey, appID, channel)
 	resp, err := client.Check(currentVersion, runtime.GOOS, runtime.GOARCH)
 	if err != nil {
 		log.Printf("app-updates: check failed for %s: %v", appID, err)
-		startupConsolef("nu ma pot conecta la serverul de update %s: %v", baseURL, err)
+		startupConsolef("nu ma pot conecta la serverul de update %s pentru app_id=%s: %v", baseURL, appID, err)
 		startupConsolef("daca nu este corect, schimbati in config.yaml URL-ul acestuia")
 		return nil
 	}
@@ -84,6 +85,9 @@ func checkForUpdates(cfg *config.Config, opts RunOptions) error {
 		mandatoryConsolef("app-updates: incepe download-ul in %s", downloadDir)
 	}
 	log.Printf("app-updates: download request start url=%s target_dir=%s mandatory=%t", resp.DownloadURL, downloadDir, resp.Mandatory)
+	if resp.Mandatory {
+		mandatoryConsolef("app-updates: download url %s", resp.DownloadURL)
+	}
 	lastProgress := int64(-1)
 	lastProgressAt := time.Now()
 	filePath, checksum, err := client.DownloadWithProgress(resp.DownloadURL, downloadDir, func(progress appupdates.DownloadProgress) {
@@ -113,7 +117,7 @@ func checkForUpdates(cfg *config.Config, opts RunOptions) error {
 		if progress.ReceivedBytes == lastProgress {
 			return
 		}
-		if progress.ReceivedBytes-lastProgress < 512*1024 && lastProgress >= 0 {
+		if progress.ReceivedBytes-lastProgress < 64*1024 && lastProgress >= 0 {
 			return
 		}
 		lastProgress = progress.ReceivedBytes
@@ -131,6 +135,10 @@ func checkForUpdates(cfg *config.Config, opts RunOptions) error {
 		return nil
 	}
 	log.Printf("app-updates: download completed path=%s sha256=%s", filePath, checksum)
+	if resp.Mandatory {
+		mandatoryConsolef("app-updates: download complet in %s", filePath)
+		mandatoryConsolef("app-updates: checksum descarcat %s", checksum)
+	}
 	if resp.ChecksumSHA256 != "" && !strings.EqualFold(strings.TrimSpace(resp.ChecksumSHA256), checksum) {
 		err = fmt.Errorf("download checksum mismatch for %s", filepath.Base(filePath))
 		if resp.Mandatory {

@@ -9,9 +9,9 @@ local_http:
     tls: false
 modules:
     app-updates:
-        app_id: labnovation-ld-560
+        app_id: labnovation-ld-560-reader-v3
         auto_download: true
-        base_url: http://127.0.0.1:19090
+        base_url: https://us.wisemed.eu
         channel: stable
         download_dir: ./updates
         enabled: true

@@ -686,7 +686,8 @@ func (m *Module) handlePublicCheckUpdate(w http.ResponseWriter, r *http.Request)
 	}
 	appItem, err := m.findApplicationByAppID(req.AppID)
 	if err != nil {
-		writeJSON(w, http.StatusNotFound, map[string]interface{}{"ok": false, "message": "application not found"})
+		m.rt.Logf("update-server: public check-update application not found app_id=%s current_version=%s os=%s arch=%s channel=%s", req.AppID, strings.TrimSpace(req.CurrentVersion), strings.TrimSpace(req.OS), strings.TrimSpace(req.Arch), strings.TrimSpace(req.Channel))
+		writeJSON(w, http.StatusNotFound, map[string]interface{}{"ok": false, "message": fmt.Sprintf("application not found: %s", req.AppID), "app_id": req.AppID})
 		return
 	}
 	versions, err := m.listVersions(appItem.ID)

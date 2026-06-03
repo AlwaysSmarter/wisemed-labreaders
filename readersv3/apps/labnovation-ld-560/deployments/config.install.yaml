@@ -20,7 +20,7 @@ analyzer:
 modules:
   app-updates:
     enabled: true
-    app_id: labnovation-ld-560
+    app_id: labnovation-ld-560-reader-v3
     channel: stable
     base_url: http://127.0.0.1:19090
     auto_download: true

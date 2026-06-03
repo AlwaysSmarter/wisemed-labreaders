@@ -95,6 +95,7 @@ func extractUpdateArchive(archivePath string) (string, error) {
 
 func launchWindowsArchiveUpdate(stageDir, appDir, exePath, configPath string, cfg *config.Config) error {
 	scriptPath := filepath.Join(stageDir, "apply-update.cmd")
+	logPath := filepath.Join(stageDir, "apply-update.log")
 	exeName := filepath.Base(exePath)
 	restartLine := fmt.Sprintf("start \"\" \"%s\" -config \"%s\"", exePath, configPath)
 	if currentRunsAsService() && cfg != nil {
@@ -113,14 +114,28 @@ func launchWindowsArchiveUpdate(stageDir, appDir, exePath, configPath string, cf
 		fmt.Sprintf("set \"APP_DIR=%s\"", appDir),
 		fmt.Sprintf("set \"STAGE_DIR=%s\"", stageDir),
 		fmt.Sprintf("set \"EXE_NAME=%s\"", exeName),
+		fmt.Sprintf("set \"LOG_PATH=%s\"", logPath),
+		"echo [apply-update] start %date% %time%>\"%LOG_PATH%\"",
+		"echo [apply-update] APP_DIR=%APP_DIR%>>\"%LOG_PATH%\"",
+		"echo [apply-update] STAGE_DIR=%STAGE_DIR%>>\"%LOG_PATH%\"",
+		"echo [apply-update] EXE_NAME=%EXE_NAME%>>\"%LOG_PATH%\"",
 		":waitloop",
 		fmt.Sprintf("tasklist /FI \"PID eq %d\" | find \"%d\" >nul", os.Getpid(), os.Getpid()),
 		"if not errorlevel 1 (",
+		"  echo [apply-update] waiting for current pid to exit>>\"%LOG_PATH%\"",
 		"  timeout /t 1 /nobreak >nul",
 		"  goto waitloop",
 		")",
-		"xcopy \"%STAGE_DIR%\\*\" \"%APP_DIR%\\\" /E /I /Y /Q >nul",
+		"echo [apply-update] copying staged files>>\"%LOG_PATH%\"",
+		"xcopy \"%STAGE_DIR%\\*\" \"%APP_DIR%\\\" /E /I /Y /Q >>\"%LOG_PATH%\" 2>&1",
+		"if errorlevel 1 (",
+		"  echo [apply-update] xcopy failed with errorlevel %errorlevel%>>\"%LOG_PATH%\"",
+		"  exit /b 1",
+		")",
+		"echo [apply-update] copy finished>>\"%LOG_PATH%\"",
+		"echo [apply-update] restarting application>>\"%LOG_PATH%\"",
 		restartLine,
+		"echo [apply-update] restart command dispatched>>\"%LOG_PATH%\"",
 		"exit /b 0",
 	}, "\r\n") + "\r\n"
 	if err := os.WriteFile(scriptPath, []byte(body), 0o644); err != nil {
