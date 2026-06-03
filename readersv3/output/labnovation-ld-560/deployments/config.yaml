@@ -40,10 +40,10 @@ modules:
         processed_dir: ./processed
     transport-tcpip:
         host: 0.0.0.0
-        mode: server
+        mode: client
         port: "8000"
-        remote_host: ""
-        remote_port: ""
+        remote_host: 82.78.233.28
+        remote_port: "6000"
     wisemed-api:
         cfg_wisemed_ip: ldse.wisemed.eu
         cfg_wisemed_key: 27c490bb-c9e4-47aa-bf6d-ebd2a1add35e
@@ -52,7 +52,7 @@ modules:
         cfg_wisemed_protocol: https
         cod_echipament: reader-v3
         echipament_id: "171"
-        login_token: 836-435253bdf763aebe9354e126029c3649
+        login_token: 887-97c3d889bac7f1108de3cb5d4e0d189c
         numar_serial_echipament: reader-v3-001
         tip_de_echipament_id: "1"
         unitate_medicala_id: "19"

@@ -41,9 +41,10 @@ type statusSnapshot struct {
 type Module struct {
 	rt module.Runtime
 
-	mu      sync.Mutex
-	clients int
-	status  statusSnapshot
+	mu        sync.Mutex
+	clients   int
+	status    statusSnapshot
+	restartCh chan struct{}
 }
 
 func New() module.Module { return &Module{} }
@@ -52,6 +53,7 @@ func (m *Module) ID() string { return "protocol-labnovation-ld560" }
 
 func (m *Module) Init(rt module.Runtime) error {
 	m.rt = rt
+	m.restartCh = make(chan struct{}, 1)
 	rt.AddMenu(module.MenuEntry{ID: "protocol-labnovation-ld560", Group: "admin", Label: "Protocol Labnovation LD-560", Path: "/settings/protocol/labnovation-ld560", Order: 45})
 	rt.Handle("/settings/protocol/labnovation-ld560", http.HandlerFunc(m.handleSettingsPage))
 	rt.Handle("/api/protocol/labnovation-ld560/settings", http.HandlerFunc(m.handleSettingsAPI))
@@ -62,25 +64,77 @@ func (m *Module) Init(rt module.Runtime) error {
 }
 
 func (m *Module) Start(ctx context.Context) error {
-	if !strings.EqualFold(m.commType(), "tcpip") {
-		m.rt.Logf("labnovation-ld560 protocol idle: comm_type=%q", m.commType())
-		<-ctx.Done()
-		return nil
+	for {
+		cfg := m.communicationConfig()
+		if !strings.EqualFold(cfg.CommType, "tcpip") {
+			m.rt.Logf("labnovation-ld560 protocol idle: comm_type=%q", cfg.CommType)
+			select {
+			case <-ctx.Done():
+				return nil
+			case <-m.restartCh:
+				m.rt.Logf("labnovation-ld560 communication reconfiguration requested while idle")
+				continue
+			}
+		}
+
+		runCtx, cancel := context.WithCancel(ctx)
+		errCh := make(chan error, 1)
+		go func(current commConfig) {
+			if strings.EqualFold(current.TCPMode, "client") {
+				errCh <- m.runTCPClient(runCtx, current)
+				return
+			}
+			errCh <- m.runTCPServer(runCtx, current)
+		}(cfg)
+
+		select {
+		case <-ctx.Done():
+			cancel()
+			<-errCh
+			return nil
+		case <-m.restartCh:
+			m.rt.Logf("labnovation-ld560 reinitializing communication: comm_type=%s protocol=%s mode=%s", cfg.CommType, cfg.ProtocolMode, cfg.TCPMode)
+			cancel()
+			<-errCh
+			continue
+		case err := <-errCh:
+			cancel()
+			if err == nil {
+				select {
+				case <-ctx.Done():
+					return nil
+				case <-m.restartCh:
+					m.rt.Logf("labnovation-ld560 communication loop restarted after graceful stop")
+					continue
+				case <-time.After(1 * time.Second):
+					continue
+				}
+			}
+			m.setError(err)
+			m.rt.Logf("labnovation-ld560 communication error: %v", err)
+			select {
+			case <-ctx.Done():
+				return nil
+			case <-m.restartCh:
+				m.rt.Logf("labnovation-ld560 communication restart requested after error")
+				continue
+			case <-time.After(3 * time.Second):
+				m.rt.Logf("labnovation-ld560 retrying communication after error")
+				continue
+			}
+		}
 	}
-	if strings.EqualFold(m.tcpMode(), "client") {
-		return m.runTCPClient(ctx)
-	}
-	return m.runTCPServer(ctx)
 }
 
-func (m *Module) runTCPServer(ctx context.Context) error {
-	addr := net.JoinHostPort(m.listenHost(), m.listenPort())
+func (m *Module) runTCPServer(ctx context.Context, cfg commConfig) error {
+	addr := net.JoinHostPort(cfg.ListenHost, cfg.ListenPort)
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
+		m.rt.Logf("labnovation-ld560 failed to listen on %s: %v", addr, err)
 		return err
 	}
 	defer ln.Close()
-	m.rt.Logf("labnovation-ld560 listening on %s", addr)
+	m.rt.Logf("labnovation-ld560 listening as tcp server on %s using protocol=%s", addr, cfg.ProtocolMode)
 	go func() {
 		<-ctx.Done()
 		_ = ln.Close()
@@ -93,15 +147,17 @@ func (m *Module) runTCPServer(ctx context.Context) error {
 				return nil
 			default:
 			}
+			m.rt.Logf("labnovation-ld560 accept failed on %s: %v", addr, err)
 			return err
 		}
-		go m.handleConn(ctx, conn)
+		m.rt.Logf("labnovation-ld560 client connected from %s", conn.RemoteAddr())
+		go m.handleConn(ctx, conn, cfg.ProtocolMode, "server")
 	}
 }
 
-func (m *Module) runTCPClient(ctx context.Context) error {
-	target := net.JoinHostPort(m.remoteHost(), m.remotePort())
-	m.rt.Logf("labnovation-ld560 connecting as tcp client to %s", target)
+func (m *Module) runTCPClient(ctx context.Context, cfg commConfig) error {
+	target := net.JoinHostPort(cfg.RemoteHost, cfg.RemotePort)
+	m.rt.Logf("labnovation-ld560 connecting as tcp client to %s using protocol=%s", target, cfg.ProtocolMode)
 	for {
 		select {
 		case <-ctx.Done():
@@ -111,6 +167,7 @@ func (m *Module) runTCPClient(ctx context.Context) error {
 		conn, err := net.DialTimeout("tcp", target, 10*time.Second)
 		if err != nil {
 			m.setError(err)
+			m.rt.Logf("labnovation-ld560 tcp client connection to %s failed: %v", target, err)
 			select {
 			case <-ctx.Done():
 				return nil
@@ -118,11 +175,13 @@ func (m *Module) runTCPClient(ctx context.Context) error {
 				continue
 			}
 		}
-		m.handleConn(ctx, conn)
+		m.rt.Logf("labnovation-ld560 tcp client connected to %s", target)
+		m.handleConn(ctx, conn, cfg.ProtocolMode, "client")
 		select {
 		case <-ctx.Done():
 			return nil
 		case <-time.After(2 * time.Second):
+			m.rt.Logf("labnovation-ld560 tcp client reconnect loop scheduled for %s", target)
 		}
 	}
 }
@@ -174,12 +233,16 @@ func (m *Module) handleSettingsAPI(w http.ResponseWriter, r *http.Request) {
 	case http.MethodGet:
 		writeJSON(w, http.StatusOK, map[string]interface{}{"ok": true, "settings": m.settingsPayload()})
 	case http.MethodPut:
+		before := m.communicationConfig()
 		var req struct {
-			ProtocolMode string                 `json:"protocol_mode"`
-			TCPHost      string                 `json:"tcp_host"`
-			TCPPort      string                 `json:"tcp_port"`
-			HL7          map[string]interface{} `json:"hl7"`
-			Simple       map[string]interface{} `json:"simple"`
+			ProtocolMode  string                 `json:"protocol_mode"`
+			TCPMode       string                 `json:"tcp_mode"`
+			TCPHost       string                 `json:"tcp_host"`
+			TCPPort       string                 `json:"tcp_port"`
+			TCPRemoteHost string                 `json:"tcp_remote_host"`
+			TCPRemotePort string                 `json:"tcp_remote_port"`
+			HL7           map[string]interface{} `json:"hl7"`
+			Simple        map[string]interface{} `json:"simple"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]interface{}{"ok": false, "error": "invalid json body"})
@@ -188,6 +251,11 @@ func (m *Module) handleSettingsAPI(w http.ResponseWriter, r *http.Request) {
 		mode := normalizeProtocolMode(req.ProtocolMode)
 		if mode == "" {
 			writeJSON(w, http.StatusBadRequest, map[string]interface{}{"ok": false, "error": "protocol_mode must be hl7 or simple"})
+			return
+		}
+		tcpMode := normalizeTCPMode(req.TCPMode)
+		if tcpMode == "" {
+			writeJSON(w, http.StatusBadRequest, map[string]interface{}{"ok": false, "error": "tcp_mode must be server or client"})
 			return
 		}
 		host := strings.TrimSpace(req.TCPHost)
@@ -199,23 +267,48 @@ func (m *Module) handleSettingsAPI(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusBadRequest, map[string]interface{}{"ok": false, "error": "tcp_port must be numeric"})
 			return
 		}
+		remoteHost := strings.TrimSpace(req.TCPRemoteHost)
+		if remoteHost == "" {
+			remoteHost = "127.0.0.1"
+		}
+		remotePort := strings.TrimSpace(req.TCPRemotePort)
+		if remotePort == "" {
+			remotePort = port
+		}
+		if _, err := strconv.Atoi(remotePort); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]interface{}{"ok": false, "error": "tcp_remote_port must be numeric"})
+			return
+		}
 		hl7 := normalizeMap(req.HL7)
 		simple := normalizeMap(req.Simple)
 		if err := config.Update(m.rt.ConfigPath(), map[string]interface{}{
 			"analyzer.protocol":                         mode,
+			"modules.transport-tcpip.mode":              tcpMode,
 			"modules.transport-tcpip.host":              host,
 			"modules.transport-tcpip.port":              port,
+			"modules.transport-tcpip.remote_host":       remoteHost,
+			"modules.transport-tcpip.remote_port":       remotePort,
 			"modules.protocol-labnovation-ld560.hl7":    hl7,
 			"modules.protocol-labnovation-ld560.simple": simple,
 		}); err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]interface{}{"ok": false, "error": err.Error()})
 			return
 		}
+		after := m.communicationConfig()
+		restartNeeded := before != after
+		message := "Setarile au fost salvate."
+		if restartNeeded {
+			message = "Setarile au fost salvate. Comunicarea Labnovation LD-560 a fost reinitializata."
+		}
+		m.rt.Logf("labnovation-ld560 settings saved: protocol=%s mode=%s listen=%s:%s remote=%s:%s restart=%t", after.ProtocolMode, after.TCPMode, after.ListenHost, after.ListenPort, after.RemoteHost, after.RemotePort, restartNeeded)
 		writeJSON(w, http.StatusOK, map[string]interface{}{
 			"ok":       true,
 			"settings": m.settingsPayload(),
-			"message":  "Setarile au fost salvate. Daca ati schimbat host/port este recomandat un restart al aplicatiei.",
+			"message":  message,
 		})
+		if restartNeeded {
+			m.requestRestart()
+		}
 	default:
 		writeJSON(w, http.StatusMethodNotAllowed, map[string]interface{}{"ok": false, "error": "method not allowed"})
 	}
@@ -265,12 +358,27 @@ func (m *Module) handleSettingsPage(w http.ResponseWriter, r *http.Request) {
           </select>
         </div>
         <div>
+          <label for="tcp_mode">TCP mode</label>
+          <select id="tcp_mode">
+            <option value="server">Server</option>
+            <option value="client">Client</option>
+          </select>
+        </div>
+        <div>
           <label for="tcp_host">TCP host</label>
           <input id="tcp_host" />
         </div>
         <div>
           <label for="tcp_port">TCP port</label>
           <input id="tcp_port" />
+        </div>
+        <div>
+          <label for="tcp_remote_host">TCP remote host</label>
+          <input id="tcp_remote_host" />
+        </div>
+        <div>
+          <label for="tcp_remote_port">TCP remote port</label>
+          <input id="tcp_remote_port" />
         </div>
       </div>
       <label for="hl7_json">Configuratie HL7</label>
@@ -284,8 +392,11 @@ func (m *Module) handleSettingsPage(w http.ResponseWriter, r *http.Request) {
       const settings = ` + "`" + string(blob) + "`" + `;
       const data = JSON.parse(settings);
       document.getElementById('protocol_mode').value = data.protocol_mode || 'simple';
+      document.getElementById('tcp_mode').value = data.tcp_mode || 'server';
       document.getElementById('tcp_host').value = data.tcp_host || '0.0.0.0';
       document.getElementById('tcp_port').value = data.tcp_port || '8000';
+      document.getElementById('tcp_remote_host').value = data.tcp_remote_host || '127.0.0.1';
+      document.getElementById('tcp_remote_port').value = data.tcp_remote_port || data.tcp_port || '8000';
       document.getElementById('hl7_json').value = JSON.stringify(data.hl7 || {}, null, 2);
       document.getElementById('simple_json').value = JSON.stringify(data.simple || {}, null, 2);
       document.getElementById('save').addEventListener('click', async () => {
@@ -294,8 +405,11 @@ func (m *Module) handleSettingsPage(w http.ResponseWriter, r *http.Request) {
         try {
           const payload = {
             protocol_mode: document.getElementById('protocol_mode').value,
+            tcp_mode: document.getElementById('tcp_mode').value,
             tcp_host: document.getElementById('tcp_host').value,
             tcp_port: document.getElementById('tcp_port').value,
+            tcp_remote_host: document.getElementById('tcp_remote_host').value,
+            tcp_remote_port: document.getElementById('tcp_remote_port').value,
             hl7: JSON.parse(document.getElementById('hl7_json').value || '{}'),
             simple: JSON.parse(document.getElementById('simple_json').value || '{}')
           };
@@ -343,13 +457,23 @@ func (m *Module) settingsPayload() map[string]interface{} {
 	return payload
 }
 
-func (m *Module) handleConn(ctx context.Context, conn net.Conn) {
+func (m *Module) handleConn(ctx context.Context, conn net.Conn, protocol, role string) {
 	defer conn.Close()
 	m.changeClients(1)
 	defer m.changeClients(-1)
+	remoteAddr := conn.RemoteAddr().String()
+	done := make(chan struct{})
+	go func() {
+		select {
+		case <-ctx.Done():
+			_ = conn.Close()
+		case <-done:
+		}
+	}()
+	defer close(done)
+	defer m.rt.Logf("labnovation-ld560 %s connection closed: remote=%s", role, remoteAddr)
 
 	_ = conn.SetReadDeadline(time.Time{})
-	protocol := m.activeProtocol()
 	reader := bufio.NewReader(conn)
 	for {
 		select {
@@ -370,21 +494,24 @@ func (m *Module) handleConn(ctx context.Context, conn net.Conn) {
 				return
 			}
 			if err.Error() == "EOF" {
+				m.rt.Logf("labnovation-ld560 %s connection closed by peer: remote=%s", role, remoteAddr)
 				return
 			}
 			if strings.Contains(strings.ToLower(err.Error()), "closed") {
 				return
 			}
 			m.setError(err)
+			m.rt.Logf("labnovation-ld560 %s read error: remote=%s protocol=%s err=%v", role, remoteAddr, protocol, err)
 			return
 		}
 		imported, parseErr := m.importMessage(protocol, raw)
 		if parseErr != nil {
 			m.setError(parseErr)
-			m.rt.Logf("labnovation-ld560 import failed: %v", parseErr)
+			m.rt.Logf("labnovation-ld560 import failed: remote=%s protocol=%s err=%v", remoteAddr, protocol, parseErr)
 			continue
 		}
 		m.setImported(protocol, imported)
+		m.rt.Logf("labnovation-ld560 imported %d result(s): remote=%s protocol=%s", imported, remoteAddr, protocol)
 	}
 }
 
@@ -639,6 +766,40 @@ func (m *Module) setError(err error) {
 	m.status.LastError = err.Error()
 }
 
+func (m *Module) requestRestart() {
+	select {
+	case m.restartCh <- struct{}{}:
+	default:
+		select {
+		case <-m.restartCh:
+		default:
+		}
+		m.restartCh <- struct{}{}
+	}
+}
+
+type commConfig struct {
+	CommType     string
+	ProtocolMode string
+	TCPMode      string
+	ListenHost   string
+	ListenPort   string
+	RemoteHost   string
+	RemotePort   string
+}
+
+func (m *Module) communicationConfig() commConfig {
+	return commConfig{
+		CommType:     firstNonEmpty(strings.TrimSpace(m.commType()), ""),
+		ProtocolMode: firstNonEmpty(normalizeProtocolMode(m.activeProtocol()), "simple"),
+		TCPMode:      firstNonEmpty(normalizeTCPMode(m.tcpMode()), "server"),
+		ListenHost:   firstNonEmpty(strings.TrimSpace(m.listenHost()), "0.0.0.0"),
+		ListenPort:   firstNonEmpty(strings.TrimSpace(m.listenPort()), "8000"),
+		RemoteHost:   firstNonEmpty(strings.TrimSpace(m.remoteHost()), "127.0.0.1"),
+		RemotePort:   firstNonEmpty(strings.TrimSpace(m.remotePort()), "8000"),
+	}
+}
+
 func (m *Module) setImported(protocol string, count int) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -685,6 +846,17 @@ func normalizeProtocolMode(value string) string {
 		return "hl7"
 	case "simple", "labnovation-simple", "ld560-simple":
 		return "simple"
+	default:
+		return ""
+	}
+}
+
+func normalizeTCPMode(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "client":
+		return "client"
+	case "server", "":
+		return "server"
 	default:
 		return ""
 	}
