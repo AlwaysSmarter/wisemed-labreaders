@@ -14,6 +14,17 @@ log() {
   printf '[wmlr-update-server] %s\n' "$*"
 }
 
+show_binary_state() {
+  if [[ -f "${BUILD_OUTPUT}" ]]; then
+    log "Binary state: present"
+    stat -c '[wmlr-update-server] Binary mtime: %y' "${BUILD_OUTPUT}"
+    stat -c '[wmlr-update-server] Binary size: %s bytes' "${BUILD_OUTPUT}"
+    sha256sum "${BUILD_OUTPUT}" | sed 's/^/[wmlr-update-server] Binary sha256: /'
+  else
+    log "Binary state: missing"
+  fi
+}
+
 show_runtime_paths() {
   log "Repo root: ${REPO_ROOT}"
   log "Runtime dir: ${APP_ROOT}"
@@ -90,6 +101,7 @@ BUILD_OUTPUT="${BUILD_OUTPUT:-${APP_ROOT}/Update_Server}"
 mkdir -p "${APP_ROOT}" "${DEPLOYMENTS_DIR}" /go/pkg/mod /root/.cache/go-build
 
 show_runtime_paths
+show_binary_state
 
 sync_deployments "${REPO_ROOT}/apps/update-server/deployments"
 apply_runtime_config "${DEPLOYMENTS_DIR}/config.install.yaml"
@@ -97,9 +109,18 @@ apply_runtime_config "${DEPLOYMENTS_DIR}/config.yaml"
 
 log "Compilez ultima versiune din ${REPO_ROOT}."
 cd "${REPO_ROOT}"
+log "Git HEAD: $(git rev-parse HEAD 2>/dev/null || echo unavailable)"
+log "Git branch: $(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo unavailable)"
+log "Go version: $(go version)"
+log "Build package: ${GO_BUILD_PKG}"
+log "Build flags: ${GO_BUILD_FLAGS:-<none>}"
+log "Output binary: ${BUILD_OUTPUT}"
+log "Rulez go build cu output complet in stdout."
+set -x
 GOCACHE="${GOCACHE:-/root/.cache/go-build}" \
 GOMODCACHE="${GOMODCACHE:-/go/pkg/mod}" \
-go build ${GO_BUILD_FLAGS} -o "${BUILD_OUTPUT}" "${GO_BUILD_PKG}"
+go build -v -x ${GO_BUILD_FLAGS} -o "${BUILD_OUTPUT}" "${GO_BUILD_PKG}"
+set +x
 
 if [[ ! -x "${BUILD_OUTPUT}" ]]; then
   log "Build-ul nu a produs binarul ${BUILD_OUTPUT}."
@@ -108,6 +129,7 @@ fi
 
 log "Build complet."
 show_runtime_paths
+show_binary_state
 log "Config path: ${DEPLOYMENTS_DIR}/config.yaml"
 log "Start command: ${BUILD_OUTPUT} -config ${DEPLOYMENTS_DIR}/config.yaml"
 log "Pornesc update-server pe ${UPDATE_SERVER_BIND}."
