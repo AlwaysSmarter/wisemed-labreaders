@@ -5,7 +5,8 @@ Acest setup pornește un container `ubuntu:24.04` care:
 - are Go `1.24.0` instalat în container
 - montează repo-ul host-ului în `/opt/wmlr`
 - compilează la fiecare pornire ultima versiune `./apps/update-server`
-- sincronizează `apps/update-server/deployments` în runtime fără să suprascrie `deployments/config.yaml`
+- scrie runtime-ul în `output/update-server`
+- sincronizează `apps/update-server/deployments` în `output/update-server/deployments` fără să suprascrie `config.yaml`
 - pornește serverul și îl expune pe portul `19090`
 
 ## Cerințe
@@ -49,17 +50,22 @@ docker compose up --build -d
 ## Volume persistente
 
 - `/opt/wmlr:/opt/wmlr`: repo-ul sursă de pe host
-- `wisemed-update-server-deployments:/opt/update-server/deployments`: config, DB, fișiere publicate
 - `wisemed-update-server-gomod:/go/pkg/mod`: cache module Go
 - `wisemed-update-server-gobuild:/root/.cache/go-build`: cache build Go
+
+Datele runtime rămân direct în:
+
+- `/opt/wmlr/readersv3/output/update-server/Update_Server`
+- `/opt/wmlr/readersv3/output/update-server/deployments`
 
 ## Ce se întâmplă la startup
 
 1. containerul validează repo-ul montat în `/opt/wmlr`
-2. copiază template-ul `apps/update-server/deployments` în runtime
-3. aplică `UPDATE_SERVER_BIND` și opțional `PUBLIC_BASE_URL`
-4. rulează `go build -o /opt/update-server/Update_Server ./apps/update-server`
-5. pornește binarul cu `-config /opt/update-server/deployments/config.yaml`
+2. creează sau reutilizează `output/update-server`
+3. copiază template-ul `apps/update-server/deployments` în runtime
+4. aplică `UPDATE_SERVER_BIND` și opțional `PUBLIC_BASE_URL`
+5. rulează `go build -o output/update-server/Update_Server ./apps/update-server`
+6. pornește binarul cu `-config output/update-server/deployments/config.yaml`
 
 ## Observații
 

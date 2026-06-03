@@ -2,9 +2,9 @@
 set -euo pipefail
 
 WMLR_REPO="${WMLR_REPO:-/opt/wmlr}"
-APP_ROOT="${APP_ROOT:-/opt/update-server}"
-DEPLOYMENTS_DIR="${DEPLOYMENTS_DIR:-${APP_ROOT}/deployments}"
-BUILD_OUTPUT="${BUILD_OUTPUT:-${APP_ROOT}/Update_Server}"
+APP_ROOT="${APP_ROOT:-}"
+DEPLOYMENTS_DIR="${DEPLOYMENTS_DIR:-}"
+BUILD_OUTPUT="${BUILD_OUTPUT:-}"
 GO_BUILD_PKG="${GO_BUILD_PKG:-./apps/update-server}"
 GO_BUILD_FLAGS="${GO_BUILD_FLAGS:-}"
 UPDATE_SERVER_BIND="${UPDATE_SERVER_BIND:-0.0.0.0:19090}"
@@ -75,6 +75,10 @@ if [[ ! -f "${REPO_ROOT}/go.mod" ]]; then
   log "Nu există ${REPO_ROOT}/go.mod."
   exit 1
 fi
+
+APP_ROOT="${APP_ROOT:-${REPO_ROOT}/output/update-server}"
+DEPLOYMENTS_DIR="${DEPLOYMENTS_DIR:-${APP_ROOT}/deployments}"
+BUILD_OUTPUT="${BUILD_OUTPUT:-${APP_ROOT}/Update_Server}"
 
 mkdir -p "${APP_ROOT}" "${DEPLOYMENTS_DIR}" /go/pkg/mod /root/.cache/go-build
 

@@ -19,7 +19,7 @@ RUN curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" -o /tmp/go
 
 WORKDIR /opt/update-server
 
-COPY readersv3/apps/update-server/docker/ubuntu/entrypoint.sh /usr/local/bin/wmlr-update-server-entrypoint
+COPY apps/update-server/docker/ubuntu/entrypoint.sh /usr/local/bin/wmlr-update-server-entrypoint
 
 RUN chmod +x /usr/local/bin/wmlr-update-server-entrypoint \
     && mkdir -p /opt/update-server/deployments /go/pkg/mod /root/.cache/go-build
