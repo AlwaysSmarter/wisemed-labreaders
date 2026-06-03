@@ -14,6 +14,13 @@ log() {
   printf '[wmlr-update-server] %s\n' "$*"
 }
 
+show_runtime_paths() {
+  log "Repo root: ${REPO_ROOT}"
+  log "Runtime dir: ${APP_ROOT}"
+  log "Deployments dir: ${DEPLOYMENTS_DIR}"
+  log "Binary path: ${BUILD_OUTPUT}"
+}
+
 escape_sed_replacement() {
   printf '%s' "$1" | sed -e 's/[\/&]/\\&/g'
 }
@@ -82,6 +89,8 @@ BUILD_OUTPUT="${BUILD_OUTPUT:-${APP_ROOT}/Update_Server}"
 
 mkdir -p "${APP_ROOT}" "${DEPLOYMENTS_DIR}" /go/pkg/mod /root/.cache/go-build
 
+show_runtime_paths
+
 sync_deployments "${REPO_ROOT}/apps/update-server/deployments"
 apply_runtime_config "${DEPLOYMENTS_DIR}/config.install.yaml"
 apply_runtime_config "${DEPLOYMENTS_DIR}/config.yaml"
@@ -97,5 +106,9 @@ if [[ ! -x "${BUILD_OUTPUT}" ]]; then
   exit 1
 fi
 
-log "Pornesc update-server (1) pe ${UPDATE_SERVER_BIND}."
+log "Build complet."
+show_runtime_paths
+log "Config path: ${DEPLOYMENTS_DIR}/config.yaml"
+log "Start command: ${BUILD_OUTPUT} -config ${DEPLOYMENTS_DIR}/config.yaml"
+log "Pornesc update-server pe ${UPDATE_SERVER_BIND}."
 exec "${BUILD_OUTPUT}" -config "${DEPLOYMENTS_DIR}/config.yaml"

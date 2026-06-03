@@ -67,6 +67,15 @@ Datele runtime rămân direct în:
 5. rulează `go build -o output/update-server/Update_Server ./apps/update-server`
 6. pornește binarul cu `-config output/update-server/deployments/config.yaml`
 
+La fiecare startup, logurile containerului afișează explicit:
+
+- `Repo root`
+- `Runtime dir`
+- `Deployments dir`
+- `Binary path`
+- `Config path`
+- `Start command`
+
 ## Observații
 
 - `config.yaml` este păstrat între restarturi și nu este suprascris
