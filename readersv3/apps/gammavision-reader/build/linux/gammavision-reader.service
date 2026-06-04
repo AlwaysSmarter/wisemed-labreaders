@@ -1,0 +1,17 @@
+[Unit]
+Description=WiseMED readersv3 GammaVision Reader background service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/gammavision-reader
+ExecStart=/opt/gammavision-reader/gammavision-reader -config deployments/config.yaml -headless
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

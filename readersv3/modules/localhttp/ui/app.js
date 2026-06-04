@@ -188,6 +188,10 @@ const translations = {
     analysesWithResult: "Analize cu rezultat",
     sampleIdPrompt: "Sample ID",
     sampleNo: "Nr. proba",
+    sentSampleCode: "Cod trimis",
+    fileId: "Fisa",
+    sampleCode: "Sample code",
+    specimenCode: "Specimen code",
     statusReceived: "primit",
     statusPending: "in asteptare",
     statusCompleted: "finalizat",
@@ -394,6 +398,10 @@ const translations = {
     analysesWithResult: "Analyses with result",
     sampleIdPrompt: "Sample ID",
     sampleNo: "Sample No",
+    sentSampleCode: "Sent sample code",
+    fileId: "File ID",
+    sampleCode: "Sample code",
+    specimenCode: "Specimen code",
     statusReceived: "received",
     statusPending: "pending",
     statusCompleted: "completed",
@@ -1591,6 +1599,7 @@ async function loadReaderSettings() {
     result_sync_sample_suffixes: String(resp.settings?.result_sync_sample_suffixes || ""),
     result_sync_separators: String(resp.settings?.result_sync_separators || "-"),
     result_sync_qc_prefixes: String(resp.settings?.result_sync_qc_prefixes || ""),
+    protocol_subtype: String(resp.settings?.protocol_subtype || ""),
   };
   const form = els.readerSettingsForm;
   if (form) {
@@ -1627,6 +1636,7 @@ async function loadReaderSettings() {
     form.elements.result_sync_sample_suffixes.value = state.readerSettings.result_sync_sample_suffixes;
     form.elements.result_sync_separators.value = state.readerSettings.result_sync_separators;
     form.elements.result_sync_qc_prefixes.value = state.readerSettings.result_sync_qc_prefixes;
+    form.elements.protocol_subtype.value = state.readerSettings.protocol_subtype;
     syncReaderSettingsTransportFields();
   }
   els.repeatModeSelect.value = state.readerSettings.repeat_mode;
@@ -1671,6 +1681,7 @@ async function onSaveReaderSettings(event) {
     result_sync_sample_suffixes: String(form.elements.result_sync_sample_suffixes.value || "").trim(),
     result_sync_separators: String(form.elements.result_sync_separators.value || "-").trim(),
     result_sync_qc_prefixes: String(form.elements.result_sync_qc_prefixes.value || "").trim(),
+    protocol_subtype: String(form.elements.protocol_subtype.value || "").trim(),
     repeat_mode: String(els.repeatModeSelect.value || "individual"),
   };
   const resp = await api("/api/reader-settings", {
@@ -1712,6 +1723,7 @@ async function onSaveReaderSettings(event) {
     result_sync_sample_suffixes: String(resp.settings?.result_sync_sample_suffixes || payload.result_sync_sample_suffixes),
     result_sync_separators: String(resp.settings?.result_sync_separators || payload.result_sync_separators),
     result_sync_qc_prefixes: String(resp.settings?.result_sync_qc_prefixes || payload.result_sync_qc_prefixes),
+    protocol_subtype: String(resp.settings?.protocol_subtype || payload.protocol_subtype),
   };
   els.repeatModeSelect.value = state.readerSettings.repeat_mode;
   syncReaderSettingsTransportFields();
@@ -3827,9 +3839,29 @@ function renderSlot(bundle) {
   </button>`;
 }
 
+function orderSentSampleCode(order) {
+  return String(order?.meta?.sent_sample_code || order?.sample_id || "").trim();
+}
+
+function orderFileID(order) {
+  return String(order?.file_id || "").trim();
+}
+
+function orderSampleCode(order) {
+  return String(order?.patient_id || "").trim();
+}
+
+function orderSpecimenCode(order) {
+  return String(order?.patient_name || "").trim();
+}
+
 function renderSimpleRow(bundle) {
   const order = bundle.order;
   const analysesCount = (bundle.analyses || []).length;
+  const sentSampleCode = orderSentSampleCode(order);
+  const fileID = orderFileID(order);
+  const sampleCode = orderSampleCode(order);
+  const specimenCode = orderSpecimenCode(order);
   return `<tr class="${order.id === state.selectedOrderId ? "active" : ""}" data-order-id="${order.id}">
     <td class="col-check">
       ${state.commType === "file" ? `<span class="order-select"><input type="checkbox" data-order-check="${order.id}" ${state.selectedOrderIDs.includes(order.id) ? "checked" : ""}></span>` : ""}
@@ -3837,10 +3869,13 @@ function renderSimpleRow(bundle) {
     <td class="col-slot"><span class="slot-pill">${escapeHtml(slotLabel(order))}</span></td>
     <td class="col-sample">
         <div class="sample-main">
-          <div class="sample-id">${escapeHtml(order.sample_id || "-")}</div>
+        <div class="sample-id">${escapeHtml(order.sample_id || "-")}</div>
         <div class="sample-sub">
           <span>${escapeHtml(`${t("sampleNo")}: ${String(order.sample_no || 0)}`)}</span>
-          <span>${escapeHtml(order.patient_name || "")}</span>
+          <span>${escapeHtml(`${t("sentSampleCode")}: ${sentSampleCode || "-"}`)}</span>
+          <span>${escapeHtml(`${t("fileId")}: ${fileID || "-"}`)}</span>
+          <span>${escapeHtml(`${t("sampleCode")}: ${sampleCode || "-"}`)}</span>
+          <span>${escapeHtml(`${t("specimenCode")}: ${specimenCode || "-"}`)}</span>
         </div>
       </div>
     </td>
@@ -3867,12 +3902,16 @@ function renderOrderDetails() {
     state.selectedOrderAnalysisID = analyses[0].analysis.id;
   }
   const selectedAnalysisBundle = analyses.find((item) => item.analysis.id === state.selectedOrderAnalysisID) || analyses[0] || null;
+  const sentSampleCode = orderSentSampleCode(bundle.order);
+  const fileID = orderFileID(bundle.order);
+  const sampleCode = orderSampleCode(bundle.order);
+  const specimenCode = orderSpecimenCode(bundle.order);
   els.orderDetails.innerHTML = `
     <div class="order-card">
       <div class="order-headline">
         <div class="order-title">
           <strong>${escapeHtml(bundle.order.sample_id)}</strong>
-          <div class="small muted">${escapeHtml(bundle.order.patient_name || "")}</div>
+          <div class="small muted">${escapeHtml(`${t("sentSampleCode")}: ${sentSampleCode || "-"}`)}</div>
         </div>
         <span class="slot-pill">${escapeHtml(`${t("round")} ${bundle.order.round_no || 1}`)}</span>
       </div>
@@ -3888,6 +3927,18 @@ function renderOrderDetails() {
         <div class="meta-kpi">
           <span class="label">${escapeHtml(t("status"))}</span>
           <span class="value">${escapeHtml(localizeOrderStatus(bundle.order.status || ""))}</span>
+        </div>
+        <div class="meta-kpi">
+          <span class="label">${escapeHtml(t("fileId"))}</span>
+          <span class="value">${escapeHtml(fileID || "-")}</span>
+        </div>
+        <div class="meta-kpi">
+          <span class="label">${escapeHtml(t("sampleCode"))}</span>
+          <span class="value">${escapeHtml(sampleCode || "-")}</span>
+        </div>
+        <div class="meta-kpi">
+          <span class="label">${escapeHtml(t("specimenCode"))}</span>
+          <span class="value">${escapeHtml(specimenCode || "-")}</span>
         </div>
       </div>
     </div>

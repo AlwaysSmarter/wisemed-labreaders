@@ -77,7 +77,7 @@ modules:
         cfg_wisemed_protocol: https
         cod_echipament: cary60-uvvis
         echipament_id: "158"
-        login_token: 786-228d9f44f9a272c3bf0e8e9e66b9306a
+        login_token: 893-d789dd0b9ae668a76cfd658beed154f3
         numar_serial_echipament: cary60-uvvis-001
         tip_de_echipament_id: "1"
         unitate_medicala_id: "19"

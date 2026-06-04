@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<service>
+  <id>wisemed-shimatzu-tocl-reader</id>
+  <name>WiseMED Shimatzu Tocl Reader</name>
+  <description>WiseMED readersv3 Shimatzu Tocl Reader background service</description>
+  <executable>shimatzu-tocl-reader.exe</executable>
+  <arguments>-config deployments\config.yaml -headless</arguments>
+  <stoptimeout>15sec</stoptimeout>
+  <startmode>Automatic</startmode>
+  <delayedAutoStart>true</delayedAutoStart>
+  <serviceaccount>
+    <username>LocalSystem</username>
+  </serviceaccount>
+  <onfailure action="restart" delay="10 sec" />
+  <onfailure action="restart" delay="30 sec" />
+  <onfailure action="restart" delay="60 sec" />
+  <log mode="roll-by-size">
+    <sizeThreshold>10485760</sizeThreshold>
+    <keepFiles>5</keepFiles>
+  </log>
+</service>

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<service>
+  <id>wisemed-tricarb-5110-tr-reader</id>
+  <name>WiseMED TriCARB 5110 TR Reader</name>
+  <description>WiseMED readersv3 TriCARB 5110 TR Reader background service</description>
+  <executable>tricarb-5110-tr-reader.exe</executable>
+  <arguments>-config deployments\config.yaml -headless</arguments>
+  <stoptimeout>15sec</stoptimeout>
+  <startmode>Automatic</startmode>
+  <delayedAutoStart>true</delayedAutoStart>
+  <serviceaccount>
+    <username>LocalSystem</username>
+  </serviceaccount>
+  <onfailure action="restart" delay="10 sec" />
+  <onfailure action="restart" delay="30 sec" />
+  <onfailure action="restart" delay="60 sec" />
+  <log mode="roll-by-size">
+    <sizeThreshold>10485760</sizeThreshold>
+    <keepFiles>5</keepFiles>
+  </log>
+</service>

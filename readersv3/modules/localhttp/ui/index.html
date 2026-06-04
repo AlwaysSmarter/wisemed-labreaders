@@ -350,6 +350,15 @@
                 <span>Prefixe QC (`prefix:true|false`)</span>
                 <input name="result_sync_qc_prefixes" type="text" placeholder="PC35:true, PC0.5:true">
               </label>
+              <label class="reader-settings-field">
+                <span>Subtip protocol SHIMATZU Generic</span>
+                <select name="protocol_subtype">
+                  <option value="">Auto</option>
+                  <option value="auto">Auto</option>
+                  <option value="hplc">HPLC</option>
+                  <option value="ion-cromatograph">Ion Cromatograph</option>
+                </select>
+              </label>
               <div class="orders-buttons">
                 <button id="run-result-sync" class="ghost" type="button">Ruleaza acum</button>
                 <button id="reset-result-sync" class="ghost" type="button">Reseteaza stare sync</button>

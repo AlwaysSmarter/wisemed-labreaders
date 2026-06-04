@@ -1,11 +1,21 @@
 [
   {
+    "id": "anatolia-geneworks-reader",
+    "title": "Anatolia Geneworks Reader",
+    "binaryName": "anatolia-geneworks-reader",
+    "serviceName": "wisemed-anatolia-geneworks-reader",
+    "displayName": "WiseMED Anatolia Geneworks Reader",
+    "description": "WiseMED readersv3 Anatolia Geneworks Reader background service",
+    "bundleId": "eu.wisemed.readersv3.anatolia.geneworks.reader",
+    "supportsHeadless": true
+  },
+  {
     "id": "barcodeprinter",
-    "title": "Barcode Printer",
-    "binaryName": "BarcodePrinter",
+    "title": "Barcodeprinter",
+    "binaryName": "barcodeprinter",
     "serviceName": "wisemed-barcodeprinter",
-    "displayName": "WiseMED Barcode Printer",
-    "description": "WiseMED readersv3 Barcode Printer background service",
+    "displayName": "WiseMED Barcodeprinter",
+    "description": "WiseMED readersv3 Barcodeprinter background service",
     "bundleId": "eu.wisemed.readersv3.barcodeprinter",
     "supportsHeadless": true
   },
@@ -20,12 +30,22 @@
     "supportsHeadless": true
   },
   {
+    "id": "biosan-hipo-mpp-96-reader",
+    "title": "Biosan Hipo Mpp 96 Reader",
+    "binaryName": "biosan-hipo-mpp-96-reader",
+    "serviceName": "wisemed-biosan-hipo-mpp-96-reader",
+    "displayName": "WiseMED Biosan HIPO MPP-96 Reader",
+    "description": "WiseMED readersv3 Biosan HIPO MPP-96 Reader background service",
+    "bundleId": "eu.wisemed.readersv3.biosan.hipo.mpp96.reader",
+    "supportsHeadless": true
+  },
+  {
     "id": "cary60-uvvis-reader",
-    "title": "Cary60 UVVIS Reader",
-    "binaryName": "Cary60-UVVIS-Reader",
+    "title": "Cary60 Uvvis Reader",
+    "binaryName": "cary60-uvvis-reader",
     "serviceName": "wisemed-cary60-uvvis-reader",
-    "displayName": "WiseMED Cary60 UVVIS Reader",
-    "description": "WiseMED readersv3 Cary60 UVVIS Reader background service",
+    "displayName": "WiseMED Cary60 Uvvis Reader",
+    "description": "WiseMED readersv3 Cary60 Uvvis Reader background service",
     "bundleId": "eu.wisemed.readersv3.cary60.uvvis.reader",
     "supportsHeadless": true
   },
@@ -37,6 +57,16 @@
     "displayName": "WiseMED Gemini Reader",
     "description": "WiseMED readersv3 Gemini Reader background service",
     "bundleId": "eu.wisemed.readersv3.gemini.reader",
+    "supportsHeadless": true
+  },
+  {
+    "id": "gammavision-reader",
+    "title": "GammaVision Reader",
+    "binaryName": "gammavision-reader",
+    "serviceName": "wisemed-gammavision-reader",
+    "displayName": "WiseMED GammaVision Reader",
+    "description": "WiseMED readersv3 GammaVision Reader background service",
+    "bundleId": "eu.wisemed.readersv3.gammavision.reader",
     "supportsHeadless": true
   },
   {
@@ -67,6 +97,36 @@
     "displayName": "WiseMED Seegene Reader",
     "description": "WiseMED readersv3 Seegene Reader background service",
     "bundleId": "eu.wisemed.readersv3.seegene.reader",
+    "supportsHeadless": true
+  },
+  {
+    "id": "shimatzu-tocl-reader",
+    "title": "Shimatzu Tocl Reader",
+    "binaryName": "shimatzu-tocl-reader",
+    "serviceName": "wisemed-shimatzu-tocl-reader",
+    "displayName": "WiseMED Shimatzu Tocl Reader",
+    "description": "WiseMED readersv3 Shimatzu Tocl Reader background service",
+    "bundleId": "eu.wisemed.readersv3.shimatzu.tocl.reader",
+    "supportsHeadless": true
+  },
+  {
+    "id": "shimatzu-generic-reader",
+    "title": "Shimatzu Generic Reader",
+    "binaryName": "shimatzu-generic-reader",
+    "serviceName": "wisemed-shimatzu-generic-reader",
+    "displayName": "WiseMED SHIMATZU Generic Reader",
+    "description": "WiseMED readersv3 SHIMATZU Generic Reader background service",
+    "bundleId": "eu.wisemed.readersv3.shimatzu.generic.reader",
+    "supportsHeadless": true
+  },
+  {
+    "id": "tricarb-5110-tr-reader",
+    "title": "TriCARB 5110 TR Reader",
+    "binaryName": "tricarb-5110-tr-reader",
+    "serviceName": "wisemed-tricarb-5110-tr-reader",
+    "displayName": "WiseMED TriCARB 5110 TR Reader",
+    "description": "WiseMED readersv3 TriCARB 5110 TR Reader background service",
+    "bundleId": "eu.wisemed.readersv3.tricarb.5110.tr.reader",
     "supportsHeadless": true
   },
   {

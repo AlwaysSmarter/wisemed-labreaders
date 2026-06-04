@@ -636,11 +636,23 @@ func supportedProtocols(cfg *config.Config) []string {
 			add("ir-biotyper")
 		case "protocol-cary60-uvvis":
 			add("cary60-uvvis")
+		case "protocol-biosan-hipo-mpp96":
+			add("biosan-hipo-mpp96")
+		case "protocol-gammavision":
+			add("gammavision")
+		case "protocol-shimatzu-tocl":
+			add("shimatzu-tocl")
+		case "protocol-shimatzu-generic":
+			add("shimatzu-generic")
 		case "protocol-seegene-excel":
 			add("seegene-excel")
 		case "protocol-beosl-csv":
 			add("beoslcsv")
 			add("beosl-csv")
+		case "protocol-tricarb-5110-tr":
+			add("tricarb-5110-tr")
+		case "protocol-anatolia-geneworks":
+			add("anatolia-geneworks")
 		case "protocol-generic-file":
 			add("generic-file")
 		}
@@ -664,7 +676,7 @@ func supportedCommTypes(cfg *config.Config) []string {
 		switch strings.ToLower(strings.TrimSpace(protocol)) {
 		case "hl7", "simple", "astm", "ir-biotyper":
 			add("tcpip")
-		case "seegene-excel", "beosl-csv", "beoslcsv", "cary60-uvvis", "generic-file":
+		case "seegene-excel", "beosl-csv", "beoslcsv", "cary60-uvvis", "shimatzu-tocl", "shimatzu-generic", "biosan-hipo-mpp96", "gammavision", "tricarb-5110-tr", "anatolia-geneworks", "generic-file":
 			add("file")
 		case "barcodeprinter":
 			add("utility")

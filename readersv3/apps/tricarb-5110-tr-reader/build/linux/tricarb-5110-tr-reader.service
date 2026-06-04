@@ -1,0 +1,17 @@
+[Unit]
+Description=WiseMED readersv3 TriCARB 5110 TR Reader background service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/tricarb-5110-tr-reader
+ExecStart=/opt/tricarb-5110-tr-reader/tricarb-5110-tr-reader -config deployments/config.yaml -headless
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

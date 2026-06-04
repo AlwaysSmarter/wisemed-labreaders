@@ -1137,6 +1137,7 @@ func (s *Store) RecordImportedResult(orderDate string, roundNo int, rec coremode
 		SampleNo:     rec.SampleNo,
 		Status:       "received",
 		SourceFile:   sourceFile,
+		Meta:         metaOrEmpty(rec.Meta),
 	})
 	if err != nil {
 		return coremodel.Order{}, coremodel.OrderAnalysis{}, coremodel.OrderAnalysisResult{}, err

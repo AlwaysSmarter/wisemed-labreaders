@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="ro">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ajutor WiseMED Anatolia Geneworks</title>
+  <style>
+    :root{--bg:#f4f8fb;--panel:#ffffff;--ink:#173047;--muted:#5d7284;--line:#d7e3ec;--accent:#1f6ea6;--shadow:0 18px 42px rgba(23,48,71,.08)}
+    *{box-sizing:border-box} body{margin:0;font:16px/1.6 Arial,sans-serif;background:linear-gradient(180deg,#fbfdfe 0%,var(--bg) 100%);color:var(--ink)}
+    .wrap{max-width:980px;margin:0 auto;padding:32px 20px 80px} .panel{background:var(--panel);border:1px solid var(--line);border-radius:24px;padding:28px;box-shadow:var(--shadow);margin-bottom:24px}
+    h1,h2{margin:0 0 12px} code{background:#eef4f8;border:1px solid var(--line);padding:2px 6px;border-radius:8px} ul{padding-left:20px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="panel">
+      <h1>Anatolia Geneworks</h1>
+      <p>Anatolia Geneworks urmărește directorul configurat în <code>transport-file.import_dir</code>, citește exporturile locale și le salvează în baza locală WiseMED.</p>
+      <p>Importă fișiere XLS Anatolia Geneworks și importă ținta, Ct-ul și concluzia pentru probe și controale.</p>
+    </section>
+    <section class="panel">
+      <h2>Setări esențiale</h2>
+      <ul>
+        <li><code>transport-file.import_dir</code>, <code>processed_dir</code>, <code>failed_dir</code> pentru fluxul fișierelor.</li>
+        <li><code>result-sync.sample_prefixes</code>, <code>sample_suffixes</code> și <code>separators</code> pentru normalizarea codurilor de probă.</li>
+        <li><code>result-sync.qc_prefixes</code> pentru controalele QC când formatul le marchează prin prefix.</li>
+        <li><code>local_http.address</code> pentru consola locală.</li>
+      </ul>
+    </section>
+    <section class="panel">
+      <h2>Verificări rapide</h2>
+      <ul>
+        <li>formatul fișierului trebuie să corespundă exportului instrumentului;</li>
+        <li>după procesare, fișierul trebuie mutat în <code>processed_dir</code>;</li>
+        <li>dacă matching-ul nu este corect, verifică regulile din <code>result-sync</code>.</li>
+      </ul>
+    </section>
+  </div>
+</body>
+</html>

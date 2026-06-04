@@ -1,0 +1,77 @@
+analyzer:
+    comm_type: file
+    protocol: shimatzu-tocl
+local_http:
+    address: 127.0.0.1:18080
+    cors_allowed_origins: https://ldse.wisemed.eu
+    enabled: true
+    language: ro
+    tls: false
+modules:
+    app-updates:
+        app_id: shimatzu-tocl-v3
+        auto_download: "true"
+        base_url: http://127.0.0.1:19090
+        channel: stable
+        download_dir: ./updates
+        enabled: "true"
+    local-http:
+        address: 127.0.0.1:18080
+        cors_allowed_origins: https://ldse.wisemed.eu
+        enabled: true
+        language: ro
+        tls: false
+    result-sync:
+        enabled: "true"
+        interval_minutes: "5"
+        qc_prefixes:
+            - keep_as_lot: false
+              prefix: PC
+            - keep_as_lot: false
+              prefix: PC_
+        sample_prefixes:
+            - C_AC_
+            - M_AP_
+        sample_suffixes:
+            - _PB
+            - _PV
+        separators:
+            - '-'
+            - _
+            - /
+    storage-sqlite:
+        path: ./shimatzu-tocl-reader-v3.db
+    transport-file:
+        export_dir: ./outbox
+        failed_dir: ./failed
+        import_dir: ./inbox
+        pattern: '*.csv'
+        processed_dir: ./processed
+    wisemed-api:
+        cfg_wisemed_ip: ldse.wisemed.eu
+        cfg_wisemed_key: 27c490bb-c9e4-47aa-bf6d-ebd2a1add35e
+        cfg_wisemed_path: /wisemed-api/apiv2
+        cfg_wisemed_port: "443"
+        cfg_wisemed_protocol: https
+        cod_echipament: shimatzu-tocl
+        echipament_id: "177"
+        login_token: 895-69d441a26b5203b96441337d34e06f88
+        numar_serial_echipament: shimatzu-tocl-001
+        tip_de_echipament_id: "1"
+        unitate_medicala_id: "13"
+    wisemed-ws:
+        enabled: false
+        heartbeat_ms: 15000
+        reconnect_delay_ms: 5000
+        url: wss://wslocal.wisemed.eu/ws
+reader:
+    analyzer_code: shimatzu-tocl
+    analyzer_name: Shimatzu TOC-L
+    db_name: shimatzu-tocl-reader-v3.db
+    id: shimatzu-tocl-v3
+    label: Shimatzu TOC-L
+wisemed_ws:
+    enabled: false
+    heartbeat_ms: 15000
+    reconnect_delay_ms: 5000
+    url: wss://wslocal.wisemed.eu/ws

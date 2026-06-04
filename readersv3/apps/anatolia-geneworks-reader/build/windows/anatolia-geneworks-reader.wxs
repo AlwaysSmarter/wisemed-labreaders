@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package Name="WiseMED anatolia-geneworks-reader"
+           Manufacturer="WiseMED"
+           Version="1.0.0"
+           UpgradeCode="5C17D0C1-7A9A-4A47-B220-anatolia-geneworks-reader">
+    <MediaTemplate EmbedCab="yes" />
+    <MajorUpgrade DowngradeErrorMessage="A newer version is already installed." />
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLROOT" Name="WiseMED">
+        <Directory Id="INSTALLFOLDER" Name="anatolia-geneworks-reader" />
+      </Directory>
+    </StandardDirectory>
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="ProgramMenuWiseMED" Name="WiseMED" />
+    </StandardDirectory>
+    <StandardDirectory Id="TempFolder" />
+
+    <?include $(var.FilesWxi)?>
+
+    <Feature Id="MainFeature" Title="WiseMED anatolia-geneworks-reader" Level="1">
+      <ComponentGroupRef Id="ShortcutComponents" />
+    </Feature>
+
+    <ComponentGroup Id="ShortcutComponents">
+      <Component Directory="ProgramMenuWiseMED" Guid="*">
+        <Shortcut Id="StartMenuShortcut"
+                  Name="WiseMED anatolia-geneworks-reader"
+                  Target="[INSTALLFOLDER]\anatolia-geneworks-reader.exe"
+                  WorkingDirectory="INSTALLFOLDER" />
+        <RemoveFolder Id="RemoveWiseMEDProgramMenu" Directory="ProgramMenuWiseMED" On="uninstall" />
+        <RegistryValue Root="HKLM" Key="Software\WiseMED\anatolia-geneworks-reader" Name="installed" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </ComponentGroup>
+
+    <Binary Id="InstallServiceScript" SourceFile="$(var.InstallScript)" />
+    <Binary Id="UninstallServiceScript" SourceFile="$(var.UninstallScript)" />
+
+    <CustomAction Id="InstallService"
+                  BinaryRef="InstallServiceScript"
+                  ExeCommand="-ExecutionPolicy Bypass -File &quot;[#InstallServiceScript]&quot;"
+                  Execute="deferred"
+                  Impersonate="no"
+                  Return="check" />
+    <CustomAction Id="UninstallService"
+                  BinaryRef="UninstallServiceScript"
+                  ExeCommand="-ExecutionPolicy Bypass -File &quot;[#UninstallServiceScript]&quot;"
+                  Execute="deferred"
+                  Impersonate="no"
+                  Return="ignore" />
+
+    <InstallExecuteSequence>
+      <Custom Action="InstallService" After="InstallFiles">NOT Installed OR REINSTALL</Custom>
+      <Custom Action="UninstallService" Before="RemoveFiles">REMOVE="ALL"</Custom>
+    </InstallExecuteSequence>
+  </Package>
+</Wix>

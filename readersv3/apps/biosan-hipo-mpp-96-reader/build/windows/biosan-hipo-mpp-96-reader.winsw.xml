@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<service>
+  <id>wisemed-biosan-hipo-mpp-96-reader</id>
+  <name>WiseMED Biosan HIPO MPP-96 Reader</name>
+  <description>WiseMED readersv3 Biosan HIPO MPP-96 Reader background service</description>
+  <executable>biosan-hipo-mpp-96-reader.exe</executable>
+  <arguments>-config deployments\config.yaml -headless</arguments>
+  <stoptimeout>15sec</stoptimeout>
+  <startmode>Automatic</startmode>
+  <delayedAutoStart>true</delayedAutoStart>
+  <serviceaccount>
+    <username>LocalSystem</username>
+  </serviceaccount>
+  <onfailure action="restart" delay="10 sec" />
+  <onfailure action="restart" delay="30 sec" />
+  <onfailure action="restart" delay="60 sec" />
+  <log mode="roll-by-size">
+    <sizeThreshold>10485760</sizeThreshold>
+    <keepFiles>5</keepFiles>
+  </log>
+</service>
