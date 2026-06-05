@@ -1,0 +1,16 @@
+[Header]	
+System	TOC-LCPH	
+S/W Version	1.00	
+User	admin	
+Date/Time	6/5/2026 2:52:21 PM	
+
+[System]	
+Instrument Options	TOC/ASI/IC Unit/	
+
+[Data]	
+Type	Anal.	Sample Name	Sample ID	Result(TOC)	Result(TC)	Result(IC)	Result(POC)	Result(NPOC)	Result(TN)	Unit	Vial	Date / Time	
+Unknown	NPOC	apa pura	martor					0.09238		mg/L	1	06/05/2026 9:15:01 AM	
+Unknown	NPOC	et	pc_1ppm					1.249		mg/L	2	06/05/2026 9:40:41 AM	
+Unknown	NPOC	et	pc_3ppm					3.116		mg/L	3	06/05/2026 9:52:05 AM	
+Unknown	NPOC	et	pc_1ppmr					1.069		mg/L	4	06/05/2026 10:05:57 AM	
+Unknown	NPOC	apa potabila	C_AC_1762					2.553		mg/L	5	06/05/2026 11:49:58 AM
