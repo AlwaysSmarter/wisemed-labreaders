@@ -2,6 +2,7 @@ package cary60uvvis
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -15,10 +16,17 @@ import (
 
 	"wisemed-labreaders/readersv3/core/module"
 	coremodel "wisemed-labreaders/readersv3/modules/core/model"
+	"wisemed-labreaders/readersv3/modules/protocols/fileimportbase"
 )
 
 type analyteStore interface {
+	ListAnalytes() ([]coremodel.Analyte, error)
 	SaveAnalyte(item coremodel.Analyte) (coremodel.Analyte, error)
+}
+
+type wiseMedSyncService interface {
+	SetupComplete() bool
+	EnsureEquipmentOnline(reader map[string]interface{}) (map[string]interface{}, error)
 }
 
 type importStore interface {
@@ -78,6 +86,7 @@ func (m *Module) Start(ctx context.Context) error {
 }
 
 func (m *Module) ImportFileNow(path, orderDate string) (map[string]interface{}, error) {
+	m.logf(4, "cary60 manual import requested file=%s order_date=%s", path, effectiveDate(orderDate))
 	imported, warnings, err := m.importFile(path, orderDate)
 	if err != nil {
 		return nil, err
@@ -102,10 +111,13 @@ func (m *Module) scanImportDir() {
 		m.rt.Logf("cary60 glob failed: %v", err)
 		return
 	}
+	m.logf(5, "cary60 scan import_dir=%s pattern=%s matched_files=%d", meta.ImportDir, meta.Pattern, len(files))
 	for _, path := range files {
 		if !m.begin(path) {
+			m.logIgnored("file", "already processing", map[string]interface{}{"file": path})
 			continue
 		}
+		m.logf(4, "cary60 picked import file=%s", path)
 		func() {
 			defer m.end(path)
 			if _, _, err := m.importFile(path, ""); err != nil {
@@ -123,14 +135,45 @@ func (m *Module) importFile(path, fallbackDate string) (int, int, error) {
 	if store == nil {
 		return 0, 0, errors.New("storage service unavailable")
 	}
-	data, err := parseCary60CSV(path)
+	m.logf(4, "cary60 import start file=%s fallback_date=%s", path, effectiveDate(fallbackDate))
+	data, err := parseCary60CSV(path, m.logIgnored)
 	if err != nil {
 		return 0, 0, err
 	}
+	m.logf(4, "cary60 parse ok file=%s sample_records=%d qc_records=%d analytes=%d daily_details=%d", path, len(data.SampleRecords), len(data.QCRecords), len(data.Analytes), len(data.DailyDetails))
+	if m.verboseLevel() >= 5 {
+		preview := map[string]interface{}{}
+		if len(data.SampleRecords) > 0 {
+			preview["first_sample_record"] = data.SampleRecords[0]
+		}
+		if len(data.QCRecords) > 0 {
+			preview["first_qc_record"] = data.QCRecords[0]
+		}
+		if len(data.Analytes) > 0 {
+			limit := len(data.Analytes)
+			if limit > 5 {
+				limit = 5
+			}
+			preview["analyte_preview"] = data.Analytes[:limit]
+		}
+		if len(data.DailyDetails) > 0 {
+			preview["first_daily_detail"] = data.DailyDetails[0]
+		}
+		if blob, err := json.Marshal(preview); err == nil {
+			m.rt.Logf("cary60 parse preview %s", string(blob))
+		}
+	}
+	knownAnalytes, err := m.listExistingAnalytes()
+	if err != nil {
+		return 0, 0, err
+	}
+	analytesChanged := false
 	for _, analyte := range data.Analytes {
-		if err := m.ensureAnalyte(analyte); err != nil {
+		changed, err := m.ensureAnalyte(knownAnalytes, analyte)
+		if err != nil {
 			return 0, 0, err
 		}
+		analytesChanged = analytesChanged || changed
 	}
 	for _, item := range data.DailyDetails {
 		if _, err := store.SaveDailyDetailValue(item); err != nil {
@@ -138,6 +181,7 @@ func (m *Module) importFile(path, fallbackDate string) (int, int, error) {
 		}
 	}
 	roundCache := map[string]int{}
+	autoSaveTargets := map[string]*fileimportbase.AutoSaveTarget{}
 	imported := 0
 	sourceFile := filepath.Base(path)
 	for _, item := range data.SampleRecords {
@@ -150,9 +194,11 @@ func (m *Module) importFile(path, fallbackDate string) (int, int, error) {
 			}
 			roundCache[runDate] = roundNo
 		}
-		if _, _, _, err := store.RecordImportedResult(runDate, roundNo, item.Record, sourceFile); err != nil {
+		order, _, _, err := store.RecordImportedResult(runDate, roundNo, item.Record, sourceFile)
+		if err != nil {
 			return imported, 0, err
 		}
+		fileimportbase.CollectAutoSaveTarget(autoSaveTargets, runDate, roundNo, order.ID)
 		imported++
 	}
 	for _, record := range data.QCRecords {
@@ -171,19 +217,31 @@ func (m *Module) importFile(path, fallbackDate string) (int, int, error) {
 			imported++
 		}
 	}
-	return imported, 0, nil
+	warnings := 0
+	if analytesChanged {
+		if err := m.syncAnalytesToWiseMED(); err != nil {
+			warnings++
+			m.rt.Logf("cary60 analyte sync warning %s: %v", path, err)
+		}
+	}
+	if err := fileimportbase.AutoSaveResultsToWiseMED(m.rt, fileimportbase.FlattenAutoSaveTargets(autoSaveTargets)); err != nil {
+		warnings++
+		m.rt.Logf("cary60 result autosave warning %s: %v", path, err)
+	}
+	m.logf(4, "cary60 import done file=%s imported=%d warnings=%d analytes_changed=%t", path, imported, warnings, analytesChanged)
+	return imported, warnings, nil
 }
 
-func (m *Module) ensureAnalyte(item cary60Analyte) error {
+func (m *Module) ensureAnalyte(known map[string]coremodel.Analyte, item cary60Analyte) (bool, error) {
 	service, ok := m.rt.Service("storage")
 	if !ok {
-		return errors.New("storage service unavailable")
+		return false, errors.New("storage service unavailable")
 	}
 	store, ok := service.(analyteStore)
 	if !ok {
-		return errors.New("analyte store unavailable")
+		return false, errors.New("analyte store unavailable")
 	}
-	_, err := store.SaveAnalyte(coremodel.Analyte{
+	target := coremodel.Analyte{
 		Active:            true,
 		Tag:               item.Tag,
 		Code:              item.Tag,
@@ -196,8 +254,17 @@ func (m *Module) ensureAnalyte(item cary60Analyte) error {
 		ProtocolOptions: map[string]interface{}{
 			"worklist_label": defaultCaryWorklistLabel(item.Tag, item.Unit),
 		},
-	})
-	return err
+	}
+	existing, ok := known[strings.TrimSpace(target.Tag)]
+	if ok && analytesEquivalent(existing, target) {
+		return false, nil
+	}
+	saved, err := store.SaveAnalyte(target)
+	if err != nil {
+		return false, err
+	}
+	known[strings.TrimSpace(saved.Tag)] = saved
+	return true, nil
 }
 
 func (m *Module) importStore() importStore {
@@ -223,6 +290,92 @@ func (m *Module) fileTransport() fileTransportMeta {
 		meta.Pattern = value
 	}
 	return meta
+}
+
+func (m *Module) listExistingAnalytes() (map[string]coremodel.Analyte, error) {
+	service, ok := m.rt.Service("storage")
+	if !ok {
+		return nil, errors.New("storage service unavailable")
+	}
+	store, ok := service.(analyteStore)
+	if !ok {
+		return nil, errors.New("analyte store unavailable")
+	}
+	items, err := store.ListAnalytes()
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[string]coremodel.Analyte, len(items))
+	for _, item := range items {
+		out[strings.TrimSpace(item.Tag)] = item
+	}
+	return out, nil
+}
+
+func analytesEquivalent(existing, target coremodel.Analyte) bool {
+	if existing.Active != target.Active ||
+		strings.TrimSpace(existing.Tag) != strings.TrimSpace(target.Tag) ||
+		strings.TrimSpace(existing.Code) != strings.TrimSpace(target.Code) ||
+		strings.TrimSpace(existing.Name) != strings.TrimSpace(target.Name) ||
+		strings.TrimSpace(existing.Description) != strings.TrimSpace(target.Description) ||
+		strings.TrimSpace(existing.ResultType) != strings.TrimSpace(target.ResultType) ||
+		strings.TrimSpace(existing.ResultFormatting) != strings.TrimSpace(target.ResultFormatting) ||
+		existing.ResultWeighting != target.ResultWeighting ||
+		strings.TrimSpace(existing.ResultMeasureUnit) != strings.TrimSpace(target.ResultMeasureUnit) {
+		return false
+	}
+	leftJSON, _ := json.Marshal(existing.ProtocolOptions)
+	rightJSON, _ := json.Marshal(target.ProtocolOptions)
+	return string(leftJSON) == string(rightJSON)
+}
+
+func (m *Module) syncAnalytesToWiseMED() error {
+	service, ok := m.rt.Service("wisemed-api")
+	if !ok {
+		return nil
+	}
+	api, ok := service.(wiseMedSyncService)
+	if !ok || !api.SetupComplete() {
+		return nil
+	}
+	_, err := api.EnsureEquipmentOnline(nil)
+	return err
+}
+
+func (m *Module) verboseLevel() int {
+	raw := strings.TrimSpace(fmt.Sprint(m.rt.ModuleSettings("logging")["verbose_level"]))
+	value, err := strconv.Atoi(raw)
+	if err != nil || value < 1 {
+		return 1
+	}
+	if value > 5 {
+		return 5
+	}
+	return value
+}
+
+func (m *Module) logf(level int, format string, args ...interface{}) {
+	if m.verboseLevel() >= level {
+		m.rt.Logf(format, args...)
+	}
+}
+
+func (m *Module) logIgnored(kind, reason string, payload map[string]interface{}) {
+	if m.verboseLevel() < 5 {
+		return
+	}
+	entry := map[string]interface{}{
+		"kind":   kind,
+		"reason": reason,
+	}
+	for key, value := range payload {
+		entry[key] = value
+	}
+	if blob, err := json.Marshal(entry); err == nil {
+		m.rt.Logf("cary60 ignored %s", string(blob))
+		return
+	}
+	m.rt.Logf("cary60 ignored kind=%s reason=%s", kind, reason)
 }
 
 func (m *Module) archive(path, settingKey string) error {
@@ -395,7 +548,11 @@ type cary60Row struct {
 	Flag          string
 }
 
-func parseCary60CSV(path string) (cary60ImportData, error) {
+func parseCary60CSV(path string, ignored ...func(kind, reason string, payload map[string]interface{})) (cary60ImportData, error) {
+	var logIgnored func(kind, reason string, payload map[string]interface{})
+	if len(ignored) > 0 {
+		logIgnored = ignored[0]
+	}
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return cary60ImportData{}, err
@@ -412,6 +569,14 @@ func parseCary60CSV(path string) (cary60ImportData, error) {
 	for _, section := range sections {
 		analyte := detectCary60Analyte(path, section)
 		if analyte.Tag == "" {
+			if logIgnored != nil {
+				logIgnored("section", "analyte could not be detected", map[string]interface{}{
+					"file":       fileName,
+					"method":     strings.TrimSpace(section.Method),
+					"batch_name": strings.TrimSpace(section.BatchName),
+					"units":      strings.TrimSpace(section.Units),
+				})
+			}
 			continue
 		}
 		analytesByTag[analyte.Tag] = analyte
@@ -440,10 +605,17 @@ func parseCary60CSV(path string) (cary60ImportData, error) {
 			}
 		}
 		domain := detectCary60Domain(section)
-		rows := parseCary60SectionRows(section)
+		rows := parseCary60SectionRows(section, logIgnored)
 		for _, row := range rows {
 			sampleID := normalizeCary60SampleID(row.Sample)
 			if sampleID == "" {
+				if logIgnored != nil {
+					logIgnored("row", "missing sample id", map[string]interface{}{
+						"file":       fileName,
+						"analyte":    analyte.Tag,
+						"sample_raw": row.Sample,
+					})
+				}
 				continue
 			}
 			finalNumeric := row.Concentration
@@ -610,7 +782,7 @@ func parseCary60Sections(raw string) []cary60Section {
 	return sections
 }
 
-func parseCary60SectionRows(section cary60Section) []cary60Row {
+func parseCary60SectionRows(section cary60Section, logIgnored func(kind, reason string, payload map[string]interface{})) []cary60Row {
 	index := map[string]int{}
 	for i, col := range section.Header {
 		index[normalizeToken(col)] = i
@@ -619,10 +791,25 @@ func parseCary60SectionRows(section cary60Section) []cary60Row {
 	for _, row := range section.Rows {
 		sample := valueAt(index, row, "SAMPLE")
 		if strings.TrimSpace(sample) == "" {
+			if logIgnored != nil {
+				logIgnored("row", "empty sample column", map[string]interface{}{
+					"method":     strings.TrimSpace(section.Method),
+					"batch_name": strings.TrimSpace(section.BatchName),
+					"row":        row,
+				})
+			}
 			continue
 		}
 		concentration, ok := parseNumber(valueAt(index, row, "CONCENTRATION_MG_L", "CONCENTRATION_UG_L", "CONCENTRATION_UGAL_L", "CONCENTRATION_UGFE_L"))
 		if !ok {
+			if logIgnored != nil {
+				logIgnored("row", "missing numeric concentration", map[string]interface{}{
+					"method":        strings.TrimSpace(section.Method),
+					"batch_name":    strings.TrimSpace(section.BatchName),
+					"sample":        strings.TrimSpace(sample),
+					"concentration": valueAt(index, row, "CONCENTRATION_MG_L", "CONCENTRATION_UG_L", "CONCENTRATION_UGAL_L", "CONCENTRATION_UGFE_L"),
+				})
+			}
 			continue
 		}
 		factor := 1.0

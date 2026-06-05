@@ -7,38 +7,38 @@ local_http:
     enabled: true
     language: ro
     tls: false
+logging:
+    verbose_level: 5
 modules:
     app-updates:
         app_id: shimatzu-tocl-v3
-        auto_download: "true"
+        auto_download: true
         base_url: http://127.0.0.1:19090
         channel: stable
         download_dir: ./updates
-        enabled: "true"
+        enabled: true
     local-http:
         address: 127.0.0.1:18080
         cors_allowed_origins: https://ldse.wisemed.eu
         enabled: true
         language: ro
+        repeat_mode: individual
         tls: false
+    logging:
+        verbose_level: 5
+    protocol-shimatzu-generic:
+        subtype: auto
     result-sync:
-        enabled: "true"
+        enabled: true
         interval_minutes: "5"
-        qc_prefixes:
-            - keep_as_lot: false
-              prefix: PC
-            - keep_as_lot: false
-              prefix: PC_
+        qc_prefixes: []
         sample_prefixes:
             - C_AC_
-            - M_AP_
-        sample_suffixes:
-            - _PB
-            - _PV
+        sample_suffixes: []
         separators:
             - '-'
-            - _
-            - /
+    results:
+        auto_confirm_wisemed: false
     storage-sqlite:
         path: ./shimatzu-tocl-reader-v3.db
     transport-file:
@@ -47,17 +47,28 @@ modules:
         import_dir: ./inbox
         pattern: '*.csv'
         processed_dir: ./processed
+    transport-tcpip:
+        host: ""
+        mode: server
+        port: ""
+        remote_host: ""
+        remote_port: ""
     wisemed-api:
-        cfg_wisemed_ip: ldse.wisemed.eu
+        api_key_echipament: '-'
+        cfg_wisemed_ip: php.wisemed.eu
         cfg_wisemed_key: 27c490bb-c9e4-47aa-bf6d-ebd2a1add35e
-        cfg_wisemed_path: /wisemed-api/apiv2
+        cfg_wisemed_path: /git/wisemed/wisemed-api/apiv2
         cfg_wisemed_port: "443"
         cfg_wisemed_protocol: https
         cod_echipament: shimatzu-tocl
-        echipament_id: "177"
-        login_token: 895-69d441a26b5203b96441337d34e06f88
+        echipament_id: "161"
+        login_token: 793-4ce2690f826954790bec0f44372cc760
+        nr_rackuri: "0"
         numar_serial_echipament: shimatzu-tocl-001
-        tip_de_echipament_id: "1"
+        nume_pe_raport_final: Shimatzu TOC-L
+        pozitii_pe_rack: "0"
+        producator_echipament: Shimatzu
+        tip_de_echipament_id: "4"
         unitate_medicala_id: "13"
     wisemed-ws:
         enabled: false
@@ -70,6 +81,8 @@ reader:
     db_name: shimatzu-tocl-reader-v3.db
     id: shimatzu-tocl-v3
     label: Shimatzu TOC-L
+results:
+    auto_confirm_wisemed: false
 wisemed_ws:
     enabled: false
     heartbeat_ms: 15000

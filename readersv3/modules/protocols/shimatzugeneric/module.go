@@ -34,13 +34,24 @@ func parseShimadzuGeneric(path string, rt module.Runtime) (fileimportbase.Import
 	lines := strings.Split(strings.ReplaceAll(string(raw), "\r\n", "\n"), "\n")
 	header := parseKeyValueSection(lines, "Header")
 	sampleInfo := parseKeyValueSection(lines, "Sample Information")
-	compoundRows := parseTableSection(lines, "Compound Results(Detector A)")
+	compoundRows := firstTableSection(lines,
+		"Compound Results(Detector A)",
+		"Compound Results (Detector A)",
+		"Compound Results(Ch1)",
+		"Compound Results (Ch1)",
+	)
 
-	sampleID := fileimportbase.NormalizeSampleID(firstNonEmpty(sampleInfo["Sample ID"], sampleInfo["Sample Name"], strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))))
-	sampleRaw := strings.TrimSpace(firstNonEmpty(sampleInfo["Sample ID"], sampleInfo["Sample Name"], strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))))
+	sampleID := fileimportbase.PreferredSampleCode(sampleInfo["Sample ID"], sampleInfo["Sample Name"])
+	if sampleID == "" {
+		sampleID = fileimportbase.NormalizeSampleID(strings.TrimSuffix(filepath.Base(path), filepath.Ext(path)))
+	}
+	sampleRaw := strings.TrimSpace(fileimportbase.PreferredRawSampleCode(sampleInfo["Sample ID"], sampleInfo["Sample Name"]))
+	if sampleRaw == "" {
+		sampleRaw = strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
+	}
 	sampleName := strings.TrimSpace(sampleInfo["Sample Name"])
-	runDate := fileimportbase.ParseDate(firstNonEmpty(sampleInfo["Acquired"], header["Output Date"]))
-	measuredAt := fileimportbase.ParseTimestamp(firstNonEmpty(sampleInfo["Acquired"], firstNonEmpty(header["Output Date"], "")+" "+firstNonEmpty(header["Output Time"], "")))
+	runDate := fileimportbase.ParseDate(firstNonEmpty(sampleInfo["Acquired"], sampleInfo["Acquisition Date"], header["Output Date"]))
+	measuredAt := fileimportbase.ParseTimestamp(firstNonEmpty(sampleInfo["Acquired"], sampleInfo["Acquisition Date"], firstNonEmpty(header["Output Date"], "")+" "+firstNonEmpty(header["Output Time"], "")))
 	subtype := strings.TrimSpace(firstNonEmpty(asString(rt.ModuleSettings("protocol-shimatzu-generic")["subtype"]), inferSubtype(path, compoundRows)))
 	sourceFile := filepath.Base(path)
 
@@ -74,7 +85,7 @@ func parseShimadzuGeneric(path string, rt module.Runtime) (fileimportbase.Import
 			"source":              "shimatzu_generic_txt",
 			"sample_name":         sampleName,
 			"sample_raw":          sampleRaw,
-			"sample_type":         strings.TrimSpace(sampleInfo["Sample Type"]),
+			"sample_type":         strings.TrimSpace(firstNonEmpty(sampleInfo["Sample Type"], sampleInfo["Type"])),
 			"subtype":             subtype,
 			"measured_at":         measuredAt,
 			"source_file":         sourceFile,
@@ -205,6 +216,16 @@ func parseTableSection(lines []string, name string) []map[string]string {
 	return rows
 }
 
+func firstTableSection(lines []string, names ...string) []map[string]string {
+	for _, name := range names {
+		rows := parseTableSection(lines, name)
+		if len(rows) > 0 {
+			return rows
+		}
+	}
+	return nil
+}
+
 func normalizeAnalyteTag(name string) string {
 	name = strings.TrimSpace(name)
 	if name == "" {
@@ -234,6 +255,13 @@ func inferSubtype(path string, rows []map[string]string) string {
 	}
 	if strings.Contains(base, "hplc") {
 		return "hplc"
+	}
+	if strings.Contains(base, "gc-2010") || strings.Contains(base, "gc2010") || strings.Contains(base, "gcsolution") || strings.HasSuffix(base, ".txt") {
+		for _, row := range rows {
+			if strings.TrimSpace(row["Curve"]) != "" || strings.TrimSpace(row["Constant"]) != "" {
+				return "gc-2010"
+			}
+		}
 	}
 	for _, row := range rows {
 		name := strings.ToUpper(strings.TrimSpace(row["Name"]))

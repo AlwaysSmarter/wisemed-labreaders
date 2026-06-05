@@ -1,38 +1,99 @@
-reader:
-  id: beosl-v3
-  label: BEOSL Reader V3
-  analyzer_name: BEOSL
-  analyzer_code: beosl-v3
-
-local_http:
-  enabled: true
-  address: 127.0.0.1:18080
-  language: ro
-
 analyzer:
-  comm_type: file
-  protocol: beosl-csv
-
-modules:
-  qc:
-    levels: ["negativ", "pozitiv", "pcrescut", "pscazut", "nivel1", "nivel2", "nivel3", "nivel4", "nivel5"]
-  app-updates:
-    enabled: true
-    app_id: beosl-v3
-    current_version: 1.0.0
-    channel: stable
-    base_url: http://127.0.0.1:19090
-    auto_download: true
-    download_dir: ./updates
-  local-http:
+    comm_type: file
+    protocol: beosl-csv
+local_http:
     address: 127.0.0.1:18080
+    cors_allowed_origins: https://ldse.wisemed.eu
+    enabled: true
     language: ro
-  storage-sqlite:
-    path: ./beosl-reader-v3.db
-  wisemed-api:
-    base_url: https://api.wisemed.example
-  help:
-    help_dir: ./help
-  transport-file:
-    import_dir: ./inbox
-    pattern: "*.csv"
+    tls: false
+logging:
+    verbose_level: 5
+modules:
+    app-updates:
+        app_id: beosl-v3
+        auto_download: true
+        base_url: http://127.0.0.1:19090
+        channel: stable
+        current_version: 1.0.0
+        download_dir: ./updates
+        enabled: true
+    help:
+        help_dir: ./help
+    local-http:
+        address: 127.0.0.1:18080
+        cors_allowed_origins: https://ldse.wisemed.eu
+        enabled: true
+        language: ro
+        repeat_mode: individual
+        tls: false
+    logging:
+        verbose_level: 5
+    protocol-shimatzu-generic:
+        subtype: auto
+    qc:
+        levels:
+            - negativ
+            - pozitiv
+            - pcrescut
+            - pscazut
+            - nivel1
+            - nivel2
+            - nivel3
+            - nivel4
+            - nivel5
+    result-sync:
+        enabled: true
+        interval_minutes: "5"
+        qc_prefixes: []
+        sample_prefixes: []
+        sample_suffixes: []
+        separators:
+            - '-'
+    results:
+        auto_confirm_wisemed: true
+    storage-sqlite:
+        path: ./beosl-reader-v3.db
+    transport-file:
+        export_dir: ./outbox
+        failed_dir: ./failed
+        import_dir: ./inbox
+        pattern: '*.csv'
+        processed_dir: ./processed
+    transport-tcpip:
+        host: ""
+        mode: server
+        port: ""
+        remote_host: ""
+        remote_port: ""
+    wisemed-api:
+        base_url: https://api.wisemed.example
+        cfg_wisemed_ip: php.wisemed.eu
+        cfg_wisemed_key: 27c490bb-c9e4-47aa-bf6d-ebd2a1add35e
+        cfg_wisemed_path: /git/wisemed/wisemed-api/apiv2
+        cfg_wisemed_port: "443"
+        cfg_wisemed_protocol: https
+        cod_echipament: beosl-v3
+        echipament_id: "181"
+        login_token: 911-e9b56053305c2953b578a4bcf7d61f3e
+        numar_serial_echipament: beosl-v3-001
+        tip_de_echipament_id: "1"
+        unitate_medicala_id: "18"
+    wisemed-ws:
+        enabled: false
+        heartbeat_ms: 15000
+        reconnect_delay_ms: 5000
+        url: wss://wslocal.wisemed.eu/ws
+reader:
+    analyzer_code: beosl-v3
+    analyzer_name: BEOSL
+    db_name: beosl-reader-v3.db
+    id: beosl-v3
+    label: BEOSL Reader V3
+results:
+    auto_confirm_wisemed: true
+wisemed_ws:
+    enabled: false
+    heartbeat_ms: 15000
+    reconnect_delay_ms: 5000
+    url: wss://wslocal.wisemed.eu/ws

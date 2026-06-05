@@ -19,6 +19,7 @@ import (
 	"wisemed-labreaders/readersv3/core/config"
 	"wisemed-labreaders/readersv3/core/module"
 	coremodel "wisemed-labreaders/readersv3/modules/core/model"
+	"wisemed-labreaders/readersv3/modules/protocols/fileimportbase"
 )
 
 type storageService interface {
@@ -28,6 +29,11 @@ type storageService interface {
 	UpsertQCAnalysis(item coremodel.QCAnalysis) (coremodel.QCAnalysis, error)
 	ListAnalytes() ([]coremodel.Analyte, error)
 	SaveAnalyte(item coremodel.Analyte) (coremodel.Analyte, error)
+}
+
+type wiseMedSyncService interface {
+	SetupComplete() bool
+	EnsureEquipmentOnline(reader map[string]interface{}) (map[string]interface{}, error)
 }
 
 type statusSnapshot struct {
@@ -516,22 +522,25 @@ func (m *Module) handleConn(ctx context.Context, conn net.Conn, protocol, role s
 }
 
 func (m *Module) importMessage(protocol string, raw []byte) (int, error) {
+	m.logf(5, "labnovation-ld560 import raw protocol=%s bytes=%d payload=%s", protocol, len(raw), truncateForLog(string(raw), 4000))
 	store := m.storage()
 	if store == nil {
 		return 0, errors.New("storage service unavailable")
 	}
 	switch protocol {
 	case "hl7":
-		msgs, err := parseHL7Results(raw, hl7SettingsFromMap(m.settingsPayload()["hl7"].(map[string]interface{})))
+		msgs, err := parseHL7Results(raw, hl7SettingsFromMap(m.settingsPayload()["hl7"].(map[string]interface{})), m.logIgnored)
 		if err != nil {
 			return 0, err
 		}
+		m.logParsedMessages(protocol, msgs)
 		return m.persistMessages(store, msgs, "hl7")
 	default:
-		msgs, err := parseSimpleResults(raw, simpleSettingsFromMap(m.settingsPayload()["simple"].(map[string]interface{})))
+		msgs, err := parseSimpleResults(raw, simpleSettingsFromMap(m.settingsPayload()["simple"].(map[string]interface{})), m.logIgnored)
 		if err != nil {
 			return 0, err
 		}
+		m.logParsedMessages(protocol, msgs)
 		return m.persistMessages(store, msgs, "simple")
 	}
 }
@@ -539,15 +548,35 @@ func (m *Module) importMessage(protocol string, raw []byte) (int, error) {
 func (m *Module) persistMessages(store storageService, messages []parsedMessage, source string) (int, error) {
 	imported := 0
 	roundCache := map[string]int{}
+	autoSaveTargets := map[string]*fileimportbase.AutoSaveTarget{}
+	items, err := store.ListAnalytes()
+	if err != nil {
+		return imported, err
+	}
+	knownAnalytes := make(map[string]coremodel.Analyte, len(items))
+	for _, item := range items {
+		knownAnalytes[strings.TrimSpace(item.Tag)] = item
+	}
+	analytesChanged := false
+	m.logf(4, "labnovation-ld560 persist start source=%s messages=%d", source, len(messages))
 	for _, item := range messages {
 		for _, result := range item.Results {
 			analyteTag := strings.TrimSpace(result.AnalyteTag)
 			if analyteTag == "" {
+				m.logIgnored("result", "empty analyte tag after parsing", map[string]interface{}{
+					"source":      source,
+					"sample_id":   item.SampleID,
+					"file_id":     item.FileID,
+					"analyteName": result.AnalyteName,
+					"raw_value":   result.RawValue,
+				})
 				continue
 			}
-			if err := m.ensureAnalyte(store, result); err != nil {
+			changed, err := m.ensureAnalyte(store, knownAnalytes, result)
+			if err != nil {
 				return imported, err
 			}
+			analytesChanged = analytesChanged || changed
 			if item.IsQC {
 				record, err := store.UpsertQCRecord(coremodel.QCRecord{
 					RoundNo:      1,
@@ -589,7 +618,7 @@ func (m *Module) persistMessages(store storageService, messages []parsedMessage,
 				}
 				roundCache[item.RunDate] = roundNo
 			}
-			_, _, _, err := store.RecordImportedResult(item.RunDate, roundNo, coremodel.ImportedRecord{
+			order, _, _, err := store.RecordImportedResult(item.RunDate, roundNo, coremodel.ImportedRecord{
 				SampleID:     item.SampleID,
 				FileID:       item.FileID,
 				PatientID:    item.PatientID,
@@ -611,22 +640,24 @@ func (m *Module) persistMessages(store storageService, messages []parsedMessage,
 			if err != nil {
 				return imported, err
 			}
+			fileimportbase.CollectAutoSaveTarget(autoSaveTargets, item.RunDate, roundNo, order.ID)
 			imported++
 		}
 	}
+	if analytesChanged {
+		if err := m.syncAnalytesToWiseMED(); err != nil {
+			m.rt.Logf("labnovation-ld560 analyte sync warning: %v", err)
+		}
+	}
+	if err := fileimportbase.AutoSaveResultsToWiseMED(m.rt, fileimportbase.FlattenAutoSaveTargets(autoSaveTargets)); err != nil {
+		m.rt.Logf("labnovation-ld560 result autosave warning: %v", err)
+	}
+	m.logf(4, "labnovation-ld560 persist done source=%s imported=%d analytes_changed=%t", source, imported, analytesChanged)
 	return imported, nil
 }
 
-func (m *Module) ensureAnalyte(store storageService, result parsedResult) error {
-	items, err := store.ListAnalytes()
-	if err == nil {
-		for _, item := range items {
-			if strings.EqualFold(strings.TrimSpace(item.Tag), strings.TrimSpace(result.AnalyteTag)) {
-				return nil
-			}
-		}
-	}
-	_, err = store.SaveAnalyte(coremodel.Analyte{
+func (m *Module) ensureAnalyte(store storageService, known map[string]coremodel.Analyte, result parsedResult) (bool, error) {
+	target := coremodel.Analyte{
 		Active:            true,
 		Tag:               result.AnalyteTag,
 		Code:              result.AnalyteTag,
@@ -637,8 +668,17 @@ func (m *Module) ensureAnalyte(store storageService, result parsedResult) error 
 		ResultWeighting:   1,
 		ResultMeasureUnit: result.Unit,
 		ProtocolOptions:   normalizeMap(result.ProtocolOptions),
-	})
-	return err
+	}
+	existing, ok := known[strings.TrimSpace(target.Tag)]
+	if ok && strings.EqualFold(strings.TrimSpace(existing.Tag), strings.TrimSpace(target.Tag)) {
+		return false, nil
+	}
+	saved, err := store.SaveAnalyte(target)
+	if err != nil {
+		return false, err
+	}
+	known[strings.TrimSpace(saved.Tag)] = saved
+	return true, nil
 }
 
 func (m *Module) storage() storageService {
@@ -648,6 +688,77 @@ func (m *Module) storage() storageService {
 	}
 	store, _ := service.(storageService)
 	return store
+}
+
+func (m *Module) syncAnalytesToWiseMED() error {
+	service, ok := m.rt.Service("wisemed-api")
+	if !ok {
+		return nil
+	}
+	api, ok := service.(wiseMedSyncService)
+	if !ok || !api.SetupComplete() {
+		return nil
+	}
+	_, err := api.EnsureEquipmentOnline(nil)
+	return err
+}
+
+func (m *Module) verboseLevel() int {
+	raw := strings.TrimSpace(fmt.Sprint(m.rt.ModuleSettings("logging")["verbose_level"]))
+	value, err := strconv.Atoi(raw)
+	if err != nil || value < 1 {
+		return 1
+	}
+	if value > 5 {
+		return 5
+	}
+	return value
+}
+
+func (m *Module) logf(level int, format string, args ...interface{}) {
+	if m.verboseLevel() >= level {
+		m.rt.Logf(format, args...)
+	}
+}
+
+func (m *Module) logParsedMessages(protocol string, messages []parsedMessage) {
+	m.logf(4, "labnovation-ld560 parse ok protocol=%s messages=%d", protocol, len(messages))
+	if m.verboseLevel() < 5 {
+		return
+	}
+	preview := map[string]interface{}{}
+	if len(messages) > 0 {
+		preview["first_message"] = messages[0]
+	}
+	if blob, err := json.Marshal(preview); err == nil {
+		m.rt.Logf("labnovation-ld560 parse preview protocol=%s %s", protocol, string(blob))
+	}
+}
+
+func truncateForLog(value string, limit int) string {
+	value = strings.TrimSpace(value)
+	if len(value) <= limit {
+		return value
+	}
+	return value[:limit] + "...(truncated)"
+}
+
+func (m *Module) logIgnored(kind, reason string, payload map[string]interface{}) {
+	if m.verboseLevel() < 5 {
+		return
+	}
+	entry := map[string]interface{}{
+		"kind":   kind,
+		"reason": reason,
+	}
+	for key, value := range payload {
+		entry[key] = value
+	}
+	if blob, err := json.Marshal(entry); err == nil {
+		m.rt.Logf("labnovation-ld560 ignored %s", string(blob))
+		return
+	}
+	m.rt.Logf("labnovation-ld560 ignored kind=%s reason=%s", kind, reason)
 }
 
 func (m *Module) activeProtocol() string {

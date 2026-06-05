@@ -11,7 +11,7 @@ modules:
         allowed_user_types: "-1"
         db_path: ./app-update-server.db
         files_dir: ./files
-        public_base_url: http://192.168.100.53:19090
+        public_base_url: http://192.168.2.80:19090
     local-http:
         address: 0.0.0.0:19090
         enabled: true

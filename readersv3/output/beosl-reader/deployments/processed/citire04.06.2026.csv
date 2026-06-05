@@ -1,0 +1,5 @@
+Dosimeter Id,Zero Level Date,Measurement Date,Hp007 Calc. Dose,Hp007 Background Dose,Hp007 Raw Dose,Hp10 Calc. Dose,Hp10 Background Dose,Hp10 Raw Dose,Cu Calc. Dose,Cu Background Dose,Cu Raw Dose,Pb/Sn Calc. Dose,Pb/Sn Background Dose,Pb/Sn Raw Dose,EzClip Calc. Dose,EzClip Background Dose,EzClip Raw Dose,Hp3 Calc. Dose,Hp3 Background Dose,Hp3 Raw Dose,H*(10) Calc. Dose,Verification date,Verification required on or before,Remaining days available for use
+0200088579,19/11/2024 10:19:26,04/02/2025 09:50:32,0.121,0.1064,0.227,0.085,0.1064,0.191,,,,,,,,,,,,,,12/06/2024 11:21:50,12/06/2026 11:21:50,493,
+0200089108,19/11/2024 09:43:28,04/02/2025 09:50:22,0.098,0.1078,0.206,0.077,0.1078,0.185,,,,,,,,,,,,,,23/05/2024 13:07:54,23/05/2026 13:07:54,473,
+0100075100,19/11/2024 09:43:28,04/02/2025 09:50:22,0.098,0.1078,0.206,0.077,0.1078,0.185,,,,,,,,,,,,,,23/05/2024 13:07:54,23/05/2026 13:07:54,473,
+

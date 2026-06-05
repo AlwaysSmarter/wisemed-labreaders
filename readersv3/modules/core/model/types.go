@@ -95,6 +95,8 @@ type OrderAnalysis struct {
 	AnalyteID          int64                  `json:"analyte_id"`
 	AnalyteTag         string                 `json:"analyte_tag"`
 	AnalyteName        string                 `json:"analyte_name"`
+	WiseMEDSMID        string                 `json:"wisemed_sm_id"`
+	WiseMEDFSMID       string                 `json:"wisemed_fsm_id"`
 	AnalyteDescription string                 `json:"analyte_description"`
 	Status             string                 `json:"status"`
 	RequestedAt        time.Time              `json:"requested_at,omitempty"`

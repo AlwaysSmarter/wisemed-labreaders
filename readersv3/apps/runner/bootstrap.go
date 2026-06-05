@@ -88,11 +88,26 @@ func ensureBootstrap(cfg *config.Config, reconfigure bool) (bool, error) {
 		promptString(reader, "Equipment code", settings, "cod_echipament", cfg.Reader.AnalyzerCode)
 		changed = true
 	}
+	if reconfigure || strSetting(settings, "producator_echipament") == "" {
+		promptString(reader, "Equipment manufacturer", settings, "producator_echipament", firstToken(cfg.Reader.AnalyzerName))
+		changed = true
+	}
 	if reconfigure || strSetting(settings, "numar_serial_echipament") == "" {
 		promptString(reader, "Equipment serial number", settings, "numar_serial_echipament", cfg.Reader.AnalyzerCode+"-001")
 		changed = true
 	}
-
+	if reconfigure || strSetting(settings, "nume_pe_raport_final") == "" {
+		promptString(reader, "Final report equipment name", settings, "nume_pe_raport_final", cfg.Reader.AnalyzerName)
+		changed = true
+	}
+	if reconfigure || strSetting(settings, "nr_rackuri") == "" {
+		promptString(reader, "Number of racks", settings, "nr_rackuri", "0")
+		changed = true
+	}
+	if reconfigure || strSetting(settings, "pozitii_pe_rack") == "" {
+		promptString(reader, "Positions per rack", settings, "pozitii_pe_rack", "0")
+		changed = true
+	}
 	if reconfigure || cfg.LocalHTTP.Address == "" {
 		promptTopLevelString(reader, "Local HTTP address", &cfg.LocalHTTP.Address, "127.0.0.1:18080")
 		changed = true
@@ -248,7 +263,11 @@ func needsBootstrap(cfg *config.Config) bool {
 		"unitate_medicala_id",
 		"tip_de_echipament_id",
 		"cod_echipament",
+		"producator_echipament",
 		"numar_serial_echipament",
+		"nume_pe_raport_final",
+		"nr_rackuri",
+		"pozitii_pe_rack",
 	}
 	for _, key := range requiredSettings {
 		if strSetting(ws, key) == "" {
@@ -380,18 +399,19 @@ func registerEquipment(cfg *config.Config, client *wisemedapi.BootstrapClient) e
 	payload := map[string]interface{}{
 		"cod_echipament":          strSetting(settings, "cod_echipament"),
 		"nume_echipament":         firstNonEmpty(strings.TrimSpace(cfg.Reader.AnalyzerName), strings.TrimSpace(cfg.Reader.Label), strings.TrimSpace(cfg.Reader.ID)),
-		"api_key_echipament":      strSetting(settings, "api_key_echipament"),
-		"producator_echipament":   "thinkIT",
-		"tip_analizor":            callerTypeForProtocol(cfg.Analyzer.Protocol),
+		"producator_echipament":   firstNonEmpty(strSetting(settings, "producator_echipament"), firstToken(firstNonEmpty(strings.TrimSpace(cfg.Reader.AnalyzerName), strings.TrimSpace(cfg.Reader.Label)))),
+		"tip_analizor":            analyzerTypeValue(settings, callerTypeForProtocol(cfg.Analyzer.Protocol)),
 		"numar_serial_echipament": strSetting(settings, "numar_serial_echipament"),
-		"ip":                      "0.0.0.0",
-		"port":                    "0",
 		"online":                  true,
-		"nr_rackuri":              "0",
-		"pozitii_pe_rack":         "0",
-		"echipament_id":           strSetting(settings, "echipament_id"),
+		"nr_rackuri":              intSetting(settings, "nr_rackuri", 0),
+		"pozitii_pe_rack":         intSetting(settings, "pozitii_pe_rack", 0),
+		"nume_pe_raport_final":    firstNonEmpty(strSetting(settings, "nume_pe_raport_final"), strings.TrimSpace(cfg.Reader.AnalyzerName), strings.TrimSpace(cfg.Reader.Label), strings.TrimSpace(cfg.Reader.ID)),
 		"unitate_medicala_id":     strSetting(settings, "unitate_medicala_id"),
 		"tip_de_echipament_id":    strSetting(settings, "tip_de_echipament_id"),
+		"analize":                 []map[string]interface{}{},
+	}
+	if value := strSetting(settings, "echipament_id"); value != "" {
+		payload["echipament_id"] = value
 	}
 	resp, err := client.RegisterEquipment(payload)
 	if err != nil {
@@ -405,6 +425,38 @@ func registerEquipment(cfg *config.Config, client *wisemedapi.BootstrapClient) e
 	}
 	cfg.Modules["wisemed-api"] = settings
 	return nil
+}
+
+func intSetting(settings map[string]interface{}, key string, fallback int) int {
+	value := strSetting(settings, key)
+	if value == "" {
+		return fallback
+	}
+	parsed, err := strconv.Atoi(value)
+	if err != nil {
+		return fallback
+	}
+	return parsed
+}
+
+func analyzerTypeValue(settings map[string]interface{}, fallback string) interface{} {
+	for _, key := range []string{"tip_analizor", "tip_analizor_id"} {
+		if value := strSetting(settings, key); value != "" {
+			if parsed, err := strconv.Atoi(value); err == nil {
+				return parsed
+			}
+			return value
+		}
+	}
+	return fallback
+}
+
+func firstToken(value string) string {
+	fields := strings.Fields(strings.TrimSpace(value))
+	if len(fields) == 0 {
+		return ""
+	}
+	return fields[0]
 }
 
 func promptString(reader *bufio.Reader, label string, section map[string]interface{}, key, fallback string) {
@@ -636,6 +688,8 @@ func supportedProtocols(cfg *config.Config) []string {
 			add("ir-biotyper")
 		case "protocol-cary60-uvvis":
 			add("cary60-uvvis")
+		case "protocol-analytikjena-plasmaquantms-elite":
+			add("analytikjena-plasmaquantms-elite")
 		case "protocol-biosan-hipo-mpp96":
 			add("biosan-hipo-mpp96")
 		case "protocol-gammavision":
@@ -676,7 +730,7 @@ func supportedCommTypes(cfg *config.Config) []string {
 		switch strings.ToLower(strings.TrimSpace(protocol)) {
 		case "hl7", "simple", "astm", "ir-biotyper":
 			add("tcpip")
-		case "seegene-excel", "beosl-csv", "beoslcsv", "cary60-uvvis", "shimatzu-tocl", "shimatzu-generic", "biosan-hipo-mpp96", "gammavision", "tricarb-5110-tr", "anatolia-geneworks", "generic-file":
+		case "seegene-excel", "beosl-csv", "beoslcsv", "cary60-uvvis", "analytikjena-plasmaquantms-elite", "shimatzu-tocl", "shimatzu-generic", "biosan-hipo-mpp96", "gammavision", "tricarb-5110-tr", "anatolia-geneworks", "generic-file":
 			add("file")
 		case "barcodeprinter":
 			add("utility")

@@ -1,6 +1,7 @@
 package sqlite
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -62,6 +63,14 @@ func (m *Module) Init(rt module.Runtime) error {
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		_, _ = w.Write([]byte(`{"ok":true,"module":"storage-sqlite","driver":"sqlite"}`))
 	}))
+	return nil
+}
+
+func (m *Module) Start(ctx context.Context) error {
+	<-ctx.Done()
+	if m.store != nil && m.store.db != nil {
+		return m.store.db.Close()
+	}
 	return nil
 }
 
@@ -167,6 +176,8 @@ func (s *Store) init() error {
 			analyte_id integer not null default 0,
 			analyte_tag text not null,
 			analyte_name text not null default '',
+			wisemed_sm_id text not null default '',
+			wisemed_fsm_id text not null default '',
 			status text not null default 'new',
 			default_result_id integer not null default 0,
 			result_value text not null default '',
@@ -239,6 +250,15 @@ func (s *Store) init() error {
 			manual_entered_at text not null default '',
 			created_at text not null
 		)`,
+		`create table if not exists audit_logs (
+			id integer primary key autoincrement,
+			level text not null default 'info',
+			event_type text not null default 'audit',
+			actor text not null default '',
+			message text not null default '',
+			meta_json text not null default '{}',
+			created_at text not null
+		)`,
 		`create table if not exists daily_detail_definitions (
 			id integer primary key autoincrement,
 			key text not null unique,
@@ -274,6 +294,7 @@ func (s *Store) init() error {
 		`create index if not exists idx_order_results_analysis on order_analysis_results(order_analysis_id)`,
 		`create index if not exists idx_qc_records_run_date on qc_records(run_date)`,
 		`create index if not exists idx_qc_analyses_record on qc_analyses(qc_record_id)`,
+		`create index if not exists idx_audit_logs_created_at on audit_logs(created_at)`,
 		`create index if not exists idx_qc_targets_lookup on qc_targets(analyte_tag, control_level, lot_no)`,
 		`create index if not exists idx_daily_detail_values_lookup on daily_detail_values(scope_date, round_no, analyte_tag)`,
 	}
@@ -289,6 +310,12 @@ func (s *Store) init() error {
 		return err
 	}
 	if _, err := s.db.Exec(`alter table orders add column meta_json text not null default '{}'`); err != nil && !strings.Contains(strings.ToLower(err.Error()), "duplicate column name") {
+		return err
+	}
+	if _, err := s.db.Exec(`alter table order_analyses add column wisemed_sm_id text not null default ''`); err != nil && !strings.Contains(strings.ToLower(err.Error()), "duplicate column name") {
+		return err
+	}
+	if _, err := s.db.Exec(`alter table order_analyses add column wisemed_fsm_id text not null default ''`); err != nil && !strings.Contains(strings.ToLower(err.Error()), "duplicate column name") {
 		return err
 	}
 	if _, err := s.db.Exec(`alter table qc_records add column file_id text not null default ''`); err != nil && !strings.Contains(strings.ToLower(err.Error()), "duplicate column name") {
@@ -874,11 +901,47 @@ func (s *Store) ListOrders(roundNo int, orderDate string) ([]coremodel.Order, er
 	return out, rows.Err()
 }
 
+func (s *Store) DeleteOrder(id int64) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	var orderDate string
+	var roundNo int
+	err = tx.QueryRow(`select order_date, round_no from orders where id = ?`, id).Scan(&orderDate, &roundNo)
+	if err == sql.ErrNoRows {
+		_ = tx.Rollback()
+		return nil
+	}
+	if err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+	if _, err = tx.Exec(`delete from order_analysis_results where order_analysis_id in (select id from order_analyses where order_id = ?)`, id); err != nil {
+		return err
+	}
+	if _, err = tx.Exec(`delete from order_analyses where order_id = ?`, id); err != nil {
+		return err
+	}
+	if _, err = tx.Exec(`delete from orders where id = ?`, id); err != nil {
+		return err
+	}
+	if err = s.deleteRoundIfEmptyTx(tx, orderDate, roundNo); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
 func (s *Store) GetOrderAnalysis(id int64) (coremodel.OrderAnalysis, error) {
 	var item coremodel.OrderAnalysis
 	var flagsJSON string
-	err := s.db.QueryRow(`select id,order_id,analyte_id,analyte_tag,analyte_name,status,default_result_id,result_value,raw_value,interpreted_value,unit,source_file,flags_json from order_analyses where id = ?`, id).
-		Scan(&item.ID, &item.OrderID, &item.AnalyteID, &item.AnalyteTag, &item.AnalyteName, &item.Status, &item.DefaultResultID, &item.ResultValue, &item.RawValue, &item.Interpreted, &item.Unit, &item.SourceFile, &flagsJSON)
+	err := s.db.QueryRow(`select id,order_id,analyte_id,analyte_tag,analyte_name,wisemed_sm_id,wisemed_fsm_id,status,default_result_id,result_value,raw_value,interpreted_value,unit,source_file,flags_json from order_analyses where id = ?`, id).
+		Scan(&item.ID, &item.OrderID, &item.AnalyteID, &item.AnalyteTag, &item.AnalyteName, &item.WiseMEDSMID, &item.WiseMEDFSMID, &item.Status, &item.DefaultResultID, &item.ResultValue, &item.RawValue, &item.Interpreted, &item.Unit, &item.SourceFile, &flagsJSON)
 	if err != nil {
 		return coremodel.OrderAnalysis{}, err
 	}
@@ -933,15 +996,15 @@ func (s *Store) SaveOrderAnalysis(item coremodel.OrderAnalysis) (coremodel.Order
 		existingID = item.ID
 	}
 	if existingID > 0 {
-		_, err = s.db.Exec(`update order_analyses set analyte_id=?,analyte_tag=?,analyte_name=?,status=?,default_result_id=?,result_value=?,raw_value=?,interpreted_value=?,unit=?,source_file=?,flags_json=? where id = ?`,
-			item.AnalyteID, item.AnalyteTag, item.AnalyteName, item.Status, item.DefaultResultID, item.ResultValue, item.RawValue, item.Interpreted, item.Unit, item.SourceFile, string(flagsJSON), existingID)
+		_, err = s.db.Exec(`update order_analyses set analyte_id=?,analyte_tag=?,analyte_name=?,wisemed_sm_id=?,wisemed_fsm_id=?,status=?,default_result_id=?,result_value=?,raw_value=?,interpreted_value=?,unit=?,source_file=?,flags_json=? where id = ?`,
+			item.AnalyteID, item.AnalyteTag, item.AnalyteName, item.WiseMEDSMID, item.WiseMEDFSMID, item.Status, item.DefaultResultID, item.ResultValue, item.RawValue, item.Interpreted, item.Unit, item.SourceFile, string(flagsJSON), existingID)
 		if err != nil {
 			return coremodel.OrderAnalysis{}, err
 		}
 		return s.GetOrderAnalysis(existingID)
 	}
-	res, err := s.db.Exec(`insert into order_analyses(order_id,analyte_id,analyte_tag,analyte_name,status,default_result_id,result_value,raw_value,interpreted_value,unit,source_file,flags_json) values(?,?,?,?,?,?,?,?,?,?,?,?)`,
-		item.OrderID, item.AnalyteID, item.AnalyteTag, item.AnalyteName, item.Status, item.DefaultResultID, item.ResultValue, item.RawValue, item.Interpreted, item.Unit, item.SourceFile, string(flagsJSON))
+	res, err := s.db.Exec(`insert into order_analyses(order_id,analyte_id,analyte_tag,analyte_name,wisemed_sm_id,wisemed_fsm_id,status,default_result_id,result_value,raw_value,interpreted_value,unit,source_file,flags_json) values(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		item.OrderID, item.AnalyteID, item.AnalyteTag, item.AnalyteName, item.WiseMEDSMID, item.WiseMEDFSMID, item.Status, item.DefaultResultID, item.ResultValue, item.RawValue, item.Interpreted, item.Unit, item.SourceFile, string(flagsJSON))
 	if err != nil {
 		return coremodel.OrderAnalysis{}, err
 	}
@@ -950,11 +1013,105 @@ func (s *Store) SaveOrderAnalysis(item coremodel.OrderAnalysis) (coremodel.Order
 }
 
 func (s *Store) DeleteOrderAnalysis(id int64) error {
-	if _, err := s.db.Exec(`delete from order_analysis_results where order_analysis_id = ?`, id); err != nil {
+	tx, err := s.db.Begin()
+	if err != nil {
 		return err
 	}
-	_, err := s.db.Exec(`delete from order_analyses where id = ?`, id)
-	return err
+	var orderID int64
+	var orderDate string
+	var roundNo int
+	err = tx.QueryRow(`select oa.order_id, o.order_date, o.round_no
+		from order_analyses oa
+		join orders o on o.id = oa.order_id
+		where oa.id = ?`, id).Scan(&orderID, &orderDate, &roundNo)
+	if err == sql.ErrNoRows {
+		_ = tx.Rollback()
+		return nil
+	}
+	if err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+	if _, err = tx.Exec(`delete from order_analysis_results where order_analysis_id = ?`, id); err != nil {
+		return err
+	}
+	if _, err = tx.Exec(`delete from order_analyses where id = ?`, id); err != nil {
+		return err
+	}
+	if err = s.deleteOrderIfEmptyTx(tx, orderID); err != nil {
+		return err
+	}
+	if err = s.deleteRoundIfEmptyTx(tx, orderDate, roundNo); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func (s *Store) deleteOrderIfEmptyTx(tx *sql.Tx, orderID int64) error {
+	var analysisCount int
+	if err := tx.QueryRow(`select count(1) from order_analyses where order_id = ?`, orderID).Scan(&analysisCount); err != nil {
+		return err
+	}
+	if analysisCount > 0 {
+		return nil
+	}
+	if _, err := tx.Exec(`delete from orders where id = ?`, orderID); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *Store) deleteRoundIfEmptyTx(tx *sql.Tx, orderDate string, roundNo int) error {
+	orderDate = normalizeDate(orderDate)
+	if orderDate == "" || roundNo <= 0 {
+		return nil
+	}
+	var orderCount int
+	if err := tx.QueryRow(`select count(1) from orders where order_date = ? and round_no = ?`, orderDate, roundNo).Scan(&orderCount); err != nil {
+		return err
+	}
+	if orderCount > 0 {
+		return nil
+	}
+	if _, err := tx.Exec(`delete from rounds where order_date = ? and round_no = ?`, orderDate, roundNo); err != nil {
+		return err
+	}
+	if err := compactRoundsForDateTx(tx, orderDate, roundNo); err != nil {
+		return err
+	}
+	return nil
+}
+
+func compactRoundsForDateTx(tx *sql.Tx, orderDate string, deletedRoundNo int) error {
+	if deletedRoundNo <= 0 {
+		return nil
+	}
+	// Move affected round numbers to a temporary negative space to avoid unique collisions
+	// while compacting sequences like 1,2,3 -> deleting 1 should become 1,2.
+	if _, err := tx.Exec(`update rounds set round_no = -round_no where order_date = ? and round_no > ?`, orderDate, deletedRoundNo); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`update orders set round_no = -round_no where order_date = ? and round_no > ?`, orderDate, deletedRoundNo); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`update daily_detail_values set round_no = -round_no where scope_date = ? and round_no > ?`, orderDate, deletedRoundNo); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`update rounds set round_no = (-round_no) - 1 where order_date = ? and round_no < 0`, orderDate); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`update orders set round_no = (-round_no) - 1 where order_date = ? and round_no < 0`, orderDate); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`update daily_detail_values set round_no = (-round_no) - 1 where scope_date = ? and round_no < 0`, orderDate); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (s *Store) GetOrderAnalysisResult(id int64) (coremodel.OrderAnalysisResult, error) {
@@ -1344,6 +1501,36 @@ func (s *Store) DeleteQCAnalysis(id int64) error {
 	return err
 }
 
+func (s *Store) AppendAuditLog(level, actor, eventType, message string, meta map[string]interface{}) error {
+	level = defaultString(strings.TrimSpace(level), "info")
+	eventType = defaultString(strings.TrimSpace(eventType), "audit")
+	actor = strings.TrimSpace(actor)
+	message = strings.TrimSpace(message)
+	metaJSON, _ := json.Marshal(metaOrEmpty(meta))
+	_, err := s.db.Exec(`insert into audit_logs(level,event_type,actor,message,meta_json,created_at) values(?,?,?,?,?,?)`,
+		level, eventType, actor, message, string(metaJSON), time.Now().UTC().Format(time.RFC3339))
+	return err
+}
+
+func (s *Store) DeleteQCRecord(id int64) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+	if _, err = tx.Exec(`delete from qc_analyses where qc_record_id = ?`, id); err != nil {
+		return err
+	}
+	if _, err = tx.Exec(`delete from qc_records where id = ?`, id); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
 func (s *Store) ListQCRoundNumbers(runDate string) ([]int, error) {
 	return []int{1}, nil
 }
@@ -1454,6 +1641,14 @@ func (s *Store) ListLogs(limit int) ([]coremodel.EventLog, error) {
 				coalesce(nullif(qa.created_at,''), qr.created_at) as created_at
 			from qc_analyses qa
 			join qc_records qr on qr.id = qa.qc_record_id
+			union all
+			select
+				(3000000000 + al.id) as id,
+				al.level as level,
+				al.event_type as event_type,
+				al.message as message,
+				al.created_at as created_at
+			from audit_logs al
 		)
 		order by datetime(created_at) desc
 		limit ?`, limit)

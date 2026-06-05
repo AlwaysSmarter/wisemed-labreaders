@@ -4,6 +4,10 @@ reader:
   analyzer_name: Biosan HIPO MPP-96
   analyzer_code: biosan-hipo-mpp-96
   db_name: biosan-hipo-mpp-96-reader-v3.db
+logging:
+  verbose_level: 1
+results:
+  auto_confirm_wisemed: false
 local_http:
   enabled: true
   address: 127.0.0.1:18080
@@ -38,6 +42,10 @@ modules:
         keep_as_lot: false
       - prefix: "PC_"
         keep_as_lot: false
+  logging:
+    verbose_level: 1
+  results:
+    auto_confirm_wisemed: false
   local-http:
     enabled: true
     address: 127.0.0.1:18080

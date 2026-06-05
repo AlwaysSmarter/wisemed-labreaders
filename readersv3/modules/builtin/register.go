@@ -13,6 +13,7 @@ import (
 	"wisemed-labreaders/readersv3/modules/help"
 	"wisemed-labreaders/readersv3/modules/localhttp"
 	"wisemed-labreaders/readersv3/modules/login"
+	"wisemed-labreaders/readersv3/modules/protocols/analytikjenaplasmaquantmselite"
 	"wisemed-labreaders/readersv3/modules/protocols/anatoliageneworks"
 	astmproto "wisemed-labreaders/readersv3/modules/protocols/astm"
 	"wisemed-labreaders/readersv3/modules/protocols/beoslcsv"
@@ -58,6 +59,7 @@ func RegisterAll(reg *module.Registry) {
 	reg.Register("transport-tcpip", tcptransport.New)
 	reg.Register("protocol-generic-file", genericfile.New)
 	reg.Register("protocol-cary60-uvvis", cary60uvvis.New)
+	reg.Register("protocol-analytikjena-plasmaquantms-elite", analytikjenaplasmaquantmselite.New)
 	reg.Register("protocol-seegene-excel", seegeneexcel.New)
 	reg.Register("protocol-beosl-csv", beoslcsv.New)
 	reg.Register("protocol-biosan-hipo-mpp96", biosanhipompp96.New)

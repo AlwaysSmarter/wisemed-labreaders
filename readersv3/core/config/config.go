@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"strconv"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -10,6 +11,8 @@ import (
 type Config struct {
 	path           string                            `yaml:"-"`
 	Reader         ReaderConfig                      `yaml:"reader"`
+	Logging        LoggingConfig                     `yaml:"logging"`
+	Results        ResultsConfig                     `yaml:"results"`
 	LocalHTTP      LocalHTTPConfig                   `yaml:"local_http"`
 	WiseMedWS      WiseMedWSConfig                   `yaml:"wisemed_ws"`
 	Analyzer       AnalyzerConfig                    `yaml:"analyzer"`
@@ -23,6 +26,14 @@ type ReaderConfig struct {
 	AnalyzerName string `yaml:"analyzer_name"`
 	AnalyzerCode string `yaml:"analyzer_code"`
 	DBName       string `yaml:"db_name"`
+}
+
+type LoggingConfig struct {
+	VerboseLevel int `yaml:"verbose_level"`
+}
+
+type ResultsConfig struct {
+	AutoConfirmWiseMED bool `yaml:"auto_confirm_wisemed"`
 }
 
 type LocalHTTPConfig struct {
@@ -70,6 +81,8 @@ func (c *Config) ApplyDefaults() {
 		c.Modules = map[string]map[string]interface{}{}
 	}
 	syncLocalHTTPMirror(c)
+	syncLoggingMirror(c)
+	syncResultsMirror(c)
 
 	if c.Reader.Label == "" {
 		c.Reader.Label = "Reader v3"
@@ -99,6 +112,8 @@ func (c *Config) ApplyDefaults() {
 		c.WiseMedWS.ReconnectDelayMS = 5000
 	}
 	syncLocalHTTPMirror(c)
+	syncLoggingMirror(c)
+	syncResultsMirror(c)
 }
 
 func (c *Config) ModuleSettings(moduleID string) map[string]interface{} {
@@ -173,4 +188,66 @@ func syncLocalHTTPMirror(c *Config) {
 		}
 	}
 	item["cors_allowed_origins"] = c.LocalHTTP.CORS
+}
+
+func syncLoggingMirror(c *Config) {
+	if c == nil {
+		return
+	}
+	if c.Modules == nil {
+		c.Modules = map[string]map[string]interface{}{}
+	}
+	item, ok := c.Modules["logging"]
+	if !ok || item == nil {
+		item = map[string]interface{}{}
+		c.Modules["logging"] = item
+	}
+	if c.Logging.VerboseLevel <= 0 {
+		switch value := item["verbose_level"].(type) {
+		case int:
+			if value > 0 {
+				c.Logging.VerboseLevel = value
+			}
+		case int64:
+			if value > 0 {
+				c.Logging.VerboseLevel = int(value)
+			}
+		case float64:
+			if value > 0 {
+				c.Logging.VerboseLevel = int(value)
+			}
+		case string:
+			if parsed, err := strconv.Atoi(strings.TrimSpace(value)); err == nil && parsed > 0 {
+				c.Logging.VerboseLevel = parsed
+			}
+		}
+		if c.Logging.VerboseLevel <= 0 {
+			c.Logging.VerboseLevel = 1
+		}
+	}
+	if c.Logging.VerboseLevel < 1 {
+		c.Logging.VerboseLevel = 1
+	}
+	if c.Logging.VerboseLevel > 5 {
+		c.Logging.VerboseLevel = 5
+	}
+	item["verbose_level"] = c.Logging.VerboseLevel
+}
+
+func syncResultsMirror(c *Config) {
+	if c == nil {
+		return
+	}
+	if c.Modules == nil {
+		c.Modules = map[string]map[string]interface{}{}
+	}
+	item, ok := c.Modules["results"]
+	if !ok || item == nil {
+		item = map[string]interface{}{}
+		c.Modules["results"] = item
+	}
+	if value, ok := item["auto_confirm_wisemed"].(bool); ok {
+		c.Results.AutoConfirmWiseMED = value
+	}
+	item["auto_confirm_wisemed"] = c.Results.AutoConfirmWiseMED
 }

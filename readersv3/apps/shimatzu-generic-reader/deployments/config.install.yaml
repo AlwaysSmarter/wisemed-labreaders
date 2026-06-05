@@ -1,9 +1,13 @@
 reader:
   id: shimatzu-generic-v3
-  label: SHIMATZU Generic
-  analyzer_name: SHIMATZU Generic
-  analyzer_code: shimatzu-generic
-  db_name: shimatzu-generic-reader-v3.db
+  label: Shimatzu
+  analyzer_name: Shimatzu
+  analyzer_code: shimatzu-generic-v3
+  db_name: shimatzu-generic-v3.db
+logging:
+  verbose_level: 1
+results:
+  auto_confirm_wisemed: false
 local_http:
   enabled: true
   address: 127.0.0.1:18080
@@ -20,7 +24,7 @@ analyzer:
 modules:
   app-updates:
     enabled: true
-    app_id: shimatzu-generic-v3
+    app_id: shimatzu-generic-reader
     channel: stable
     base_url: http://127.0.0.1:19090
     auto_download: true
@@ -38,6 +42,10 @@ modules:
         keep_as_lot: false
       - prefix: "PC_"
         keep_as_lot: false
+  logging:
+    verbose_level: 1
+  results:
+    auto_confirm_wisemed: false
   local-http:
     enabled: true
     address: 127.0.0.1:18080
@@ -48,7 +56,7 @@ modules:
     poll_seconds: 2
     subtype: auto
   storage-sqlite:
-    path: ./shimatzu-generic-reader-v3.db
+    path: ./shimatzu-generic-v3.db
   wisemed-api:
     base_url: https://api.wisemed.example
     cfg_wisemed_protocol: https

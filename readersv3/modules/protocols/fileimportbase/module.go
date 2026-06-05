@@ -2,6 +2,7 @@ package fileimportbase
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -15,15 +16,18 @@ import (
 
 	"wisemed-labreaders/readersv3/core/module"
 	coremodel "wisemed-labreaders/readersv3/modules/core/model"
+	"wisemed-labreaders/readersv3/modules/wisemedapi"
 )
 
 type analyteStore interface {
+	ListAnalytes() ([]coremodel.Analyte, error)
 	SaveAnalyte(item coremodel.Analyte) (coremodel.Analyte, error)
 }
 
 type importStore interface {
 	CurrentRoundNo(orderDate string) (int, error)
 	RecordImportedResult(orderDate string, roundNo int, rec coremodel.ImportedRecord, sourceFile string) (coremodel.Order, coremodel.OrderAnalysis, coremodel.OrderAnalysisResult, error)
+	ListOrderBundles(roundNo int, orderDate string) ([]coremodel.OrderBundle, error)
 	ListQCRecords(roundNo int, runDate string) ([]coremodel.QCRecord, error)
 	ListQCAnalyses(recordID int64) ([]coremodel.QCAnalysis, error)
 	ListQCTargets() ([]coremodel.QCTarget, error)
@@ -33,8 +37,11 @@ type importStore interface {
 }
 
 type FileTransportMeta struct {
-	ImportDir string
-	Pattern   string
+	ImportDir    string
+	ProcessedDir string
+	FailedDir    string
+	ExportDir    string
+	Pattern      string
 }
 
 type SampleCodeRules struct {
@@ -96,6 +103,27 @@ type ImportData struct {
 }
 
 type ParserFunc func(path string, rt module.Runtime) (ImportData, error)
+type AfterImportFunc func(path string, data ImportData, rt module.Runtime) error
+
+type wiseMedSyncService interface {
+	SetupComplete() bool
+	EnsureEquipmentOnline(reader map[string]interface{}) (map[string]interface{}, error)
+}
+
+type wiseMedResultsService interface {
+	SetupComplete() bool
+	SaveFileServiceResults(fileID string, entries []wisemedapi.ServiceResultEntry) (map[string]interface{}, error)
+}
+
+type resultSyncService interface {
+	RunOrders(orderIDs []int64, roundNo int, orderDate string) (map[string]interface{}, error)
+}
+
+type AutoSaveTarget struct {
+	OrderDate string
+	RoundNo   int
+	OrderIDs  []int64
+}
 
 type Spec struct {
 	ID                 string
@@ -109,6 +137,7 @@ type Spec struct {
 	QCTargetNotes      string
 	PollSecondsKey     string
 	Parse              ParserFunc
+	AfterImport        AfterImportFunc
 }
 
 type Module struct {
@@ -151,6 +180,11 @@ func (m *Module) Start(ctx context.Context) error {
 		<-ctx.Done()
 		return nil
 	}
+	meta := m.fileTransport()
+	message := fmt.Sprintf("%s file import watcher active import_dir=%s processed_dir=%s failed_dir=%s pattern=%s poll_seconds=%d", m.spec.ID, meta.ImportDir, meta.ProcessedDir, meta.FailedDir, meta.Pattern, pollSeconds)
+	m.rt.Logf(message)
+	fmt.Println(message)
+	m.scanImportDir()
 	ticker := time.NewTicker(time.Duration(pollSeconds) * time.Second)
 	defer ticker.Stop()
 	for {
@@ -164,6 +198,7 @@ func (m *Module) Start(ctx context.Context) error {
 }
 
 func (m *Module) ImportFileNow(path, orderDate string) (map[string]interface{}, error) {
+	m.logf(4, "%s manual import requested file=%s order_date=%s", m.spec.ID, path, EffectiveDate(orderDate))
 	imported, warnings, err := m.importFile(path, orderDate)
 	if err != nil {
 		return nil, err
@@ -188,10 +223,13 @@ func (m *Module) scanImportDir() {
 		m.rt.Logf("%s glob failed: %v", m.spec.ID, err)
 		return
 	}
+	m.logf(5, "%s scan import_dir=%s pattern=%s matched_files=%d", m.spec.ID, meta.ImportDir, meta.Pattern, len(files))
 	for _, path := range files {
 		if !m.begin(path) {
+			m.logIgnored("file", "already processing", map[string]interface{}{"file": path})
 			continue
 		}
+		m.logf(4, "%s picked import file=%s", m.spec.ID, path)
 		func() {
 			defer m.end(path)
 			if _, _, err := m.importFile(path, ""); err != nil {
@@ -209,17 +247,28 @@ func (m *Module) importFile(path, fallbackDate string) (int, int, error) {
 	if store == nil {
 		return 0, 0, errors.New("storage service unavailable")
 	}
+	m.logf(4, "%s import start file=%s fallback_date=%s", m.spec.ID, path, EffectiveDate(fallbackDate))
 	data, err := m.spec.Parse(path, m.rt)
 	if err != nil {
 		return 0, 0, err
 	}
+	m.logf(4, "%s parse ok file=%s sample_records=%d qc_records=%d analytes=%d", m.spec.ID, path, len(data.SampleRecords), len(data.QCRecords), len(data.Analytes))
+	m.logParsedPreview(path, data)
 	rules := m.sampleCodeRules()
+	knownAnalytes, err := m.listExistingAnalytes()
+	if err != nil {
+		return 0, 0, err
+	}
+	analytesChanged := false
 	for _, analyte := range data.Analytes {
-		if err := m.ensureAnalyte(analyte); err != nil {
+		changed, err := m.ensureAnalyte(knownAnalytes, analyte)
+		if err != nil {
 			return 0, 0, err
 		}
+		analytesChanged = analytesChanged || changed
 	}
 	roundCache := map[string]int{}
+	autoSaveTargets := map[string]*AutoSaveTarget{}
 	imported := 0
 	sourceFile := filepath.Base(path)
 	for _, item := range data.SampleRecords {
@@ -233,9 +282,11 @@ func (m *Module) importFile(path, fallbackDate string) (int, int, error) {
 			}
 			roundCache[runDate] = roundNo
 		}
-		if _, _, _, err := store.RecordImportedResult(runDate, roundNo, item.Record, sourceFile); err != nil {
+		order, _, _, err := store.RecordImportedResult(runDate, roundNo, item.Record, sourceFile)
+		if err != nil {
 			return imported, 0, err
 		}
+		CollectAutoSaveTarget(autoSaveTargets, runDate, roundNo, order.ID)
 		imported++
 	}
 	for _, record := range data.QCRecords {
@@ -254,37 +305,47 @@ func (m *Module) importFile(path, fallbackDate string) (int, int, error) {
 			imported++
 		}
 	}
-	return imported, 0, nil
+	warnings := 0
+	if m.spec.AfterImport != nil {
+		if err := m.spec.AfterImport(path, data, m.rt); err != nil {
+			warnings++
+			m.rt.Logf("%s after-import warning %s: %v", m.spec.ID, path, err)
+		}
+	}
+	if analytesChanged {
+		if err := m.syncAnalytesToWiseMED(); err != nil {
+			warnings++
+			m.rt.Logf("%s analyte sync warning %s: %v", m.spec.ID, path, err)
+		}
+	}
+	if err := AutoSaveResultsToWiseMED(m.rt, FlattenAutoSaveTargets(autoSaveTargets)); err != nil {
+		warnings++
+		m.rt.Logf("%s result autosave warning %s: %v", m.spec.ID, path, err)
+	}
+	m.logf(4, "%s import done file=%s imported=%d warnings=%d analytes_changed=%t", m.spec.ID, path, imported, warnings, analytesChanged)
+	return imported, warnings, nil
 }
 
-func (m *Module) ensureAnalyte(item AnalyteDef) error {
+func (m *Module) ensureAnalyte(known map[string]coremodel.Analyte, item AnalyteDef) (bool, error) {
 	service, ok := m.rt.Service("storage")
 	if !ok {
-		return errors.New("storage service unavailable")
+		return false, errors.New("storage service unavailable")
 	}
 	store, ok := service.(analyteStore)
 	if !ok {
-		return errors.New("analyte store unavailable")
+		return false, errors.New("analyte store unavailable")
 	}
-	resultType := firstNonEmpty(item.ResultType, "numeric")
-	resultFormatting := firstNonEmpty(item.ResultFormatting, "raw")
-	resultWeighting := item.ResultWeighting
-	if resultWeighting == 0 {
-		resultWeighting = 1
+	target := m.normalizeAnalyte(item)
+	existing, ok := known[strings.TrimSpace(target.Tag)]
+	if ok && analytesEquivalent(existing, target) {
+		return false, nil
 	}
-	_, err := store.SaveAnalyte(coremodel.Analyte{
-		Active:            true,
-		Tag:               item.Tag,
-		Code:              firstNonEmpty(item.Code, item.Tag),
-		Name:              firstNonEmpty(item.Name, item.Tag),
-		Description:       firstNonEmpty(item.Description, m.spec.AnalyteDescription, "Auto-generated from file imports"),
-		ResultType:        resultType,
-		ResultFormatting:  resultFormatting,
-		ResultWeighting:   resultWeighting,
-		ResultMeasureUnit: item.Unit,
-		ProtocolOptions:   cloneMap(item.ProtocolOptions),
-	})
-	return err
+	saved, err := store.SaveAnalyte(target)
+	if err != nil {
+		return false, err
+	}
+	known[strings.TrimSpace(saved.Tag)] = saved
+	return true, nil
 }
 
 func (m *Module) importStore() importStore {
@@ -306,10 +367,403 @@ func (m *Module) fileTransport() FileTransportMeta {
 	if value, _ := raw["import_dir"].(string); value != "" {
 		meta.ImportDir = value
 	}
+	if value, _ := raw["processed_dir"].(string); value != "" {
+		meta.ProcessedDir = value
+	}
+	if value, _ := raw["failed_dir"].(string); value != "" {
+		meta.FailedDir = value
+	}
+	if value, _ := raw["export_dir"].(string); value != "" {
+		meta.ExportDir = value
+	}
 	if value, _ := raw["pattern"].(string); value != "" {
 		meta.Pattern = value
 	}
 	return meta
+}
+
+func (m *Module) listExistingAnalytes() (map[string]coremodel.Analyte, error) {
+	service, ok := m.rt.Service("storage")
+	if !ok {
+		return nil, errors.New("storage service unavailable")
+	}
+	store, ok := service.(analyteStore)
+	if !ok {
+		return nil, errors.New("analyte store unavailable")
+	}
+	items, err := store.ListAnalytes()
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[string]coremodel.Analyte, len(items))
+	for _, item := range items {
+		out[strings.TrimSpace(item.Tag)] = item
+	}
+	return out, nil
+}
+
+func (m *Module) normalizeAnalyte(item AnalyteDef) coremodel.Analyte {
+	resultType := firstNonEmpty(item.ResultType, "numeric")
+	resultFormatting := firstNonEmpty(item.ResultFormatting, "raw")
+	resultWeighting := item.ResultWeighting
+	if resultWeighting == 0 {
+		resultWeighting = 1
+	}
+	return coremodel.Analyte{
+		Active:            true,
+		Tag:               strings.TrimSpace(item.Tag),
+		Code:              firstNonEmpty(item.Code, item.Tag),
+		Name:              firstNonEmpty(item.Name, item.Tag),
+		Description:       firstNonEmpty(item.Description, m.spec.AnalyteDescription, "Auto-generated from file imports"),
+		ResultType:        resultType,
+		ResultFormatting:  resultFormatting,
+		ResultWeighting:   resultWeighting,
+		ResultMeasureUnit: item.Unit,
+		ProtocolOptions:   cloneMap(item.ProtocolOptions),
+	}
+}
+
+func analytesEquivalent(existing, target coremodel.Analyte) bool {
+	if existing.Active != target.Active ||
+		strings.TrimSpace(existing.Tag) != strings.TrimSpace(target.Tag) ||
+		strings.TrimSpace(existing.Code) != strings.TrimSpace(target.Code) ||
+		strings.TrimSpace(existing.Name) != strings.TrimSpace(target.Name) ||
+		strings.TrimSpace(existing.Description) != strings.TrimSpace(target.Description) ||
+		strings.TrimSpace(existing.ResultType) != strings.TrimSpace(target.ResultType) ||
+		strings.TrimSpace(existing.ResultFormatting) != strings.TrimSpace(target.ResultFormatting) ||
+		existing.ResultWeighting != target.ResultWeighting ||
+		strings.TrimSpace(existing.ResultMeasureUnit) != strings.TrimSpace(target.ResultMeasureUnit) {
+		return false
+	}
+	return mapsEquivalent(existing.ProtocolOptions, target.ProtocolOptions)
+}
+
+func mapsEquivalent(left, right map[string]interface{}) bool {
+	leftJSON, _ := json.Marshal(left)
+	rightJSON, _ := json.Marshal(right)
+	return string(leftJSON) == string(rightJSON)
+}
+
+func (m *Module) syncAnalytesToWiseMED() error {
+	service, ok := m.rt.Service("wisemed-api")
+	if !ok {
+		return nil
+	}
+	api, ok := service.(wiseMedSyncService)
+	if !ok || !api.SetupComplete() {
+		return nil
+	}
+	_, err := api.EnsureEquipmentOnline(nil)
+	return err
+}
+
+func AutoSaveResultsToWiseMED(rt module.Runtime, targets []AutoSaveTarget) error {
+	if !autoConfirmWiseMEDEnabled(rt) || len(targets) == 0 {
+		return nil
+	}
+	store := autoSaveOrderStore(rt)
+	if store == nil {
+		return errors.New("storage service unavailable")
+	}
+	syncer := autoSaveResultSync(rt)
+	if syncer == nil {
+		return errors.New("result-sync service unavailable")
+	}
+	api := autoSaveWiseMEDAPI(rt)
+	if api == nil || !api.SetupComplete() {
+		return errors.New("wisemed-api service unavailable or setup incomplete")
+	}
+	for _, target := range targets {
+		if len(target.OrderIDs) == 0 {
+			continue
+		}
+		rt.Logf("wisemed autosave: sync start order_date=%s round_no=%d order_ids=%v", target.OrderDate, target.RoundNo, target.OrderIDs)
+		if _, err := syncer.RunOrders(target.OrderIDs, target.RoundNo, target.OrderDate); err != nil {
+			return err
+		}
+		bundles, err := store.ListOrderBundles(target.RoundNo, target.OrderDate)
+		if err != nil {
+			return err
+		}
+		selected := filterOrderBundlesByIDs(bundles, target.OrderIDs)
+		if len(selected) == 0 {
+			continue
+		}
+		if _, err := saveOrderBundlesToWiseMED(api, selected, rt); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func SaveOrderBundlesToWiseMED(rt module.Runtime, bundles []coremodel.OrderBundle) (map[string]interface{}, error) {
+	api := autoSaveWiseMEDAPI(rt)
+	if api == nil || !api.SetupComplete() {
+		return nil, errors.New("wisemed-api service unavailable or setup incomplete")
+	}
+	return saveOrderBundlesToWiseMED(api, bundles, rt)
+}
+
+func autoConfirmWiseMEDEnabled(rt module.Runtime) bool {
+	return boolString(asString(rt.ModuleSettings("results")["auto_confirm_wisemed"]))
+}
+
+func autoSaveOrderStore(rt module.Runtime) importStore {
+	service, ok := rt.Service("storage")
+	if !ok {
+		return nil
+	}
+	store, _ := service.(importStore)
+	return store
+}
+
+func autoSaveWiseMEDAPI(rt module.Runtime) wiseMedResultsService {
+	service, ok := rt.Service("wisemed-api")
+	if !ok {
+		return nil
+	}
+	api, _ := service.(wiseMedResultsService)
+	return api
+}
+
+func autoSaveResultSync(rt module.Runtime) resultSyncService {
+	service, ok := rt.Service("result-sync")
+	if !ok {
+		return nil
+	}
+	syncer, _ := service.(resultSyncService)
+	return syncer
+}
+
+func saveOrderBundlesToWiseMED(api wiseMedResultsService, bundles []coremodel.OrderBundle, rt module.Runtime) (map[string]interface{}, error) {
+	saved := 0
+	skipped := 0
+	files := make([]map[string]interface{}, 0, len(bundles))
+	for _, bundle := range bundles {
+		fileID := strings.TrimSpace(bundle.Order.FileID)
+		if fileID == "" {
+			fileID = strings.TrimSpace(asString(bundle.Order.Meta["file_id"]))
+		}
+		if fileID == "" {
+			skipped++
+			files = append(files, map[string]interface{}{
+				"order_id": bundle.Order.ID,
+				"status":   "skipped",
+				"reason":   "missing_file_id",
+			})
+			continue
+		}
+		entries := make([]wisemedapi.ServiceResultEntry, 0, len(bundle.Analyses))
+		for _, item := range bundle.Analyses {
+			fsmID := strings.TrimSpace(item.Analysis.WiseMEDFSMID)
+			if fsmID == "" {
+				continue
+			}
+			result := strings.TrimSpace(item.Analysis.ResultValue)
+			if result == "" {
+				result = strings.TrimSpace(item.Analysis.RawValue)
+			}
+			if result == "" {
+				continue
+			}
+			entries = append(entries, wisemedapi.ServiceResultEntry{
+				FSMID:          fsmID,
+				Result:         result,
+				Interpretation: strings.TrimSpace(item.Analysis.Interpreted),
+				Conclusion:     extractConclusion(item.Analysis.Flags),
+			})
+		}
+		if len(entries) == 0 {
+			skipped++
+			files = append(files, map[string]interface{}{
+				"order_id": bundle.Order.ID,
+				"file_id":  fileID,
+				"status":   "skipped",
+				"reason":   "no_entries",
+			})
+			continue
+		}
+		rt.Logf("wisemed autosave: patch results order_id=%d file_id=%s entries=%d", bundle.Order.ID, fileID, len(entries))
+		resp, err := api.SaveFileServiceResults(fileID, entries)
+		if err != nil {
+			return map[string]interface{}{
+				"saved_orders":   saved,
+				"skipped_orders": skipped,
+				"files":          files,
+			}, err
+		}
+		saved++
+		files = append(files, map[string]interface{}{
+			"order_id": bundle.Order.ID,
+			"file_id":  fileID,
+			"status":   "saved",
+			"entries":  len(entries),
+			"response": resp,
+		})
+	}
+	return map[string]interface{}{
+		"saved_orders":   saved,
+		"skipped_orders": skipped,
+		"files":          files,
+	}, nil
+}
+
+func extractConclusion(flags map[string]interface{}) string {
+	if len(flags) == 0 {
+		return ""
+	}
+	for _, key := range []string{"conclusion", "final_conclusion", "result_conclusion"} {
+		if value := strings.TrimSpace(asString(flags[key])); value != "" {
+			return value
+		}
+	}
+	return ""
+}
+
+func CollectAutoSaveTarget(items map[string]*AutoSaveTarget, orderDate string, roundNo int, orderID int64) {
+	if orderID <= 0 {
+		return
+	}
+	key := fmt.Sprintf("%s|%d", orderDate, roundNo)
+	target := items[key]
+	if target == nil {
+		target = &AutoSaveTarget{OrderDate: orderDate, RoundNo: roundNo}
+		items[key] = target
+	}
+	for _, existing := range target.OrderIDs {
+		if existing == orderID {
+			return
+		}
+	}
+	target.OrderIDs = append(target.OrderIDs, orderID)
+}
+
+func FlattenAutoSaveTargets(items map[string]*AutoSaveTarget) []AutoSaveTarget {
+	if len(items) == 0 {
+		return nil
+	}
+	out := make([]AutoSaveTarget, 0, len(items))
+	for _, item := range items {
+		if item == nil || len(item.OrderIDs) == 0 {
+			continue
+		}
+		sort.Slice(item.OrderIDs, func(i, j int) bool { return item.OrderIDs[i] < item.OrderIDs[j] })
+		out = append(out, *item)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].OrderDate == out[j].OrderDate {
+			return out[i].RoundNo < out[j].RoundNo
+		}
+		return out[i].OrderDate < out[j].OrderDate
+	})
+	return out
+}
+
+func filterOrderBundlesByIDs(items []coremodel.OrderBundle, ids []int64) []coremodel.OrderBundle {
+	if len(ids) == 0 {
+		return nil
+	}
+	allowed := make(map[int64]struct{}, len(ids))
+	for _, id := range ids {
+		allowed[id] = struct{}{}
+	}
+	out := make([]coremodel.OrderBundle, 0, len(items))
+	for _, item := range items {
+		if _, ok := allowed[item.Order.ID]; ok {
+			out = append(out, item)
+		}
+	}
+	return out
+}
+
+func asString(value interface{}) string {
+	switch typed := value.(type) {
+	case nil:
+		return ""
+	case string:
+		return typed
+	case fmt.Stringer:
+		return typed.String()
+	default:
+		return fmt.Sprint(value)
+	}
+}
+
+func boolString(value string) bool {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "1", "true", "yes", "y", "on":
+		return true
+	default:
+		return false
+	}
+}
+
+func (m *Module) verboseLevel() int {
+	raw := strings.TrimSpace(fmt.Sprint(m.rt.ModuleSettings("logging")["verbose_level"]))
+	value, err := strconv.Atoi(raw)
+	if err != nil || value < 1 {
+		return 1
+	}
+	if value > 5 {
+		return 5
+	}
+	return value
+}
+
+func (m *Module) logf(level int, format string, args ...interface{}) {
+	if m.verboseLevel() >= level {
+		m.rt.Logf(format, args...)
+	}
+}
+
+func (m *Module) logParsedPreview(path string, data ImportData) {
+	if m.verboseLevel() < 5 {
+		return
+	}
+	preview := map[string]interface{}{
+		"file":           filepath.Base(path),
+		"sample_records": minInt(len(data.SampleRecords), 2),
+		"qc_records":     minInt(len(data.QCRecords), 2),
+		"analytes":       minInt(len(data.Analytes), 5),
+	}
+	if len(data.SampleRecords) > 0 {
+		preview["first_sample_record"] = data.SampleRecords[0]
+	}
+	if len(data.QCRecords) > 0 {
+		preview["first_qc_record"] = data.QCRecords[0]
+	}
+	if len(data.Analytes) > 0 {
+		limit := minInt(len(data.Analytes), 5)
+		preview["analyte_preview"] = data.Analytes[:limit]
+	}
+	blob, err := json.Marshal(preview)
+	if err == nil {
+		m.rt.Logf("%s parse preview %s", m.spec.ID, string(blob))
+	}
+}
+
+func minInt(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+func (m *Module) logIgnored(kind, reason string, payload map[string]interface{}) {
+	if m.verboseLevel() < 5 {
+		return
+	}
+	entry := map[string]interface{}{
+		"kind":   kind,
+		"reason": reason,
+	}
+	for key, value := range payload {
+		entry[key] = value
+	}
+	blob, err := json.Marshal(entry)
+	if err == nil {
+		m.rt.Logf("%s ignored %s", m.spec.ID, string(blob))
+	}
 }
 
 func (m *Module) sampleCodeRules() SampleCodeRules {
@@ -492,6 +946,27 @@ func NormalizeSampleID(value string) string {
 	value = strings.ToUpper(strings.TrimSpace(value))
 	value = strings.ReplaceAll(value, " ", "")
 	return value
+}
+
+func PreferredSampleCode(sampleID, sampleName string) string {
+	if raw := PreferredRawSampleCode(sampleID, sampleName); raw != "" {
+		return NormalizeSampleID(raw)
+	}
+	return ""
+}
+
+func PreferredRawSampleCode(sampleID, sampleName string) string {
+	sampleID = strings.TrimSpace(sampleID)
+	normalizedID := NormalizeSampleID(sampleID)
+	if normalizedID != "" && normalizedID != "UNTITLED" && normalizedID != "UNDEFINED" {
+		return sampleID
+	}
+	sampleName = strings.TrimSpace(sampleName)
+	normalizedName := NormalizeSampleID(sampleName)
+	if normalizedName != "" && normalizedName != "UNTITLED" && normalizedName != "UNDEFINED" {
+		return sampleName
+	}
+	return sampleID
 }
 
 func NormalizeImportedRecord(record coremodel.ImportedRecord, rules SampleCodeRules) coremodel.ImportedRecord {

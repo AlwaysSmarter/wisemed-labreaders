@@ -1,5 +1,15 @@
 [
   {
+    "id": "analytikjena-plasmaquantms-elite-reader",
+    "title": "AnalytikJena PlasmaQuantMS Elite Reader",
+    "binaryName": "analytikjena-plasmaquantms-elite-reader",
+    "serviceName": "wisemed-analytikjena-plasmaquantms-elite-reader",
+    "displayName": "WiseMED AnalytikJena PlasmaQuantMS Elite Reader",
+    "description": "WiseMED readersv3 AnalytikJena PlasmaQuantMS Elite Reader background service",
+    "bundleId": "eu.wisemed.readersv3.analytikjena.plasmaquantms.elite.reader",
+    "supportsHeadless": true
+  },
+  {
     "id": "anatolia-geneworks-reader",
     "title": "Anatolia Geneworks Reader",
     "binaryName": "anatolia-geneworks-reader",

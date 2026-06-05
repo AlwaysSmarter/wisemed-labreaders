@@ -49,6 +49,7 @@ const translations = {
     equipmentIdLabel: "ID echipament",
     readerIdLabel: "ID reader",
     analyzerNameLabel: "Analizor",
+    protocolSubtypeLabel: "Subtip protocol",
     readerCategoryGeneric: "Generic",
     readerCategoryUrine: "Urina",
     readerCategoryHematology: "Hematologie",
@@ -92,6 +93,8 @@ const translations = {
     analysesForSample: "Analize pentru proba",
     analysisName: "Denumire analiza",
     analysisTag: "Tag",
+    wisemedSMID: "Serviciu medical ID",
+    wisemedFSMID: "FSM ID",
     analysisQualitative: "Rezultat calitativ",
     analysisQuantitative: "Rezultat cantitativ",
     analysesCount: "Nr. analize",
@@ -103,6 +106,12 @@ const translations = {
     newRound: "Runda noua",
     exportedFile: "Fisier exportat",
     importedFile: "Fisier importat",
+    sendToBulletin: "Trimite in buletin",
+    sendToBulletinSuccess: "Rezultatele au fost trimise in buletinul WiseMED.",
+    sendToBulletinFailed: "Trimiterea in buletinul WiseMED a esuat.",
+    syncToWiseMED: "Try WiseMED match",
+    syncToWiseMEDSuccess: "Sincronizarea de match cu WiseMED a fost rulata.",
+    syncToWiseMEDFailed: "Sincronizarea de match cu WiseMED a esuat.",
     importing: "Se importa...",
     importSuccess: "Import finalizat",
     importFailed: "Import esuat",
@@ -192,6 +201,13 @@ const translations = {
     fileId: "Fisa",
     sampleCode: "Sample code",
     specimenCode: "Specimen code",
+    patientId: "ID solicitant",
+    patientName: "Solicitant",
+    deleteSelection: "Sterge selectia",
+    deleteOrdersConfirm: "Stergi cererile selectate si toate rezultatele lor?",
+    deleteQCConfirm: "Stergi inregistrarile QC selectate si toate rezultatele lor?",
+    deleteSuccess: "Stergere finalizata",
+    dailyWorksheet: "Fisa de lucru",
     statusReceived: "primit",
     statusPending: "in asteptare",
     statusCompleted: "finalizat",
@@ -259,6 +275,7 @@ const translations = {
     equipmentIdLabel: "Equipment ID",
     readerIdLabel: "Reader ID",
     analyzerNameLabel: "Analyzer",
+    protocolSubtypeLabel: "Protocol subtype",
     readerCategoryGeneric: "Generic",
     readerCategoryUrine: "Urine",
     readerCategoryHematology: "Hematology",
@@ -302,6 +319,8 @@ const translations = {
     analysesForSample: "Analyses for sample",
     analysisName: "Analysis name",
     analysisTag: "Tag",
+    wisemedSMID: "Medical service ID",
+    wisemedFSMID: "FSM ID",
     analysisQualitative: "Qualitative result",
     analysisQuantitative: "Quantitative result",
     analysesCount: "Analyses count",
@@ -313,6 +332,12 @@ const translations = {
     newRound: "New round",
     exportedFile: "Exported file",
     importedFile: "Imported file",
+    sendToBulletin: "Send to bulletin",
+    sendToBulletinSuccess: "Results were sent to the WiseMED bulletin.",
+    sendToBulletinFailed: "Sending to the WiseMED bulletin failed.",
+    syncToWiseMED: "Try WiseMED match",
+    syncToWiseMEDSuccess: "WiseMED match sync was executed.",
+    syncToWiseMEDFailed: "WiseMED match sync failed.",
     importing: "Importing...",
     importSuccess: "Import completed",
     importFailed: "Import failed",
@@ -402,6 +427,13 @@ const translations = {
     fileId: "File ID",
     sampleCode: "Sample code",
     specimenCode: "Specimen code",
+    patientId: "Requester ID",
+    patientName: "Requester",
+    deleteSelection: "Delete selection",
+    deleteOrdersConfirm: "Delete the selected requests and all their results?",
+    deleteQCConfirm: "Delete the selected QC records and all their results?",
+    deleteSuccess: "Deletion completed",
+    dailyWorksheet: "Worksheet",
     statusReceived: "received",
     statusPending: "pending",
     statusCompleted: "completed",
@@ -650,6 +682,7 @@ const state = {
   selectedQCAnalysisTag: null,
   selectedOrderAnalysisID: null,
   selectedOrderIDs: [],
+  selectedQCRecordIDs: [],
   settingsSubView: "reader",
   dailyDetailDefinitions: [],
   dailyDetailValues: [],
@@ -672,6 +705,7 @@ const state = {
   readerSettings: { repeat_mode: "individual", available_comm_types: [], available_protocols: [], available_tcpip_modes: [] },
   appUpdateSettings: {},
   appUpdateStatus: null,
+  resultsDelivery: { auto_confirm_wisemed: false, send_supported: false },
   wisemedSetup: { settings: {}, configured: false, setup_complete: false, equipment_registered: false },
   wisemedBootstrap: { medical_units: [], analyzer_types: [] },
 };
@@ -742,7 +776,10 @@ const els = {
   ordersSelectAllLabel: document.getElementById("orders-select-all-label"),
   importOrdersBtn: document.getElementById("import-orders"),
   exportOrdersBtn: document.getElementById("export-orders"),
+  syncOrdersWiseMEDBtn: document.getElementById("sync-orders-wisemed"),
+  sendOrdersWiseMEDBtn: document.getElementById("send-orders-wisemed"),
   worklistOrdersBtn: document.getElementById("worklist-orders"),
+  deleteOrdersBtn: document.getElementById("delete-orders"),
   newRoundBtn: document.getElementById("new-round"),
   ordersImportFile: document.getElementById("orders-import-file"),
   ordersLayout: document.getElementById("orders-layout"),
@@ -753,6 +790,7 @@ const els = {
   dailyDetailsAnalyteBox: document.getElementById("daily-details-analyte-box"),
   dailyDetailsAnalyte: document.getElementById("daily-details-analyte"),
   dailyDetailsValueSearch: document.getElementById("daily-details-value-search"),
+  dailyDetailsPrintBtn: document.getElementById("daily-details-print"),
   refreshDailyDetailValuesBtn: document.getElementById("refresh-daily-detail-values"),
   dailyDetailsTabs: [...document.querySelectorAll("[data-daily-scope]")],
   dailyDetailDefinitionSearch: document.getElementById("daily-detail-search"),
@@ -773,10 +811,14 @@ const els = {
   qcRoundSelect: document.getElementById("qc-round-select"),
   qcAnalyteFilter: document.getElementById("qc-analyte-filter"),
   qcLevelFilter: document.getElementById("qc-level-filter"),
+  qcSelectAll: document.getElementById("qc-select-all"),
+  qcSelectAllBox: document.getElementById("qc-select-all-box"),
+  qcSelectAllLabel: document.getElementById("qc-select-all-label"),
   qcLayout: document.getElementById("qc-layout"),
   qcDetails: document.getElementById("qc-details"),
   qcSummary: document.getElementById("qc-summary"),
   qcOpenWestgardBtn: document.getElementById("qc-open-westgard"),
+  deleteQCRecordsBtn: document.getElementById("delete-qc-records"),
   qcRecordModal: document.getElementById("qc-record-modal"),
   qcRecordModalBackdrop: document.getElementById("qc-record-modal-backdrop"),
   closeQCRecordModalBtn: document.getElementById("close-qc-record-modal"),
@@ -865,25 +907,28 @@ async function init() {
 }
 
 function bindEvents() {
-  els.loginForm.addEventListener("submit", onLogin);
-  els.logoutBtn.addEventListener("click", onLogout);
+  bindAsyncSubmit(els.loginForm, onLogin);
+  bindAsyncClick(els.logoutBtn, onLogout);
   els.languageSelectLogin.addEventListener("change", onLanguageChange);
   els.languageSelectDashboard.addEventListener("change", onLanguageChange);
   if (els.loginAppVersionLink) els.loginAppVersionLink.addEventListener("click", onAppVersionClick);
   if (els.dashboardAppVersionLink) els.dashboardAppVersionLink.addEventListener("click", onAppVersionClick);
   if (els.loginAppUpdateIndicator) els.loginAppUpdateIndicator.addEventListener("click", onAppUpdateIndicatorClick);
   if (els.dashboardAppUpdateIndicator) els.dashboardAppUpdateIndicator.addEventListener("click", onAppUpdateIndicatorClick);
-  els.refreshLogsBtn.addEventListener("click", loadLogs);
+  bindAsyncClick(els.refreshLogsBtn, loadLogs);
   els.logPollSeconds.addEventListener("change", onLogPollChange);
-  els.refreshOrdersBtn.addEventListener("click", onRefreshOrdersClick);
+  bindAsyncClick(els.refreshOrdersBtn, onRefreshOrdersClick);
   els.orderDate.addEventListener("change", onOrderDateChange);
   els.roundSelect.addEventListener("change", onRoundChange);
   els.ordersSelectAll.addEventListener("change", onOrdersSelectAllChange);
   els.importOrdersBtn.addEventListener("click", onImportOrdersClick);
-  els.exportOrdersBtn.addEventListener("click", onExportOrdersClick);
-  els.worklistOrdersBtn.addEventListener("click", onWorklistOrdersClick);
-  els.newRoundBtn.addEventListener("click", onNewRoundClick);
-  els.refreshQCBtn.addEventListener("click", loadQCRecords);
+  bindAsyncClick(els.exportOrdersBtn, onExportOrdersClick);
+  bindAsyncClick(els.syncOrdersWiseMEDBtn, onSyncOrdersWiseMEDClick);
+  bindAsyncClick(els.sendOrdersWiseMEDBtn, onSendOrdersWiseMEDClick);
+  bindAsyncClick(els.worklistOrdersBtn, onWorklistOrdersClick);
+  bindAsyncClick(els.deleteOrdersBtn, onDeleteOrdersClick);
+  bindAsyncClick(els.newRoundBtn, onNewRoundClick);
+  bindAsyncClick(els.refreshQCBtn, loadQCRecords);
   els.newQCRecordBtn.addEventListener("click", openQCRecordModal);
   if (els.qcPeriod) els.qcPeriod.addEventListener("change", onQCPeriodChange);
   if (els.qcDateFrom) els.qcDateFrom.addEventListener("change", onQCDateRangeChange);
@@ -891,50 +936,53 @@ function bindEvents() {
   els.qcRoundSelect.addEventListener("change", onQCRoundChange);
   els.qcAnalyteFilter.addEventListener("change", onQCAnalyteFilterChange);
   els.qcLevelFilter.addEventListener("change", onQCLevelFilterChange);
+  els.qcSelectAll.addEventListener("change", onQCSelectAllChange);
+  bindAsyncClick(els.deleteQCRecordsBtn, onDeleteQCRecordsClick);
   els.ordersImportFile.addEventListener("change", onOrdersImportFileChange);
   els.appToastClose.addEventListener("click", hideToast);
   els.newAnalyteBtn.addEventListener("click", () => openAnalyteModal());
-  els.refreshAnalytesBtn.addEventListener("click", onRefreshAnalytesClick);
-  if (els.readerSettingsForm) els.readerSettingsForm.addEventListener("submit", onSaveReaderSettings);
+  bindAsyncClick(els.refreshAnalytesBtn, onRefreshAnalytesClick);
+  if (els.readerSettingsForm) bindAsyncSubmit(els.readerSettingsForm, onSaveReaderSettings);
   if (els.readerSettingsForm?.elements?.analyzer_comm_type) els.readerSettingsForm.elements.analyzer_comm_type.addEventListener("change", syncReaderSettingsTransportFields);
   if (els.readerSettingsForm?.elements?.tcpip_mode) els.readerSettingsForm.elements.tcpip_mode.addEventListener("change", syncReaderSettingsTransportFields);
-  if (els.runResultSyncBtn) els.runResultSyncBtn.addEventListener("click", onRunResultSync);
-  if (els.resetResultSyncBtn) els.resetResultSyncBtn.addEventListener("click", onResetResultSync);
-  els.deleteAnalyteBtn.addEventListener("click", onDeleteAnalyte);
-  els.analyteForm.addEventListener("submit", onSaveAnalyte);
+  if (els.runResultSyncBtn) bindAsyncClick(els.runResultSyncBtn, onRunResultSync);
+  if (els.resetResultSyncBtn) bindAsyncClick(els.resetResultSyncBtn, onResetResultSync);
+  bindAsyncClick(els.deleteAnalyteBtn, onDeleteAnalyte);
+  bindAsyncSubmit(els.analyteForm, onSaveAnalyte);
   els.analyteSearch.addEventListener("input", renderAnalyteList);
-  if (els.dailyDetailDefinitionForm) els.dailyDetailDefinitionForm.addEventListener("submit", onSaveDailyDetailDefinition);
+  if (els.dailyDetailDefinitionForm) bindAsyncSubmit(els.dailyDetailDefinitionForm, onSaveDailyDetailDefinition);
   if (els.dailyDetailDefinitionSearch) els.dailyDetailDefinitionSearch.addEventListener("input", renderDailyDetailDefinitionList);
   if (els.newDailyDetailDefinitionBtn) els.newDailyDetailDefinitionBtn.addEventListener("click", () => openDailyDetailDefinitionModal());
-  if (els.refreshDailyDetailDefinitionsBtn) els.refreshDailyDetailDefinitionsBtn.addEventListener("click", onRefreshDailyDetailDefinitionsClick);
+  if (els.refreshDailyDetailDefinitionsBtn) bindAsyncClick(els.refreshDailyDetailDefinitionsBtn, onRefreshDailyDetailDefinitionsClick);
   if (els.dailyDetailsDate) els.dailyDetailsDate.addEventListener("change", onDailyDetailsDateChange);
   if (els.dailyDetailsRound) els.dailyDetailsRound.addEventListener("change", onDailyDetailsRoundChange);
   if (els.dailyDetailsAnalyte) els.dailyDetailsAnalyte.addEventListener("change", onDailyDetailsAnalyteChange);
+  if (els.dailyDetailsPrintBtn) bindAsyncClick(els.dailyDetailsPrintBtn, onPrintDailyWorksheetClick);
   if (els.dailyDetailsValueSearch) els.dailyDetailsValueSearch.addEventListener("input", renderDailyDetailValuesWorkspace);
-  if (els.refreshDailyDetailValuesBtn) els.refreshDailyDetailValuesBtn.addEventListener("click", () => loadDailyDetailsWorkspace().catch((error) => showToast(error?.message || "Cannot load daily details", "error")));
+  if (els.refreshDailyDetailValuesBtn) bindAsyncClick(els.refreshDailyDetailValuesBtn, () => loadDailyDetailsWorkspace().catch((error) => showToast(error?.message || "Cannot load daily details", "error")));
   els.dailyDetailsTabs.forEach((tab) => tab.addEventListener("click", () => onDailyDetailsScopeChange(tab.dataset.dailyScope || "day")));
   if (els.dailyDetailDefinitionModalBackdrop) els.dailyDetailDefinitionModalBackdrop.addEventListener("click", closeDailyDetailDefinitionModal);
   if (els.closeDailyDetailDefinitionModalBtn) els.closeDailyDetailDefinitionModalBtn.addEventListener("click", closeDailyDetailDefinitionModal);
-  if (els.deleteDailyDetailDefinitionBtn) els.deleteDailyDetailDefinitionBtn.addEventListener("click", onDeleteDailyDetailDefinition);
-  els.qcTargetForm.addEventListener("submit", onSaveQCTarget);
-  els.newQCTargetBtn.addEventListener("click", async () => {
+  if (els.deleteDailyDetailDefinitionBtn) bindAsyncClick(els.deleteDailyDetailDefinitionBtn, onDeleteDailyDetailDefinition);
+  bindAsyncSubmit(els.qcTargetForm, onSaveQCTarget);
+  bindAsyncClick(els.newQCTargetBtn, async () => {
     if (!state.qcLevels.length) {
       await loadQCMeta().catch(() => {});
     }
     openQCTargetModal();
   });
-  els.refreshQCTargetsBtn.addEventListener("click", onRefreshQCTargetsClick);
-  els.deleteQCTargetBtn.addEventListener("click", onDeleteQCTarget);
+  bindAsyncClick(els.refreshQCTargetsBtn, onRefreshQCTargetsClick);
+  bindAsyncClick(els.deleteQCTargetBtn, onDeleteQCTarget);
   els.qcTargetFilterAnalyte.addEventListener("change", onQCTargetFilterAnalyteChange);
   els.qcTargetAnalyte.addEventListener("change", onQCTargetAnalyteChange);
   els.qcTargetLevel.addEventListener("change", syncSelectedTargetFromForm);
   els.qcTargetLot.addEventListener("input", syncSelectedTargetFromForm);
   els.qcTargetMean.addEventListener("input", updateQCTargetDerivedFields);
   els.qcTargetSD.addEventListener("input", updateQCTargetDerivedFields);
-  els.qcOpenWestgardBtn.addEventListener("click", onGenerateQCWestgard);
+  bindAsyncClick(els.qcOpenWestgardBtn, onGenerateQCWestgard);
   els.qcRecordModalBackdrop.addEventListener("click", closeQCRecordModal);
   els.closeQCRecordModalBtn.addEventListener("click", closeQCRecordModal);
-  els.qcRecordForm.addEventListener("submit", onSaveQCRecord);
+  bindAsyncSubmit(els.qcRecordForm, onSaveQCRecord);
   els.qcRecordAnalyte.addEventListener("change", syncQCRecordLotOptions);
   els.qcRecordLot.addEventListener("change", syncQCRecordLotMetadata);
   els.qcWestgardModalBackdrop.addEventListener("click", closeQCWestgardModal);
@@ -942,7 +990,7 @@ function bindEvents() {
   els.qcWestgardPeriod.addEventListener("change", onQCWestgardPeriodChange);
   els.qcWestgardDateFrom.addEventListener("change", onQCWestgardCustomDateChange);
   els.qcWestgardDateTo.addEventListener("change", onQCWestgardCustomDateChange);
-  els.qcWestgardValidateBtn.addEventListener("click", onShowQCWestgardIssues);
+  bindAsyncClick(els.qcWestgardValidateBtn, onShowQCWestgardIssues);
   els.qcTargetModalBackdrop.addEventListener("click", closeQCTargetModal);
   els.closeQCTargetModalBtn.addEventListener("click", closeQCTargetModal);
   els.analyteModalBackdrop.addEventListener("click", closeAnalyteModal);
@@ -981,6 +1029,64 @@ function bindEvents() {
   window.addEventListener("popstate", () => {
     activateView(viewFromLocation(), false);
   });
+}
+
+function bindAsyncClick(element, handler) {
+  if (!element) return;
+  element.addEventListener("click", async (event) => {
+    const button = resolveActionButton(event.currentTarget);
+    try {
+      setButtonLoading(button, true);
+      await handler(event);
+    } finally {
+      setButtonLoading(button, false);
+    }
+  });
+}
+
+function bindAsyncSubmit(form, handler) {
+  if (!form) return;
+  form.addEventListener("submit", async (event) => {
+    const button = resolveActionButton(event.submitter) || form.querySelector('button[type="submit"], input[type="submit"]');
+    try {
+      setButtonLoading(button, true);
+      await handler(event);
+    } finally {
+      setButtonLoading(button, false);
+    }
+  });
+}
+
+function resolveActionButton(target) {
+  if (!target) return null;
+  if (target instanceof HTMLButtonElement) return target;
+  if (target instanceof HTMLElement) return target.closest("button");
+  return null;
+}
+
+function setButtonLoading(button, loading) {
+  if (!button) return;
+  if (loading) {
+    if (!button.dataset.originalLabel) {
+      button.dataset.originalLabel = button.innerHTML;
+    }
+    if (!button.dataset.originalDisabled) {
+      button.dataset.originalDisabled = button.disabled ? "true" : "false";
+    }
+    button.classList.add("is-loading");
+    button.disabled = true;
+    button.setAttribute("aria-busy", "true");
+    return;
+  }
+  if (button.dataset.originalLabel) {
+    button.innerHTML = button.dataset.originalLabel;
+    delete button.dataset.originalLabel;
+  }
+  const wasDisabled = button.dataset.originalDisabled === "true";
+  delete button.dataset.originalDisabled;
+  button.disabled = wasDisabled;
+  button.classList.remove("is-loading");
+  button.removeAttribute("aria-busy");
 }
 
 function isBarcodeMode() {
@@ -1221,8 +1327,8 @@ async function mountDashboard(sessionResp) {
   state.appUpdateSettings = { ...(sessionResp.app_update || state.appUpdateSettings || {}) };
   state.settingsSubView = settingsSubViewFromLocation();
   applyBarcodeModeUI();
-  els.readerTitle.textContent = sessionResp.reader.label;
-  els.readerSubtitle.textContent = `${sessionResp.reader.analyzer_name} · ${sessionResp.reader.id}`;
+  els.readerTitle.textContent = formatReaderPrimaryLabel(sessionResp.reader);
+  els.readerSubtitle.textContent = formatReaderSecondaryLabel(sessionResp.reader);
   syncAppVersionUI();
   const userParts = [state.session?.first_name, state.session?.last_name].filter(Boolean);
   els.sessionUser.textContent = userParts.join(" ").trim() || state.session?.username || "-";
@@ -1515,6 +1621,7 @@ async function loadStatus() {
   state.commType = communication.type || state.commType || "file";
   const layout = data.layout || {};
   state.layoutKind = layout.kind || state.layoutKind || "simple_list";
+  state.resultsDelivery = { ...(state.resultsDelivery || {}), ...(data.results_delivery || {}) };
   const connections = data.connections || {};
   updateConnectionPills(connections);
   const cards = state.barcodeMode ? [
@@ -1586,6 +1693,13 @@ async function loadReaderSettings() {
     tcpip_port: String(resp.settings?.tcpip_port || ""),
     tcpip_remote_host: String(resp.settings?.tcpip_remote_host || ""),
     tcpip_remote_port: String(resp.settings?.tcpip_remote_port || ""),
+    file_import_dir: String(resp.settings?.file_import_dir || "./inbox"),
+    file_processed_dir: String(resp.settings?.file_processed_dir || "./processed"),
+    file_failed_dir: String(resp.settings?.file_failed_dir || "./failed"),
+    file_pattern: String(resp.settings?.file_pattern || "*"),
+    logging_verbose_level: String(resp.settings?.logging_verbose_level || "1"),
+    results_auto_confirm_wisemed: String(resp.settings?.results_auto_confirm_wisemed || "false"),
+    results_send_supported: Boolean(resp.settings?.results_send_supported),
     app_updates_enabled: String(resp.settings?.app_updates_enabled || "true"),
     app_updates_app_id: String(resp.settings?.app_updates_app_id || ""),
     app_updates_current_version: String(resp.settings?.app_updates_current_version || "0.0.0"),
@@ -1599,7 +1713,12 @@ async function loadReaderSettings() {
     result_sync_sample_suffixes: String(resp.settings?.result_sync_sample_suffixes || ""),
     result_sync_separators: String(resp.settings?.result_sync_separators || "-"),
     result_sync_qc_prefixes: String(resp.settings?.result_sync_qc_prefixes || ""),
-    protocol_subtype: String(resp.settings?.protocol_subtype || ""),
+    protocol_subtype: String(resp.settings?.protocol_subtype || "auto"),
+  };
+  state.resultsDelivery = {
+    ...(state.resultsDelivery || {}),
+    auto_confirm_wisemed: state.readerSettings.results_auto_confirm_wisemed === "true",
+    send_supported: Boolean(state.readerSettings.results_send_supported),
   };
   const form = els.readerSettingsForm;
   if (form) {
@@ -1623,6 +1742,12 @@ async function loadReaderSettings() {
     form.elements.tcpip_port.value = state.readerSettings.tcpip_port;
     form.elements.tcpip_remote_host.value = state.readerSettings.tcpip_remote_host;
     form.elements.tcpip_remote_port.value = state.readerSettings.tcpip_remote_port;
+    form.elements.file_import_dir.value = state.readerSettings.file_import_dir;
+    form.elements.file_processed_dir.value = state.readerSettings.file_processed_dir;
+    form.elements.file_failed_dir.value = state.readerSettings.file_failed_dir;
+    form.elements.file_pattern.value = state.readerSettings.file_pattern;
+    form.elements.logging_verbose_level.value = state.readerSettings.logging_verbose_level;
+    form.elements.results_auto_confirm_wisemed.value = state.readerSettings.results_auto_confirm_wisemed;
     form.elements.app_updates_enabled.value = state.readerSettings.app_updates_enabled;
     form.elements.app_updates_app_id.value = state.readerSettings.app_updates_app_id;
     form.elements.app_updates_current_version.value = state.readerSettings.app_updates_current_version;
@@ -1636,7 +1761,7 @@ async function loadReaderSettings() {
     form.elements.result_sync_sample_suffixes.value = state.readerSettings.result_sync_sample_suffixes;
     form.elements.result_sync_separators.value = state.readerSettings.result_sync_separators;
     form.elements.result_sync_qc_prefixes.value = state.readerSettings.result_sync_qc_prefixes;
-    form.elements.protocol_subtype.value = state.readerSettings.protocol_subtype;
+    form.elements.protocol_subtype.value = state.readerSettings.protocol_subtype || "auto";
     syncReaderSettingsTransportFields();
   }
   els.repeatModeSelect.value = state.readerSettings.repeat_mode;
@@ -1668,6 +1793,12 @@ async function onSaveReaderSettings(event) {
     tcpip_port: String(form.elements.tcpip_port.value || "").trim(),
     tcpip_remote_host: String(form.elements.tcpip_remote_host.value || "").trim(),
     tcpip_remote_port: String(form.elements.tcpip_remote_port.value || "").trim(),
+    file_import_dir: String(form.elements.file_import_dir.value || "./inbox").trim(),
+    file_processed_dir: String(form.elements.file_processed_dir.value || "./processed").trim(),
+    file_failed_dir: String(form.elements.file_failed_dir.value || "./failed").trim(),
+    file_pattern: String(form.elements.file_pattern.value || "*").trim(),
+    logging_verbose_level: String(form.elements.logging_verbose_level.value || "1").trim(),
+    results_auto_confirm_wisemed: String(form.elements.results_auto_confirm_wisemed.value || "false").trim(),
     app_updates_enabled: String(form.elements.app_updates_enabled.value || "true").trim(),
     app_updates_app_id: String(form.elements.app_updates_app_id.value || "").trim(),
     app_updates_current_version: String(form.elements.app_updates_current_version.value || "0.0.0").trim(),
@@ -1710,6 +1841,13 @@ async function onSaveReaderSettings(event) {
     tcpip_port: String(resp.settings?.tcpip_port || payload.tcpip_port),
     tcpip_remote_host: String(resp.settings?.tcpip_remote_host || payload.tcpip_remote_host),
     tcpip_remote_port: String(resp.settings?.tcpip_remote_port || payload.tcpip_remote_port),
+    file_import_dir: String(resp.settings?.file_import_dir || payload.file_import_dir),
+    file_processed_dir: String(resp.settings?.file_processed_dir || payload.file_processed_dir),
+    file_failed_dir: String(resp.settings?.file_failed_dir || payload.file_failed_dir),
+    file_pattern: String(resp.settings?.file_pattern || payload.file_pattern),
+    logging_verbose_level: String(resp.settings?.logging_verbose_level || payload.logging_verbose_level),
+    results_auto_confirm_wisemed: String(resp.settings?.results_auto_confirm_wisemed || payload.results_auto_confirm_wisemed),
+    results_send_supported: Boolean(resp.settings?.results_send_supported),
     app_updates_enabled: String(resp.settings?.app_updates_enabled || payload.app_updates_enabled),
     app_updates_app_id: String(resp.settings?.app_updates_app_id || payload.app_updates_app_id),
     app_updates_current_version: String(resp.settings?.app_updates_current_version || payload.app_updates_current_version),
@@ -1738,6 +1876,7 @@ async function onSaveReaderSettings(event) {
     analyzer_code: state.readerSettings.analyzer_code || state.readerInfo?.analyzer_code,
     comm_type: state.readerSettings.analyzer_comm_type || state.readerInfo?.comm_type,
     protocol: state.readerSettings.analyzer_protocol || state.readerInfo?.protocol,
+    protocol_subtype: state.readerSettings.protocol_subtype || state.readerInfo?.protocol_subtype,
     repeat_mode: state.readerSettings.repeat_mode,
     app_version: state.readerSettings.app_updates_current_version || state.readerInfo?.app_version,
   };
@@ -1749,6 +1888,11 @@ async function onSaveReaderSettings(event) {
     base_url: state.readerSettings.app_updates_base_url,
     auto_download: state.readerSettings.app_updates_auto_download,
     download_dir: state.readerSettings.app_updates_download_dir,
+  };
+  state.resultsDelivery = {
+    ...(state.resultsDelivery || {}),
+    auto_confirm_wisemed: state.readerSettings.results_auto_confirm_wisemed === "true",
+    send_supported: Boolean(state.readerSettings.results_send_supported),
   };
   syncAppVersionUI();
   refreshAppUpdateStatus(true).catch(() => {});
@@ -1777,10 +1921,13 @@ function syncReaderSettingsTransportFields() {
   const tcpModeRow = document.getElementById("reader-settings-tcp-mode-row");
   const tcpServerRow = document.getElementById("reader-settings-tcp-server-row");
   const tcpClientRow = document.getElementById("reader-settings-tcp-client-row");
+  const fileRow = document.getElementById("reader-settings-file-row");
   const showTCP = commType === "tcpip";
+  const showFile = commType === "file";
   if (tcpModeRow) tcpModeRow.hidden = !showTCP;
   if (tcpServerRow) tcpServerRow.hidden = !showTCP || tcpMode === "client";
   if (tcpClientRow) tcpClientRow.hidden = !showTCP || tcpMode !== "client";
+  if (fileRow) fileRow.hidden = !showFile;
 }
 
 async function loadResultSyncStatus() {
@@ -1907,34 +2054,51 @@ async function loadBarcodeSettingsView() {
 
   if (saveBtn) {
     saveBtn.addEventListener("click", async () => {
-      const payload = collect();
-      const updatePayload = collectUpdate();
-      const settingsResp = await api("/api/barcode/settings", {
-        method: "PUT",
-        body: JSON.stringify(payload),
-      });
-      const updateResp = await api("/api/app-update/settings", {
-        method: "PUT",
-        body: JSON.stringify(updatePayload),
-      });
-      state.barcodeSettings = settingsResp.settings || payload;
-      state.appUpdateSettings = updateResp.settings || { ...state.appUpdateSettings, ...updatePayload };
-      state.readerInfo = { ...(state.readerInfo || {}), app_version: updatePayload.current_version || state.readerInfo?.app_version };
-      syncAppVersionUI();
-      refreshAppUpdateStatus(true).catch(() => {});
-      await loadBarcodeSettingsView();
-      showToast("Setari salvate", "success");
+      try {
+        setButtonLoading(saveBtn, true);
+        const payload = collect();
+        const updatePayload = collectUpdate();
+        const settingsResp = await api("/api/barcode/settings", {
+          method: "PUT",
+          body: JSON.stringify(payload),
+        });
+        const updateResp = await api("/api/app-update/settings", {
+          method: "PUT",
+          body: JSON.stringify(updatePayload),
+        });
+        state.barcodeSettings = settingsResp.settings || payload;
+        state.appUpdateSettings = updateResp.settings || { ...state.appUpdateSettings, ...updatePayload };
+        state.readerInfo = { ...(state.readerInfo || {}), app_version: updatePayload.current_version || state.readerInfo?.app_version };
+        syncAppVersionUI();
+        refreshAppUpdateStatus(true).catch(() => {});
+        await loadBarcodeSettingsView();
+        showToast("Setari salvate", "success");
+      } finally {
+        setButtonLoading(saveBtn, false);
+      }
     });
   }
   if (testBtn) {
     testBtn.addEventListener("click", async () => {
-      await api("/api/barcode/test-print", { method: "POST", body: "{}" });
-      showToast("Test print trimis", "success");
+      try {
+        setButtonLoading(testBtn, true);
+        await api("/api/barcode/test-print", { method: "POST", body: "{}" });
+        showToast("Test print trimis", "success");
+      } finally {
+        setButtonLoading(testBtn, false);
+      }
     });
   }
   if (refreshBtn) {
-    refreshBtn.addEventListener("click", () => {
-      loadBarcodeSettingsView().catch((e) => showToast(e.message || "Refresh failed", "error"));
+    refreshBtn.addEventListener("click", async () => {
+      try {
+        setButtonLoading(refreshBtn, true);
+        await loadBarcodeSettingsView();
+      } catch (e) {
+        showToast(e.message || "Refresh failed", "error");
+      } finally {
+        setButtonLoading(refreshBtn, false);
+      }
     });
   }
   bindRerender();
@@ -2486,7 +2650,10 @@ function syncOrderControls() {
   if (state.barcodeMode) {
     els.importOrdersBtn.hidden = true;
     els.exportOrdersBtn.hidden = true;
+    if (els.syncOrdersWiseMEDBtn) els.syncOrdersWiseMEDBtn.hidden = true;
+    if (els.sendOrdersWiseMEDBtn) els.sendOrdersWiseMEDBtn.hidden = true;
     els.worklistOrdersBtn.hidden = true;
+    if (els.deleteOrdersBtn) els.deleteOrdersBtn.hidden = true;
     els.newRoundBtn.hidden = true;
     els.ordersSelectAllBox.hidden = true;
     if (els.orderDate?.parentElement) els.orderDate.parentElement.hidden = true;
@@ -2500,7 +2667,10 @@ function syncOrderControls() {
   const caryMode = String(state.readerInfo?.protocol || state.readerInfo?.analyzer_code || "").toLowerCase() === "cary60-uvvis";
   els.importOrdersBtn.hidden = !fileMode;
   els.exportOrdersBtn.hidden = !fileMode;
+  if (els.syncOrdersWiseMEDBtn) els.syncOrdersWiseMEDBtn.hidden = !fileMode;
+  if (els.sendOrdersWiseMEDBtn) els.sendOrdersWiseMEDBtn.hidden = !(fileMode && state.resultsDelivery?.send_supported);
   els.worklistOrdersBtn.hidden = !(fileMode && caryMode);
+  if (els.deleteOrdersBtn) els.deleteOrdersBtn.hidden = !fileMode;
   els.newRoundBtn.hidden = !fileMode;
   els.ordersSelectAllBox.hidden = !fileMode;
 }
@@ -2540,6 +2710,10 @@ function syncQCControls() {
   }
   if (els.qcLevelFilter) {
     els.qcLevelFilter.value = state.selectedQCLevel || "";
+  }
+  if (els.qcSelectAll) {
+    const candidates = selectedQCRecordCandidates();
+    els.qcSelectAll.checked = candidates.length > 0 && candidates.every((id) => state.selectedQCRecordIDs.includes(id));
   }
 }
 
@@ -2599,6 +2773,39 @@ function onQCLevelFilterChange() {
 function onQCAnalyteFilterChange() {
   state.selectedQCAnalyteFilter = els.qcAnalyteFilter.value || "";
   syncQCSelectionAfterFilter();
+}
+
+function selectedQCRecordCandidates() {
+  return filteredQCRecords().map((item) => item.record.id);
+}
+
+function onQCSelectAllChange() {
+  if (els.qcSelectAll.checked) {
+    state.selectedQCRecordIDs = selectedQCRecordCandidates();
+  } else {
+    state.selectedQCRecordIDs = [];
+  }
+  renderQCLayout();
+}
+
+async function onDeleteQCRecordsClick() {
+  const ids = state.selectedQCRecordIDs.length ? [...state.selectedQCRecordIDs] : (state.selectedQCRecordId ? [state.selectedQCRecordId] : []);
+  if (!ids.length) return;
+  if (!window.confirm(t("deleteQCConfirm"))) return;
+  try {
+    await api("/api/qc-records/delete", {
+      method: "POST",
+      body: JSON.stringify({ qc_record_ids: ids }),
+    });
+    state.selectedQCRecordIDs = [];
+    state.selectedQCRecordId = null;
+    state.selectedQCAnalysisId = null;
+    state.selectedQCAnalysisTag = null;
+    await Promise.all([loadQCRecords(), loadDashboard(), loadStatus(), loadLogs().catch(() => {})]);
+    showToast(t("deleteSuccess"), "success");
+  } catch (error) {
+    showToast(error?.message || "Cannot delete QC records", "error");
+  }
 }
 
 function syncQCSelectionAfterFilter() {
@@ -2662,6 +2869,21 @@ function onDailyDetailsScopeChange(scope) {
   loadDailyDetailsWorkspace().catch((error) => showToast(error?.message || "Cannot load daily details", "error"));
 }
 
+function onPrintDailyWorksheetClick() {
+  const scope = state.dailyDetailsScopeTab || "day";
+  const params = new URLSearchParams({
+    order_date: state.dailyDetailsDate || localISODate(),
+    scope,
+  });
+  if (scope === "day_round" || scope === "day_round_analyte") {
+    params.set("round_no", String(Number(state.dailyDetailsRoundNo || 0)));
+  }
+  if (scope === "day_analyte" || scope === "day_round_analyte") {
+    params.set("analyte_tag", String(state.dailyDetailsAnalyteTag || "").trim());
+  }
+  window.open(`/api/daily-details/worksheet?${params.toString()}`, "_blank", "noopener,noreferrer");
+}
+
 function onOrdersSelectAllChange() {
   if (els.ordersSelectAll.checked) {
     state.selectedOrderIDs = state.orders.map((item) => item.order.id);
@@ -2669,6 +2891,72 @@ function onOrdersSelectAllChange() {
     state.selectedOrderIDs = [];
   }
   renderOrdersLayout();
+}
+
+async function onDeleteOrdersClick() {
+  const ids = state.selectedOrderIDs.length ? [...state.selectedOrderIDs] : (state.selectedOrderId ? [state.selectedOrderId] : []);
+  if (!ids.length) return;
+  if (!window.confirm(t("deleteOrdersConfirm"))) return;
+  try {
+    await api("/api/orders/delete", {
+      method: "POST",
+      body: JSON.stringify({ order_ids: ids }),
+    });
+    state.selectedOrderIDs = [];
+    state.selectedOrderId = null;
+    state.selectedOrderAnalysisID = null;
+    await Promise.all([loadOrders(), loadDashboard(), loadStatus(), loadLogs().catch(() => {})]);
+    showToast(t("deleteSuccess"), "success");
+  } catch (error) {
+    showToast(error?.message || "Cannot delete orders", "error");
+  }
+}
+
+async function onSendOrdersWiseMEDClick() {
+  const ids = state.selectedOrderIDs.length ? [...state.selectedOrderIDs] : (state.selectedOrderId ? [state.selectedOrderId] : []);
+  if (!ids.length) {
+    showToast("Selecteaza cel putin o cerere.", "error");
+    return;
+  }
+  try {
+    const resp = await api("/api/orders/send-to-bulletin", {
+      method: "POST",
+      body: JSON.stringify({
+        order_ids: ids,
+        order_date: state.selectedOrderDate || localISODate(),
+        round_no: Number(state.selectedRoundNo || 0),
+      }),
+    });
+    showToast(resp?.ok === false ? t("sendToBulletinFailed") : t("sendToBulletinSuccess"), resp?.ok === false ? "error" : "success");
+    await Promise.all([loadOrders(), loadLogs().catch(() => {})]);
+  } catch (error) {
+    showToast(error?.message || t("sendToBulletinFailed"), "error");
+    await loadLogs().catch(() => {});
+  }
+}
+
+async function onSyncOrdersWiseMEDClick() {
+  const ids = state.selectedOrderIDs.length ? [...state.selectedOrderIDs] : (state.selectedOrderId ? [state.selectedOrderId] : []);
+  if (!ids.length) {
+    showToast("Selecteaza cel putin o cerere.", "error");
+    return;
+  }
+  try {
+    const resp = await api("/api/result-sync/orders", {
+      method: "POST",
+      body: JSON.stringify({
+        order_ids: ids,
+        order_date: state.selectedOrderDate || localISODate(),
+        round_no: Number(state.selectedRoundNo || 0),
+      }),
+    });
+    const summary = resp?.summary || {};
+    showToast(`${t("syncToWiseMEDSuccess")} ${summary.matched || 0}/${summary.processed || 0} matched`, "success");
+    await Promise.all([loadOrders(), loadResultSyncStatus(), loadLogs().catch(() => {})]);
+  } catch (error) {
+    showToast(error?.message || t("syncToWiseMEDFailed"), "error");
+    await loadLogs().catch(() => {});
+  }
 }
 
 function onImportOrdersClick() {
@@ -2831,6 +3119,7 @@ async function loadQCRecords() {
     state.selectedQCAnalysisId = filtered[0]?.analysis?.id || null;
     state.selectedQCAnalysisTag = filtered[0]?.analysis?.analyte_tag || null;
   }
+  state.selectedQCRecordIDs = state.selectedQCRecordIDs.filter((id) => state.qcRecords.some((item) => item.record.id === id));
   state.qcWestgardMetrics = null;
   renderQCLayout();
   renderQCDetails();
@@ -3290,7 +3579,7 @@ function filteredDailyDetailValueDefinitions() {
   const scope = state.dailyDetailsScopeTab || "day";
   const query = String(els.dailyDetailsValueSearch?.value || "").trim().toLowerCase();
   return (state.dailyDetailDefinitions || [])
-    .filter((item) => item.active !== false && item.scope === scope)
+    .filter((item) => item.active !== false && (item.scope === scope || item.key === "cod_formular_fisa_lucru"))
     .filter((item) => !query || [item.key, item.label, item.placeholder].join(" ").toLowerCase().includes(query));
 }
 
@@ -3848,10 +4137,18 @@ function orderFileID(order) {
 }
 
 function orderSampleCode(order) {
-  return String(order?.patient_id || "").trim();
+  return String(order?.meta?.sample_code_id || "").trim();
 }
 
 function orderSpecimenCode(order) {
+  return String(order?.meta?.sample_code_specimen_id || "").trim();
+}
+
+function orderPatientID(order) {
+  return String(order?.patient_id || "").trim();
+}
+
+function orderPatientName(order) {
   return String(order?.patient_name || "").trim();
 }
 
@@ -3862,6 +4159,8 @@ function renderSimpleRow(bundle) {
   const fileID = orderFileID(order);
   const sampleCode = orderSampleCode(order);
   const specimenCode = orderSpecimenCode(order);
+  const patientID = orderPatientID(order);
+  const patientName = orderPatientName(order);
   return `<tr class="${order.id === state.selectedOrderId ? "active" : ""}" data-order-id="${order.id}">
     <td class="col-check">
       ${state.commType === "file" ? `<span class="order-select"><input type="checkbox" data-order-check="${order.id}" ${state.selectedOrderIDs.includes(order.id) ? "checked" : ""}></span>` : ""}
@@ -3876,6 +4175,8 @@ function renderSimpleRow(bundle) {
           <span>${escapeHtml(`${t("fileId")}: ${fileID || "-"}`)}</span>
           <span>${escapeHtml(`${t("sampleCode")}: ${sampleCode || "-"}`)}</span>
           <span>${escapeHtml(`${t("specimenCode")}: ${specimenCode || "-"}`)}</span>
+          <span>${escapeHtml(`${t("patientId")}: ${patientID || "-"}`)}</span>
+          <span>${escapeHtml(`${t("patientName")}: ${patientName || "-"}`)}</span>
         </div>
       </div>
     </td>
@@ -3906,6 +4207,8 @@ function renderOrderDetails() {
   const fileID = orderFileID(bundle.order);
   const sampleCode = orderSampleCode(bundle.order);
   const specimenCode = orderSpecimenCode(bundle.order);
+  const patientID = orderPatientID(bundle.order);
+  const patientName = orderPatientName(bundle.order);
   els.orderDetails.innerHTML = `
     <div class="order-card">
       <div class="order-headline">
@@ -3940,6 +4243,14 @@ function renderOrderDetails() {
           <span class="label">${escapeHtml(t("specimenCode"))}</span>
           <span class="value">${escapeHtml(specimenCode || "-")}</span>
         </div>
+        <div class="meta-kpi">
+          <span class="label">${escapeHtml(t("patientId"))}</span>
+          <span class="value">${escapeHtml(patientID || "-")}</span>
+        </div>
+        <div class="meta-kpi">
+          <span class="label">${escapeHtml(t("patientName"))}</span>
+          <span class="value">${escapeHtml(patientName || "-")}</span>
+        </div>
       </div>
     </div>
     <div class="analysis-list">
@@ -3962,6 +4273,8 @@ function renderOrderDetails() {
                     <td>
                       <strong>${escapeHtml(item.analysis.analyte_name || item.analysis.analyte_tag || "-")}</strong>
                       <div class="small muted">${escapeHtml(item.analysis.analyte_description || "")}</div>
+                      <div class="small muted">${escapeHtml(`${t("wisemedSMID")}: ${item.analysis.wisemed_sm_id || "-"}`)}</div>
+                      <div class="small muted">${escapeHtml(`${t("wisemedFSMID")}: ${item.analysis.wisemed_fsm_id || "-"}`)}</div>
                     </td>
                     <td>${escapeHtml(item.analysis.analyte_tag || "-")}</td>
                     <td>${escapeHtml(item.analysis.result_value || t("noResult"))}</td>
@@ -3978,6 +4291,8 @@ function renderOrderDetails() {
               <strong>${escapeHtml(selectedAnalysisBundle.analysis.analyte_tag)}</strong>
               <div class="small muted">${escapeHtml(selectedAnalysisBundle.analysis.analyte_name || "")}</div>
               <div class="small muted">${escapeHtml(selectedAnalysisBundle.analysis.analyte_description || "")}</div>
+              <div class="small muted">${escapeHtml(`${t("wisemedSMID")}: ${selectedAnalysisBundle.analysis.wisemed_sm_id || "-"}`)}</div>
+              <div class="small muted">${escapeHtml(`${t("wisemedFSMID")}: ${selectedAnalysisBundle.analysis.wisemed_fsm_id || "-"}`)}</div>
             </div>
             <div class="analysis-value-box">
               <div class="small muted">${escapeHtml(t("currentResult"))}</div>
@@ -4028,6 +4343,7 @@ function renderQCLayout() {
       <table class="orders-table">
         <thead>
           <tr>
+            <th class="col-check"></th>
             <th class="col-slot">${escapeHtml(t("qcDate"))}</th>
             <th>${escapeHtml(t("analysisName"))}</th>
             <th>${escapeHtml(t("lotNo"))}</th>
@@ -4048,6 +4364,22 @@ function renderQCLayout() {
       renderQCDetails();
     });
   });
+  [...els.qcLayout.querySelectorAll("[data-qc-record-check]")].forEach((checkbox) => {
+    checkbox.addEventListener("click", (event) => event.stopPropagation());
+    checkbox.addEventListener("change", () => {
+      const id = Number(checkbox.dataset.qcRecordCheck || 0);
+      if (!id) return;
+      if (checkbox.checked) {
+        if (!state.selectedQCRecordIDs.includes(id)) state.selectedQCRecordIDs.push(id);
+      } else {
+        state.selectedQCRecordIDs = state.selectedQCRecordIDs.filter((item) => item !== id);
+      }
+      const candidates = selectedQCRecordCandidates();
+      els.qcSelectAll.checked = candidates.length > 0 && candidates.every((candidate) => state.selectedQCRecordIDs.includes(candidate));
+    });
+  });
+  const candidates = selectedQCRecordCandidates();
+  els.qcSelectAll.checked = candidates.length > 0 && candidates.every((id) => state.selectedQCRecordIDs.includes(id));
 }
 
 function renderQCRow(row) {
@@ -4055,6 +4387,7 @@ function renderQCRow(row) {
   const analysis = row.analysis;
   const isActive = record.id === state.selectedQCRecordId && analysis?.id === state.selectedQCAnalysisId;
   return `<tr class="${isActive ? "active" : ""}" data-qc-record-id="${record.id}" data-qc-analysis-id="${analysis?.id || 0}" data-qc-analysis-tag="${escapeHtml(analysis?.analyte_tag || "")}">
+    <td class="col-check"><span class="order-select"><input type="checkbox" data-qc-record-check="${record.id}" ${state.selectedQCRecordIDs.includes(record.id) ? "checked" : ""}></span></td>
     <td class="col-slot"><span class="slot-pill">${escapeHtml(formatDate(analysis?.created_at || record.created_at || record.run_date || "-"))}</span></td>
     <td><strong>${escapeHtml(analysis?.analyte_name || analysis?.analyte_tag || "-")}</strong><div class="small muted">${escapeHtml(analysis?.analyte_tag || "-")}</div></td>
     <td>${escapeHtml(analysis?.lot_no || record.lot_no || "-")}</td>
@@ -4284,7 +4617,10 @@ function applyLanguage() {
   document.getElementById("orders-select-all-label").textContent = t("selectAll");
   document.getElementById("import-orders").textContent = t("importFile");
   document.getElementById("export-orders").textContent = t("exportFile");
+  document.getElementById("sync-orders-wisemed").textContent = t("syncToWiseMED");
+  document.getElementById("send-orders-wisemed").textContent = t("sendToBulletin");
   document.getElementById("worklist-orders").textContent = t("getWorklist");
+  document.getElementById("delete-orders").textContent = t("deleteSelection");
   document.getElementById("new-round").textContent = t("newRound");
   document.getElementById("editor-title").textContent = t("analyteEditor");
   document.getElementById("help-title").textContent = t("howTo");
@@ -4294,6 +4630,9 @@ function applyLanguage() {
   document.getElementById("save-analyte").textContent = t("save");
   document.getElementById("refresh-analytes").textContent = t("refresh");
   document.getElementById("refresh-qc-targets").textContent = t("refresh");
+  if (document.getElementById("qc-select-all-label")) document.getElementById("qc-select-all-label").textContent = t("selectAll");
+  if (document.getElementById("delete-qc-records")) document.getElementById("delete-qc-records").textContent = t("deleteSelection");
+  if (document.getElementById("daily-details-print")) document.getElementById("daily-details-print").textContent = t("dailyWorksheet");
   els.closeAnalyteModalBtn.textContent = t("close");
   els.closeQCTargetModalBtn.textContent = t("close");
   els.closeQCRecordModalBtn.textContent = t("close");
@@ -4377,19 +4716,54 @@ function inferReaderCategory(readerInfo = {}) {
   return { key: "readerCategoryGeneric", theme: "theme-biochemistry", icon: "R" };
 }
 
+function normalizedProtocolSubtype(readerInfo = {}) {
+  return String(readerInfo.protocol_subtype || state.readerSettings?.protocol_subtype || "").trim();
+}
+
+function formatProtocolSubtypeLabel(value) {
+  const normalized = String(value || "").trim();
+  if (!normalized || normalized.toLowerCase() === "auto") return "";
+  return normalized.toUpperCase();
+}
+
+function formatReaderAnalyzerDisplay(readerInfo = {}) {
+  const analyzerName = String(readerInfo.analyzer_name || "").trim() || t("readerCategoryGeneric");
+  const subtype = formatProtocolSubtypeLabel(normalizedProtocolSubtype(readerInfo));
+  return subtype ? `${analyzerName} · ${subtype}` : analyzerName;
+}
+
+function isShimadzuGenericReader(readerInfo = {}) {
+  return String(readerInfo.protocol || "").trim().toLowerCase() === "shimatzu-generic";
+}
+
+function formatReaderPrimaryLabel(readerInfo = {}) {
+  if (isShimadzuGenericReader(readerInfo)) return "SHIMATZU";
+  return String(readerInfo.label || "").trim() || "Reader";
+}
+
+function formatReaderSecondaryLabel(readerInfo = {}) {
+  if (isShimadzuGenericReader(readerInfo)) {
+    return formatProtocolSubtypeLabel(normalizedProtocolSubtype(readerInfo)) || String(readerInfo.analyzer_name || "").trim() || "-";
+  }
+  return `${formatReaderAnalyzerDisplay(readerInfo)} · ${readerInfo.id}`;
+}
+
 function renderReaderSidebar() {
   const reader = state.readerInfo || {};
   const category = inferReaderCategory(reader);
+  const isShimadzuGeneric = isShimadzuGenericReader(reader);
+  const shimadzuSubtype = formatProtocolSubtypeLabel(normalizedProtocolSubtype(reader)) || String(reader.analyzer_name || "").trim() || "-";
   els.readerIdentityBadge.className = `reader-identity-badge ${category.theme}`;
   els.readerIdentityIcon.textContent = category.icon;
-  els.readerIdentityTitle.textContent = t(category.key);
-  els.readerIdentitySubtitle.textContent = reader.analyzer_name || t("readerCategoryGeneric");
+  els.readerIdentityTitle.textContent = isShimadzuGeneric ? "SHIMATZU" : t(category.key);
+  els.readerIdentitySubtitle.textContent = isShimadzuGeneric ? shimadzuSubtype : formatReaderAnalyzerDisplay(reader);
   const items = [
     { label: t("medicalUnitLabel"), value: reader.medical_unit_id ?? "-" },
     { label: t("equipmentTypeLabel"), value: reader.equipment_type_id ?? "-" },
     { label: t("equipmentIdLabel"), value: reader.equipment_id ?? "-" },
     { label: t("readerIdLabel"), value: reader.id || "-" },
-    { label: t("analyzerNameLabel"), value: reader.analyzer_name || "-" },
+    { label: t("analyzerNameLabel"), value: formatReaderAnalyzerDisplay(reader) || "-" },
+    { label: t("protocolSubtypeLabel"), value: formatProtocolSubtypeLabel(normalizedProtocolSubtype(reader)) || "-" },
   ];
   els.readerSummaryList.innerHTML = items.map((item) => `
     <div class="reader-summary-item">

@@ -35,6 +35,7 @@ func Run(configPath string, defaultModules []string, opts RunOptions) error {
 	if err != nil {
 		return err
 	}
+	normalizeLegacyConfig(cfg)
 	if ensureResult.Created {
 		log.Printf("configuration created from install template: %s", configPath)
 	}
@@ -44,7 +45,10 @@ func Run(configPath string, defaultModules []string, opts RunOptions) error {
 	cfg.EnabledModules = append([]string(nil), defaultModules...)
 	changed, err := ensureBootstrap(cfg, opts.Reconfigure)
 	if err != nil {
-		return err
+		log.Printf("bootstrap: non-blocking startup warning: %v", err)
+		startupConsolef("warning bootstrap: %v", err)
+		changed = false
+		cfg.ApplyDefaults()
 	}
 	logPath, closeLog, err := setupLogging(cfg, opts.ShowLog)
 	if err != nil {
@@ -70,7 +74,8 @@ func Run(configPath string, defaultModules []string, opts RunOptions) error {
 		if errors.Is(err, errUpdateStarted) {
 			return nil
 		}
-		return err
+		log.Printf("app-updates: non-blocking startup warning: %v", err)
+		startupConsolef("warning update server: %v", err)
 	}
 	if opts.Headless && !opts.HeadlessChild {
 		info, err := launchHeadlessProcess(configPath)
@@ -88,7 +93,7 @@ func Run(configPath string, defaultModules []string, opts RunOptions) error {
 	}
 	reg := module.NewRegistry()
 	builtin.RegisterAll(reg)
-	logger := log.New(os.Stdout, "", log.LstdFlags)
+	logger := log.New(log.Writer(), "", log.LstdFlags|log.Lmicroseconds)
 	app := runtime.New(cfg, logger, reg)
 	if err := app.InitModules(cfg.EnabledModules); err != nil {
 		return err
@@ -110,7 +115,7 @@ func Run(configPath string, defaultModules []string, opts RunOptions) error {
 			}()
 		}
 	}
-	return app.Start(ctx)
+	return runAppLoop(ctx, configPath, defaultModules, logger)
 }
 
 func startupConsolef(format string, args ...interface{}) {
@@ -128,4 +133,90 @@ func withoutModule(items []string, target string) []string {
 		out = append(out, item)
 	}
 	return out
+}
+
+func normalizeLegacyConfig(cfg *config.Config) {
+	if cfg == nil {
+		return
+	}
+	if !strings.EqualFold(strings.TrimSpace(cfg.Analyzer.Protocol), "shimatzu-generic") {
+		return
+	}
+	if cfg.Modules == nil {
+		cfg.Modules = map[string]map[string]interface{}{}
+	}
+	appUpdates := cfg.ModuleSettings("app-updates")
+	if appUpdates == nil {
+		appUpdates = map[string]interface{}{}
+		cfg.Modules["app-updates"] = appUpdates
+	}
+	currentAppID := strings.TrimSpace(fmt.Sprint(appUpdates["app_id"]))
+	if strings.EqualFold(currentAppID, "shimatzu-generic-v3") || currentAppID == "" {
+		appUpdates["app_id"] = "shimatzu-generic-reader"
+		log.Printf("normalized legacy update app_id for SHIMATZU-GENERIC: %q -> %q", currentAppID, "shimatzu-generic-reader")
+	}
+}
+
+type processControl struct {
+	restartCh chan string
+}
+
+func (p *processControl) RequestRestart(reason string) {
+	reason = strings.TrimSpace(reason)
+	if reason == "" {
+		reason = "configuration updated"
+	}
+	select {
+	case p.restartCh <- reason:
+	default:
+		select {
+		case <-p.restartCh:
+		default:
+		}
+		p.restartCh <- reason
+	}
+}
+
+func runAppLoop(ctx context.Context, configPath string, defaultModules []string, logger *log.Logger) error {
+	restartCh := make(chan string, 1)
+	for {
+		cfg, err := config.Load(configPath)
+		if err != nil {
+			return err
+		}
+		cfg.EnabledModules = append([]string(nil), defaultModules...)
+
+		reg := module.NewRegistry()
+		builtin.RegisterAll(reg)
+		app := runtime.New(cfg, logger, reg)
+		app.RegisterService("process-control", &processControl{restartCh: restartCh})
+		if err := app.InitModules(cfg.EnabledModules); err != nil {
+			return err
+		}
+
+		runCtx, cancel := context.WithCancel(ctx)
+		errCh := make(chan error, 1)
+		go func() {
+			errCh <- app.Start(runCtx)
+		}()
+
+		select {
+		case <-ctx.Done():
+			cancel()
+			<-errCh
+			return nil
+		case reason := <-restartCh:
+			log.Printf("full runtime restart requested: %s", reason)
+			cancel()
+			if err := <-errCh; err != nil && !errors.Is(err, context.Canceled) {
+				log.Printf("runtime stopped during restart request: %v", err)
+			}
+		case err := <-errCh:
+			cancel()
+			if ctx.Err() != nil {
+				return nil
+			}
+			return err
+		}
+	}
 }

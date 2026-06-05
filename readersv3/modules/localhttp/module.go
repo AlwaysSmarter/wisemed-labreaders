@@ -27,6 +27,7 @@ import (
 	"wisemed-labreaders/readersv3/core/config"
 	"wisemed-labreaders/readersv3/core/module"
 	coremodel "wisemed-labreaders/readersv3/modules/core/model"
+	"wisemed-labreaders/readersv3/modules/protocols/fileimportbase"
 	"wisemed-labreaders/readersv3/modules/wisemedapi"
 	"wisemed-labreaders/readersv3/shared/appmeta"
 	"wisemed-labreaders/readersv3/shared/appupdates"
@@ -89,6 +90,7 @@ type qcTargetStore interface {
 type qcRecordStore interface {
 	ListQCRecordBundles(runDate string) ([]coremodel.QCRecordBundle, error)
 	SaveManualQCRecord(runDate string, analysis coremodel.QCAnalysis, actor string, enteredAt time.Time) error
+	DeleteQCRecord(id int64) error
 }
 
 type qcRecordRangeStore interface {
@@ -107,11 +109,20 @@ type logStore interface {
 	ListLogs(limit int) ([]coremodel.EventLog, error)
 }
 
+type auditStore interface {
+	AppendAuditLog(level, actor, eventType, message string, meta map[string]interface{}) error
+}
+
 type orderStore interface {
 	ListOrderBundles(roundNo int, orderDate string) ([]coremodel.OrderBundle, error)
 	ListRoundNumbers(orderDate string) ([]int, error)
 	CreateNextRound(orderDate string) (int, error)
 	SetDefaultResult(orderAnalysisID, resultID int64, repeatMode string) error
+	DeleteOrder(id int64) error
+}
+
+type resultPublisherService interface {
+	SendOrderBundles([]coremodel.OrderBundle, string) (map[string]interface{}, error)
 }
 
 type dailyDetailService interface {
@@ -142,6 +153,7 @@ type wiseMedAPIService interface {
 	Bootstrap() (map[string]interface{}, error)
 	Login(wisemedapi.LoginRequest) (wisemedapi.LoginResponse, error)
 	EnsureEquipmentOnline(reader map[string]interface{}) (map[string]interface{}, error)
+	SaveFileServiceResults(fileID string, entries []wisemedapi.ServiceResultEntry) (map[string]interface{}, error)
 }
 
 type wiseMedWSStatusService interface {
@@ -152,7 +164,12 @@ type resultSyncService interface {
 	Status() map[string]interface{}
 	SettingsPayload() map[string]interface{}
 	RunNow() (map[string]interface{}, error)
+	RunOrders(orderIDs []int64, roundNo int, orderDate string) (map[string]interface{}, error)
 	Reset()
+}
+
+type processControlService interface {
+	RequestRestart(reason string)
 }
 
 func New() module.Module     { return &Module{} }
@@ -196,10 +213,15 @@ func (m *Module) Init(rt module.Runtime) error {
 	m.rt.Handle("/api/orders/rounds", m.withNoCache(m.requireSession(http.HandlerFunc(m.handleOrderRounds))))
 	m.rt.Handle("/api/orders/import", m.withNoCache(m.requireSession(http.HandlerFunc(m.handleOrdersImport))))
 	m.rt.Handle("/api/orders/export", m.withNoCache(m.requireSession(http.HandlerFunc(m.handleOrdersExport))))
+	m.rt.Handle("/api/orders/delete", m.withNoCache(m.requireSession(http.HandlerFunc(m.handleOrdersDelete))))
+	m.rt.Handle("/api/orders/send-to-wisemed", m.withNoCache(m.requireSession(http.HandlerFunc(m.handleOrdersSendToWiseMED))))
+	m.rt.Handle("/api/orders/send-to-bulletin", m.withNoCache(m.requireSession(http.HandlerFunc(m.handleOrdersSendToBulletin))))
 	m.rt.Handle("/api/daily-details/definitions", m.withNoCache(m.requireSession(http.HandlerFunc(m.handleDailyDetailDefinitions))))
 	m.rt.Handle("/api/daily-details/definitions/", m.withNoCache(m.requireSession(http.HandlerFunc(m.handleDailyDetailDefinitionByID))))
 	m.rt.Handle("/api/daily-details", m.withNoCache(m.requireSession(http.HandlerFunc(m.handleDailyDetails))))
+	m.rt.Handle("/api/daily-details/worksheet", m.withNoCache(m.requireSession(http.HandlerFunc(m.handleDailyDetailsWorksheet))))
 	m.rt.Handle("/api/qc-records", m.withNoCache(m.requireSession(http.HandlerFunc(m.handleQCRecords))))
+	m.rt.Handle("/api/qc-records/delete", m.withNoCache(m.requireSession(http.HandlerFunc(m.handleQCRecordsDelete))))
 	m.rt.Handle("/api/qc-targets", m.withNoCache(m.requireSession(http.HandlerFunc(m.handleQCTargets))))
 	m.rt.Handle("/api/qc-targets/", m.withNoCache(m.requireSession(http.HandlerFunc(m.handleQCTargetByID))))
 	m.rt.Handle("/api/qc/metrics", m.withNoCache(m.requireSession(http.HandlerFunc(m.handleQCMetrics))))
@@ -207,6 +229,7 @@ func (m *Module) Init(rt module.Runtime) error {
 	m.rt.Handle("/api/result-sync/status", m.withNoCache(m.requireSession(http.HandlerFunc(m.handleResultSyncStatus))))
 	m.rt.Handle("/api/result-sync/settings", m.withNoCache(m.requireSession(http.HandlerFunc(m.handleResultSyncSettings))))
 	m.rt.Handle("/api/result-sync/run", m.withNoCache(m.requireSession(http.HandlerFunc(m.handleResultSyncRun))))
+	m.rt.Handle("/api/result-sync/orders", m.withNoCache(m.requireSession(http.HandlerFunc(m.handleResultSyncOrders))))
 	m.rt.Handle("/api/result-sync/reset", m.withNoCache(m.requireSession(http.HandlerFunc(m.handleResultSyncReset))))
 	return nil
 }
@@ -278,6 +301,7 @@ func (m *Module) Start(ctx context.Context) error {
 			errCh <- srv.ListenAndServe()
 		}(server, useTLS, certFile, keyFile)
 		m.rt.Logf("local http listening on %s://%s", protocol, addr)
+		m.printStartupConnectionInfo(protocol, addr)
 		select {
 		case <-ctx.Done():
 			shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -315,6 +339,16 @@ func (m *Module) Start(ctx context.Context) error {
 			return nil
 		}
 	}
+}
+
+func (m *Module) printStartupConnectionInfo(protocol, addr string) {
+	protocol = strings.TrimSpace(protocol)
+	addr = strings.TrimSpace(addr)
+	if protocol == "" || addr == "" {
+		return
+	}
+	fmt.Printf("API server listening at: %s\n", addr)
+	fmt.Printf("Web UI: %s://%s\n", protocol, addr)
 }
 
 func (m *Module) withNoCache(next http.Handler) http.Handler {
@@ -548,6 +582,12 @@ func (m *Module) handleReaderSettings(w http.ResponseWriter, r *http.Request) {
 			TCPIPPort                 string `json:"tcpip_port"`
 			TCPIPRemoteHost           string `json:"tcpip_remote_host"`
 			TCPIPRemotePort           string `json:"tcpip_remote_port"`
+			FileImportDir             string `json:"file_import_dir"`
+			FileProcessedDir          string `json:"file_processed_dir"`
+			FileFailedDir             string `json:"file_failed_dir"`
+			FilePattern               string `json:"file_pattern"`
+			LoggingVerboseLevel       string `json:"logging_verbose_level"`
+			ResultsAutoConfirm        string `json:"results_auto_confirm_wisemed"`
 			SQLitePath                string `json:"sqlite_path"`
 			AppUpdatesEnabled         string `json:"app_updates_enabled"`
 			AppUpdatesAppID           string `json:"app_updates_app_id"`
@@ -583,12 +623,44 @@ func (m *Module) handleReaderSettings(w http.ResponseWriter, r *http.Request) {
 		if tcpMode == "" {
 			tcpMode = "server"
 		}
+		currentProtocol := firstNonEmpty(m.analyzerSetting("protocol", ""), asString(m.rt.ModuleSettings("analyzer")["protocol"]))
+		requestedSubtype := normalizeShimadzuGenericSubtype(req.ProtocolSubtype)
+		nextDBName := strings.TrimSpace(req.DBName)
+		nextSQLitePath := strings.TrimSpace(req.SQLitePath)
+		if isShimadzuGenericProtocol(protocol) || (protocol == "" && isShimadzuGenericProtocol(currentProtocol)) {
+			nextDBName, nextSQLitePath = shimadzuGenericDatabaseSettings(nextDBName, nextSQLitePath, requestedSubtype)
+			if strings.TrimSpace(req.ReaderLabel) == "" {
+				req.ReaderLabel = "Shimatzu"
+			}
+			if strings.TrimSpace(req.AnalyzerName) == "" {
+				req.AnalyzerName = "Shimatzu"
+			}
+			if strings.TrimSpace(req.AnalyzerCode) == "" {
+				req.AnalyzerCode = "shimatzu-generic-v3"
+			}
+			if strings.TrimSpace(req.ReaderID) == "" {
+				req.ReaderID = "shimatzu-generic-v3"
+			}
+		}
+		currentSubtype := normalizeShimadzuGenericSubtype(asString(m.rt.ModuleSettings("protocol-shimatzu-generic")["subtype"]))
+		currentSQLitePath := strings.TrimSpace(asString(m.rt.ModuleSettings("storage-sqlite")["path"]))
+		currentDBName := strings.TrimSpace(m.readerSetting("db_name", ""))
+		verboseLevel := clampVerboseLevel(req.LoggingVerboseLevel)
+		verboseLevelInt, _ := strconv.Atoi(verboseLevel)
+		requiresFullRestart := nextDBName != currentDBName || nextSQLitePath != currentSQLitePath
+		if isShimadzuGenericProtocol(protocol) || (protocol == "" && isShimadzuGenericProtocol(currentProtocol)) {
+			requiresFullRestart = requiresFullRestart || requestedSubtype != currentSubtype
+		}
+		currentVerboseLevel := clampVerboseLevel(asString(m.rt.ModuleSettings("logging")["verbose_level"]))
+		currentAutoConfirm := boolString(asString(m.rt.ModuleSettings("results")["auto_confirm_wisemed"]))
+		requestedAutoConfirm := boolString(req.ResultsAutoConfirm)
+		requiresFullRestart = requiresFullRestart || currentVerboseLevel != verboseLevel || currentAutoConfirm != requestedAutoConfirm
 		if err := m.persistReaderSettings(map[string]interface{}{
 			"reader.id":                                 strings.TrimSpace(req.ReaderID),
 			"reader.label":                              strings.TrimSpace(req.ReaderLabel),
 			"reader.analyzer_name":                      strings.TrimSpace(req.AnalyzerName),
 			"reader.analyzer_code":                      strings.TrimSpace(req.AnalyzerCode),
-			"reader.db_name":                            strings.TrimSpace(req.DBName),
+			"reader.db_name":                            nextDBName,
 			"local_http.address":                        strings.TrimSpace(req.LocalHTTPAddress),
 			"local_http.language":                       strings.TrimSpace(req.LocalHTTPLang),
 			"local_http.tls":                            boolString(req.LocalHTTPTLS),
@@ -605,7 +677,15 @@ func (m *Module) handleReaderSettings(w http.ResponseWriter, r *http.Request) {
 			"modules.transport-tcpip.port":              strings.TrimSpace(req.TCPIPPort),
 			"modules.transport-tcpip.remote_host":       strings.TrimSpace(req.TCPIPRemoteHost),
 			"modules.transport-tcpip.remote_port":       strings.TrimSpace(req.TCPIPRemotePort),
-			"modules.storage-sqlite.path":               strings.TrimSpace(req.SQLitePath),
+			"modules.transport-file.import_dir":         strings.TrimSpace(req.FileImportDir),
+			"modules.transport-file.processed_dir":      strings.TrimSpace(req.FileProcessedDir),
+			"modules.transport-file.failed_dir":         strings.TrimSpace(req.FileFailedDir),
+			"modules.transport-file.pattern":            strings.TrimSpace(req.FilePattern),
+			"logging.verbose_level":                     verboseLevelInt,
+			"modules.logging.verbose_level":             verboseLevelInt,
+			"results.auto_confirm_wisemed":              requestedAutoConfirm,
+			"modules.results.auto_confirm_wisemed":      requestedAutoConfirm,
+			"modules.storage-sqlite.path":               nextSQLitePath,
 			"modules.app-updates.enabled":               boolString(req.AppUpdatesEnabled),
 			"modules.app-updates.app_id":                strings.TrimSpace(req.AppUpdatesAppID),
 			"modules.app-updates.channel":               strings.TrimSpace(req.AppUpdatesChannel),
@@ -618,7 +698,7 @@ func (m *Module) handleReaderSettings(w http.ResponseWriter, r *http.Request) {
 			"modules.result-sync.sample_suffixes":       splitCSV(req.ResultSyncSampleSuffixes),
 			"modules.result-sync.separators":            splitCSV(req.ResultSyncSeparators),
 			"modules.result-sync.qc_prefixes":           parseQCPrefixSettings(req.ResultSyncQCPrefixes),
-			"modules.protocol-shimatzu-generic.subtype": strings.TrimSpace(req.ProtocolSubtype),
+			"modules.protocol-shimatzu-generic.subtype": requestedSubtype,
 		}); err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]interface{}{"ok": false, "error": err.Error()})
 			return
@@ -635,7 +715,25 @@ func (m *Module) handleReaderSettings(w http.ResponseWriter, r *http.Request) {
 		shouldRestart := nextAddr != m.currentAddress()
 		nextTLS := boolString(req.LocalHTTPTLS)
 		shouldRestart = shouldRestart || nextTLS != m.currentTLSEnabled()
+		m.appendAuditLog(r, "reader-settings", fmt.Sprintf("Utilizatorul %s a actualizat setarile readerului.", m.auditActor(r)), map[string]interface{}{
+			"reader_id":                    strings.TrimSpace(req.ReaderID),
+			"protocol":                     protocol,
+			"comm_type":                    commType,
+			"repeatMode":                   mode,
+			"protocol_subtype":             requestedSubtype,
+			"logging_verbose_level":        verboseLevel,
+			"results_auto_confirm_wisemed": requestedAutoConfirm,
+			"sqlite_path":                  nextSQLitePath,
+			"db_name":                      nextDBName,
+			"requires_full_restart":        requiresFullRestart,
+		})
 		writeJSON(w, http.StatusOK, map[string]interface{}{"ok": true, "settings": m.readerSettingsPayload()})
+		if requiresFullRestart {
+			if control := m.processControl(); control != nil {
+				go control.RequestRestart(fmt.Sprintf("reader settings updated: protocol=%s subtype=%s db=%s", protocol, requestedSubtype, nextSQLitePath))
+				return
+			}
+		}
 		if shouldRestart {
 			go m.requestRestart(nextAddr, nextTLS)
 		}
@@ -716,6 +814,39 @@ func (m *Module) handleResultSyncRun(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadGateway, map[string]interface{}{"ok": false, "error": err.Error()})
 		return
 	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{"ok": true, "summary": summary})
+}
+
+func (m *Module) handleResultSyncOrders(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]interface{}{"ok": false, "error": "method not allowed"})
+		return
+	}
+	service := m.resultSyncService()
+	if service == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]interface{}{"ok": false, "error": "result sync service unavailable"})
+		return
+	}
+	var req struct {
+		OrderIDs  []int64 `json:"order_ids"`
+		OrderDate string  `json:"order_date"`
+		RoundNo   int     `json:"round_no"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]interface{}{"ok": false, "error": "invalid json body"})
+		return
+	}
+	summary, err := service.RunOrders(req.OrderIDs, req.RoundNo, req.OrderDate)
+	if err != nil {
+		writeJSON(w, http.StatusBadGateway, map[string]interface{}{"ok": false, "error": err.Error()})
+		return
+	}
+	m.appendAuditLog(r, "result-sync-run-orders", fmt.Sprintf("Utilizatorul %s a rulat manual sincronizarea WiseMED pentru %d cereri.", m.auditActor(r), len(req.OrderIDs)), map[string]interface{}{
+		"order_ids":  req.OrderIDs,
+		"order_date": req.OrderDate,
+		"round_no":   req.RoundNo,
+		"summary":    summary,
+	})
 	writeJSON(w, http.StatusOK, map[string]interface{}{"ok": true, "summary": summary})
 }
 
@@ -928,6 +1059,10 @@ func (m *Module) handleStatus(w http.ResponseWriter, r *http.Request) {
 			"wisemed_ws_connected": wsConnected,
 			"analyzer_connected":   analyzerConnected,
 		},
+		"results_delivery": map[string]interface{}{
+			"auto_confirm_wisemed": boolString(asString(m.rt.ModuleSettings("results")["auto_confirm_wisemed"])),
+			"send_supported":       m.resultSaveSupported(),
+		},
 	})
 }
 
@@ -1015,7 +1150,12 @@ func (m *Module) handleAnalytes(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusBadRequest, map[string]interface{}{"ok": false, "error": err.Error()})
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]interface{}{"ok": true, "id": saved.ID, "tag": saved.Tag})
+		m.appendAuditLog(r, "analyte-create", fmt.Sprintf("Utilizatorul %s a creat analiza %s.", m.auditActor(r), saved.Tag), map[string]interface{}{"analyte_id": saved.ID, "tag": saved.Tag})
+		resp := map[string]interface{}{"ok": true, "id": saved.ID, "tag": saved.Tag}
+		if err := m.syncAnalytesToWiseMED(); err != nil {
+			resp["wisemed_sync_error"] = err.Error()
+		}
+		writeJSON(w, http.StatusOK, resp)
 	default:
 		writeJSON(w, http.StatusMethodNotAllowed, map[string]interface{}{"ok": false, "error": "method not allowed"})
 	}
@@ -1047,12 +1187,19 @@ func (m *Module) handleAnalyteByID(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusBadRequest, map[string]interface{}{"ok": false, "error": err.Error()})
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]interface{}{"ok": true, "id": saved.ID, "tag": saved.Tag})
+		m.appendAuditLog(r, "analyte-update", fmt.Sprintf("Utilizatorul %s a actualizat analiza %s.", m.auditActor(r), saved.Tag), map[string]interface{}{"analyte_id": saved.ID, "tag": saved.Tag})
+		resp := map[string]interface{}{"ok": true, "id": saved.ID, "tag": saved.Tag}
+		if err := m.syncAnalytesToWiseMED(); err != nil {
+			resp["wisemed_sync_error"] = err.Error()
+		}
+		writeJSON(w, http.StatusOK, resp)
 	case http.MethodDelete:
+		item, _ := m.getAnalyteByID(id)
 		if err := m.deleteAnalyte(id); err != nil {
 			writeJSON(w, http.StatusNotFound, map[string]interface{}{"ok": false, "error": err.Error()})
 			return
 		}
+		m.appendAuditLog(r, "analyte-delete", fmt.Sprintf("Utilizatorul %s a sters analiza %s.", m.auditActor(r), firstNonEmpty(item.Tag, strconv.FormatInt(id, 10))), map[string]interface{}{"analyte_id": id, "tag": item.Tag})
 		writeJSON(w, http.StatusOK, map[string]interface{}{"ok": true, "deleted": id})
 	default:
 		writeJSON(w, http.StatusMethodNotAllowed, map[string]interface{}{"ok": false, "error": "method not allowed"})
@@ -1150,6 +1297,7 @@ func (m *Module) handleOrderRounds(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusInternalServerError, map[string]interface{}{"ok": false, "error": err.Error()})
 			return
 		}
+		m.appendAuditLog(r, "orders-round-create", fmt.Sprintf("Utilizatorul %s a creat runda %d pentru data %s.", m.auditActor(r), roundNo, orderDate), map[string]interface{}{"order_date": orderDate, "round_no": roundNo})
 		writeJSON(w, http.StatusOK, map[string]interface{}{"ok": true, "order_date": orderDate, "round_no": roundNo, "rounds": rounds})
 	default:
 		writeJSON(w, http.StatusMethodNotAllowed, map[string]interface{}{"ok": false, "error": "method not allowed"})
@@ -1195,11 +1343,142 @@ func (m *Module) handleOrdersImport(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]interface{}{"ok": false, "error": err.Error()})
 		return
 	}
+	m.appendAuditLog(r, "orders-import", fmt.Sprintf("Utilizatorul %s a importat fisierul %s.", m.auditActor(r), filepath.Base(header.Filename)), map[string]interface{}{"file_name": filepath.Base(header.Filename), "order_date": orderDate, "summary": summary})
 	writeJSON(w, http.StatusOK, summary)
 }
 
 func (m *Module) handleOrdersExport(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusBadRequest, map[string]interface{}{"ok": false, "error": "file export backend is not migrated yet"})
+}
+
+func (m *Module) handleOrdersDelete(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost && r.Method != http.MethodDelete {
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]interface{}{"ok": false, "error": "method not allowed"})
+		return
+	}
+	store := m.orderStore()
+	if store == nil {
+		writeJSON(w, http.StatusBadRequest, map[string]interface{}{"ok": false, "error": "storage service unavailable"})
+		return
+	}
+	var req struct {
+		OrderIDs []int64 `json:"order_ids"`
+		OrderID  int64   `json:"order_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil && !errors.Is(err, io.EOF) {
+		writeJSON(w, http.StatusBadRequest, map[string]interface{}{"ok": false, "error": "invalid json body"})
+		return
+	}
+	ids := normalizeDeleteIDs(req.OrderIDs, req.OrderID)
+	if len(ids) == 0 {
+		writeJSON(w, http.StatusBadRequest, map[string]interface{}{"ok": false, "error": "missing order ids"})
+		return
+	}
+	deleted := make([]int64, 0, len(ids))
+	for _, id := range ids {
+		if err := store.DeleteOrder(id); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]interface{}{"ok": false, "error": err.Error(), "deleted": deleted})
+			return
+		}
+		deleted = append(deleted, id)
+	}
+	m.appendAuditLog(r, "orders-delete", fmt.Sprintf("Utilizatorul %s a sters %d cereri de analize.", m.auditActor(r), len(deleted)), map[string]interface{}{"order_ids": deleted})
+	writeJSON(w, http.StatusOK, map[string]interface{}{"ok": true, "deleted": deleted})
+}
+
+func (m *Module) handleOrdersSendToWiseMED(w http.ResponseWriter, r *http.Request) {
+	m.handleOrdersSendToBulletin(w, r)
+}
+
+func (m *Module) handleOrdersSendToBulletin(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]interface{}{"ok": false, "error": "method not allowed"})
+		return
+	}
+	store := m.orderStore()
+	if store == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]interface{}{"ok": false, "error": "storage service unavailable"})
+		return
+	}
+	if !m.resultSaveSupported() {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]interface{}{"ok": false, "error": "WiseMED bulletin save is not available"})
+		return
+	}
+	var req struct {
+		OrderIDs  []int64 `json:"order_ids"`
+		OrderDate string  `json:"order_date"`
+		RoundNo   int     `json:"round_no"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]interface{}{"ok": false, "error": "invalid json body"})
+		return
+	}
+	orderDate := strings.TrimSpace(req.OrderDate)
+	if orderDate == "" {
+		orderDate = time.Now().Format("2006-01-02")
+	}
+	bundles, err := store.ListOrderBundles(req.RoundNo, orderDate)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]interface{}{"ok": false, "error": err.Error()})
+		return
+	}
+	selected := filterOrderBundlesByIDs(bundles, req.OrderIDs)
+	if len(selected) == 0 {
+		writeJSON(w, http.StatusBadRequest, map[string]interface{}{"ok": false, "error": "no matching orders selected"})
+		return
+	}
+	targets := []fileimportbase.AutoSaveTarget{{
+		OrderDate: orderDate,
+		RoundNo:   req.RoundNo,
+		OrderIDs:  req.OrderIDs,
+	}}
+	syncer := m.resultSyncService()
+	if syncer == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]interface{}{"ok": false, "error": "result-sync service unavailable"})
+		return
+	}
+	if _, err := syncer.RunOrders(req.OrderIDs, req.RoundNo, orderDate); err != nil {
+		m.appendAuditLog(r, "results-send-bulletin", fmt.Sprintf("Utilizatorul %s a incercat sa sincronizeze %d cereri inainte de trimiterea in buletin, dar a esuat.", m.auditActor(r), len(selected)), map[string]interface{}{
+			"selected_orders": len(selected),
+			"order_ids":       req.OrderIDs,
+			"order_date":      orderDate,
+			"round_no":        req.RoundNo,
+			"error":           err.Error(),
+		})
+		writeJSON(w, http.StatusBadGateway, map[string]interface{}{"ok": false, "error": err.Error()})
+		return
+	}
+	bundles, err = store.ListOrderBundles(req.RoundNo, orderDate)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]interface{}{"ok": false, "error": err.Error()})
+		return
+	}
+	selected = filterOrderBundlesByIDs(bundles, req.OrderIDs)
+	if len(selected) == 0 {
+		writeJSON(w, http.StatusBadRequest, map[string]interface{}{"ok": false, "error": "no matching orders selected after sync"})
+		return
+	}
+	resp, err := fileimportbase.SaveOrderBundlesToWiseMED(m.rt, selected)
+	if err != nil {
+		m.appendAuditLog(r, "results-send-bulletin", fmt.Sprintf("Utilizatorul %s a incercat sa trimita %d cereri in buletinul WiseMED, dar a esuat.", m.auditActor(r), len(selected)), map[string]interface{}{
+			"selected_orders": len(selected),
+			"order_ids":       req.OrderIDs,
+			"order_date":      orderDate,
+			"round_no":        req.RoundNo,
+			"error":           err.Error(),
+			"targets":         targets,
+		})
+		writeJSON(w, http.StatusBadGateway, map[string]interface{}{"ok": false, "error": err.Error()})
+		return
+	}
+	m.appendAuditLog(r, "results-send-bulletin", fmt.Sprintf("Utilizatorul %s a trimis %d cereri in buletinul WiseMED.", m.auditActor(r), len(selected)), map[string]interface{}{
+		"selected_orders": len(selected),
+		"order_ids":       req.OrderIDs,
+		"order_date":      orderDate,
+		"round_no":        req.RoundNo,
+		"response":        resp,
+	})
+	writeJSON(w, http.StatusOK, map[string]interface{}{"ok": true, "result": resp})
 }
 
 func (m *Module) handleOrdersWorklist(w http.ResponseWriter, r *http.Request) {
@@ -1275,10 +1554,70 @@ func (m *Module) handleDailyDetails(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusBadRequest, map[string]interface{}{"ok": false, "error": err.Error()})
 			return
 		}
+		m.appendAuditLog(r, "daily-detail-value-save", fmt.Sprintf("Utilizatorul %s a actualizat detaliul zilnic %s.", m.auditActor(r), saved.DefinitionKey), map[string]interface{}{"definition_key": saved.DefinitionKey, "scope_date": saved.ScopeDate, "round_no": saved.RoundNo, "analyte_tag": saved.AnalyteTag, "value_text": saved.ValueText})
 		writeJSON(w, http.StatusOK, map[string]interface{}{"ok": true, "value": saved})
 	default:
 		writeJSON(w, http.StatusMethodNotAllowed, map[string]interface{}{"ok": false, "error": "method not allowed"})
 	}
+}
+
+func (m *Module) handleDailyDetailsWorksheet(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]interface{}{"ok": false, "error": "method not allowed"})
+		return
+	}
+	orderDate := strings.TrimSpace(r.URL.Query().Get("order_date"))
+	if orderDate == "" {
+		orderDate = time.Now().Format("2006-01-02")
+	}
+	scope := strings.TrimSpace(r.URL.Query().Get("scope"))
+	if scope == "" {
+		scope = "day"
+	}
+	usesRound := scope == "day_round" || scope == "day_round_analyte"
+	usesAnalyte := scope == "day_analyte" || scope == "day_round_analyte"
+	roundNo, _ := strconv.Atoi(strings.TrimSpace(r.URL.Query().Get("round_no")))
+	if !usesRound {
+		roundNo = 0
+	}
+	analyteTag := strings.TrimSpace(r.URL.Query().Get("analyte_tag"))
+	if !usesAnalyte {
+		analyteTag = ""
+	}
+	store := m.orderStore()
+	if store == nil {
+		writeJSON(w, http.StatusBadRequest, map[string]interface{}{"ok": false, "error": "storage service unavailable"})
+		return
+	}
+	bundles, err := store.ListOrderBundles(roundNo, orderDate)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]interface{}{"ok": false, "error": err.Error()})
+		return
+	}
+	if analyteTag != "" {
+		filtered := make([]coremodel.OrderBundle, 0, len(bundles))
+		for _, bundle := range bundles {
+			matched := false
+			for _, analysis := range bundle.Analyses {
+				if strings.EqualFold(strings.TrimSpace(analysis.Analysis.AnalyteTag), analyteTag) {
+					matched = true
+					break
+				}
+			}
+			if matched {
+				filtered = append(filtered, bundle)
+			}
+		}
+		bundles = filtered
+	}
+	formCode, detailRows, err := m.dailyWorksheetMeta(orderDate, scope, roundNo, analyteTag)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]interface{}{"ok": false, "error": err.Error()})
+		return
+	}
+	m.appendAuditLog(r, "daily-worksheet-print", fmt.Sprintf("Utilizatorul %s a deschis fisa de lucru pentru %s.", m.auditActor(r), orderDate), map[string]interface{}{"order_date": orderDate, "scope": scope, "round_no": roundNo, "analyte_tag": analyteTag, "orders": len(bundles)})
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_, _ = w.Write([]byte(m.renderDailyWorksheetHTML(orderDate, scope, roundNo, analyteTag, formCode, detailRows, bundles)))
 }
 
 func (m *Module) handleDailyDetailDefinitions(w http.ResponseWriter, r *http.Request) {
@@ -1306,6 +1645,7 @@ func (m *Module) handleDailyDetailDefinitions(w http.ResponseWriter, r *http.Req
 			writeJSON(w, http.StatusBadRequest, map[string]interface{}{"ok": false, "error": err.Error()})
 			return
 		}
+		m.appendAuditLog(r, "daily-detail-definition-create", fmt.Sprintf("Utilizatorul %s a creat definitia %s.", m.auditActor(r), saved.Key), map[string]interface{}{"definition_id": saved.ID, "key": saved.Key, "scope": saved.Scope})
 		writeJSON(w, http.StatusOK, map[string]interface{}{"ok": true, "definition": saved})
 	default:
 		writeJSON(w, http.StatusMethodNotAllowed, map[string]interface{}{"ok": false, "error": "method not allowed"})
@@ -1336,12 +1676,15 @@ func (m *Module) handleDailyDetailDefinitionByID(w http.ResponseWriter, r *http.
 			writeJSON(w, http.StatusBadRequest, map[string]interface{}{"ok": false, "error": err.Error()})
 			return
 		}
+		m.appendAuditLog(r, "daily-detail-definition-update", fmt.Sprintf("Utilizatorul %s a actualizat definitia %s.", m.auditActor(r), saved.Key), map[string]interface{}{"definition_id": saved.ID, "key": saved.Key, "scope": saved.Scope})
 		writeJSON(w, http.StatusOK, map[string]interface{}{"ok": true, "definition": saved})
 	case http.MethodDelete:
+		def, _ := m.combinedDailyDetailDefinitionByID(id)
 		if err := m.deleteDailyDetailDefinition(id); err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]interface{}{"ok": false, "error": err.Error()})
 			return
 		}
+		m.appendAuditLog(r, "daily-detail-definition-delete", fmt.Sprintf("Utilizatorul %s a sters definitia %s.", m.auditActor(r), firstNonEmpty(def.Key, strconv.FormatInt(id, 10))), map[string]interface{}{"definition_id": id, "key": def.Key})
 		writeJSON(w, http.StatusOK, map[string]interface{}{"ok": true, "deleted": id})
 	default:
 		writeJSON(w, http.StatusMethodNotAllowed, map[string]interface{}{"ok": false, "error": "method not allowed"})
@@ -1413,10 +1756,51 @@ func (m *Module) handleQCRecords(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusBadRequest, map[string]interface{}{"ok": false, "error": err.Error()})
 			return
 		}
+		m.appendAuditLog(r, "qc-record-create", fmt.Sprintf("Utilizatorul %s a adaugat manual un rezultat QC pentru %s.", m.auditActor(r), analysis.AnalyteTag), map[string]interface{}{"run_date": strings.TrimSpace(req.RunDate), "analyte_tag": analysis.AnalyteTag, "control_label": strings.TrimSpace(req.ControlLabel), "lot_no": strings.TrimSpace(req.LotNo)})
 		writeJSON(w, http.StatusOK, map[string]interface{}{"ok": true})
 	default:
 		writeJSON(w, http.StatusMethodNotAllowed, map[string]interface{}{"ok": false, "error": "method not allowed"})
 	}
+}
+
+func (m *Module) handleQCRecordsDelete(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost && r.Method != http.MethodDelete {
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]interface{}{"ok": false, "error": "method not allowed"})
+		return
+	}
+	service, ok := m.rt.Service("storage")
+	if !ok {
+		writeJSON(w, http.StatusBadRequest, map[string]interface{}{"ok": false, "error": "storage service unavailable"})
+		return
+	}
+	store, ok := service.(qcRecordStore)
+	if !ok {
+		writeJSON(w, http.StatusBadRequest, map[string]interface{}{"ok": false, "error": "qc storage service unavailable"})
+		return
+	}
+	var req struct {
+		QCRecordIDs []int64 `json:"qc_record_ids"`
+		QCRecordID  int64   `json:"qc_record_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil && !errors.Is(err, io.EOF) {
+		writeJSON(w, http.StatusBadRequest, map[string]interface{}{"ok": false, "error": "invalid json body"})
+		return
+	}
+	ids := normalizeDeleteIDs(req.QCRecordIDs, req.QCRecordID)
+	if len(ids) == 0 {
+		writeJSON(w, http.StatusBadRequest, map[string]interface{}{"ok": false, "error": "missing qc record ids"})
+		return
+	}
+	deleted := make([]int64, 0, len(ids))
+	for _, id := range ids {
+		if err := store.DeleteQCRecord(id); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]interface{}{"ok": false, "error": err.Error(), "deleted": deleted})
+			return
+		}
+		deleted = append(deleted, id)
+	}
+	m.appendAuditLog(r, "qc-record-delete", fmt.Sprintf("Utilizatorul %s a sters %d inregistrari QC.", m.auditActor(r), len(deleted)), map[string]interface{}{"qc_record_ids": deleted})
+	writeJSON(w, http.StatusOK, map[string]interface{}{"ok": true, "deleted": deleted})
 }
 
 func (m *Module) handleQCTargets(w http.ResponseWriter, r *http.Request) {
@@ -1439,6 +1823,7 @@ func (m *Module) handleQCTargets(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusBadRequest, map[string]interface{}{"ok": false, "error": err.Error()})
 			return
 		}
+		m.appendAuditLog(r, "qc-target-create", fmt.Sprintf("Utilizatorul %s a creat tinta QC %s / %s / %s.", m.auditActor(r), saved.AnalyteTag, saved.ControlLevel, saved.LotNo), map[string]interface{}{"qc_target_id": saved.ID, "analyte_tag": saved.AnalyteTag, "control_level": saved.ControlLevel, "lot_no": saved.LotNo})
 		writeJSON(w, http.StatusOK, map[string]interface{}{"ok": true, "qc_target": saved})
 	default:
 		writeJSON(w, http.StatusMethodNotAllowed, map[string]interface{}{"ok": false, "error": "method not allowed"})
@@ -1471,12 +1856,15 @@ func (m *Module) handleQCTargetByID(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusBadRequest, map[string]interface{}{"ok": false, "error": err.Error()})
 			return
 		}
+		m.appendAuditLog(r, "qc-target-update", fmt.Sprintf("Utilizatorul %s a actualizat tinta QC %s / %s / %s.", m.auditActor(r), saved.AnalyteTag, saved.ControlLevel, saved.LotNo), map[string]interface{}{"qc_target_id": saved.ID, "analyte_tag": saved.AnalyteTag, "control_level": saved.ControlLevel, "lot_no": saved.LotNo})
 		writeJSON(w, http.StatusOK, map[string]interface{}{"ok": true, "qc_target": saved})
 	case http.MethodDelete:
+		target, _ := m.getQCTarget(id)
 		if err := m.deleteQCTarget(id); err != nil {
 			writeJSON(w, http.StatusNotFound, map[string]interface{}{"ok": false, "error": err.Error()})
 			return
 		}
+		m.appendAuditLog(r, "qc-target-delete", fmt.Sprintf("Utilizatorul %s a sters tinta QC %s / %s / %s.", m.auditActor(r), target.AnalyteTag, target.ControlLevel, target.LotNo), map[string]interface{}{"qc_target_id": id, "analyte_tag": target.AnalyteTag, "control_level": target.ControlLevel, "lot_no": target.LotNo})
 		writeJSON(w, http.StatusOK, map[string]interface{}{"ok": true, "deleted": id})
 	default:
 		writeJSON(w, http.StatusMethodNotAllowed, map[string]interface{}{"ok": false, "error": "method not allowed"})
@@ -1535,6 +1923,7 @@ func (m *Module) handleDefaultResult(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]interface{}{"ok": false, "error": err.Error()})
 		return
 	}
+	m.appendAuditLog(r, "result-default-change", fmt.Sprintf("Utilizatorul %s a schimbat rezultatul implicit pentru analiza %d.", m.auditActor(r), req.OrderAnalysisID), map[string]interface{}{"order_analysis_id": req.OrderAnalysisID, "result_id": req.ResultID, "repeat_mode": m.currentRepeatMode()})
 	writeJSON(w, http.StatusOK, map[string]interface{}{"ok": true})
 }
 
@@ -1610,6 +1999,29 @@ func (m *Module) currentSession(r *http.Request) (session, bool) {
 	return sess, true
 }
 
+func (m *Module) auditActor(r *http.Request) string {
+	sess, ok := m.currentSession(r)
+	if !ok {
+		return "unknown"
+	}
+	fullName := strings.TrimSpace(strings.TrimSpace(sess.FirstName) + " " + strings.TrimSpace(sess.LastName))
+	return firstNonEmpty(fullName, strings.TrimSpace(sess.Username), strings.TrimSpace(sess.UserEmail), "unknown")
+}
+
+func (m *Module) appendAuditLog(r *http.Request, eventType, message string, meta map[string]interface{}) {
+	service, ok := m.rt.Service("storage")
+	if !ok {
+		return
+	}
+	store, ok := service.(auditStore)
+	if !ok {
+		return
+	}
+	if err := store.AppendAuditLog("info", m.auditActor(r), eventType, strings.TrimSpace(message), meta); err != nil {
+		m.rt.Logf("audit log failed: %v", err)
+	}
+}
+
 func (m *Module) sessionSecret() []byte {
 	return []byte("wisemed-local-session:" + m.rt.ReaderID())
 }
@@ -1676,6 +2088,7 @@ func (m *Module) readerPayload() map[string]interface{} {
 		"analyzer_code":     m.readerSetting("analyzer_code", ""),
 		"comm_type":         m.analyzerSetting("comm_type", ""),
 		"protocol":          m.analyzerSetting("protocol", ""),
+		"protocol_subtype":  asString(m.rt.ModuleSettings("protocol-shimatzu-generic")["subtype"]),
 		"repeat_mode":       m.currentRepeatMode(),
 		"app_version":       appmeta.CurrentVersion(),
 		"app_update_app_id": firstNonEmpty(asString(updateMeta["app_id"]), m.rt.ReaderID()),
@@ -1884,6 +2297,13 @@ func (m *Module) readerSettingsPayload() map[string]interface{} {
 		"tcpip_port":                      asString(m.rt.ModuleSettings("transport-tcpip")["port"]),
 		"tcpip_remote_host":               asString(m.rt.ModuleSettings("transport-tcpip")["remote_host"]),
 		"tcpip_remote_port":               asString(m.rt.ModuleSettings("transport-tcpip")["remote_port"]),
+		"file_import_dir":                 asString(m.rt.ModuleSettings("transport-file")["import_dir"]),
+		"file_processed_dir":              asString(m.rt.ModuleSettings("transport-file")["processed_dir"]),
+		"file_failed_dir":                 asString(m.rt.ModuleSettings("transport-file")["failed_dir"]),
+		"file_pattern":                    asString(m.rt.ModuleSettings("transport-file")["pattern"]),
+		"logging_verbose_level":           clampVerboseLevel(asString(m.rt.ModuleSettings("logging")["verbose_level"])),
+		"results_auto_confirm_wisemed":    boolString(asString(m.rt.ModuleSettings("results")["auto_confirm_wisemed"])),
+		"results_send_supported":          m.resultSaveSupported(),
 		"sqlite_path":                     asString(m.rt.ModuleSettings("storage-sqlite")["path"]),
 		"app_updates_enabled":             asString(m.rt.ModuleSettings("app-updates")["enabled"]),
 		"app_updates_app_id":              firstNonEmpty(asString(m.rt.ModuleSettings("app-updates")["app_id"]), m.rt.ReaderID()),
@@ -1912,6 +2332,9 @@ func (m *Module) readerSettingsPayload() map[string]interface{} {
 	shimadzuGeneric := cfg.ModuleSettings("protocol-shimatzu-generic")
 	storageSQLite := cfg.ModuleSettings("storage-sqlite")
 	transportTCPIP := cfg.ModuleSettings("transport-tcpip")
+	transportFile := cfg.ModuleSettings("transport-file")
+	logged := cfg.ModuleSettings("logging")
+	results := cfg.ModuleSettings("results")
 
 	settings["repeat_mode"] = firstNonEmpty(asString(localHTTP["repeat_mode"]), asString(settings["repeat_mode"]))
 	settings["reader_id"] = firstNonEmpty(strings.TrimSpace(cfg.Reader.ID), asString(settings["reader_id"]))
@@ -1930,6 +2353,12 @@ func (m *Module) readerSettingsPayload() map[string]interface{} {
 	settings["tcpip_port"] = firstNonEmpty(asString(transportTCPIP["port"]), asString(settings["tcpip_port"]))
 	settings["tcpip_remote_host"] = firstNonEmpty(asString(transportTCPIP["remote_host"]), asString(settings["tcpip_remote_host"]))
 	settings["tcpip_remote_port"] = firstNonEmpty(asString(transportTCPIP["remote_port"]), asString(settings["tcpip_remote_port"]))
+	settings["file_import_dir"] = firstNonEmpty(asString(transportFile["import_dir"]), asString(settings["file_import_dir"]))
+	settings["file_processed_dir"] = firstNonEmpty(asString(transportFile["processed_dir"]), asString(settings["file_processed_dir"]))
+	settings["file_failed_dir"] = firstNonEmpty(asString(transportFile["failed_dir"]), asString(settings["file_failed_dir"]))
+	settings["file_pattern"] = firstNonEmpty(asString(transportFile["pattern"]), asString(settings["file_pattern"]), "*")
+	settings["logging_verbose_level"] = clampVerboseLevel(firstNonEmpty(asString(logged["verbose_level"]), asString(settings["logging_verbose_level"])))
+	settings["results_auto_confirm_wisemed"] = boolString(firstNonEmpty(asString(results["auto_confirm_wisemed"]), asString(settings["results_auto_confirm_wisemed"])))
 	settings["sqlite_path"] = firstNonEmpty(asString(storageSQLite["path"]), asString(settings["sqlite_path"]))
 	settings["app_updates_enabled"] = firstNonEmpty(asString(appUpdates["enabled"]), asString(settings["app_updates_enabled"]))
 	settings["app_updates_app_id"] = firstNonEmpty(asString(appUpdates["app_id"]), asString(settings["app_updates_app_id"]))
@@ -1958,6 +2387,70 @@ func (m *Module) readerSetting(key, fallback string) string {
 	return fallback
 }
 
+func (m *Module) processControl() processControlService {
+	if service, ok := m.rt.Service("process-control"); ok {
+		if control, ok := service.(processControlService); ok {
+			return control
+		}
+	}
+	return nil
+}
+
+func isShimadzuGenericProtocol(protocol string) bool {
+	return strings.EqualFold(strings.TrimSpace(protocol), "shimatzu-generic")
+}
+
+func normalizeShimadzuGenericSubtype(value string) string {
+	value = strings.ToLower(strings.TrimSpace(value))
+	if value == "" {
+		return "auto"
+	}
+	return value
+}
+
+func shimadzuGenericDatabaseSettings(dbName, sqlitePath, subtype string) (string, string) {
+	subtype = normalizeShimadzuGenericSubtype(subtype)
+	baseName := normalizeShimadzuGenericBaseName(firstNonEmpty(strings.TrimSpace(dbName), filepath.Base(strings.TrimSpace(sqlitePath)), "shimatzu-generic-v3.db"))
+	if filepath.Ext(baseName) == "" {
+		baseName += ".db"
+	}
+	finalName := baseName
+	if subtype != "auto" {
+		finalName = normalizeShimadzuGenericSubtypeToken(subtype) + "-" + baseName
+	}
+
+	pathToken := strings.TrimSpace(sqlitePath)
+	if pathToken == "" {
+		return finalName, "./" + finalName
+	}
+	dir := filepath.Dir(pathToken)
+	if dir == "." || dir == "" {
+		return finalName, "./" + finalName
+	}
+	return finalName, filepath.Join(dir, finalName)
+}
+
+func normalizeShimadzuGenericBaseName(name string) string {
+	name = strings.TrimSpace(filepath.Base(name))
+	for _, subtype := range []string{"gc-2010", "hplc", "ion-cromatograph", "gcms-qp2010"} {
+		prefix := subtype + "-"
+		if strings.HasPrefix(strings.ToLower(name), prefix) {
+			return name[len(prefix):]
+		}
+	}
+	return name
+}
+
+func normalizeShimadzuGenericSubtypeToken(value string) string {
+	value = strings.ToLower(strings.TrimSpace(value))
+	replacer := strings.NewReplacer(" ", "-", "_", "-", "/", "-", "\\", "-", ".", "-", ":", "-", ";", "-", ",", "-")
+	value = replacer.Replace(value)
+	for strings.Contains(value, "--") {
+		value = strings.ReplaceAll(value, "--", "-")
+	}
+	return strings.Trim(value, "-")
+}
+
 func (m *Module) analyzerSetting(key, fallback string) string {
 	if service, ok := m.rt.Service("analyzer-config"); ok {
 		if cfg, ok := service.(map[string]interface{}); ok {
@@ -1978,6 +2471,15 @@ func (m *Module) wiseMEDAPI() wiseMedAPIService {
 	return api
 }
 
+func (m *Module) syncAnalytesToWiseMED() error {
+	api := m.wiseMEDAPI()
+	if api == nil || !api.SetupComplete() {
+		return nil
+	}
+	_, err := api.EnsureEquipmentOnline(m.readerPayload())
+	return err
+}
+
 func (m *Module) resultSyncService() resultSyncService {
 	service, ok := m.rt.Service("result-sync")
 	if !ok {
@@ -1985,6 +2487,20 @@ func (m *Module) resultSyncService() resultSyncService {
 	}
 	item, _ := service.(resultSyncService)
 	return item
+}
+
+func (m *Module) resultPublisher() resultPublisherService {
+	service, ok := m.rt.Service("result-publisher")
+	if !ok {
+		return nil
+	}
+	item, _ := service.(resultPublisherService)
+	return item
+}
+
+func (m *Module) resultSaveSupported() bool {
+	api := m.wiseMEDAPI()
+	return api != nil && api.SetupComplete()
 }
 
 func (m *Module) wiseMEDState() map[string]interface{} {
@@ -2046,6 +2562,39 @@ func asString(value interface{}) string {
 		}
 		return fmt.Sprint(value)
 	}
+}
+
+func clampVerboseLevel(value string) string {
+	n, err := strconv.Atoi(strings.TrimSpace(value))
+	if err != nil {
+		n = 1
+	}
+	if n < 1 {
+		n = 1
+	}
+	if n > 5 {
+		n = 5
+	}
+	return strconv.Itoa(n)
+}
+
+func filterOrderBundlesByIDs(items []coremodel.OrderBundle, ids []int64) []coremodel.OrderBundle {
+	if len(ids) == 0 {
+		return items
+	}
+	allowed := map[int64]struct{}{}
+	for _, id := range ids {
+		if id > 0 {
+			allowed[id] = struct{}{}
+		}
+	}
+	out := make([]coremodel.OrderBundle, 0, len(items))
+	for _, item := range items {
+		if _, ok := allowed[item.Order.ID]; ok {
+			out = append(out, item)
+		}
+	}
+	return out
 }
 
 func boolString(value string) bool {
@@ -2262,6 +2811,17 @@ func (m *Module) dailyDetailsDynamicEnabled() bool {
 func (m *Module) combinedDailyDetailDefinitions() ([]coremodel.DailyDetailDefinition, error) {
 	out := []coremodel.DailyDetailDefinition{}
 	index := map[string]int{}
+	ensureBuiltIn := func(item coremodel.DailyDetailDefinition) {
+		key := strings.TrimSpace(item.Key)
+		if key == "" {
+			return
+		}
+		if _, ok := index[key]; ok {
+			return
+		}
+		index[key] = len(out)
+		out = append(out, item)
+	}
 	if service := m.dailyDetailConfig(); service != nil {
 		for _, item := range service.Definitions() {
 			key := strings.TrimSpace(item.Key)
@@ -2272,6 +2832,18 @@ func (m *Module) combinedDailyDetailDefinitions() ([]coremodel.DailyDetailDefini
 			out = append(out, item)
 		}
 	}
+	ensureBuiltIn(coremodel.DailyDetailDefinition{
+		Key:          "cod_formular_fisa_lucru",
+		Label:        "Cod formular fisa lucru",
+		Scope:        "day",
+		FieldType:    "text",
+		Placeholder:  "FL-12 Ed. 1 Rev. 3",
+		DefaultValue: "",
+		Required:     false,
+		Active:       true,
+		Source:       "static",
+		SortOrder:    -100,
+	})
 	if store := m.dailyDetailStore(); store != nil {
 		items, err := store.ListDailyDetailDefinitions()
 		if err != nil {
@@ -2300,6 +2872,19 @@ func (m *Module) combinedDailyDetailDefinitions() ([]coremodel.DailyDetailDefini
 		return out[i].Key < out[j].Key
 	})
 	return out, nil
+}
+
+func (m *Module) combinedDailyDetailDefinitionByID(id int64) (coremodel.DailyDetailDefinition, error) {
+	items, err := m.combinedDailyDetailDefinitions()
+	if err != nil {
+		return coremodel.DailyDetailDefinition{}, err
+	}
+	for _, item := range items {
+		if item.ID == id {
+			return item, nil
+		}
+	}
+	return coremodel.DailyDetailDefinition{}, errors.New("daily detail definition not found")
 }
 
 func (m *Module) listDailyDetailValues(scopeDate string, roundNo int) ([]coremodel.DailyDetailValue, error) {
@@ -2408,6 +2993,8 @@ func (m *Module) supportedProtocols() []string {
 			add("ir-biotyper")
 		case "protocol-cary60-uvvis":
 			add("cary60-uvvis")
+		case "protocol-analytikjena-plasmaquantms-elite":
+			add("analytikjena-plasmaquantms-elite")
 		case "protocol-biosan-hipo-mpp96":
 			add("biosan-hipo-mpp96")
 		case "protocol-gammavision":
@@ -2449,7 +3036,7 @@ func (m *Module) supportedCommTypes() []string {
 		switch strings.ToLower(strings.TrimSpace(protocol)) {
 		case "hl7", "simple", "astm", "ir-biotyper":
 			add("tcpip")
-		case "seegene-excel", "beosl-csv", "cary60-uvvis", "shimatzu-tocl", "shimatzu-generic", "biosan-hipo-mpp96", "gammavision", "tricarb-5110-tr", "anatolia-geneworks", "generic-file":
+		case "seegene-excel", "beosl-csv", "cary60-uvvis", "analytikjena-plasmaquantms-elite", "shimatzu-tocl", "shimatzu-generic", "biosan-hipo-mpp96", "gammavision", "tricarb-5110-tr", "anatolia-geneworks", "generic-file":
 			add("file")
 		case "barcodeprinter":
 			add("utility")
@@ -2654,6 +3241,134 @@ th{background:#f2f2f2}
 </body></html>`
 }
 
+func (m *Module) dailyWorksheetMeta(scopeDate, scope string, roundNo int, analyteTag string) (string, []string, error) {
+	definitions, err := m.combinedDailyDetailDefinitions()
+	if err != nil {
+		return "", nil, err
+	}
+	values, err := m.listDailyDetailValues(scopeDate, roundNo)
+	if err != nil {
+		return "", nil, err
+	}
+	usesRound := scope == "day_round" || scope == "day_round_analyte"
+	usesAnalyte := scope == "day_analyte" || scope == "day_round_analyte"
+	currentRound := 0
+	currentAnalyte := ""
+	if usesRound {
+		currentRound = roundNo
+	}
+	if usesAnalyte {
+		currentAnalyte = strings.TrimSpace(analyteTag)
+	}
+	findValue := func(key string) string {
+		for _, item := range values {
+			if strings.TrimSpace(item.DefinitionKey) != key {
+				continue
+			}
+			if item.RoundNo != currentRound {
+				continue
+			}
+			if strings.TrimSpace(item.AnalyteTag) != currentAnalyte {
+				continue
+			}
+			return strings.TrimSpace(item.ValueText)
+		}
+		return ""
+	}
+	formCode := findValue("cod_formular_fisa_lucru")
+	rows := []string{}
+	for _, def := range definitions {
+		key := strings.TrimSpace(def.Key)
+		if key == "" {
+			continue
+		}
+		if key != "cod_formular_fisa_lucru" && def.Scope != scope {
+			continue
+		}
+		value := findValue(key)
+		if value == "" {
+			value = strings.TrimSpace(def.DefaultValue)
+		}
+		if key == "cod_formular_fisa_lucru" {
+			if formCode == "" {
+				formCode = value
+			}
+			continue
+		}
+		if value == "" {
+			continue
+		}
+		rows = append(rows, `<tr><th>`+html.EscapeString(firstNonEmpty(def.Label, key))+`</th><td>`+html.EscapeString(value)+`</td></tr>`)
+	}
+	return formCode, rows, nil
+}
+
+func (m *Module) renderDailyWorksheetHTML(orderDate, scope string, roundNo int, analyteTag, formCode string, detailRows []string, bundles []coremodel.OrderBundle) string {
+	scopeLabel := map[string]string{
+		"day":               "Pe zi",
+		"day_round":         "Pe zi si runda",
+		"day_analyte":       "Pe zi si analiza",
+		"day_round_analyte": "Pe zi, runda si analiza",
+	}[scope]
+	if scopeLabel == "" {
+		scopeLabel = scope
+	}
+	rows := make([]string, 0, len(bundles))
+	for _, bundle := range bundles {
+		analyses := make([]string, 0, len(bundle.Analyses))
+		for _, analysisBundle := range bundle.Analyses {
+			analysis := analysisBundle.Analysis
+			if analyteTag != "" && !strings.EqualFold(strings.TrimSpace(analysis.AnalyteTag), analyteTag) {
+				continue
+			}
+			result := firstNonEmpty(strings.TrimSpace(analysis.ResultValue), strings.TrimSpace(analysis.RawValue), "-")
+			analyses = append(analyses, firstNonEmpty(analysis.AnalyteTag, analysis.AnalyteName)+` = `+result)
+		}
+		if analyteTag != "" && len(analyses) == 0 {
+			continue
+		}
+		rows = append(rows, `<tr>`+
+			`<td>`+html.EscapeString(bundle.Order.SampleID)+`</td>`+
+			`<td>`+html.EscapeString(firstNonEmpty(asString(bundle.Order.Meta["sent_sample_code"]), "-"))+`</td>`+
+			`<td>`+html.EscapeString(firstNonEmpty(bundle.Order.FileID, "-"))+`</td>`+
+			`<td>`+html.EscapeString(firstNonEmpty(bundle.Order.PatientID, "-"))+`</td>`+
+			`<td>`+html.EscapeString(firstNonEmpty(bundle.Order.PatientName, "-"))+`</td>`+
+			`<td>`+html.EscapeString(strings.Join(analyses, " | "))+`</td>`+
+			`</tr>`)
+	}
+	if len(rows) == 0 {
+		rows = append(rows, `<tr><td colspan="6">Nu exista cereri pentru filtrul selectat.</td></tr>`)
+	}
+	metaParts := []string{`Data: ` + html.EscapeString(orderDate), `Scope: ` + html.EscapeString(scopeLabel)}
+	if roundNo > 0 {
+		metaParts = append(metaParts, `Runda: `+html.EscapeString(strconv.Itoa(roundNo)))
+	}
+	if strings.TrimSpace(analyteTag) != "" {
+		metaParts = append(metaParts, `Analiza: `+html.EscapeString(analyteTag))
+	}
+	formCodeText := firstNonEmpty(strings.TrimSpace(formCode), "-")
+	detailsHTML := ""
+	if len(detailRows) > 0 {
+		detailsHTML = `<table class="details"><tbody>` + strings.Join(detailRows, "") + `</tbody></table>`
+	}
+	return `<!doctype html><html lang="ro"><head><meta charset="utf-8"><title>Fisa de lucru</title><style>
+body{font-family:Arial,sans-serif;margin:24px;color:#111}
+h1{margin:0 0 12px}
+.top{display:flex;justify-content:space-between;align-items:flex-start;gap:24px;margin-bottom:20px}
+.meta,.form-code{color:#444;font-size:12px}
+table{width:100%;border-collapse:collapse;margin:0 0 20px}
+th,td{border:1px solid #222;padding:8px 10px;font-size:12px;vertical-align:top}
+th{background:#f2f2f2}
+.details{width:auto;min-width:360px}
+@media print{body{margin:8mm}.print-btn{display:none}}
+</style></head><body>
+<button class="print-btn" onclick="window.print()">Print</button>
+<div class="top"><div><h1>Fisa de lucru</h1><div class="meta">` + strings.Join(metaParts, ` · `) + `</div></div><div class="form-code"><strong>Cod formular:</strong> ` + html.EscapeString(formCodeText) + `</div></div>
+` + detailsHTML + `
+<table><thead><tr><th>Proba</th><th>Cod trimis</th><th>Fisa</th><th>Sample code</th><th>Specimen code</th><th>Analize</th></tr></thead><tbody>` + strings.Join(rows, "") + `</tbody></table>
+</body></html>`
+}
+
 func parsePathInt64(path, prefix string) (int64, error) {
 	raw := strings.TrimSpace(strings.TrimPrefix(path, prefix))
 	if raw == "" || raw == path {
@@ -2664,6 +3379,26 @@ func parsePathInt64(path, prefix string) (int64, error) {
 		return 0, errors.New("resource id must be a positive integer")
 	}
 	return v, nil
+}
+
+func normalizeDeleteIDs(ids []int64, single int64) []int64 {
+	seen := map[int64]struct{}{}
+	out := make([]int64, 0, len(ids)+1)
+	push := func(id int64) {
+		if id <= 0 {
+			return
+		}
+		if _, ok := seen[id]; ok {
+			return
+		}
+		seen[id] = struct{}{}
+		out = append(out, id)
+	}
+	push(single)
+	for _, id := range ids {
+		push(id)
+	}
+	return out
 }
 
 func randomID() (string, error) {

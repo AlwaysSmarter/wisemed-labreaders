@@ -2,6 +2,7 @@ package wisemedapi
 
 import (
 	"bytes"
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
@@ -9,7 +10,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -20,7 +20,32 @@ import (
 
 	"gopkg.in/yaml.v3"
 	"wisemed-labreaders/readersv3/core/module"
+	coremodel "wisemed-labreaders/readersv3/modules/core/model"
 )
+
+type DosimetryEntry struct {
+	Serial string
+	HP10   string
+	HP007  string
+}
+
+type DosimetryResult struct {
+	Success bool   `json:"success"`
+	Serial  string `json:"serial"`
+	Error   string `json:"error"`
+}
+
+type DosimetryResponse struct {
+	Success bool              `json:"success"`
+	Results []DosimetryResult `json:"results"`
+}
+
+type ServiceResultEntry struct {
+	FSMID          string
+	Result         string
+	Interpretation string
+	Conclusion     string
+}
 
 type Module struct {
 	rt module.Runtime
@@ -28,6 +53,10 @@ type Module struct {
 	mu       sync.RWMutex
 	settings map[string]string
 	client   *http.Client
+}
+
+type analyteStore interface {
+	ListAnalytes() ([]coremodel.Analyte, error)
 }
 
 type LoginRequest struct {
@@ -99,6 +128,16 @@ func (m *Module) Init(rt module.Runtime) error {
 			"features":             []string{"administrative-login", "administrative-analyzer", "medicalunits", "wmanalyzertypes"},
 		})
 	}))
+	return nil
+}
+
+func (m *Module) Start(ctx context.Context) error {
+	if m.SetupComplete() {
+		if _, err := m.EnsureEquipmentOnline(nil); err != nil {
+			m.rt.Logf("wisemed-api startup sync failed: %v", err)
+		}
+	}
+	<-ctx.Done()
 	return nil
 }
 
@@ -224,7 +263,7 @@ func (m *Module) EnsureEquipmentOnline(reader map[string]interface{}) (map[strin
 	}
 	payload := m.analyzerPayload(reader)
 	resp := map[string]interface{}{}
-	if err := m.putJSON("/administrative/analyzer", payload, &resp); err != nil {
+	if err := m.putJSON("/administrative/analyzer?XDEBUG_TRIGGER=debug", payload, &resp); err != nil {
 		return nil, err
 	}
 	updates := map[string]string{}
@@ -274,6 +313,61 @@ func (m *Module) FetchFileForAnalyzer(fileID, equipmentID string) (map[string]in
 	endpoint := "/fileforanalyzer/" + url.PathEscape(fileID) + "/" + url.PathEscape(equipmentID) + "/?XDEBUG_TRIGGER=debug"
 	var raw interface{}
 	if err := m.doJSON(http.MethodGet, endpoint, nil, &raw); err != nil {
+		return nil, err
+	}
+	if resp, ok := raw.(map[string]interface{}); ok {
+		return resp, nil
+	}
+	return map[string]interface{}{"data": raw}, nil
+}
+
+func (m *Module) SaveDosimetry(entries []DosimetryEntry) (*DosimetryResponse, error) {
+	if len(entries) == 0 {
+		return nil, errors.New("dosimetry entries are required")
+	}
+	var raw interface{}
+	if err := m.doForm(http.MethodPatch, "/file/services/dosimetry/?XDEBUG_TRIGGER=debug", buildDosimetryForm(entries), &raw); err != nil {
+		return nil, err
+	}
+	if raw == nil {
+		return nil, errors.New("dosimetry endpoint returned empty response")
+	}
+	blob, err := json.Marshal(raw)
+	if err != nil {
+		return nil, err
+	}
+	var out DosimetryResponse
+	if err := json.Unmarshal(blob, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+func (m *Module) SaveFileServiceResults(fileID string, entries []ServiceResultEntry) (map[string]interface{}, error) {
+	fileID = strings.TrimSpace(fileID)
+	if fileID == "" {
+		return nil, errors.New("file id is required")
+	}
+	form := url.Values{}
+	index := 0
+	for _, item := range entries {
+		fsmID := strings.TrimSpace(item.FSMID)
+		if fsmID == "" {
+			continue
+		}
+		key := strconv.Itoa(index)
+		form.Set("srv["+key+"][fsmid]", fsmID)
+		form.Set("srv["+key+"][result]", strings.TrimSpace(item.Result))
+		form.Set("srv["+key+"][interpretation]", strings.TrimSpace(item.Interpretation))
+		form.Set("srv["+key+"][conclusion]", strings.TrimSpace(item.Conclusion))
+		index++
+	}
+	if index == 0 {
+		return nil, errors.New("no service results available to save")
+	}
+	endpoint := "/file/services/results/" + url.PathEscape(fileID) + "?XDEBUG_TRIGGER=debug"
+	var raw interface{}
+	if err := m.doForm(http.MethodPatch, endpoint, form, &raw); err != nil {
 		return nil, err
 	}
 	if resp, ok := raw.(map[string]interface{}); ok {
@@ -357,7 +451,39 @@ func (m *Module) createJWT() (string, error) {
 }
 
 func (m *Module) doJSON(method, path string, payload interface{}, out interface{}) error {
-	return doJSONWithClient(m.client, m.Settings(), m.callerType(), method, path, payload, out)
+	targetURL, _ := makeURLFromSettings(m.Settings(), path)
+	if m.verboseLevel() >= 4 {
+		m.rt.Logf("wisemed-api request method=%s path=%s url=%s body=%s", method, path, targetURL, mustJSON(maskSecrets(payload)))
+	}
+	err := doJSONWithClient(m.client, m.Settings(), m.callerType(), method, path, payload, out)
+	if m.verboseLevel() >= 4 {
+		if err != nil {
+			m.rt.Logf("wisemed-api response method=%s path=%s url=%s error=%v", method, path, targetURL, err)
+		} else if m.verboseLevel() >= 5 {
+			m.rt.Logf("wisemed-api response method=%s path=%s url=%s body=%s", method, path, targetURL, mustJSON(maskSecrets(out)))
+		} else {
+			m.rt.Logf("wisemed-api response method=%s path=%s url=%s status=ok", method, path, targetURL)
+		}
+	}
+	return err
+}
+
+func (m *Module) doForm(method, path string, payload url.Values, out interface{}) error {
+	targetURL, _ := makeURLFromSettings(m.Settings(), path)
+	if m.verboseLevel() >= 4 {
+		m.rt.Logf("wisemed-api form request method=%s path=%s url=%s body=%s", method, path, targetURL, sanitizeFormValues(payload).Encode())
+	}
+	err := doFormWithClient(m.client, m.Settings(), m.callerType(), method, path, payload, out)
+	if m.verboseLevel() >= 4 {
+		if err != nil {
+			m.rt.Logf("wisemed-api form response method=%s path=%s url=%s error=%v", method, path, targetURL, err)
+		} else if m.verboseLevel() >= 5 {
+			m.rt.Logf("wisemed-api form response method=%s path=%s url=%s body=%s", method, path, targetURL, mustJSON(maskSecrets(out)))
+		} else {
+			m.rt.Logf("wisemed-api form response method=%s path=%s url=%s status=ok", method, path, targetURL)
+		}
+	}
+	return err
 }
 
 func (m *Module) putJSON(path string, payload interface{}, out interface{}) error {
@@ -384,28 +510,153 @@ func (m *Module) getJSONArray(path string) ([]map[string]interface{}, error) {
 
 func (m *Module) analyzerPayload(reader map[string]interface{}) map[string]interface{} {
 	settings := m.Settings()
-	addr := firstNonEmpty(localHTTPString(m.rt, "address"), "127.0.0.1:18080")
-	host, port, err := net.SplitHostPort(addr)
-	if err != nil {
-		host = "127.0.0.1"
-		port = "18080"
-	}
-	return map[string]interface{}{
-		"cod_echipament":          firstNonEmpty(settings["cod_echipament"], asString(reader["analyzer_code"]), m.rt.ReaderID()),
-		"nume_echipament":         firstNonEmpty(asString(reader["analyzer_name"]), asString(reader["label"]), m.rt.ReaderID()),
-		"api_key_echipament":      settings["api_key_echipament"],
-		"producator_echipament":   "thinkIT",
-		"tip_analizor":            m.callerType(),
+	analytes := m.analytePayload()
+	payload := map[string]interface{}{
+		"cod_echipament":          firstNonEmpty(settings["cod_echipament"], asString(reader["analyzer_code"]), readerString(m.rt, "analyzer_code"), m.rt.ReaderID()),
+		"nume_echipament":         firstNonEmpty(asString(reader["analyzer_name"]), asString(reader["label"]), readerString(m.rt, "analyzer_name"), readerString(m.rt, "label"), m.rt.ReaderID()),
+		"producator_echipament":   firstNonEmpty(settings["producator_echipament"], firstToken(firstNonEmpty(asString(reader["analyzer_name"]), readerString(m.rt, "analyzer_name"), asString(reader["label"]), readerString(m.rt, "label")))),
+		"tip_analizor":            analyzerTypeValue(settings, m.callerType()),
 		"numar_serial_echipament": settings["numar_serial_echipament"],
-		"ip":                      host,
-		"port":                    port,
 		"online":                  true,
-		"nr_rackuri":              "0",
-		"pozitii_pe_rack":         "0",
-		"echipament_id":           settings["echipament_id"],
-		"unitate_medicala_id":     settings["unitate_medicala_id"],
-		"tip_de_echipament_id":    settings["tip_de_echipament_id"],
+		"nr_rackuri":              intSetting(settings, "nr_rackuri", 0),
+		"pozitii_pe_rack":         intSetting(settings, "pozitii_pe_rack", 0),
+		"nume_pe_raport_final":    firstNonEmpty(settings["nume_pe_raport_final"], asString(reader["analyzer_name"]), readerString(m.rt, "analyzer_name"), asString(reader["label"]), readerString(m.rt, "label"), m.rt.ReaderID()),
+		"unitate_medicala_id":     intSetting(settings, "unitate_medicala_id", 0),
+		"tip_de_echipament_id":    intSetting(settings, "tip_de_echipament_id", 0),
+		"analize":                 analytes,
 	}
+	if value := intSetting(settings, "echipament_id", 0); value > 0 {
+		payload["echipament_id"] = value
+	}
+	return payload
+}
+
+func (m *Module) analytePayload() []map[string]interface{} {
+	store := m.analyteStore()
+	if store == nil {
+		return []map[string]interface{}{}
+	}
+	items, err := store.ListAnalytes()
+	if err != nil {
+		m.rt.Logf("wisemed-api analyte payload load failed: %v", err)
+		return []map[string]interface{}{}
+	}
+	equipmentID := intSetting(m.Settings(), "echipament_id", 0)
+	out := make([]map[string]interface{}, 0, len(items))
+	for _, item := range items {
+		worklistLabel := strings.TrimSpace(asString(item.ProtocolOptions["worklist_label"]))
+		unit := firstNonEmpty(item.ResultMeasureUnit, worklistLabel)
+		row := map[string]interface{}{
+			"pe_tag":                  strings.TrimSpace(item.Tag),
+			"pe_codificare":           strings.TrimSpace(item.Code),
+			"pe_codificare2":          "",
+			"pe_formatare":            formatCode(item.ResultFormatting),
+			"pe_tip_rezultat":         resultTypeCode(item.ResultType),
+			"pe_ponderare_um":         item.ResultWeighting,
+			"pe_um":                   unit,
+			"pe_set_reactivi_buletin": strings.TrimSpace(item.ResultReagentsSet),
+			"pe_nr_sincronizari":      0,
+			"pe_activ":                boolToInt(item.Active),
+			"pe_transformare":         analyteTransformationJSON(item),
+		}
+		if equipmentID > 0 {
+			row["echipament_id"] = equipmentID
+		}
+		out = append(out, row)
+	}
+	return out
+}
+
+func (m *Module) analyteStore() analyteStore {
+	service, ok := m.rt.Service("storage")
+	if !ok {
+		return nil
+	}
+	store, _ := service.(analyteStore)
+	return store
+}
+
+func resultTypeCode(value string) int {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "numeric", "number", "cantitativ", "quantitative":
+		return 1
+	case "text", "qualitative", "calitativ":
+		return 2
+	default:
+		return 0
+	}
+}
+
+func formatCode(value string) int {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "numeric", "integer", "int", "decimal_0":
+		return 1
+	case "decimal_1":
+		return 2
+	case "decimal_2":
+		return 3
+	case "decimal_3":
+		return 4
+	case "decimal_4":
+		return 5
+	default:
+		return 0
+	}
+}
+
+func boolToInt(value bool) int {
+	if value {
+		return 1
+	}
+	return 0
+}
+
+func analyteTransformationJSON(item coremodel.Analyte) string {
+	if len(item.Transformation) > 0 {
+		blob, err := json.Marshal(item.Transformation)
+		if err == nil {
+			return string(blob)
+		}
+	}
+	if raw, ok := item.ProtocolOptions["transformation"]; ok {
+		blob, err := json.Marshal(raw)
+		if err == nil {
+			return string(blob)
+		}
+	}
+	return ""
+}
+
+func intSetting(settings map[string]string, key string, fallback int) int {
+	value := strings.TrimSpace(settings[key])
+	if value == "" {
+		return fallback
+	}
+	parsed, err := strconv.Atoi(value)
+	if err != nil {
+		return fallback
+	}
+	return parsed
+}
+
+func analyzerTypeValue(settings map[string]string, fallback string) interface{} {
+	for _, key := range []string{"tip_analizor", "tip_analizor_id"} {
+		if value := strings.TrimSpace(settings[key]); value != "" {
+			if parsed, err := strconv.Atoi(value); err == nil {
+				return parsed
+			}
+			return value
+		}
+	}
+	return fallback
+}
+
+func firstToken(value string) string {
+	fields := strings.Fields(strings.TrimSpace(value))
+	if len(fields) == 0 {
+		return ""
+	}
+	return fields[0]
 }
 
 func (m *Module) callerType() string {
@@ -419,6 +670,107 @@ func (m *Module) callerType() string {
 	default:
 		return "Undefined"
 	}
+}
+
+func buildDosimetryForm(entries []DosimetryEntry) url.Values {
+	form := url.Values{}
+	for idx, entry := range entries {
+		if strings.TrimSpace(entry.Serial) == "" {
+			continue
+		}
+		prefix := fmt.Sprintf("dos[%d]", idx)
+		form.Set(prefix+"[serial]", strings.TrimSpace(entry.Serial))
+		form.Set(prefix+"[hp_10]", strings.TrimSpace(entry.HP10))
+		form.Set(prefix+"[hp_007]", strings.TrimSpace(entry.HP007))
+	}
+	return form
+}
+
+func (m *Module) verboseLevel() int {
+	raw := asString(m.rt.ModuleSettings("logging")["verbose_level"])
+	value, err := strconv.Atoi(strings.TrimSpace(raw))
+	if err != nil {
+		value = 1
+	}
+	if value < 1 {
+		value = 1
+	}
+	if value > 5 {
+		value = 5
+	}
+	return value
+}
+
+func mustJSON(value interface{}) string {
+	blob, err := json.Marshal(value)
+	if err != nil {
+		return fmt.Sprintf("%v", value)
+	}
+	return string(blob)
+}
+
+func maskSecrets(value interface{}) interface{} {
+	switch typed := value.(type) {
+	case nil, string, bool, float64, float32, int, int64, int32, uint, uint64, uint32, json.Number:
+		return typed
+	case []interface{}:
+		out := make([]interface{}, 0, len(typed))
+		for _, item := range typed {
+			out = append(out, maskSecrets(item))
+		}
+		return out
+	case map[string]interface{}:
+		out := map[string]interface{}{}
+		for key, item := range typed {
+			out[key] = maskSecretValue(key, item)
+		}
+		return out
+	case map[string]string:
+		out := map[string]interface{}{}
+		for key, item := range typed {
+			out[key] = maskSecretValue(key, item)
+		}
+		return out
+	case *interface{}:
+		if typed == nil {
+			return nil
+		}
+		return maskSecrets(*typed)
+	default:
+		blob, err := json.Marshal(value)
+		if err != nil {
+			return value
+		}
+		var generic interface{}
+		if err := json.Unmarshal(blob, &generic); err != nil {
+			return value
+		}
+		return maskSecrets(generic)
+	}
+}
+
+func maskSecretValue(key string, value interface{}) interface{} {
+	key = strings.ToLower(strings.TrimSpace(key))
+	switch key {
+	case "password", "login_token", "cfg_wisemed_key", "authorization", "api_key_echipament":
+		return "***"
+	default:
+		return maskSecrets(value)
+	}
+}
+
+func sanitizeFormValues(values url.Values) url.Values {
+	out := url.Values{}
+	for key, items := range values {
+		copied := append([]string(nil), items...)
+		if strings.Contains(strings.ToLower(key), "token") || strings.Contains(strings.ToLower(key), "password") {
+			copied = []string{"***"}
+		}
+		for _, item := range copied {
+			out.Add(key, item)
+		}
+	}
+	return out
 }
 
 func readStringSettings(raw map[string]interface{}) map[string]string {
@@ -455,6 +807,8 @@ func firstNonEmpty(items ...string) string {
 
 func asString(value interface{}) string {
 	switch t := value.(type) {
+	case nil:
+		return ""
 	case string:
 		return t
 	case json.Number:
@@ -617,7 +971,7 @@ func doJSONWithClient(client *http.Client, settings map[string]string, callerTyp
 	if err != nil {
 		return err
 	}
-	req.Header.Set("authorization", token)
+	req.Header.Set("Authorization", "Bearer "+token)
 	resp, err := client.Do(req)
 	if err != nil {
 		return err
@@ -636,6 +990,56 @@ func doJSONWithClient(client *http.Client, settings map[string]string, callerTyp
 	}
 	if out == nil || len(raw) == 0 {
 		return nil
+	}
+	return json.Unmarshal(raw, out)
+}
+
+func doFormWithClient(client *http.Client, settings map[string]string, callerType, method, path string, payload url.Values, out interface{}) error {
+	target, err := makeURLFromSettings(settings, path)
+	if err != nil {
+		return err
+	}
+	encoded := ""
+	if payload != nil {
+		encoded = payload.Encode()
+	}
+	req, err := http.NewRequest(method, target, strings.NewReader(encoded))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	token, err := createJWTForSettings(settings, callerType)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	raw, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		apiErr := apiError{}
+		if err := json.Unmarshal(raw, &apiErr); err == nil && strings.TrimSpace(apiErr.Message) != "" {
+			return errors.New(apiErr.Message)
+		}
+		if trimmed := strings.TrimSpace(string(raw)); trimmed != "" {
+			return errors.New(trimmed)
+		}
+		return fmt.Errorf("%d %s", resp.StatusCode, resp.Status)
+	}
+	if out == nil {
+		return nil
+	}
+	if len(bytes.TrimSpace(raw)) == 0 {
+		switch ptr := out.(type) {
+		case *interface{}:
+			*ptr = nil
+			return nil
+		default:
+			return nil
+		}
 	}
 	return json.Unmarshal(raw, out)
 }

@@ -37,6 +37,8 @@ type parsedResult struct {
 	ProtocolOptions map[string]interface{}
 }
 
+type ignoreLogger func(kind, reason string, payload map[string]interface{})
+
 type hl7Settings struct {
 	Framing               string
 	SampleIDPath          string
@@ -207,7 +209,11 @@ func readSimpleMessage(reader *bufio.Reader) ([]byte, error) {
 	}
 }
 
-func parseHL7Results(raw []byte, settings hl7Settings) ([]parsedMessage, error) {
+func parseHL7Results(raw []byte, settings hl7Settings, ignored ...ignoreLogger) ([]parsedMessage, error) {
+	var logIgnored ignoreLogger
+	if len(ignored) > 0 {
+		logIgnored = ignored[0]
+	}
 	raw = bytes.TrimSpace(raw)
 	if len(raw) == 0 {
 		return nil, errors.New("empty hl7 message")
@@ -261,12 +267,25 @@ func parseHL7Results(raw []byte, settings hl7Settings) ([]parsedMessage, error) 
 		}
 		identifier := resolvePathValue(msg, settings.ResultIdentifierPath, &segment)
 		if len(settings.AllowedResultIDs) > 0 && !containsFold(settings.AllowedResultIDs, identifier) {
+			if logIgnored != nil {
+				logIgnored("hl7_result", "result identifier filtered by allowed_result_ids", map[string]interface{}{
+					"identifier": identifier,
+					"name":       resolvePathValue(msg, settings.ResultNamePath, &segment),
+				})
+			}
 			continue
 		}
 		name := resolvePathValue(msg, settings.ResultNamePath, &segment)
 		tag := mapAnalyte(identifier, name, settings.AnalyteMappings)
 		value := resolvePathValue(msg, settings.ResultValuePath, &segment)
 		if strings.TrimSpace(value) == "" {
+			if logIgnored != nil {
+				logIgnored("hl7_result", "empty result value", map[string]interface{}{
+					"identifier": identifier,
+					"name":       name,
+					"tag":        tag,
+				})
+			}
 			continue
 		}
 		results = append(results, parsedResult{
@@ -291,7 +310,11 @@ func parseHL7Results(raw []byte, settings hl7Settings) ([]parsedMessage, error) 
 	return []parsedMessage{current}, nil
 }
 
-func parseSimpleResults(raw []byte, settings simpleSettings) ([]parsedMessage, error) {
+func parseSimpleResults(raw []byte, settings simpleSettings, ignored ...ignoreLogger) ([]parsedMessage, error) {
+	var logIgnored ignoreLogger
+	if len(ignored) > 0 {
+		logIgnored = ignored[0]
+	}
 	text := string(raw)
 	if !strings.Contains(text, "<TRANSMIT>") {
 		return nil, errors.New("invalid simple payload")
@@ -329,6 +352,14 @@ func parseSimpleResults(raw []byte, settings simpleSettings) ([]parsedMessage, e
 	sort.Strings(keys)
 	for _, key := range keys {
 		value := strings.TrimSpace(pairs[key])
+		if value == "" {
+			if logIgnored != nil {
+				logIgnored("simple_result", "empty parsed value", map[string]interface{}{
+					"analyte": key,
+				})
+			}
+			continue
+		}
 		tag := mapAnalyte(key, key, settings.AnalyteMappings)
 		message.Results = append(message.Results, parsedResult{
 			AnalyteTag:  tag,

@@ -4,6 +4,10 @@ reader:
   analyzer_name: Gemini / IR Biotyper
   analyzer_code: gemini-v3
   db_name: gemini-reader-v3.db
+logging:
+  verbose_level: 1
+results:
+  auto_confirm_wisemed: false
 local_http:
   enabled: true
   address: 127.0.0.1:18080
@@ -34,6 +38,10 @@ modules:
     sample_suffixes: []
     separators: ["-"]
     qc_prefixes: []
+  logging:
+    verbose_level: 1
+  results:
+    auto_confirm_wisemed: false
   local-http:
     enabled: true
     address: 127.0.0.1:18080

@@ -273,6 +273,27 @@
                   <input name="tcpip_remote_port" type="text">
                 </label>
               </div>
+              <div id="reader-settings-file-row">
+                <div class="panel-head compact-head">
+                  <h3>Directoare transport fișiere</h3>
+                </div>
+                <label class="reader-settings-field">
+                  <span>Director import</span>
+                  <input name="file_import_dir" type="text" placeholder="./inbox">
+                </label>
+                <label class="reader-settings-field">
+                  <span>Director procesate</span>
+                  <input name="file_processed_dir" type="text" placeholder="./processed">
+                </label>
+                <label class="reader-settings-field">
+                  <span>Director erori</span>
+                  <input name="file_failed_dir" type="text" placeholder="./failed">
+                </label>
+                <label class="reader-settings-field">
+                  <span>Pattern fisiere import</span>
+                  <input name="file_pattern" type="text" placeholder="*.csv">
+                </label>
+              </div>
               <div class="panel-head compact-head">
                 <h3>Update server</h3>
               </div>
@@ -319,6 +340,41 @@
                 <input name="app_updates_download_dir" type="text">
               </label>
               <div class="panel-head compact-head">
+                <h3>Logare si trasabilitate</h3>
+              </div>
+              <div class="two-col">
+                <label class="reader-settings-field">
+                  <span>Nivel debug verbose</span>
+                  <select name="logging_verbose_level">
+                    <option value="1">1</option>
+                    <option value="2">2</option>
+                    <option value="3">3</option>
+                    <option value="4">4</option>
+                    <option value="5">5</option>
+                  </select>
+                </label>
+                <div class="reader-settings-field">
+                  <span>Detaliu</span>
+                  <p class="small muted">La nivel 5 se scriu in fisierul de log request-urile si raspunsurile WiseMED, inclusiv payload-urile relevante pentru depanare.</p>
+                </div>
+              </div>
+              <div class="panel-head compact-head">
+                <h3>Rezultate</h3>
+              </div>
+              <div class="two-col">
+                <label class="reader-settings-field">
+                  <span>Auto-confirm results in WiseMED</span>
+                  <select name="results_auto_confirm_wisemed">
+                    <option value="true">Da</option>
+                    <option value="false">Nu</option>
+                  </select>
+                </label>
+                <div class="reader-settings-field">
+                  <span>Manual</span>
+                  <p class="small muted">Cand optiunea este dezactivata, rezultatele raman locale pana la trimiterea manuala din butonul `(re)Send to WiseMED`.</p>
+                </div>
+              </div>
+              <div class="panel-head compact-head">
                 <h3>Sincronizare rezultate WiseMED</h3>
               </div>
               <div class="two-col">
@@ -353,8 +409,8 @@
               <label class="reader-settings-field">
                 <span>Subtip protocol SHIMATZU Generic</span>
                 <select name="protocol_subtype">
-                  <option value="">Auto</option>
                   <option value="auto">Auto</option>
+                  <option value="gc-2010">GC-2010</option>
                   <option value="hplc">HPLC</option>
                   <option value="ion-cromatograph">Ion Cromatograph</option>
                 </select>
@@ -446,6 +502,7 @@
                 </label>
               </div>
               <div class="orders-buttons">
+                <button id="daily-details-print" class="ghost" type="button">Fisa de lucru</button>
                 <button id="refresh-daily-detail-values" class="ghost" type="button">Refresh</button>
               </div>
             </div>
@@ -479,7 +536,10 @@
               <div class="orders-buttons">
                 <button id="import-orders" class="ghost">Import fisier</button>
                 <button id="export-orders" class="ghost">Export</button>
+                <button id="sync-orders-wisemed" class="ghost" type="button">Try WiseMED match</button>
+                <button id="send-orders-wisemed" class="ghost" type="button">Trimite in buletin</button>
                 <button id="worklist-orders" class="ghost">Get worklist</button>
+                <button id="delete-orders" class="danger" type="button">Sterge selectia</button>
                 <button id="new-round" class="ghost">Runda noua</button>
                 <button id="refresh-orders" class="ghost" data-i18n="refresh">Refresh</button>
               </div>
@@ -522,10 +582,15 @@
                   <span id="qc-level-filter-label">Nivel QC</span>
                   <select id="qc-level-filter"></select>
                 </label>
+                <label id="qc-select-all-box" class="toggle">
+                  <input id="qc-select-all" type="checkbox">
+                  <span id="qc-select-all-label">Selecteaza tot</span>
+                </label>
               </div>
               <div class="orders-buttons">
                 <button id="new-qc-record" class="ghost" type="button">Adauga QC</button>
                 <button id="qc-open-westgard" class="ghost" type="button">Diagrama Westgard</button>
+                <button id="delete-qc-records" class="danger" type="button">Sterge selectia</button>
                 <button id="refresh-qc" class="ghost" data-i18n="refresh">Refresh</button>
               </div>
             </div>
