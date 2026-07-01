@@ -119,7 +119,12 @@ log "Rulez go build cu output complet in stdout."
 set -x
 GOCACHE="${GOCACHE:-/root/.cache/go-build}" \
 GOMODCACHE="${GOMODCACHE:-/go/pkg/mod}" \
-go build -v -x ${GO_BUILD_FLAGS} -o "${BUILD_OUTPUT}" "${GO_BUILD_PKG}"
+go build \
+    -buildvcs=false \
+    -v -x \
+    ${GO_BUILD_FLAGS} \
+    -o "${BUILD_OUTPUT}" \
+    "${GO_BUILD_PKG}"
 set +x
 
 if [[ ! -x "${BUILD_OUTPUT}" ]]; then

@@ -16,9 +16,9 @@ readersv3/release/
 /readersv3/build/apps.json
 /readersv3/output/*/deployments/*.log
 /readersv3/output/*/deployments/*.zip
-/readersv3/output/*/deployments/*.db
-/readersv3/output/*/deployments/*.db-*
+/readersv3/output/*/deployments/*.db*
 /readersv3/output/*/deployments/tls/**
+/readersv3/output/*/deployments/bin/**
 /readersv3/output/*/deployments/files/**
 /readersv3/output/*/deployments/images/**
 /readersv3/output/*/deployments/failed/**
