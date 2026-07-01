@@ -19,6 +19,7 @@ import (
 	"wisemed-labreaders/readersv3/modules/protocols/beoslcsv"
 	"wisemed-labreaders/readersv3/modules/protocols/biosanhipompp96"
 	"wisemed-labreaders/readersv3/modules/protocols/cary60uvvis"
+	"wisemed-labreaders/readersv3/modules/protocols/cfx96quantitation"
 	"wisemed-labreaders/readersv3/modules/protocols/gammavision"
 	"wisemed-labreaders/readersv3/modules/protocols/genericfile"
 	"wisemed-labreaders/readersv3/modules/protocols/irbiotyper"
@@ -29,6 +30,7 @@ import (
 	"wisemed-labreaders/readersv3/modules/protocols/tricarb5110tr"
 	"wisemed-labreaders/readersv3/modules/qc"
 	"wisemed-labreaders/readersv3/modules/resultsync"
+	"wisemed-labreaders/readersv3/modules/signingpad"
 	"wisemed-labreaders/readersv3/modules/stats"
 	sqlitestorage "wisemed-labreaders/readersv3/modules/storage/sqlite"
 	filetransport "wisemed-labreaders/readersv3/modules/transports/file"
@@ -51,6 +53,7 @@ func RegisterAll(reg *module.Registry) {
 	reg.Register("analyte-management", analytemanagement.New)
 	reg.Register("qc", qc.New)
 	reg.Register("result-sync", resultsync.New)
+	reg.Register("signing-pad", signingpad.New)
 	reg.Register("stats", stats.New)
 	reg.Register("daily-details", dailydetails.New)
 	reg.Register("daily-orders", dailyorders.New)
@@ -59,6 +62,7 @@ func RegisterAll(reg *module.Registry) {
 	reg.Register("transport-tcpip", tcptransport.New)
 	reg.Register("protocol-generic-file", genericfile.New)
 	reg.Register("protocol-cary60-uvvis", cary60uvvis.New)
+	reg.Register("protocol-cfx96-quantitation", cfx96quantitation.New)
 	reg.Register("protocol-analytikjena-plasmaquantms-elite", analytikjenaplasmaquantmselite.New)
 	reg.Register("protocol-seegene-excel", seegeneexcel.New)
 	reg.Register("protocol-beosl-csv", beoslcsv.New)

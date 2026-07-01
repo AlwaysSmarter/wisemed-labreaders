@@ -29,8 +29,10 @@ type Module struct {
 }
 
 type Store struct {
-	db       *sql.DB
-	jsonPath string
+	db           *sql.DB
+	jsonPath     string
+	logf         func(string, ...interface{})
+	verboseLevel func() int
 }
 
 type sidecarData struct {
@@ -54,6 +56,15 @@ func (m *Module) Init(rt module.Runtime) error {
 		return err
 	}
 	m.store = store
+	m.store.logf = rt.Logf
+	m.store.verboseLevel = func() int {
+		raw := strings.TrimSpace(fmt.Sprint(rt.ModuleSettings("logging")["verbose_level"]))
+		level, err := strconv.Atoi(raw)
+		if err != nil || level < 1 {
+			return 1
+		}
+		return level
+	}
 	rt.RegisterService("storage", store)
 	rt.RegisterService("storage-meta", map[string]interface{}{
 		"driver": "sqlite",
@@ -141,6 +152,7 @@ func (s *Store) init() error {
 			active integer not null default 1,
 			tag text not null unique,
 			code text not null default '',
+			result_formula_code text not null default '',
 			name text not null,
 			description text not null default '',
 			result_type text not null default 'numeric',
@@ -148,6 +160,7 @@ func (s *Store) init() error {
 			result_weighting real not null default 1,
 			result_measure_unit text not null default '',
 			result_reagents_set text not null default '',
+			transform_rules_json text not null default '[]',
 			protocol_options_json text not null default '{}',
 			created_at text not null,
 			updated_at text not null
@@ -183,6 +196,9 @@ func (s *Store) init() error {
 			result_value text not null default '',
 			raw_value text not null default '',
 			interpreted_value text not null default '',
+			source_result_value text not null default '',
+			source_raw_value text not null default '',
+			source_interpreted_value text not null default '',
 			unit text not null default '',
 			source_file text not null default '',
 			flags_json text not null default '{}'
@@ -193,6 +209,9 @@ func (s *Store) init() error {
 			result_value text not null default '',
 			raw_value text not null default '',
 			interpreted_value text not null default '',
+			source_result_value text not null default '',
+			source_raw_value text not null default '',
+			source_interpreted_value text not null default '',
 			unit text not null default '',
 			source_file text not null default '',
 			flags_json text not null default '{}',
@@ -242,6 +261,9 @@ func (s *Store) init() error {
 			result_value text not null default '',
 			raw_value text not null default '',
 			interpreted_value text not null default '',
+			source_result_value text not null default '',
+			source_raw_value text not null default '',
+			source_interpreted_value text not null default '',
 			numeric_value real,
 			unit text not null default '',
 			source_file text not null default '',
@@ -309,6 +331,12 @@ func (s *Store) init() error {
 	if _, err := s.db.Exec(`alter table analytes add column protocol_options_json text not null default '{}'`); err != nil && !strings.Contains(strings.ToLower(err.Error()), "duplicate column name") {
 		return err
 	}
+	if _, err := s.db.Exec(`alter table analytes add column result_formula_code text not null default ''`); err != nil && !strings.Contains(strings.ToLower(err.Error()), "duplicate column name") {
+		return err
+	}
+	if _, err := s.db.Exec(`alter table analytes add column transform_rules_json text not null default '[]'`); err != nil && !strings.Contains(strings.ToLower(err.Error()), "duplicate column name") {
+		return err
+	}
 	if _, err := s.db.Exec(`alter table orders add column meta_json text not null default '{}'`); err != nil && !strings.Contains(strings.ToLower(err.Error()), "duplicate column name") {
 		return err
 	}
@@ -341,6 +369,21 @@ func (s *Store) init() error {
 	}
 	if _, err := s.db.Exec(`alter table qc_analyses add column flags_json text not null default '{}'`); err != nil && !strings.Contains(strings.ToLower(err.Error()), "duplicate column name") {
 		return err
+	}
+	for _, stmt := range []string{
+		`alter table order_analyses add column source_result_value text not null default ''`,
+		`alter table order_analyses add column source_raw_value text not null default ''`,
+		`alter table order_analyses add column source_interpreted_value text not null default ''`,
+		`alter table order_analysis_results add column source_result_value text not null default ''`,
+		`alter table order_analysis_results add column source_raw_value text not null default ''`,
+		`alter table order_analysis_results add column source_interpreted_value text not null default ''`,
+		`alter table qc_analyses add column source_result_value text not null default ''`,
+		`alter table qc_analyses add column source_raw_value text not null default ''`,
+		`alter table qc_analyses add column source_interpreted_value text not null default ''`,
+	} {
+		if _, err := s.db.Exec(stmt); err != nil && !strings.Contains(strings.ToLower(err.Error()), "duplicate column name") {
+			return err
+		}
 	}
 	if _, err := s.db.Exec(`alter table qc_analyses add column manual_entered_by text not null default ''`); err != nil && !strings.Contains(strings.ToLower(err.Error()), "duplicate column name") {
 		return err
@@ -450,7 +493,7 @@ func (s *Store) tableExists(name string) (bool, error) {
 }
 
 func (s *Store) ListAnalytes() ([]coremodel.Analyte, error) {
-	rows, err := s.db.Query(`select id,active,tag,code,name,description,result_type,result_formatting,result_weighting,result_measure_unit,result_reagents_set,protocol_options_json,created_at,updated_at from analytes order by name asc, tag asc`)
+	rows, err := s.db.Query(`select id,active,tag,code,result_formula_code,name,description,result_type,result_formatting,result_weighting,result_measure_unit,result_reagents_set,transform_rules_json,protocol_options_json,created_at,updated_at from analytes order by name asc, tag asc`)
 	if err != nil {
 		return nil, err
 	}
@@ -460,11 +503,12 @@ func (s *Store) ListAnalytes() ([]coremodel.Analyte, error) {
 		var item coremodel.Analyte
 		var active int
 		var created, updated string
-		var protocolOptionsJSON string
-		if err := rows.Scan(&item.ID, &active, &item.Tag, &item.Code, &item.Name, &item.Description, &item.ResultType, &item.ResultFormatting, &item.ResultWeighting, &item.ResultMeasureUnit, &item.ResultReagentsSet, &protocolOptionsJSON, &created, &updated); err != nil {
+		var transformRulesJSON, protocolOptionsJSON string
+		if err := rows.Scan(&item.ID, &active, &item.Tag, &item.Code, &item.ResultFormulaCode, &item.Name, &item.Description, &item.ResultType, &item.ResultFormatting, &item.ResultWeighting, &item.ResultMeasureUnit, &item.ResultReagentsSet, &transformRulesJSON, &protocolOptionsJSON, &created, &updated); err != nil {
 			return nil, err
 		}
 		item.Active = active == 1
+		_ = json.Unmarshal([]byte(transformRulesJSON), &item.TransformRules)
 		_ = json.Unmarshal([]byte(protocolOptionsJSON), &item.ProtocolOptions)
 		item.CreatedAt, _ = time.Parse(time.RFC3339, created)
 		item.UpdatedAt, _ = time.Parse(time.RFC3339, updated)
@@ -477,13 +521,14 @@ func (s *Store) GetAnalyteByID(id int64) (coremodel.Analyte, error) {
 	var item coremodel.Analyte
 	var active int
 	var created, updated string
-	var protocolOptionsJSON string
-	err := s.db.QueryRow(`select id,active,tag,code,name,description,result_type,result_formatting,result_weighting,result_measure_unit,result_reagents_set,protocol_options_json,created_at,updated_at from analytes where id = ?`, id).
-		Scan(&item.ID, &active, &item.Tag, &item.Code, &item.Name, &item.Description, &item.ResultType, &item.ResultFormatting, &item.ResultWeighting, &item.ResultMeasureUnit, &item.ResultReagentsSet, &protocolOptionsJSON, &created, &updated)
+	var transformRulesJSON, protocolOptionsJSON string
+	err := s.db.QueryRow(`select id,active,tag,code,result_formula_code,name,description,result_type,result_formatting,result_weighting,result_measure_unit,result_reagents_set,transform_rules_json,protocol_options_json,created_at,updated_at from analytes where id = ?`, id).
+		Scan(&item.ID, &active, &item.Tag, &item.Code, &item.ResultFormulaCode, &item.Name, &item.Description, &item.ResultType, &item.ResultFormatting, &item.ResultWeighting, &item.ResultMeasureUnit, &item.ResultReagentsSet, &transformRulesJSON, &protocolOptionsJSON, &created, &updated)
 	if err != nil {
 		return coremodel.Analyte{}, err
 	}
 	item.Active = active == 1
+	_ = json.Unmarshal([]byte(transformRulesJSON), &item.TransformRules)
 	_ = json.Unmarshal([]byte(protocolOptionsJSON), &item.ProtocolOptions)
 	item.CreatedAt, _ = time.Parse(time.RFC3339, created)
 	item.UpdatedAt, _ = time.Parse(time.RFC3339, updated)
@@ -497,6 +542,11 @@ func (s *Store) SaveAnalyte(item coremodel.Analyte) (coremodel.Analyte, error) {
 	if item.Tag == "" || item.Name == "" {
 		return coremodel.Analyte{}, errors.New("analyte tag and name are required")
 	}
+	item.ResultFormulaCode = normalizeFormulaCode(item.ResultFormulaCode)
+	if item.ResultFormulaCode == "" {
+		item.ResultFormulaCode = normalizeFormulaCode(item.Tag)
+	}
+	transformRulesJSON, _ := json.Marshal(item.TransformRules)
 	protocolOptionsJSON, _ := json.Marshal(metaOrEmpty(item.ProtocolOptions))
 	var existingID int64
 	err := s.db.QueryRow(`select id from analytes where tag = ? limit 1`, item.Tag).Scan(&existingID)
@@ -510,8 +560,8 @@ func (s *Store) SaveAnalyte(item coremodel.Analyte) (coremodel.Analyte, error) {
 		if existingID > 0 && existingID != item.ID {
 			return coremodel.Analyte{}, errors.New("analyte tag must be unique")
 		}
-		res, err := s.db.Exec(`update analytes set active=?, tag=?, code=?, name=?, description=?, result_type=?, result_formatting=?, result_weighting=?, result_measure_unit=?, result_reagents_set=?, protocol_options_json=?, updated_at=? where id = ?`,
-			boolToInt(item.Active), item.Tag, item.Code, item.Name, item.Description, item.ResultType, item.ResultFormatting, item.ResultWeighting, item.ResultMeasureUnit, item.ResultReagentsSet, string(protocolOptionsJSON), now, item.ID)
+		res, err := s.db.Exec(`update analytes set active=?, tag=?, code=?, result_formula_code=?, name=?, description=?, result_type=?, result_formatting=?, result_weighting=?, result_measure_unit=?, result_reagents_set=?, transform_rules_json=?, protocol_options_json=?, updated_at=? where id = ?`,
+			boolToInt(item.Active), item.Tag, item.Code, item.ResultFormulaCode, item.Name, item.Description, item.ResultType, item.ResultFormatting, item.ResultWeighting, item.ResultMeasureUnit, item.ResultReagentsSet, string(transformRulesJSON), string(protocolOptionsJSON), now, item.ID)
 		if err != nil {
 			return coremodel.Analyte{}, err
 		}
@@ -521,8 +571,8 @@ func (s *Store) SaveAnalyte(item coremodel.Analyte) (coremodel.Analyte, error) {
 		}
 		return s.GetAnalyteByID(item.ID)
 	}
-	res, err := s.db.Exec(`insert into analytes(active,tag,code,name,description,result_type,result_formatting,result_weighting,result_measure_unit,result_reagents_set,protocol_options_json,created_at,updated_at) values(?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-		boolToInt(item.Active), item.Tag, item.Code, item.Name, item.Description, item.ResultType, item.ResultFormatting, item.ResultWeighting, item.ResultMeasureUnit, item.ResultReagentsSet, string(protocolOptionsJSON), now, now)
+	res, err := s.db.Exec(`insert into analytes(active,tag,code,result_formula_code,name,description,result_type,result_formatting,result_weighting,result_measure_unit,result_reagents_set,transform_rules_json,protocol_options_json,created_at,updated_at) values(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		boolToInt(item.Active), item.Tag, item.Code, item.ResultFormulaCode, item.Name, item.Description, item.ResultType, item.ResultFormatting, item.ResultWeighting, item.ResultMeasureUnit, item.ResultReagentsSet, string(transformRulesJSON), string(protocolOptionsJSON), now, now)
 	if err != nil {
 		return coremodel.Analyte{}, err
 	}
@@ -834,6 +884,7 @@ func (s *Store) UpsertOrder(item coremodel.Order) (coremodel.Order, error) {
 		return coremodel.Order{}, err
 	}
 	var existingID int64
+	existingMeta := map[string]interface{}{}
 	err := s.db.QueryRow(`select id from orders where order_date = ? and round_no = ? and sample_id = ? limit 1`, item.OrderDate, item.RoundNo, item.SampleID).Scan(&existingID)
 	if err != nil && err != sql.ErrNoRows {
 		return coremodel.Order{}, err
@@ -842,6 +893,12 @@ func (s *Store) UpsertOrder(item coremodel.Order) (coremodel.Order, error) {
 		existingID = item.ID
 	}
 	if existingID > 0 {
+		var existingMetaJSON string
+		if err := s.db.QueryRow(`select meta_json from orders where id = ?`, existingID).Scan(&existingMetaJSON); err == nil {
+			_ = json.Unmarshal([]byte(existingMetaJSON), &existingMeta)
+		}
+		item.Meta = mergeMeta(existingMeta, item.Meta)
+		metaJSON, _ = json.Marshal(metaOrEmpty(item.Meta))
 		_, err = s.db.Exec(`update orders set round_no=?,order_date=?,sample_id=?,file_id=?,patient_id=?,patient_name=?,rack_no=?,rack_position=?,list_position=?,sample_no=?,status=?,source_file=?,meta_json=?,updated_at=? where id = ?`,
 			item.RoundNo, item.OrderDate, item.SampleID, item.FileID, item.PatientID, item.PatientName, item.RackNo, item.RackPosition, item.ListPosition, item.SampleNo, defaultString(item.Status, "received"), item.SourceFile, string(metaJSON), now, existingID)
 		if err != nil {
@@ -940,8 +997,8 @@ func (s *Store) DeleteOrder(id int64) error {
 func (s *Store) GetOrderAnalysis(id int64) (coremodel.OrderAnalysis, error) {
 	var item coremodel.OrderAnalysis
 	var flagsJSON string
-	err := s.db.QueryRow(`select id,order_id,analyte_id,analyte_tag,analyte_name,wisemed_sm_id,wisemed_fsm_id,status,default_result_id,result_value,raw_value,interpreted_value,unit,source_file,flags_json from order_analyses where id = ?`, id).
-		Scan(&item.ID, &item.OrderID, &item.AnalyteID, &item.AnalyteTag, &item.AnalyteName, &item.WiseMEDSMID, &item.WiseMEDFSMID, &item.Status, &item.DefaultResultID, &item.ResultValue, &item.RawValue, &item.Interpreted, &item.Unit, &item.SourceFile, &flagsJSON)
+	err := s.db.QueryRow(`select id,order_id,analyte_id,analyte_tag,analyte_name,wisemed_sm_id,wisemed_fsm_id,status,default_result_id,result_value,raw_value,interpreted_value,source_result_value,source_raw_value,source_interpreted_value,unit,source_file,flags_json from order_analyses where id = ?`, id).
+		Scan(&item.ID, &item.OrderID, &item.AnalyteID, &item.AnalyteTag, &item.AnalyteName, &item.WiseMEDSMID, &item.WiseMEDFSMID, &item.Status, &item.DefaultResultID, &item.ResultValue, &item.RawValue, &item.Interpreted, &item.SourceResultValue, &item.SourceRawValue, &item.SourceInterpreted, &item.Unit, &item.SourceFile, &flagsJSON)
 	if err != nil {
 		return coremodel.OrderAnalysis{}, err
 	}
@@ -996,15 +1053,15 @@ func (s *Store) SaveOrderAnalysis(item coremodel.OrderAnalysis) (coremodel.Order
 		existingID = item.ID
 	}
 	if existingID > 0 {
-		_, err = s.db.Exec(`update order_analyses set analyte_id=?,analyte_tag=?,analyte_name=?,wisemed_sm_id=?,wisemed_fsm_id=?,status=?,default_result_id=?,result_value=?,raw_value=?,interpreted_value=?,unit=?,source_file=?,flags_json=? where id = ?`,
-			item.AnalyteID, item.AnalyteTag, item.AnalyteName, item.WiseMEDSMID, item.WiseMEDFSMID, item.Status, item.DefaultResultID, item.ResultValue, item.RawValue, item.Interpreted, item.Unit, item.SourceFile, string(flagsJSON), existingID)
+		_, err = s.db.Exec(`update order_analyses set analyte_id=?,analyte_tag=?,analyte_name=?,wisemed_sm_id=?,wisemed_fsm_id=?,status=?,default_result_id=?,result_value=?,raw_value=?,interpreted_value=?,source_result_value=?,source_raw_value=?,source_interpreted_value=?,unit=?,source_file=?,flags_json=? where id = ?`,
+			item.AnalyteID, item.AnalyteTag, item.AnalyteName, item.WiseMEDSMID, item.WiseMEDFSMID, item.Status, item.DefaultResultID, item.ResultValue, item.RawValue, item.Interpreted, item.SourceResultValue, item.SourceRawValue, item.SourceInterpreted, item.Unit, item.SourceFile, string(flagsJSON), existingID)
 		if err != nil {
 			return coremodel.OrderAnalysis{}, err
 		}
 		return s.GetOrderAnalysis(existingID)
 	}
-	res, err := s.db.Exec(`insert into order_analyses(order_id,analyte_id,analyte_tag,analyte_name,wisemed_sm_id,wisemed_fsm_id,status,default_result_id,result_value,raw_value,interpreted_value,unit,source_file,flags_json) values(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-		item.OrderID, item.AnalyteID, item.AnalyteTag, item.AnalyteName, item.WiseMEDSMID, item.WiseMEDFSMID, item.Status, item.DefaultResultID, item.ResultValue, item.RawValue, item.Interpreted, item.Unit, item.SourceFile, string(flagsJSON))
+	res, err := s.db.Exec(`insert into order_analyses(order_id,analyte_id,analyte_tag,analyte_name,wisemed_sm_id,wisemed_fsm_id,status,default_result_id,result_value,raw_value,interpreted_value,source_result_value,source_raw_value,source_interpreted_value,unit,source_file,flags_json) values(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		item.OrderID, item.AnalyteID, item.AnalyteTag, item.AnalyteName, item.WiseMEDSMID, item.WiseMEDFSMID, item.Status, item.DefaultResultID, item.ResultValue, item.RawValue, item.Interpreted, item.SourceResultValue, item.SourceRawValue, item.SourceInterpreted, item.Unit, item.SourceFile, string(flagsJSON))
 	if err != nil {
 		return coremodel.OrderAnalysis{}, err
 	}
@@ -1117,8 +1174,8 @@ func compactRoundsForDateTx(tx *sql.Tx, orderDate string, deletedRoundNo int) er
 func (s *Store) GetOrderAnalysisResult(id int64) (coremodel.OrderAnalysisResult, error) {
 	var item coremodel.OrderAnalysisResult
 	var flagsJSON, created string
-	err := s.db.QueryRow(`select id,order_analysis_id,result_value,raw_value,interpreted_value,unit,source_file,flags_json,created_at from order_analysis_results where id = ?`, id).
-		Scan(&item.ID, &item.OrderAnalysisID, &item.ResultValue, &item.RawValue, &item.Interpreted, &item.Unit, &item.SourceFile, &flagsJSON, &created)
+	err := s.db.QueryRow(`select id,order_analysis_id,result_value,raw_value,interpreted_value,source_result_value,source_raw_value,source_interpreted_value,unit,source_file,flags_json,created_at from order_analysis_results where id = ?`, id).
+		Scan(&item.ID, &item.OrderAnalysisID, &item.ResultValue, &item.RawValue, &item.Interpreted, &item.SourceResultValue, &item.SourceRawValue, &item.SourceInterpreted, &item.Unit, &item.SourceFile, &flagsJSON, &created)
 	if err != nil {
 		return coremodel.OrderAnalysisResult{}, err
 	}
@@ -1148,11 +1205,11 @@ func (s *Store) ListResultsForAnalysis(orderAnalysisID int64) ([]coremodel.Order
 	return out, rows.Err()
 }
 
-func (s *Store) UpsertOrderResultForAnalysis(orderAnalysisID int64, resultValue, rawValue, interpreted, unit, sourceFile string, flags map[string]interface{}) (coremodel.OrderAnalysisResult, bool, error) {
+func (s *Store) UpsertOrderResultForAnalysis(orderAnalysisID int64, resultValue, rawValue, interpreted, sourceResultValue, sourceRawValue, sourceInterpreted, unit, sourceFile string, flags map[string]interface{}) (coremodel.OrderAnalysisResult, bool, error) {
 	now := time.Now().UTC().Format(time.RFC3339)
 	flagsJSON, _ := json.Marshal(metaOrEmpty(flags))
-	res, err := s.db.Exec(`insert into order_analysis_results(order_analysis_id,result_value,raw_value,interpreted_value,unit,source_file,flags_json,created_at) values(?,?,?,?,?,?,?,?)`,
-		orderAnalysisID, resultValue, rawValue, interpreted, unit, sourceFile, string(flagsJSON), now)
+	res, err := s.db.Exec(`insert into order_analysis_results(order_analysis_id,result_value,raw_value,interpreted_value,source_result_value,source_raw_value,source_interpreted_value,unit,source_file,flags_json,created_at) values(?,?,?,?,?,?,?,?,?,?,?)`,
+		orderAnalysisID, resultValue, rawValue, interpreted, sourceResultValue, sourceRawValue, sourceInterpreted, unit, sourceFile, string(flagsJSON), now)
 	if err != nil {
 		return coremodel.OrderAnalysisResult{}, false, err
 	}
@@ -1300,21 +1357,24 @@ func (s *Store) RecordImportedResult(orderDate string, roundNo int, rec coremode
 		return coremodel.Order{}, coremodel.OrderAnalysis{}, coremodel.OrderAnalysisResult{}, err
 	}
 	analysis, err := s.SaveOrderAnalysis(coremodel.OrderAnalysis{
-		OrderID:     order.ID,
-		AnalyteTag:  rec.AnalyteTag,
-		AnalyteName: rec.AnalyteName,
-		Status:      "completed",
-		ResultValue: rec.ResultValue,
-		RawValue:    rec.RawValue,
-		Interpreted: rec.Interpreted,
-		Unit:        rec.Unit,
-		SourceFile:  sourceFile,
-		Flags:       rec.Flags,
+		OrderID:           order.ID,
+		AnalyteTag:        rec.AnalyteTag,
+		AnalyteName:       rec.AnalyteName,
+		Status:            "completed",
+		ResultValue:       rec.ResultValue,
+		RawValue:          rec.RawValue,
+		Interpreted:       rec.Interpreted,
+		SourceResultValue: rec.ResultValue,
+		SourceRawValue:    rec.RawValue,
+		SourceInterpreted: rec.Interpreted,
+		Unit:              rec.Unit,
+		SourceFile:        sourceFile,
+		Flags:             rec.Flags,
 	})
 	if err != nil {
 		return coremodel.Order{}, coremodel.OrderAnalysis{}, coremodel.OrderAnalysisResult{}, err
 	}
-	result, _, err := s.UpsertOrderResultForAnalysis(analysis.ID, rec.ResultValue, rec.RawValue, rec.Interpreted, rec.Unit, sourceFile, rec.Flags)
+	result, _, err := s.UpsertOrderResultForAnalysis(analysis.ID, rec.ResultValue, rec.RawValue, rec.Interpreted, rec.ResultValue, rec.RawValue, rec.Interpreted, rec.Unit, sourceFile, rec.Flags)
 	return order, analysis, result, err
 }
 
@@ -1409,12 +1469,12 @@ func (s *Store) GetQCAnalysis(id int64) (coremodel.QCAnalysis, error) {
 		select qa.id,qa.qc_record_id,qa.analyte_id,qa.analyte_tag,qa.analyte_name,
 		       coalesce(qt.control_level, qr.control_level, qa.control_level) as control_level,
 		       coalesce(qa.lot_no, qr.lot_no) as lot_no,
-		       qa.status,qa.default_result_id,qa.result_value,qa.raw_value,qa.interpreted_value,qa.numeric_value,qa.unit,qa.source_file,qa.flags_json,qa.created_at
+		       qa.status,qa.default_result_id,qa.result_value,qa.raw_value,qa.interpreted_value,qa.source_result_value,qa.source_raw_value,qa.source_interpreted_value,qa.numeric_value,qa.unit,qa.source_file,qa.flags_json,qa.created_at
 		from qc_analyses qa
 		left join qc_records qr on qr.id = qa.qc_record_id
 		left join qc_targets qt on qt.active = 1 and qt.analyte_tag = qa.analyte_tag and qt.lot_no = qa.lot_no
 		where qa.id = ?`, id).
-		Scan(&item.ID, &item.QCRecordID, &item.AnalyteID, &item.AnalyteTag, &item.AnalyteName, &item.ControlLevel, &item.LotNo, &item.Status, &item.DefaultResultID, &item.ResultValue, &item.RawValue, &item.Interpreted, &numeric, &item.Unit, &item.SourceFile, &flagsJSON, &created)
+		Scan(&item.ID, &item.QCRecordID, &item.AnalyteID, &item.AnalyteTag, &item.AnalyteName, &item.ControlLevel, &item.LotNo, &item.Status, &item.DefaultResultID, &item.ResultValue, &item.RawValue, &item.Interpreted, &item.SourceResultValue, &item.SourceRawValue, &item.SourceInterpreted, &numeric, &item.Unit, &item.SourceFile, &flagsJSON, &created)
 	if err != nil {
 		return coremodel.QCAnalysis{}, err
 	}
@@ -1480,15 +1540,15 @@ func (s *Store) UpsertQCAnalysis(item coremodel.QCAnalysis) (coremodel.QCAnalysi
 	manualEnteredBy, _ := item.Flags["manual_entered_by"].(string)
 	manualEnteredAt, _ := item.Flags["manual_entered_at"].(string)
 	if item.ID > 0 {
-		_, err := s.db.Exec(`update qc_analyses set analyte_id=?,analyte_tag=?,analyte_name=?,control_level=?,lot_no=?,status=?,default_result_id=?,result_value=?,raw_value=?,interpreted_value=?,numeric_value=?,unit=?,source_file=?,flags_json=?,manual_entered_by=?,manual_entered_at=?,created_at=? where id = ?`,
-			item.AnalyteID, item.AnalyteTag, item.AnalyteName, "", defaultString(item.LotNo, "-"), item.Status, item.DefaultResultID, item.ResultValue, item.RawValue, item.Interpreted, nullableFloatArg(numericValue, hasNumeric), item.Unit, item.SourceFile, string(flagsJSON), manualEnteredBy, manualEnteredAt, createdAt, item.ID)
+		_, err := s.db.Exec(`update qc_analyses set analyte_id=?,analyte_tag=?,analyte_name=?,control_level=?,lot_no=?,status=?,default_result_id=?,result_value=?,raw_value=?,interpreted_value=?,source_result_value=?,source_raw_value=?,source_interpreted_value=?,numeric_value=?,unit=?,source_file=?,flags_json=?,manual_entered_by=?,manual_entered_at=?,created_at=? where id = ?`,
+			item.AnalyteID, item.AnalyteTag, item.AnalyteName, "", defaultString(item.LotNo, "-"), item.Status, item.DefaultResultID, item.ResultValue, item.RawValue, item.Interpreted, item.SourceResultValue, item.SourceRawValue, item.SourceInterpreted, nullableFloatArg(numericValue, hasNumeric), item.Unit, item.SourceFile, string(flagsJSON), manualEnteredBy, manualEnteredAt, createdAt, item.ID)
 		if err != nil {
 			return coremodel.QCAnalysis{}, err
 		}
 		return s.GetQCAnalysis(item.ID)
 	}
-	res, err := s.db.Exec(`insert into qc_analyses(qc_record_id,analyte_id,analyte_tag,analyte_name,control_level,lot_no,status,default_result_id,result_value,raw_value,interpreted_value,numeric_value,unit,source_file,flags_json,manual_entered_by,manual_entered_at,created_at) values(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-		item.QCRecordID, item.AnalyteID, item.AnalyteTag, item.AnalyteName, "", defaultString(item.LotNo, "-"), item.Status, item.DefaultResultID, item.ResultValue, item.RawValue, item.Interpreted, nullableFloatArg(numericValue, hasNumeric), item.Unit, item.SourceFile, string(flagsJSON), manualEnteredBy, manualEnteredAt, createdAt)
+	res, err := s.db.Exec(`insert into qc_analyses(qc_record_id,analyte_id,analyte_tag,analyte_name,control_level,lot_no,status,default_result_id,result_value,raw_value,interpreted_value,source_result_value,source_raw_value,source_interpreted_value,numeric_value,unit,source_file,flags_json,manual_entered_by,manual_entered_at,created_at) values(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		item.QCRecordID, item.AnalyteID, item.AnalyteTag, item.AnalyteName, "", defaultString(item.LotNo, "-"), item.Status, item.DefaultResultID, item.ResultValue, item.RawValue, item.Interpreted, item.SourceResultValue, item.SourceRawValue, item.SourceInterpreted, nullableFloatArg(numericValue, hasNumeric), item.Unit, item.SourceFile, string(flagsJSON), manualEnteredBy, manualEnteredAt, createdAt)
 	if err != nil {
 		return coremodel.QCAnalysis{}, err
 	}
@@ -2023,6 +2083,17 @@ func metaOrEmpty(value map[string]interface{}) map[string]interface{} {
 		return map[string]interface{}{}
 	}
 	return value
+}
+
+func mergeMeta(base, overlay map[string]interface{}) map[string]interface{} {
+	out := map[string]interface{}{}
+	for key, value := range metaOrEmpty(base) {
+		out[key] = value
+	}
+	for key, value := range metaOrEmpty(overlay) {
+		out[key] = value
+	}
+	return out
 }
 
 func parseNumericQCValue(rawValue, resultValue string) (float64, bool) {

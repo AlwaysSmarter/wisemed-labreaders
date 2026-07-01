@@ -41,9 +41,15 @@ func TestParseShimatzuTOCL(t *testing.T) {
 		}
 		switch rec.Record.AnalyteTag {
 		case "TOC":
-			foundTOC = rec.Record.ResultValue == "2.001"
+			foundTOC = rec.Record.RawValue == "2.001" && rec.Record.ResultValue == "" && rec.Record.Interpreted == ""
+			if details, _ := rec.Record.Flags["communication_details"].(string); details == "" {
+				t.Fatalf("expected communication details for TOC, got %#v", rec.Record.Flags)
+			}
 		case "NPOC":
-			foundNPOC = rec.Record.ResultValue == "2.553"
+			foundNPOC = rec.Record.RawValue == "2.553" && rec.Record.ResultValue == "" && rec.Record.Interpreted == ""
+			if details, _ := rec.Record.Flags["communication_details"].(string); details == "" {
+				t.Fatalf("expected communication details for NPOC, got %#v", rec.Record.Flags)
+			}
 		}
 	}
 	if !foundTOC || !foundNPOC {

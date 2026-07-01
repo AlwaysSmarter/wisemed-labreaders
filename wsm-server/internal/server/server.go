@@ -1,4 +1,4 @@
-tiapackage server
+package server
 
 import (
 	"bufio"
@@ -316,6 +316,22 @@ func (s *Server) handleWS(w http.ResponseWriter, r *http.Request) {
 						"message": "send hello before other messages",
 					},
 				})
+				continue
+			}
+			if msg.Type == "command" && msg.Target != nil && msg.Target.Mode == "server" {
+				replyPayload, err := s.handleServerCommand(msg)
+				replyType := "reply"
+				if err != nil {
+					replyType = "error"
+					replyPayload = map[string]interface{}{"message": err.Error()}
+				}
+				s.hub.send(conn, Envelope{
+					Type:          replyType,
+					RequestID:     msg.RequestID,
+					CorrelationID: msg.RequestID,
+					Payload:       replyPayload,
+				})
+				log.Printf("ws server-command type=%s request_id=%s connection_id=%s payload=%s err=%v", msg.Type, msg.RequestID, conn.ID, mustJSON(msg.Payload), err)
 				continue
 			}
 			deliver := msg

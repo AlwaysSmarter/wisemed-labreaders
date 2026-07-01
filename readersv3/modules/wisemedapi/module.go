@@ -59,6 +59,11 @@ type analyteStore interface {
 	ListAnalytes() ([]coremodel.Analyte, error)
 }
 
+type wsRequester interface {
+	Connected() bool
+	Request(ctx context.Context, action string, payload map[string]interface{}) (map[string]interface{}, error)
+}
+
 type LoginRequest struct {
 	Username      string `json:"username"`
 	Password      string `json:"password"`
@@ -93,6 +98,12 @@ type BootstrapClient struct {
 	Client     *http.Client
 }
 
+type OverrideClient struct {
+	settings   map[string]string
+	callerType string
+	client     *http.Client
+}
+
 func New() module.Module     { return &Module{} }
 func (m *Module) ID() string { return "wisemed-api" }
 
@@ -109,6 +120,22 @@ func NewBootstrapClient(settings map[string]string, callerType string) *Bootstra
 		Settings:   items,
 		CallerType: callerType,
 		Client:     &http.Client{Timeout: 20 * time.Second},
+	}
+}
+
+func NewOverrideClient(settings map[string]string, callerType string) *OverrideClient {
+	items := map[string]string{}
+	for k, v := range settings {
+		items[k] = strings.TrimSpace(v)
+	}
+	applyBaseURLFallbackToSettings(items)
+	if strings.TrimSpace(callerType) == "" {
+		callerType = "Undefined"
+	}
+	return &OverrideClient{
+		settings:   items,
+		callerType: callerType,
+		client:     &http.Client{Timeout: 20 * time.Second},
 	}
 }
 
@@ -251,7 +278,10 @@ func (m *Module) Login(req LoginRequest) (LoginResponse, error) {
 	if strings.TrimSpace(resp.LoginToken) == "" {
 		return LoginResponse{}, errors.New("administrative/login did not return login_token")
 	}
-	if _, err := m.SaveSetup(map[string]string{"login_token": strings.TrimSpace(resp.LoginToken)}); err != nil {
+	if _, err := m.SaveSetup(map[string]string{
+		"login_token":   strings.TrimSpace(resp.LoginToken),
+		"login_user_id": strings.TrimSpace(resp.UserID.String()),
+	}); err != nil {
 		return LoginResponse{}, err
 	}
 	return resp, nil
@@ -262,9 +292,12 @@ func (m *Module) EnsureEquipmentOnline(reader map[string]interface{}) (map[strin
 		return nil, errors.New("WiseMED setup is incomplete")
 	}
 	payload := m.analyzerPayload(reader)
-	resp := map[string]interface{}{}
-	if err := m.putJSON("/administrative/analyzer?XDEBUG_TRIGGER=debug", payload, &resp); err != nil {
-		return nil, err
+	resp, err := m.ensureEquipmentOnlineViaWS(payload)
+	if err != nil {
+		resp = map[string]interface{}{}
+		if err := m.putJSON("/administrative/analyzer?XDEBUG_TRIGGER=debug", payload, &resp); err != nil {
+			return nil, err
+		}
 	}
 	updates := map[string]string{}
 	for _, key := range []string{
@@ -310,6 +343,9 @@ func (m *Module) FetchFileForAnalyzer(fileID, equipmentID string) (map[string]in
 	if equipmentID == "" {
 		return nil, errors.New("equipment id is required")
 	}
+	if resp, err := m.fetchFileForAnalyzerViaWS(fileID, equipmentID); err == nil {
+		return resp, nil
+	}
 	endpoint := "/fileforanalyzer/" + url.PathEscape(fileID) + "/" + url.PathEscape(equipmentID) + "/?XDEBUG_TRIGGER=debug"
 	var raw interface{}
 	if err := m.doJSON(http.MethodGet, endpoint, nil, &raw); err != nil {
@@ -319,6 +355,120 @@ func (m *Module) FetchFileForAnalyzer(fileID, equipmentID string) (map[string]in
 		return resp, nil
 	}
 	return map[string]interface{}{"data": raw}, nil
+}
+
+func (c *OverrideClient) Settings() map[string]string {
+	out := map[string]string{}
+	for k, v := range c.settings {
+		out[k] = strings.TrimSpace(v)
+	}
+	return out
+}
+
+func (c *OverrideClient) SetupComplete() bool {
+	required := []string{"cfg_wisemed_protocol", "cfg_wisemed_ip", "cfg_wisemed_port", "cfg_wisemed_path", "cfg_wisemed_key", "unitate_medicala_id", "tip_de_echipament_id", "cod_echipament", "numar_serial_echipament"}
+	for _, key := range required {
+		if strings.TrimSpace(c.settings[key]) == "" {
+			return false
+		}
+	}
+	return true
+}
+
+func (c *OverrideClient) HasEquipmentID() bool {
+	id, err := strconv.Atoi(strings.TrimSpace(c.settings["echipament_id"]))
+	return err == nil && id > 0
+}
+
+func (c *OverrideClient) FetchFileForAnalyzer(fileID, equipmentID string) (map[string]interface{}, error) {
+	fileID = strings.TrimSpace(fileID)
+	equipmentID = strings.TrimSpace(equipmentID)
+	if fileID == "" {
+		return nil, errors.New("file id is required")
+	}
+	if equipmentID == "" {
+		return nil, errors.New("equipment id is required")
+	}
+	endpoint := "/fileforanalyzer/" + url.PathEscape(fileID) + "/" + url.PathEscape(equipmentID) + "/?XDEBUG_TRIGGER=debug"
+	var raw interface{}
+	if err := doJSONWithClient(c.client, c.settings, c.callerType, http.MethodGet, endpoint, nil, &raw); err != nil {
+		return nil, err
+	}
+	if resp, ok := raw.(map[string]interface{}); ok {
+		return resp, nil
+	}
+	return map[string]interface{}{"data": raw}, nil
+}
+
+func (c *OverrideClient) SaveFileServiceResults(fileID string, entries []ServiceResultEntry) (map[string]interface{}, error) {
+	fileID = strings.TrimSpace(fileID)
+	if fileID == "" {
+		return nil, errors.New("file id is required")
+	}
+	form := url.Values{}
+	if reagentSet := strings.TrimSpace(c.settings["reagent_set_name"]); reagentSet != "" {
+		form.Set("reagent_set_name", reagentSet)
+	}
+	index := 0
+	for _, item := range entries {
+		fsmID := strings.TrimSpace(item.FSMID)
+		if fsmID == "" {
+			continue
+		}
+		key := strconv.Itoa(index)
+		form.Set("srv["+key+"][fsmid]", fsmID)
+		form.Set("srv["+key+"][result]", strings.TrimSpace(item.Result))
+		form.Set("srv["+key+"][interpretation]", strings.TrimSpace(item.Interpretation))
+		form.Set("srv["+key+"][conclusion]", strings.TrimSpace(item.Conclusion))
+		index++
+	}
+	if index == 0 {
+		return nil, errors.New("no service results available to save")
+	}
+	endpoint := "/file/services/results/" + url.PathEscape(fileID) + "?XDEBUG_TRIGGER=debug"
+	var raw interface{}
+	if err := doFormWithClient(c.client, c.settings, c.callerType, http.MethodPatch, endpoint, form, &raw); err != nil {
+		return nil, err
+	}
+	if resp, ok := raw.(map[string]interface{}); ok {
+		return resp, nil
+	}
+	return map[string]interface{}{"data": raw}, nil
+}
+
+func (m *Module) ensureEquipmentOnlineViaWS(payload map[string]interface{}) (map[string]interface{}, error) {
+	client := m.wsClient()
+	if client == nil || !client.Connected() {
+		return nil, errors.New("wisemed-ws unavailable")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	resp, err := client.Request(ctx, "wisemed.ensure_equipment_online", map[string]interface{}{
+		"reader": payload,
+	})
+	if err != nil {
+		m.rt.Logf("wisemed-api ws ensure equipment online failed, falling back to direct api: %v", err)
+		return nil, err
+	}
+	return resp, nil
+}
+
+func (m *Module) fetchFileForAnalyzerViaWS(fileID, equipmentID string) (map[string]interface{}, error) {
+	client := m.wsClient()
+	if client == nil || !client.Connected() {
+		return nil, errors.New("wisemed-ws unavailable")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	resp, err := client.Request(ctx, "wisemed.fetch_file_for_analyzer", map[string]interface{}{
+		"file_id":      fileID,
+		"equipment_id": equipmentID,
+	})
+	if err != nil {
+		m.rt.Logf("wisemed-api ws fetch file for analyzer failed, falling back to direct api: %v", err)
+		return nil, err
+	}
+	return resp, nil
 }
 
 func (m *Module) SaveDosimetry(entries []DosimetryEntry) (*DosimetryResponse, error) {
@@ -349,6 +499,9 @@ func (m *Module) SaveFileServiceResults(fileID string, entries []ServiceResultEn
 		return nil, errors.New("file id is required")
 	}
 	form := url.Values{}
+	if reagentSet := strings.TrimSpace(m.Settings()["reagent_set_name"]); reagentSet != "" {
+		form.Set("reagent_set_name", reagentSet)
+	}
 	index := 0
 	for _, item := range entries {
 		fsmID := strings.TrimSpace(item.FSMID)
@@ -576,6 +729,15 @@ func (m *Module) analyteStore() analyteStore {
 	return store
 }
 
+func (m *Module) wsClient() wsRequester {
+	service, ok := m.rt.Service("wisemed-ws-client")
+	if !ok {
+		return nil
+	}
+	client, _ := service.(wsRequester)
+	return client
+}
+
 func resultTypeCode(value string) int {
 	switch strings.ToLower(strings.TrimSpace(value)) {
 	case "numeric", "number", "cantitativ", "quantitative":
@@ -612,6 +774,12 @@ func boolToInt(value bool) int {
 }
 
 func analyteTransformationJSON(item coremodel.Analyte) string {
+	if len(item.TransformRules) > 0 {
+		blob, err := json.Marshal(item.TransformRules)
+		if err == nil {
+			return string(blob)
+		}
+	}
 	if len(item.Transformation) > 0 {
 		blob, err := json.Marshal(item.Transformation)
 		if err == nil {
@@ -661,7 +829,7 @@ func firstToken(value string) string {
 
 func (m *Module) callerType() string {
 	switch strings.ToLower(strings.TrimSpace(analyzerString(m.rt, "protocol"))) {
-	case "seegene-excel", "beosl-csv":
+	case "seegene-excel", "beosl-csv", "cfx96-quantitation":
 		return "Microbiology"
 	case "cary60-uvvis", "generic-file":
 		return "Biochemestry"
@@ -1093,6 +1261,9 @@ func createJWTForSettings(settings map[string]string, callerType string) (string
 	}
 	if token := strings.TrimSpace(settings["login_token"]); token != "" {
 		claimsMap["lt"] = token
+	}
+	if userID := strings.TrimSpace(settings["login_user_id"]); userID != "" {
+		claimsMap["login_user_id"] = userID
 	}
 	claimsJSON, _ := json.Marshal(claimsMap)
 	header := base64.RawURLEncoding.EncodeToString(headerJSON)

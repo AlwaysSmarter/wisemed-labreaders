@@ -20,17 +20,34 @@ type Analyte struct {
 	Active            bool                   `json:"active"`
 	Tag               string                 `json:"tag"`
 	Code              string                 `json:"code"`
+	ResultFormulaCode string                 `json:"result_formula_code"`
 	Name              string                 `json:"name"`
 	Description       string                 `json:"description"`
 	ResultType        string                 `json:"result_type"`
 	ResultFormatting  string                 `json:"result_formatting"`
 	ResultWeighting   float64                `json:"result_weighting"`
 	Transformation    []map[string]string    `json:"transformation"`
+	TransformRules    []TransformRule        `json:"transform_rules,omitempty"`
 	ResultMeasureUnit string                 `json:"result_measure_unit"`
 	ResultReagentsSet string                 `json:"result_reagents_set"`
 	ProtocolOptions   map[string]interface{} `json:"protocol_options,omitempty"`
 	CreatedAt         time.Time              `json:"created_at"`
 	UpdatedAt         time.Time              `json:"updated_at"`
+}
+
+type TransformRule struct {
+	ID              string `json:"id,omitempty"`
+	Order           int    `json:"order"`
+	Enabled         bool   `json:"enabled"`
+	Type            string `json:"type"`
+	SourceField     string `json:"source_field,omitempty"`
+	TargetField     string `json:"target_field"`
+	TargetMode      string `json:"target_mode,omitempty"`
+	MatchValue      string `json:"match_value,omitempty"`
+	MatchIgnoreCase bool   `json:"match_ignore_case,omitempty"`
+	OutputValue     string `json:"output_value,omitempty"`
+	Formula         string `json:"formula,omitempty"`
+	StopAfterApply  bool   `json:"stop_after_apply"`
 }
 
 type DailyDetailDefinition struct {
@@ -105,6 +122,9 @@ type OrderAnalysis struct {
 	ResultValue        string                 `json:"result_value"`
 	RawValue           string                 `json:"raw_value"`
 	Interpreted        string                 `json:"interpreted_value"`
+	SourceResultValue  string                 `json:"source_result_value"`
+	SourceRawValue     string                 `json:"source_raw_value"`
+	SourceInterpreted  string                 `json:"source_interpreted_value"`
 	Unit               string                 `json:"unit"`
 	SourceFile         string                 `json:"source_file"`
 	Flags              map[string]interface{} `json:"flags,omitempty"`
@@ -112,16 +132,19 @@ type OrderAnalysis struct {
 }
 
 type OrderAnalysisResult struct {
-	ID              int64                  `json:"id"`
-	OrderAnalysisID int64                  `json:"order_analysis_id"`
-	ResultValue     string                 `json:"result_value"`
-	RawValue        string                 `json:"raw_value"`
-	Interpreted     string                 `json:"interpreted_value"`
-	Unit            string                 `json:"unit"`
-	SourceFile      string                 `json:"source_file"`
-	Flags           map[string]interface{} `json:"flags,omitempty"`
-	Meta            map[string]interface{} `json:"meta,omitempty"`
-	CreatedAt       time.Time              `json:"created_at"`
+	ID                int64                  `json:"id"`
+	OrderAnalysisID   int64                  `json:"order_analysis_id"`
+	ResultValue       string                 `json:"result_value"`
+	RawValue          string                 `json:"raw_value"`
+	Interpreted       string                 `json:"interpreted_value"`
+	SourceResultValue string                 `json:"source_result_value"`
+	SourceRawValue    string                 `json:"source_raw_value"`
+	SourceInterpreted string                 `json:"source_interpreted_value"`
+	Unit              string                 `json:"unit"`
+	SourceFile        string                 `json:"source_file"`
+	Flags             map[string]interface{} `json:"flags,omitempty"`
+	Meta              map[string]interface{} `json:"meta,omitempty"`
+	CreatedAt         time.Time              `json:"created_at"`
 }
 
 type QCRecord struct {
@@ -156,6 +179,9 @@ type QCAnalysis struct {
 	ResultValue        string                 `json:"result_value"`
 	RawValue           string                 `json:"raw_value"`
 	Interpreted        string                 `json:"interpreted_value"`
+	SourceResultValue  string                 `json:"source_result_value"`
+	SourceRawValue     string                 `json:"source_raw_value"`
+	SourceInterpreted  string                 `json:"source_interpreted_value"`
 	NumericValue       *float64               `json:"numeric_value,omitempty"`
 	Unit               string                 `json:"unit"`
 	SourceFile         string                 `json:"source_file"`

@@ -215,6 +215,9 @@ func bootstrapModuleSettings(reader *bufio.Reader, cfg *config.Config, reconfigu
 			if strings.Contains(strings.ToLower(cfg.Analyzer.Protocol), "seegene") {
 				defaultPattern = "*.xlsx"
 			}
+			if strings.Contains(strings.ToLower(cfg.Analyzer.Protocol), "cfx96") {
+				defaultPattern = "*Quanti* Plate View Results.xlsx"
+			}
 			promptString(reader, "Import file pattern", cfg.Modules["transport-file"], "pattern", defaultPattern)
 		}
 	case "tcpip":
@@ -591,7 +594,7 @@ func itemString(item map[string]interface{}, keys ...string) string {
 
 func callerTypeForProtocol(protocol string) string {
 	switch strings.ToLower(strings.TrimSpace(protocol)) {
-	case "seegene-excel", "beosl-csv":
+	case "seegene-excel", "beosl-csv", "cfx96-quantitation":
 		return "Microbiology"
 	case "cary60-uvvis", "generic-file", "barcodeprinter":
 		return "Biochemestry"
@@ -688,6 +691,8 @@ func supportedProtocols(cfg *config.Config) []string {
 			add("ir-biotyper")
 		case "protocol-cary60-uvvis":
 			add("cary60-uvvis")
+		case "protocol-cfx96-quantitation":
+			add("cfx96-quantitation")
 		case "protocol-analytikjena-plasmaquantms-elite":
 			add("analytikjena-plasmaquantms-elite")
 		case "protocol-biosan-hipo-mpp96":
@@ -730,7 +735,7 @@ func supportedCommTypes(cfg *config.Config) []string {
 		switch strings.ToLower(strings.TrimSpace(protocol)) {
 		case "hl7", "simple", "astm", "ir-biotyper":
 			add("tcpip")
-		case "seegene-excel", "beosl-csv", "beoslcsv", "cary60-uvvis", "analytikjena-plasmaquantms-elite", "shimatzu-tocl", "shimatzu-generic", "biosan-hipo-mpp96", "gammavision", "tricarb-5110-tr", "anatolia-geneworks", "generic-file":
+		case "seegene-excel", "beosl-csv", "beoslcsv", "cfx96-quantitation", "cary60-uvvis", "analytikjena-plasmaquantms-elite", "shimatzu-tocl", "shimatzu-generic", "biosan-hipo-mpp96", "gammavision", "tricarb-5110-tr", "anatolia-geneworks", "generic-file":
 			add("file")
 		case "barcodeprinter":
 			add("utility")

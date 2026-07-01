@@ -113,6 +113,10 @@
                 <span id="analyzer-dot" class="dot"></span>
                 <span id="analyzer-status-label">Analyzer</span>
               </div>
+              <button id="result-sync-pill" class="status-pill status-pill-button" type="button">
+                <span class="dot"></span>
+                <span id="result-sync-status-label">Syncro Match WiseMED</span>
+              </button>
             </div>
           </div>
           <div id="app-toast" class="app-toast" hidden>
@@ -167,267 +171,358 @@
               <h3 id="reader-settings-title">Setari reader</h3>
             </div>
             <form id="reader-settings-form" class="stack reader-settings-form">
-              <div class="two-col">
-                <label class="reader-settings-field">
-                  <span>Reader ID</span>
-                  <input name="reader_id" type="text">
-                </label>
-                <label class="reader-settings-field">
-                  <span>Eticheta</span>
-                  <input name="reader_label" type="text">
-                </label>
-              </div>
-              <div class="two-col">
-                <label class="reader-settings-field">
-                  <span>Nume analizor</span>
-                  <input name="analyzer_name" type="text">
-                </label>
-                <label class="reader-settings-field">
-                  <span>Cod analizor</span>
-                  <input name="analyzer_code" type="text">
-                </label>
-              </div>
-              <div class="two-col">
-                <label class="reader-settings-field">
-                  <span>Baza de date</span>
-                  <input name="db_name" type="text">
-                </label>
-                <label class="reader-settings-field">
-                  <span>SQLite path</span>
-                  <input name="sqlite_path" type="text">
-                </label>
-              </div>
-              <div class="two-col">
-                <label class="reader-settings-field">
-                  <span>HTTP local address</span>
-                  <input name="local_http_address" type="text">
-                </label>
-                <label class="reader-settings-field">
-                  <span>Limba</span>
-                  <select name="local_http_language">
-                    <option value="ro">Romana</option>
-                    <option value="en">English</option>
-                  </select>
-                </label>
-              </div>
-              <div class="two-col">
-                <label class="reader-settings-field">
-                  <span>HTTPS local</span>
-                  <select name="local_http_tls">
-                    <option value="false">Nu</option>
-                    <option value="true">Da</option>
-                  </select>
-                </label>
-                <div class="reader-settings-field">
-                  <span>Certificat local</span>
-                  <p class="small muted">Daca este activat, aplicatia foloseste certificat local existent daca este valid; altfel il regenereaza automat la pornire.</p>
+              <section class="settings-section settings-section-identity">
+                <div class="settings-section-head">
+                  <div>
+                    <p class="settings-section-kicker">Identitate</p>
+                    <h4>Reader si aplicatie locala</h4>
+                  </div>
+                  <p class="small muted">Datele de baza dupa care identifici rapid instanta si locatia ei.</p>
                 </div>
-              </div>
-              <div class="two-col">
-                <label class="reader-settings-field">
-                  <span>Origin-uri CORS permise</span>
-                  <input name="local_http_cors_allowed_origins" type="text">
-                </label>
-                <div class="reader-settings-field">
-                  <span>Format</span>
-                  <p class="small muted">Lista separata prin virgula, punct si virgula sau linie noua. Implicit: https://ldse.wisemed.eu</p>
+                <div class="settings-section-grid">
+                  <div class="two-col">
+                    <label class="reader-settings-field">
+                      <span>Reader ID</span>
+                      <input name="reader_id" type="text">
+                    </label>
+                    <label class="reader-settings-field">
+                      <span>Eticheta</span>
+                      <input name="reader_label" type="text">
+                    </label>
+                  </div>
+                  <div class="two-col">
+                    <label class="reader-settings-field">
+                      <span>Nume analizor</span>
+                      <input name="analyzer_name" type="text">
+                    </label>
+                    <label class="reader-settings-field">
+                      <span>Cod analizor</span>
+                      <input name="analyzer_code" type="text">
+                    </label>
+                  </div>
+                  <div class="two-col">
+                    <label class="reader-settings-field">
+                      <span>Baza de date</span>
+                      <input name="db_name" type="text">
+                    </label>
+                    <label class="reader-settings-field">
+                      <span>SQLite path</span>
+                      <input name="sqlite_path" type="text">
+                    </label>
+                  </div>
                 </div>
-              </div>
-              <div class="two-col">
-                <label class="reader-settings-field">
-                  <span>Analyzer comm type</span>
-                  <select name="analyzer_comm_type"></select>
-                </label>
-                <label class="reader-settings-field">
-                  <span>Analyzer protocol</span>
-                  <select name="analyzer_protocol"></select>
-                </label>
-              </div>
-              <div class="two-col" id="reader-settings-tcp-mode-row">
-                <label class="reader-settings-field">
-                  <span>TCP/IP mode</span>
-                  <select name="tcpip_mode"></select>
-                </label>
-                <div class="reader-settings-field">
-                  <span>Transport</span>
-                  <p class="small muted">Sunt afisate doar modurile suportate de modulele active ale aplicatiei.</p>
+              </section>
+
+              <section class="settings-section settings-section-http">
+                <div class="settings-section-head">
+                  <div>
+                    <p class="settings-section-kicker">Interfata web</p>
+                    <h4>HTTP local, HTTPS si CORS</h4>
+                  </div>
+                  <p class="small muted">Aici sunt toate setarile pentru UI-ul local si accesul din browser.</p>
                 </div>
-              </div>
-              <div class="two-col" id="reader-settings-tcp-server-row">
-                <label class="reader-settings-field">
-                  <span>TCP/IP listen host</span>
-                  <input name="tcpip_host" type="text">
-                </label>
-                <label class="reader-settings-field">
-                  <span>TCP/IP listen port</span>
-                  <input name="tcpip_port" type="text">
-                </label>
-              </div>
-              <div class="two-col" id="reader-settings-tcp-client-row">
-                <label class="reader-settings-field">
-                  <span>TCP/IP remote host</span>
-                  <input name="tcpip_remote_host" type="text">
-                </label>
-                <label class="reader-settings-field">
-                  <span>TCP/IP remote port</span>
-                  <input name="tcpip_remote_port" type="text">
-                </label>
-              </div>
-              <div id="reader-settings-file-row">
-                <div class="panel-head compact-head">
-                  <h3>Directoare transport fișiere</h3>
+                <div class="settings-section-grid">
+                  <div class="two-col">
+                    <label class="reader-settings-field">
+                      <span>HTTP local address</span>
+                      <input name="local_http_address" type="text">
+                    </label>
+                    <label class="reader-settings-field">
+                      <span>Limba</span>
+                      <select name="local_http_language">
+                        <option value="ro">Romana</option>
+                        <option value="en">English</option>
+                      </select>
+                    </label>
+                  </div>
+                  <div class="two-col">
+                    <label class="reader-settings-field">
+                      <span>HTTPS local</span>
+                      <select name="local_http_tls">
+                        <option value="false">Nu</option>
+                        <option value="true">Da</option>
+                      </select>
+                    </label>
+                    <div class="reader-settings-note">
+                      <span>Certificat local</span>
+                      <p class="small muted">Daca este activat, aplicatia foloseste certificat local existent daca este valid; altfel il regenereaza automat la pornire.</p>
+                    </div>
+                  </div>
+                  <div class="two-col">
+                    <label class="reader-settings-field">
+                      <span>Origin-uri CORS permise</span>
+                      <input name="local_http_cors_allowed_origins" type="text">
+                    </label>
+                    <div class="reader-settings-note">
+                      <span>Format</span>
+                      <p class="small muted">Lista separata prin virgula, punct si virgula sau linie noua. Implicit: https://ldse.wisemed.eu</p>
+                    </div>
+                  </div>
                 </div>
-                <label class="reader-settings-field">
-                  <span>Director import</span>
-                  <input name="file_import_dir" type="text" placeholder="./inbox">
-                </label>
-                <label class="reader-settings-field">
-                  <span>Director procesate</span>
-                  <input name="file_processed_dir" type="text" placeholder="./processed">
-                </label>
-                <label class="reader-settings-field">
-                  <span>Director erori</span>
-                  <input name="file_failed_dir" type="text" placeholder="./failed">
-                </label>
-                <label class="reader-settings-field">
-                  <span>Pattern fisiere import</span>
-                  <input name="file_pattern" type="text" placeholder="*.csv">
-                </label>
-              </div>
-              <div class="panel-head compact-head">
-                <h3>Update server</h3>
-              </div>
-              <div class="two-col">
-                <label class="reader-settings-field">
-                  <span>Update enabled</span>
-                  <select name="app_updates_enabled">
-                    <option value="true">Da</option>
-                    <option value="false">Nu</option>
-                  </select>
-                </label>
-                <label class="reader-settings-field">
-                  <span>App ID update</span>
-                  <input name="app_updates_app_id" type="text">
-                </label>
-              </div>
-              <div class="two-col">
-                <label class="reader-settings-field">
-                  <span>Versiune curenta</span>
-                  <input name="app_updates_current_version" type="text" readonly>
-                </label>
-                <label class="reader-settings-field">
-                  <span>Canal</span>
-                  <select name="app_updates_channel">
-                    <option value="stable">stable</option>
-                  </select>
-                </label>
-              </div>
-              <div class="two-col">
-                <label class="reader-settings-field">
-                  <span>Update server URL</span>
-                  <input name="app_updates_base_url" type="text">
-                </label>
-                <label class="reader-settings-field">
-                  <span>Auto download</span>
-                  <select name="app_updates_auto_download">
-                    <option value="true">Da</option>
-                    <option value="false">Nu</option>
-                  </select>
-                </label>
-              </div>
-              <label class="reader-settings-field">
-                <span>Director download update</span>
-                <input name="app_updates_download_dir" type="text">
-              </label>
-              <div class="panel-head compact-head">
-                <h3>Logare si trasabilitate</h3>
-              </div>
-              <div class="two-col">
-                <label class="reader-settings-field">
-                  <span>Nivel debug verbose</span>
-                  <select name="logging_verbose_level">
-                    <option value="1">1</option>
-                    <option value="2">2</option>
-                    <option value="3">3</option>
-                    <option value="4">4</option>
-                    <option value="5">5</option>
-                  </select>
-                </label>
-                <div class="reader-settings-field">
-                  <span>Detaliu</span>
-                  <p class="small muted">La nivel 5 se scriu in fisierul de log request-urile si raspunsurile WiseMED, inclusiv payload-urile relevante pentru depanare.</p>
+              </section>
+
+              <section class="settings-section settings-section-transport">
+                <div class="settings-section-head">
+                  <div>
+                    <p class="settings-section-kicker">Comunicare analizor</p>
+                    <h4>Protocol, TCP/IP si fisiere</h4>
+                  </div>
+                  <p class="small muted">Grupeaza toate optiunile care definesc modul de comunicare cu reader-ul.</p>
                 </div>
-              </div>
-              <div class="panel-head compact-head">
-                <h3>Rezultate</h3>
-              </div>
-              <div class="two-col">
-                <label class="reader-settings-field">
-                  <span>Auto-confirm results in WiseMED</span>
-                  <select name="results_auto_confirm_wisemed">
-                    <option value="true">Da</option>
-                    <option value="false">Nu</option>
-                  </select>
-                </label>
-                <div class="reader-settings-field">
-                  <span>Manual</span>
-                  <p class="small muted">Cand optiunea este dezactivata, rezultatele raman locale pana la trimiterea manuala din butonul `(re)Send to WiseMED`.</p>
+                <div class="settings-section-grid">
+                  <div class="two-col">
+                    <label class="reader-settings-field">
+                      <span>Analyzer comm type</span>
+                      <select name="analyzer_comm_type"></select>
+                    </label>
+                    <label class="reader-settings-field">
+                      <span>Analyzer protocol</span>
+                      <select name="analyzer_protocol"></select>
+                    </label>
+                  </div>
+                  <div class="two-col" id="reader-settings-tcp-mode-row">
+                    <label class="reader-settings-field">
+                      <span>TCP/IP mode</span>
+                      <select name="tcpip_mode"></select>
+                    </label>
+                    <div class="reader-settings-note">
+                      <span>Transport</span>
+                      <p class="small muted">Sunt afisate doar modurile suportate de modulele active ale aplicatiei.</p>
+                    </div>
+                  </div>
+                  <div class="two-col" id="reader-settings-tcp-server-row">
+                    <label class="reader-settings-field">
+                      <span>TCP/IP listen host</span>
+                      <input name="tcpip_host" type="text">
+                    </label>
+                    <label class="reader-settings-field">
+                      <span>TCP/IP listen port</span>
+                      <input name="tcpip_port" type="text">
+                    </label>
+                  </div>
+                  <div class="two-col" id="reader-settings-tcp-client-row">
+                    <label class="reader-settings-field">
+                      <span>TCP/IP remote host</span>
+                      <input name="tcpip_remote_host" type="text">
+                    </label>
+                    <label class="reader-settings-field">
+                      <span>TCP/IP remote port</span>
+                      <input name="tcpip_remote_port" type="text">
+                    </label>
+                  </div>
+                  <div id="reader-settings-file-row" class="settings-subsection">
+                    <div class="settings-subsection-head">
+                      <h5>Directoare transport fisiere</h5>
+                      <p class="small muted">Folosit pentru protocoalele bazate pe schimb de fisiere.</p>
+                    </div>
+                    <div class="settings-section-grid">
+                      <label class="reader-settings-field">
+                        <span>Director import</span>
+                        <input name="file_import_dir" type="text" placeholder="./inbox">
+                      </label>
+                      <label class="reader-settings-field">
+                        <span>Director procesate</span>
+                        <input name="file_processed_dir" type="text" placeholder="./processed">
+                      </label>
+                      <label class="reader-settings-field">
+                        <span>Director erori</span>
+                        <input name="file_failed_dir" type="text" placeholder="./failed">
+                      </label>
+                      <label class="reader-settings-field">
+                        <span>Pattern fisiere import</span>
+                        <input name="file_pattern" type="text" placeholder="*.csv">
+                      </label>
+                    </div>
+                  </div>
                 </div>
-              </div>
-              <div class="panel-head compact-head">
-                <h3>Sincronizare rezultate WiseMED</h3>
-              </div>
-              <div class="two-col">
-                <label class="reader-settings-field">
-                  <span>Sync activ</span>
-                  <select name="result_sync_enabled">
-                    <option value="true">Da</option>
-                    <option value="false">Nu</option>
-                  </select>
-                </label>
-                <label class="reader-settings-field">
-                  <span>Interval cron (minute)</span>
-                  <input name="result_sync_interval_minutes" type="number" min="1" step="1">
-                </label>
-              </div>
-              <label class="reader-settings-field">
-                <span>Prefixe probe de eliminat</span>
-                <input name="result_sync_sample_prefixes" type="text" placeholder="C_AC_, M_AP_">
-              </label>
-              <label class="reader-settings-field">
-                <span>Sufixe probe de eliminat</span>
-                <input name="result_sync_sample_suffixes" type="text" placeholder="_PB, _PV">
-              </label>
-              <label class="reader-settings-field">
-                <span>Separatoare acceptate</span>
-                <input name="result_sync_separators" type="text" placeholder="-, _">
-              </label>
-              <label class="reader-settings-field">
-                <span>Prefixe QC (`prefix:true|false`)</span>
-                <input name="result_sync_qc_prefixes" type="text" placeholder="PC35:true, PC0.5:true">
-              </label>
-              <label class="reader-settings-field">
-                <span>Subtip protocol SHIMATZU Generic</span>
-                <select name="protocol_subtype">
-                  <option value="auto">Auto</option>
-                  <option value="gc-2010">GC-2010</option>
-                  <option value="hplc">HPLC</option>
-                  <option value="ion-cromatograph">Ion Cromatograph</option>
-                </select>
-              </label>
-              <div class="orders-buttons">
-                <button id="run-result-sync" class="ghost" type="button">Ruleaza acum</button>
-                <button id="reset-result-sync" class="ghost" type="button">Reseteaza stare sync</button>
-              </div>
-              <p id="result-sync-status" class="small muted"></p>
-              <label class="reader-settings-field">
-                <span id="repeat-mode-label">Mod tratare repetari</span>
-                <select id="repeat-mode-select" name="repeat_mode">
-                  <option value="individual">Repetari individuale pe analiza</option>
-                  <option value="grouped">Repetari grupate pe lot de rezultate</option>
-                </select>
-              </label>
-              <p id="repeat-mode-help" class="small muted">Schimbarea rezultatului implicit poate afecta doar analiza selectata sau intreg grupul de rezultate primit simultan pentru aceeasi proba.</p>
+              </section>
+
+              <section class="settings-section settings-section-updates">
+                <div class="settings-section-head">
+                  <div>
+                    <p class="settings-section-kicker">Mentenanta</p>
+                    <h4>Auto-update si logare</h4>
+                  </div>
+                  <p class="small muted">Setari pentru distribuirea versiunilor noi si pentru depanare.</p>
+                </div>
+                <div class="settings-section-grid">
+                  <div class="settings-subsection">
+                    <div class="settings-subsection-head">
+                      <h5>Update server</h5>
+                    </div>
+                    <div class="settings-section-grid">
+                      <div class="two-col">
+                        <label class="reader-settings-field">
+                          <span>Update enabled</span>
+                          <select name="app_updates_enabled">
+                            <option value="true">Da</option>
+                            <option value="false">Nu</option>
+                          </select>
+                        </label>
+                        <label class="reader-settings-field">
+                          <span>App ID update</span>
+                          <input name="app_updates_app_id" type="text">
+                        </label>
+                      </div>
+                      <div class="two-col">
+                        <label class="reader-settings-field">
+                          <span>Versiune curenta</span>
+                          <input name="app_updates_current_version" type="text" readonly>
+                        </label>
+                        <label class="reader-settings-field">
+                          <span>Canal</span>
+                          <select name="app_updates_channel">
+                            <option value="stable">stable</option>
+                          </select>
+                        </label>
+                      </div>
+                      <div class="two-col">
+                        <label class="reader-settings-field">
+                          <span>Update server URL</span>
+                          <input name="app_updates_base_url" type="text">
+                        </label>
+                        <label class="reader-settings-field">
+                          <span>Auto download</span>
+                          <select name="app_updates_auto_download">
+                            <option value="true">Da</option>
+                            <option value="false">Nu</option>
+                          </select>
+                        </label>
+                      </div>
+                      <label class="reader-settings-field">
+                        <span>Director download update</span>
+                        <input name="app_updates_download_dir" type="text">
+                      </label>
+                    </div>
+                  </div>
+                  <div class="settings-subsection">
+                    <div class="settings-subsection-head">
+                      <h5>Logare si trasabilitate</h5>
+                    </div>
+                    <div class="two-col">
+                      <label class="reader-settings-field">
+                        <span>Nivel debug verbose</span>
+                        <select name="logging_verbose_level">
+                          <option value="1">1</option>
+                          <option value="2">2</option>
+                          <option value="3">3</option>
+                          <option value="4">4</option>
+                          <option value="5">5</option>
+                        </select>
+                      </label>
+                      <div class="reader-settings-note">
+                        <span>Detaliu</span>
+                        <p class="small muted">La nivel 5 se scriu in fisierul de log request-urile si raspunsurile WiseMED, inclusiv payload-urile relevante pentru depanare.</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <section class="settings-section settings-section-results">
+                <div class="settings-section-head">
+                  <div>
+                    <p class="settings-section-kicker">Rezultate si WiseMED</p>
+                    <h4>Trimitere, confirmare si sincronizare</h4>
+                  </div>
+                  <p class="small muted">Tot ce tine de rezultatele finale si schimbul lor cu WiseMED.</p>
+                </div>
+                <div class="settings-section-grid">
+                  <div class="settings-subsection">
+                    <div class="settings-subsection-head">
+                      <h5>Flux rezultate</h5>
+                    </div>
+                    <div class="two-col">
+                      <label class="reader-settings-field">
+                        <span>Auto-confirm results in WiseMED</span>
+                        <select name="results_auto_confirm_wisemed">
+                          <option value="true">Da</option>
+                          <option value="false">Nu</option>
+                        </select>
+                      </label>
+                      <div class="reader-settings-note">
+                        <span>Manual</span>
+                        <p class="small muted">Cand optiunea este dezactivata, rezultatele raman locale pana la trimiterea manuala din butonul `(re)Send to WiseMED`.</p>
+                      </div>
+                    </div>
+                    <div class="two-col">
+                      <label class="reader-settings-field">
+                        <span>Set de reactivi implicit WiseMED</span>
+                        <input name="wisemed_reagent_set_name" type="text" placeholder="Numele exact din MedicalPAGEs">
+                      </label>
+                      <div class="reader-settings-note">
+                        <span>Aplicare</span>
+                        <p class="small muted">Valoarea este trimisa automat catre MP API la salvarea rezultatelor si este folosita ca default pentru acest reader.</p>
+                      </div>
+                    </div>
+                    <label class="reader-settings-field">
+                      <span id="repeat-mode-label">Mod tratare repetari</span>
+                      <select id="repeat-mode-select" name="repeat_mode">
+                        <option value="individual">Repetari individuale pe analiza</option>
+                        <option value="grouped">Repetari grupate pe lot de rezultate</option>
+                      </select>
+                    </label>
+                    <div class="reader-settings-note">
+                      <span id="delete-orders-preference-label">Confirmare stergere cereri</span>
+                      <label class="toggle">
+                        <input id="delete-orders-preference" type="checkbox">
+                        <span id="delete-orders-preference-toggle-label">Nu mai intreba la stergere</span>
+                      </label>
+                    </div>
+                    <p id="repeat-mode-help" class="small muted">Schimbarea rezultatului implicit poate afecta doar analiza selectata sau intreg grupul de rezultate primit simultan pentru aceeasi proba.</p>
+                  </div>
+                  <div class="settings-subsection">
+                    <div class="settings-subsection-head">
+                      <h5>Sincronizare rezultate WiseMED</h5>
+                    </div>
+                    <div class="settings-section-grid">
+                      <div class="two-col">
+                        <label class="reader-settings-field">
+                          <span>Sync activ</span>
+                          <select name="result_sync_enabled">
+                            <option value="true">Da</option>
+                            <option value="false">Nu</option>
+                          </select>
+                        </label>
+                        <label class="reader-settings-field">
+                          <span>Interval cron (minute)</span>
+                          <input name="result_sync_interval_minutes" type="number" min="1" step="1">
+                        </label>
+                      </div>
+                      <label class="reader-settings-field">
+                        <span>Prefixe probe de eliminat</span>
+                        <input name="result_sync_sample_prefixes" type="text" placeholder="C_AC_, M_AP_">
+                      </label>
+                      <label class="reader-settings-field">
+                        <span>Sufixe probe de eliminat</span>
+                        <input name="result_sync_sample_suffixes" type="text" placeholder="_PB, _PV">
+                      </label>
+                      <label class="reader-settings-field">
+                        <span>Separatoare acceptate</span>
+                        <input name="result_sync_separators" type="text" placeholder="-, _">
+                      </label>
+                      <label class="reader-settings-field">
+                        <span>Prefixe QC (`prefix:true|false`)</span>
+                        <input name="result_sync_qc_prefixes" type="text" placeholder="PC35:true, PC0.5:true">
+                      </label>
+                      <label class="reader-settings-field">
+                        <span>Subtip protocol SHIMATZU Generic</span>
+                        <select name="protocol_subtype">
+                          <option value="auto">Auto</option>
+                          <option value="gc-2010">GC-2010</option>
+                          <option value="hplc">HPLC</option>
+                          <option value="ion-cromatograph">Ion Cromatograph</option>
+                        </select>
+                      </label>
+                      <div class="orders-buttons">
+                        <button id="run-result-sync" class="ghost" type="button">Ruleaza acum</button>
+                        <button id="reset-result-sync" class="ghost" type="button">Reseteaza stare sync</button>
+                      </div>
+                      <p id="result-sync-status" class="small muted"></p>
+                    </div>
+                  </div>
+                </div>
+              </section>
               <div class="orders-buttons">
                 <button id="save-reader-settings" class="ghost" type="submit">Salveaza</button>
               </div>
@@ -532,17 +627,36 @@
                   <input id="orders-select-all" type="checkbox">
                   <span id="orders-select-all-label">Selecteaza tot</span>
                 </label>
+                <label class="poll-box poll-box-round">
+                  <span id="orders-received-filter-label">Rezultate</span>
+                  <select id="orders-received-filter"></select>
+                </label>
+                <label class="poll-box poll-box-round">
+                  <span id="orders-sent-filter-label">Trimiteri WiseMED</span>
+                  <select id="orders-sent-filter"></select>
+                </label>
+                <label class="poll-box analyte-search-box">
+                  <span id="orders-search-label">Cautare</span>
+                  <input id="orders-search" type="search" placeholder="Cauta dupa File ID, Sample code, Specimen code">
+                </label>
+                <span id="orders-filter-active" class="status-pill" hidden>Filtru activ</span>
               </div>
               <div class="orders-buttons">
                 <button id="import-orders" class="ghost">Import fisier</button>
                 <button id="export-orders" class="ghost">Export</button>
                 <button id="sync-orders-wisemed" class="ghost" type="button">Try WiseMED match</button>
+                <button id="reapply-order-transformations" class="ghost" type="button">Reaplica transformari</button>
                 <button id="send-orders-wisemed" class="ghost" type="button">Trimite in buletin</button>
                 <button id="worklist-orders" class="ghost">Get worklist</button>
                 <button id="delete-orders" class="danger" type="button">Sterge selectia</button>
                 <button id="new-round" class="ghost">Runda noua</button>
                 <button id="refresh-orders" class="ghost" data-i18n="refresh">Refresh</button>
               </div>
+            </div>
+            <div class="orders-legend" id="orders-legend">
+              <div class="legend-chip"><span class="status-stack"><span class="status-bar receive none"></span><span class="status-bar send none"></span></span><span>Neprimite / Netrimise</span></div>
+              <div class="legend-chip"><span class="status-stack"><span class="status-bar receive partial"></span><span class="status-bar send partial"></span></span><span>Partial</span></div>
+              <div class="legend-chip"><span class="status-stack"><span class="status-bar receive full"></span><span class="status-bar send full"></span></span><span>Complet</span></div>
             </div>
             <input id="orders-import-file" type="file" accept=".csv,text/csv" hidden>
             <div id="orders-layout" class="orders-layout"></div>
@@ -786,7 +900,7 @@
   </div>
   <div id="analyte-modal" class="modal-shell" hidden>
     <div id="analyte-modal-backdrop" class="modal-backdrop"></div>
-    <section class="modal-card form-panel" role="dialog" aria-modal="true" aria-labelledby="editor-title">
+    <section class="modal-card form-panel analyte-modal-card" role="dialog" aria-modal="true" aria-labelledby="editor-title">
       <div class="modal-window-bar">
         <div class="modal-window-dots" aria-hidden="true">
           <span></span>
@@ -798,10 +912,11 @@
         <h3 id="editor-title">Editor analyte</h3>
         <button id="close-analyte-modal" class="ghost modal-close-btn" type="button" aria-label="Close">Close</button>
       </div>
-      <div class="modal-body">
+      <div class="modal-body analyte-modal-body">
         <form id="analyte-form" class="stack">
           <label><span data-i18n="field_tag">Tag</span><input name="tag" required></label>
           <label><span data-i18n="field_code">Code</span><input name="code"></label>
+          <label><span>Cod analiza rezultat</span><input name="result_formula_code" placeholder="FCAT"></label>
           <label><span data-i18n="field_name">Name</span><input name="name" required></label>
           <label><span data-i18n="field_description">Description</span><textarea name="description" rows="3"></textarea></label>
           <div class="two-col">
@@ -830,12 +945,145 @@
           </div>
           <label><span data-i18n="field_reagents_set">Reagents Set</span><input name="result_reagents_set"></label>
           <label><span>Domeniu de lucru / Unitate de măsură</span><input name="worklist_label"></label>
+          <div class="transform-rules-editor">
+            <div class="transform-rules-head">
+              <div>
+                <strong>Reguli transformare</strong>
+                <div class="small muted">Se aplica in ordinea afisata pentru rezultatul acestui analit.</div>
+              </div>
+              <button id="add-transform-rule" type="button" class="ghost">Adauga regula</button>
+            </div>
+            <div id="transform-rules-list" class="transform-rules-list"></div>
+            <textarea name="transform_rules" hidden></textarea>
+          </div>
+          <label id="analyte-detected-max-cq-field" hidden><span>Prag maxim Ct/Cq detectat</span><input name="detected_max_cq" type="number" step="0.01" min="0"></label>
           <label class="toggle"><input name="active" type="checkbox" checked><span data-i18n="field_active">Active</span></label>
           <div class="actions">
             <button id="save-analyte" type="submit" class="primary">Save</button>
             <button type="button" id="delete-analyte" class="danger" hidden data-i18n="delete">Delete</button>
           </div>
           <p id="analyte-message" class="small muted"></p>
+        </form>
+      </div>
+    </section>
+  </div>
+  <div id="transform-rule-modal" class="modal-shell" hidden>
+    <div id="transform-rule-modal-backdrop" class="modal-backdrop"></div>
+    <section class="modal-card form-panel transform-rule-modal-card" role="dialog" aria-modal="true" aria-labelledby="transform-rule-title">
+      <div class="modal-window-bar">
+        <div class="modal-window-dots" aria-hidden="true">
+          <span></span>
+          <span></span>
+          <span></span>
+        </div>
+      </div>
+      <div class="panel-head modal-head">
+        <h3 id="transform-rule-title">Regula transformare</h3>
+        <button id="close-transform-rule-modal" class="ghost modal-close-btn" type="button" aria-label="Close">Close</button>
+      </div>
+      <div class="modal-body transform-rule-modal-body">
+        <form id="transform-rule-form" class="stack">
+          <div class="two-col">
+            <label>
+              <span>Nume regula</span>
+              <input name="id" type="text" placeholder="Ex. neg-map">
+            </label>
+            <label>
+              <span>Tip transformare</span>
+              <select name="type">
+                <option value="value_map">Din valoare in valoare</option>
+                <option value="formula">Formula</option>
+              </select>
+            </label>
+          </div>
+          <div class="two-col">
+            <label>
+              <span>Citeste din</span>
+              <select name="source_field">
+                <option value="source_result">Rezultat brut calitativ</option>
+                <option value="source_raw">Rezultat brut cantitativ</option>
+                <option value="source_interpreted">Interpretare bruta</option>
+                <option value="result_value">Rezultat curent</option>
+                <option value="raw_value">Cantitativ curent</option>
+                <option value="interpreted">Interpretare curenta</option>
+              </select>
+            </label>
+            <label>
+              <span>Scrie in</span>
+              <select name="target_field">
+                <option value="result_value">Rezultat calitativ</option>
+                <option value="raw_value">Rezultat cantitativ</option>
+                <option value="interpreted">Interpretare</option>
+              </select>
+            </label>
+          </div>
+          <div class="two-col">
+            <label>
+              <span>Actiune pe interpretare</span>
+              <select name="target_mode">
+                <option value="">Rescrie</option>
+                <option value="append">Adauga la interpretare</option>
+              </select>
+            </label>
+            <label>
+              <span>Dupa aplicare</span>
+              <select name="stop_after_apply">
+                <option value="true">Opreste transformarile</option>
+                <option value="false">Continua cu regula urmatoare</option>
+              </select>
+            </label>
+          </div>
+          <div class="two-col transform-rule-map-fields">
+            <label>
+              <span>Daca valoarea este</span>
+              <input name="match_value" type="text" placeholder="Ex. neg">
+            </label>
+            <label>
+              <span>Transforma in</span>
+              <input name="output_value" type="text" placeholder="Ex. NEDETECTAT">
+            </label>
+          </div>
+          <label class="transform-rule-formula-field" hidden>
+            <span>Formula</span>
+            <textarea name="formula" rows="7" placeholder="Exemple:
+100*0.01
+SRC_RAW*0.01
+CUR_RAW+5
+IF(SRC_RAW > 40, &quot;NEDETECTABIL&quot;, &quot;DETECTABIL&quot;)
+SQRT(SRC_RAW)
+SUM(RES_FCAT, RES_FPT)
+AVG(SRC_RAW, RES_FCAT, RES_FPT)
+ROUND(((6-RES_FCAT) - RES_FPT/3) / (RES_FPT + 6), 2)
+( (6-RES_FCAT) - RES_FPT/3) / (RES_FPT + 6)
+
+Variabile utile:
+SRC_RESULT = rezultatul brut calitativ
+SRC_RAW = rezultatul brut cantitativ
+CUR_RESULT = rezultatul curent
+CUR_RAW = cantitativul curent
+RES_FCAT = rezultatul brut al analitului cu cod FCAT"></textarea>
+            <div class="transform-formula-helper">
+              <div class="transform-formula-helper-block">
+                <strong>Functii disponibile</strong>
+                <div id="transform-formula-functions" class="transform-formula-chip-list"></div>
+              </div>
+              <div class="transform-formula-helper-block">
+                <strong>Variabile disponibile</strong>
+                <div id="transform-formula-variables" class="transform-formula-chip-list"></div>
+              </div>
+              <div class="small muted">
+                Click pe o functie sau variabila pentru inserare in formula. Pentru texte foloseste ghilimele, de exemplu <code>IF(SRC_RAW &gt; 40, "NEDETECTABIL", "DETECTABIL")</code>.
+              </div>
+            </div>
+          </label>
+          <div class="two-col">
+            <label class="toggle"><input name="enabled" type="checkbox" checked><span>Regula activa</span></label>
+            <label class="toggle"><input name="match_ignore_case" type="checkbox" checked><span>Ignora litere mari/mici</span></label>
+          </div>
+          <div class="actions">
+            <button id="save-transform-rule" type="submit" class="primary">Salveaza regula</button>
+          </div>
+          <p id="transform-rule-message" class="small muted"></p>
         </form>
       </div>
     </section>
@@ -893,6 +1141,33 @@
           </div>
           <p id="daily-detail-definition-message" class="small muted"></p>
         </form>
+      </div>
+    </section>
+  </div>
+  <div id="orders-delete-modal" class="modal-shell" hidden>
+    <div id="orders-delete-modal-backdrop" class="modal-backdrop"></div>
+    <section class="modal-card form-panel" role="dialog" aria-modal="true" aria-labelledby="orders-delete-title">
+      <div class="modal-window-bar">
+        <div class="modal-window-dots" aria-hidden="true">
+          <span></span><span></span><span></span>
+        </div>
+      </div>
+      <div class="panel-head modal-head">
+        <h3 id="orders-delete-title">Confirmare stergere</h3>
+        <button id="close-orders-delete-modal" class="ghost modal-close-btn" type="button" aria-label="Close">Close</button>
+      </div>
+      <div class="modal-body">
+        <div class="stack">
+          <p id="orders-delete-message">Stergi cererile selectate si toate rezultatele lor?</p>
+          <label class="toggle">
+            <input id="orders-delete-skip-confirm" type="checkbox">
+            <span id="orders-delete-skip-confirm-label">Nu mai intreba</span>
+          </label>
+          <div class="actions">
+            <button id="orders-delete-confirm" type="button" class="danger">Sterge</button>
+            <button id="orders-delete-cancel" type="button" class="ghost">Renunta</button>
+          </div>
+        </div>
       </div>
     </section>
   </div>

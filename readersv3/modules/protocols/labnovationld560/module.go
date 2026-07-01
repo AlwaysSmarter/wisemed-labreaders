@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -20,13 +21,17 @@ import (
 	"wisemed-labreaders/readersv3/core/module"
 	coremodel "wisemed-labreaders/readersv3/modules/core/model"
 	"wisemed-labreaders/readersv3/modules/protocols/fileimportbase"
+	"wisemed-labreaders/readersv3/shared/bindguard"
+	"wisemed-labreaders/readersv3/shared/commtrace"
 )
 
 type storageService interface {
 	CurrentRoundNo(orderDate string) (int, error)
 	RecordImportedResult(orderDate string, roundNo int, rec coremodel.ImportedRecord, sourceFile string) (coremodel.Order, coremodel.OrderAnalysis, coremodel.OrderAnalysisResult, error)
+	ReapplyOrderTransformations(orderIDs []int64) error
 	UpsertQCRecord(item coremodel.QCRecord) (coremodel.QCRecord, error)
 	UpsertQCAnalysis(item coremodel.QCAnalysis) (coremodel.QCAnalysis, error)
+	ReapplyQCTransformations(recordIDs []int64) error
 	ListAnalytes() ([]coremodel.Analyte, error)
 	SaveAnalyte(item coremodel.Analyte) (coremodel.Analyte, error)
 }
@@ -34,6 +39,15 @@ type storageService interface {
 type wiseMedSyncService interface {
 	SetupComplete() bool
 	EnsureEquipmentOnline(reader map[string]interface{}) (map[string]interface{}, error)
+}
+
+type auditLogger interface {
+	AppendAuditLog(level, actor, eventType, message string, meta map[string]interface{}) error
+}
+
+type analyzerActivityTracker interface {
+	Connected(delta int)
+	Packet(direction, transport string)
 }
 
 type statusSnapshot struct {
@@ -136,11 +150,43 @@ func (m *Module) runTCPServer(ctx context.Context, cfg commConfig) error {
 	addr := net.JoinHostPort(cfg.ListenHost, cfg.ListenPort)
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
+		if bindguard.IsAddressInUse(err) {
+			nextAddr, _, handleErr := bindguard.HandleAddressInUse(m.rt.ConfigPath(), addr, map[string]interface{}{
+				"modules.transport-tcpip.host": cfg.ListenHost,
+				"modules.transport-tcpip.port": cfg.ListenPort,
+			}, m.rt.Logf)
+			if handleErr == nil {
+				msg := fmt.Sprintf("labnovation-ld560 nu se poate binda la %s: %v. Propun %s si scriu aceasta valoare in config.yaml", addr, err, nextAddr)
+				fmt.Println(msg)
+				m.rt.Logf(msg)
+				host, port, splitErr := net.SplitHostPort(nextAddr)
+				if splitErr == nil {
+					cfg.ListenHost = host
+					cfg.ListenPort = port
+					return m.runTCPServer(ctx, cfg)
+				}
+			}
+		}
 		m.rt.Logf("labnovation-ld560 failed to listen on %s: %v", addr, err)
+		m.appendAuditLog("error", "transport-tcpip", fmt.Sprintf("labnovation-ld560 server failed to start on %s", addr), map[string]interface{}{
+			"mode":     "server",
+			"address":  addr,
+			"host":     cfg.ListenHost,
+			"port":     cfg.ListenPort,
+			"protocol": cfg.ProtocolMode,
+			"error":    err.Error(),
+		})
 		return err
 	}
 	defer ln.Close()
 	m.rt.Logf("labnovation-ld560 listening as tcp server on %s using protocol=%s", addr, cfg.ProtocolMode)
+	m.appendAuditLog("info", "transport-tcpip", fmt.Sprintf("labnovation-ld560 tcp server started on %s", addr), map[string]interface{}{
+		"mode":     "server",
+		"address":  addr,
+		"host":     cfg.ListenHost,
+		"port":     cfg.ListenPort,
+		"protocol": cfg.ProtocolMode,
+	})
 	go func() {
 		<-ctx.Done()
 		_ = ln.Close()
@@ -164,6 +210,13 @@ func (m *Module) runTCPServer(ctx context.Context, cfg commConfig) error {
 func (m *Module) runTCPClient(ctx context.Context, cfg commConfig) error {
 	target := net.JoinHostPort(cfg.RemoteHost, cfg.RemotePort)
 	m.rt.Logf("labnovation-ld560 connecting as tcp client to %s using protocol=%s", target, cfg.ProtocolMode)
+	m.appendAuditLog("info", "transport-tcpip", fmt.Sprintf("labnovation-ld560 tcp client connecting to %s", target), map[string]interface{}{
+		"mode":        "client",
+		"address":     target,
+		"remote_host": cfg.RemoteHost,
+		"remote_port": cfg.RemotePort,
+		"protocol":    cfg.ProtocolMode,
+	})
 	for {
 		select {
 		case <-ctx.Done():
@@ -204,6 +257,12 @@ func (m *Module) snapshot() statusSnapshot {
 	return m.status
 }
 
+func (m *Module) LastMessageAt() time.Time {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.status.LastMessageAt
+}
+
 func (m *Module) handleMeta(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"ok":                true,
@@ -239,7 +298,6 @@ func (m *Module) handleSettingsAPI(w http.ResponseWriter, r *http.Request) {
 	case http.MethodGet:
 		writeJSON(w, http.StatusOK, map[string]interface{}{"ok": true, "settings": m.settingsPayload()})
 	case http.MethodPut:
-		before := m.communicationConfig()
 		var req struct {
 			ProtocolMode  string                 `json:"protocol_mode"`
 			TCPMode       string                 `json:"tcp_mode"`
@@ -247,6 +305,7 @@ func (m *Module) handleSettingsAPI(w http.ResponseWriter, r *http.Request) {
 			TCPPort       string                 `json:"tcp_port"`
 			TCPRemoteHost string                 `json:"tcp_remote_host"`
 			TCPRemotePort string                 `json:"tcp_remote_port"`
+			ImageMode     string                 `json:"image_mode"`
 			HL7           map[string]interface{} `json:"hl7"`
 			Simple        map[string]interface{} `json:"simple"`
 		}
@@ -287,6 +346,7 @@ func (m *Module) handleSettingsAPI(w http.ResponseWriter, r *http.Request) {
 		}
 		hl7 := normalizeMap(req.HL7)
 		simple := normalizeMap(req.Simple)
+		simple["image_mode"] = normalizeImageMode(req.ImageMode)
 		if err := config.Update(m.rt.ConfigPath(), map[string]interface{}{
 			"analyzer.protocol":                         mode,
 			"modules.transport-tcpip.mode":              tcpMode,
@@ -301,11 +361,8 @@ func (m *Module) handleSettingsAPI(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		after := m.communicationConfig()
-		restartNeeded := before != after
-		message := "Setarile au fost salvate."
-		if restartNeeded {
-			message = "Setarile au fost salvate. Comunicarea Labnovation LD-560 a fost reinitializata."
-		}
+		restartNeeded := true
+		message := "Setarile au fost salvate. Comunicarea Labnovation LD-560 a fost reinitializata."
 		m.rt.Logf("labnovation-ld560 settings saved: protocol=%s mode=%s listen=%s:%s remote=%s:%s restart=%t", after.ProtocolMode, after.TCPMode, after.ListenHost, after.ListenPort, after.RemoteHost, after.RemotePort, restartNeeded)
 		writeJSON(w, http.StatusOK, map[string]interface{}{
 			"ok":       true,
@@ -391,6 +448,12 @@ func (m *Module) handleSettingsPage(w http.ResponseWriter, r *http.Request) {
       <textarea id="hl7_json"></textarea>
       <label for="simple_json">Configuratie Simple</label>
       <textarea id="simple_json"></textarea>
+      <label for="image_mode">Image mode</label>
+      <select id="image_mode">
+        <option value="no_image">No image</option>
+        <option value="bitmap">Bitmap format</option>
+        <option value="base64">Base 64 format</option>
+      </select>
       <button id="save">Salveaza</button>
       <div id="status" class="status"></div>
     </div>
@@ -405,6 +468,7 @@ func (m *Module) handleSettingsPage(w http.ResponseWriter, r *http.Request) {
       document.getElementById('tcp_remote_port').value = data.tcp_remote_port || data.tcp_port || '8000';
       document.getElementById('hl7_json').value = JSON.stringify(data.hl7 || {}, null, 2);
       document.getElementById('simple_json').value = JSON.stringify(data.simple || {}, null, 2);
+      document.getElementById('image_mode').value = data.image_mode || ((data.simple || {}).image_mode) || 'no_image';
       document.getElementById('save').addEventListener('click', async () => {
         const status = document.getElementById('status');
         status.className = 'status';
@@ -416,6 +480,7 @@ func (m *Module) handleSettingsPage(w http.ResponseWriter, r *http.Request) {
             tcp_port: document.getElementById('tcp_port').value,
             tcp_remote_host: document.getElementById('tcp_remote_host').value,
             tcp_remote_port: document.getElementById('tcp_remote_port').value,
+            image_mode: document.getElementById('image_mode').value,
             hl7: JSON.parse(document.getElementById('hl7_json').value || '{}'),
             simple: JSON.parse(document.getElementById('simple_json').value || '{}')
           };
@@ -444,6 +509,7 @@ func (m *Module) handleSettingsPage(w http.ResponseWriter, r *http.Request) {
 
 func (m *Module) settingsPayload() map[string]interface{} {
 	settings := m.rt.ModuleSettings(m.ID())
+	nestedImageModeConfigured := false
 	payload := map[string]interface{}{
 		"protocol_mode":   m.activeProtocol(),
 		"tcp_mode":        m.tcpMode(),
@@ -453,12 +519,24 @@ func (m *Module) settingsPayload() map[string]interface{} {
 		"tcp_remote_port": m.remotePort(),
 		"hl7":             defaultHL7Settings(),
 		"simple":          defaultSimpleSettings(),
+		"image_mode":      "no_image",
+	}
+	if cfg, err := config.Load(m.rt.ConfigPath()); err == nil && cfg != nil {
+		settings = cfg.ModuleSettings(m.ID())
 	}
 	if raw, ok := settings["hl7"].(map[string]interface{}); ok && raw != nil {
 		payload["hl7"] = mergeSettings(defaultHL7Settings(), raw)
 	}
 	if raw, ok := settings["simple"].(map[string]interface{}); ok && raw != nil {
+		_, nestedImageModeConfigured = raw["image_mode"]
 		payload["simple"] = mergeSettings(defaultSimpleSettings(), raw)
+	}
+	if simple, ok := payload["simple"].(map[string]interface{}); ok {
+		legacy := normalizeImageMode(asString(settings["image_mode"]))
+		if !nestedImageModeConfigured && legacy != "" {
+			simple["image_mode"] = legacy
+		}
+		payload["image_mode"] = normalizeImageMode(asString(simple["image_mode"]))
 	}
 	return payload
 }
@@ -466,7 +544,9 @@ func (m *Module) settingsPayload() map[string]interface{} {
 func (m *Module) handleConn(ctx context.Context, conn net.Conn, protocol, role string) {
 	defer conn.Close()
 	m.changeClients(1)
+	m.markAnalyzerConnected(1)
 	defer m.changeClients(-1)
+	defer m.markAnalyzerConnected(-1)
 	remoteAddr := conn.RemoteAddr().String()
 	done := make(chan struct{})
 	go func() {
@@ -510,6 +590,8 @@ func (m *Module) handleConn(ctx context.Context, conn net.Conn, protocol, role s
 			m.rt.Logf("labnovation-ld560 %s read error: remote=%s protocol=%s err=%v", role, remoteAddr, protocol, err)
 			return
 		}
+		m.logWire("in", "tcp", fmt.Sprintf("remote=%s protocol=%s role=%s bytes=%d", remoteAddr, protocol, role, len(raw)), raw)
+		m.markAnalyzerPacket("tcp")
 		imported, parseErr := m.importMessage(protocol, raw)
 		if parseErr != nil {
 			m.setError(parseErr)
@@ -522,7 +604,6 @@ func (m *Module) handleConn(ctx context.Context, conn net.Conn, protocol, role s
 }
 
 func (m *Module) importMessage(protocol string, raw []byte) (int, error) {
-	m.logf(5, "labnovation-ld560 import raw protocol=%s bytes=%d payload=%s", protocol, len(raw), truncateForLog(string(raw), 4000))
 	store := m.storage()
 	if store == nil {
 		return 0, errors.New("storage service unavailable")
@@ -549,6 +630,8 @@ func (m *Module) persistMessages(store storageService, messages []parsedMessage,
 	imported := 0
 	roundCache := map[string]int{}
 	autoSaveTargets := map[string]*fileimportbase.AutoSaveTarget{}
+	qcRecordIDs := []int64{}
+	imageMode := m.simpleImageMode()
 	items, err := store.ListAnalytes()
 	if err != nil {
 		return imported, err
@@ -558,8 +641,25 @@ func (m *Module) persistMessages(store storageService, messages []parsedMessage,
 		knownAnalytes[strings.TrimSpace(item.Tag)] = item
 	}
 	analytesChanged := false
-	m.logf(4, "labnovation-ld560 persist start source=%s messages=%d", source, len(messages))
+	m.logf(4, "labnovation-ld560 persist start source=%s messages=%d image_mode=%s", source, len(messages), imageMode)
 	for _, item := range messages {
+		imagePath := ""
+		imageFormat := ""
+		imageEncoding := ""
+		if item.image == nil && imageMode != "no_image" {
+			m.rt.Logf("labnovation-ld560 image not parsed file_id=%s image_mode=%s", firstNonEmpty(item.FileID, "-"), imageMode)
+		}
+		if item.image != nil {
+			imageFormat = firstNonEmpty(item.image.format, "bin")
+			imageEncoding = firstNonEmpty(item.image.encoding, "bitmap")
+			m.rt.Logf("labnovation-ld560 image received file_id=%s image_name=%s encoding=%s bytes=%d", firstNonEmpty(item.FileID, "-"), firstNonEmpty(item.image.name, "-"), imageEncoding, len(item.image.data))
+			if savedPath, err := m.saveMessageImage(item, *item.image); err != nil {
+				m.rt.Logf("labnovation-ld560 image save failed file_id=%s image_name=%s err=%v", firstNonEmpty(item.FileID, "-"), firstNonEmpty(item.image.name, "-"), err)
+			} else {
+				imagePath = savedPath
+				m.rt.Logf("labnovation-ld560 image saved file_id=%s path=%s", firstNonEmpty(item.FileID, "-"), savedPath)
+			}
+		}
 		for _, result := range item.Results {
 			analyteTag := strings.TrimSpace(result.AnalyteTag)
 			if analyteTag == "" {
@@ -606,6 +706,7 @@ func (m *Module) persistMessages(store storageService, messages []parsedMessage,
 				}); err != nil {
 					return imported, err
 				}
+				qcRecordIDs = append(qcRecordIDs, record.ID)
 				imported++
 				continue
 			}
@@ -634,7 +735,10 @@ func (m *Module) persistMessages(store storageService, messages []parsedMessage,
 				RackPosition: atoi(item.RackPosition),
 				SampleNo:     atoi(item.SampleNo),
 				Meta: map[string]interface{}{
-					"protocol": source,
+					"protocol":                   source,
+					"labnovation_image_path":     imagePath,
+					"labnovation_image_format":   imageFormat,
+					"labnovation_image_encoding": imageEncoding,
 				},
 			}, "tcp:"+source)
 			if err != nil {
@@ -643,6 +747,16 @@ func (m *Module) persistMessages(store storageService, messages []parsedMessage,
 			fileimportbase.CollectAutoSaveTarget(autoSaveTargets, item.RunDate, roundNo, order.ID)
 			imported++
 		}
+	}
+	orderIDs := []int64{}
+	for _, target := range fileimportbase.FlattenAutoSaveTargets(autoSaveTargets) {
+		orderIDs = append(orderIDs, target.OrderIDs...)
+	}
+	if err := store.ReapplyOrderTransformations(orderIDs); err != nil {
+		m.rt.Logf("labnovation-ld560 transformation warning: %v", err)
+	}
+	if err := store.ReapplyQCTransformations(qcRecordIDs); err != nil {
+		m.rt.Logf("labnovation-ld560 qc transformation warning: %v", err)
 	}
 	if analytesChanged {
 		if err := m.syncAnalytesToWiseMED(); err != nil {
@@ -733,14 +847,6 @@ func (m *Module) logParsedMessages(protocol string, messages []parsedMessage) {
 	if blob, err := json.Marshal(preview); err == nil {
 		m.rt.Logf("labnovation-ld560 parse preview protocol=%s %s", protocol, string(blob))
 	}
-}
-
-func truncateForLog(value string, limit int) string {
-	value = strings.TrimSpace(value)
-	if len(value) <= limit {
-		return value
-	}
-	return value[:limit] + "...(truncated)"
 }
 
 func (m *Module) logIgnored(kind, reason string, payload map[string]interface{}) {
@@ -861,6 +967,51 @@ func (m *Module) remotePort() string {
 	return port
 }
 
+func (m *Module) appendAuditLog(level, eventType, message string, meta map[string]interface{}) {
+	service, ok := m.rt.Service("storage")
+	if !ok {
+		return
+	}
+	logger, ok := service.(auditLogger)
+	if !ok {
+		return
+	}
+	if err := logger.AppendAuditLog(level, "system", eventType, strings.TrimSpace(message), meta); err != nil {
+		m.rt.Logf("labnovation-ld560 audit log failed: %v", err)
+	}
+}
+
+func (m *Module) logWire(direction, transport, details string, payload []byte) {
+	if m.verboseLevel() < 4 {
+		return
+	}
+	m.rt.Logf("labnovation-ld560 %s", commtrace.Format(direction, transport, details, payload, m.verboseLevel()))
+}
+
+func (m *Module) markAnalyzerConnected(delta int) {
+	service, ok := m.rt.Service("analyzer-activity")
+	if !ok {
+		return
+	}
+	tracker, ok := service.(analyzerActivityTracker)
+	if !ok {
+		return
+	}
+	tracker.Connected(delta)
+}
+
+func (m *Module) markAnalyzerPacket(transport string) {
+	service, ok := m.rt.Service("analyzer-activity")
+	if !ok {
+		return
+	}
+	tracker, ok := service.(analyzerActivityTracker)
+	if !ok {
+		return
+	}
+	tracker.Packet("in", transport)
+}
+
 func (m *Module) changeClients(delta int) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -909,6 +1060,50 @@ func (m *Module) communicationConfig() commConfig {
 		RemoteHost:   firstNonEmpty(strings.TrimSpace(m.remoteHost()), "127.0.0.1"),
 		RemotePort:   firstNonEmpty(strings.TrimSpace(m.remotePort()), "8000"),
 	}
+}
+
+func (m *Module) simpleImageMode() string {
+	settings := m.settingsPayload()
+	simple, _ := settings["simple"].(map[string]interface{})
+	mode := normalizeImageMode(asString(simple["image_mode"]))
+	if mode != "" {
+		return mode
+	}
+	return normalizeImageMode(asString(settings["image_mode"]))
+}
+
+func (m *Module) saveMessageImage(item parsedMessage, image parsedImage) (string, error) {
+	if len(image.data) == 0 {
+		return "", nil
+	}
+	root := m.rt.ResolvePath(filepath.Join("images", "labnovation-ld-560"))
+	tuple := strings.Join([]string{
+		safePathToken(item.FileID, "missing-fileid"),
+		safePathToken("", "missing-samplecode"),
+		safePathToken("", "missing-specimen"),
+	}, "__")
+	targetDir := filepath.Join(root, tuple)
+	if err := os.MkdirAll(targetDir, 0o755); err != nil {
+		return "", err
+	}
+	ext := image.format
+	if ext == "" {
+		ext = "bin"
+	}
+	filename := fmt.Sprintf("%s_%s.%s",
+		safePathToken(firstNonEmpty(trimFileExt(image.name), item.FileID, item.SampleID, item.SampleNo), "image"),
+		time.Now().UTC().Format("20060102T150405.000Z0700"),
+		ext,
+	)
+	absPath := filepath.Join(targetDir, filename)
+	if err := os.WriteFile(absPath, image.data, 0o644); err != nil {
+		return "", err
+	}
+	relPath, err := filepath.Rel(m.rt.ConfigDir(), absPath)
+	if err != nil {
+		return absPath, nil
+	}
+	return relPath, nil
 }
 
 func (m *Module) setImported(protocol string, count int) {
@@ -971,6 +1166,43 @@ func normalizeTCPMode(value string) string {
 	default:
 		return ""
 	}
+}
+
+func normalizeImageMode(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "bitmap", "bmp":
+		return "bitmap"
+	case "base64", "base_64", "b64":
+		return "base64"
+	default:
+		return "no_image"
+	}
+}
+
+func safePathToken(value, fallback string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		value = fallback
+	}
+	replacer := strings.NewReplacer("/", "_", "\\", "_", ":", "_", "*", "_", "?", "_", "\"", "_", "<", "_", ">", "_", "|", "_", " ", "_")
+	value = replacer.Replace(value)
+	value = strings.Trim(value, "._-")
+	if value == "" {
+		return fallback
+	}
+	return value
+}
+
+func trimFileExt(name string) string {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return ""
+	}
+	ext := filepath.Ext(name)
+	if ext == "" {
+		return name
+	}
+	return strings.TrimSuffix(name, ext)
 }
 
 func writeJSON(w http.ResponseWriter, status int, payload map[string]interface{}) {

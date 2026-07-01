@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"wisemed-labreaders/readersv3/core/module"
+	"wisemed-labreaders/readersv3/shared/analyzeractivity"
 )
 
 type Module struct{ rt module.Runtime }
@@ -13,6 +14,7 @@ func (m *Module) ID() string { return "events" }
 
 func (m *Module) Init(rt module.Runtime) error {
 	m.rt = rt
+	rt.RegisterService("analyzer-activity", analyzeractivity.New())
 	rt.RegisterService("events", map[string]interface{}{
 		"features": []string{"log-stream", "broadcast", "ui-refresh-hooks"},
 	})

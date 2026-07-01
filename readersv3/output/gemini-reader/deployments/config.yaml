@@ -1,38 +1,131 @@
-reader:
-  id: gemini-v3
-  label: Gemini Reader V3
-  analyzer_name: Gemini / IR Biotyper
-  analyzer_code: gemini-v3
-
-local_http:
-  enabled: true
-  address: 127.0.0.1:18080
-  language: ro
-
 analyzer:
-  comm_type: tcpip
-  protocol: astm
-
-modules:
-  qc:
-    levels: ["negativ", "pozitiv", "pcrescut", "pscazut", "nivel1", "nivel2", "nivel3", "nivel4", "nivel5"]
-  app-updates:
-    enabled: true
-    app_id: gemini-v3
-    current_version: 1.0.0
-    channel: stable
-    base_url: http://127.0.0.1:19090
-    auto_download: true
-    download_dir: ./updates
-  local-http:
+    comm_type: tcpip
+    protocol: astm
+local_http:
     address: 127.0.0.1:18080
+    cors_allowed_origins: https://ldse.wisemed.eu
+    enabled: true
     language: ro
-  storage-sqlite:
-    path: ./gemini-reader-v3.db
-  wisemed-api:
-    base_url: https://api.wisemed.example
-  help:
-    help_dir: ./help
-  transport-tcpip:
-    host: 127.0.0.1
-    port: 9000
+    tls: false
+logging:
+    verbose_level: 1
+modules:
+    app-updates:
+        app_id: gemini-v3
+        auto_download: true
+        base_url: http://127.0.0.1:19090
+        channel: stable
+        current_version: 1.0.0
+        download_dir: ./updates
+        enabled: true
+    help:
+        help_dir: ./help
+    local-http:
+        address: 127.0.0.1:18080
+        cors_allowed_origins: https://ldse.wisemed.eu
+        enabled: true
+        language: ro
+        repeat_mode: individual
+        tls: false
+    logging:
+        verbose_level: 1
+    protocol-astm:
+        analyte_mappings: {}
+        frame_timeout_ms: 2000
+        patient_id_paths:
+            - P.3.1
+            - P.2.1
+        patient_name_paths:
+            - P.5.1
+            - P.4.1
+        qc_prefixes:
+            - QC
+            - CTRL
+            - CONTROL
+        result_flag_paths:
+            - R.6.1
+            - R.8.1
+        result_id_paths:
+            - R.2.4
+            - R.2.1
+        result_name_paths:
+            - R.2.4
+            - R.2.1
+        result_unit_paths:
+            - R.4.1
+        result_value_paths:
+            - R.3.1
+        run_date_paths:
+            - O.7.1
+            - O.6.1
+            - H.13.1
+        sample_id_paths:
+            - O.3.1
+            - O.2.1
+        send_ack: true
+    qc:
+        levels:
+            - negativ
+            - pozitiv
+            - pcrescut
+            - pscazut
+            - nivel1
+            - nivel2
+            - nivel3
+            - nivel4
+            - nivel5
+    result-sync:
+        enabled: true
+        interval_minutes: 5
+        qc_prefixes: []
+        sample_prefixes: []
+        sample_suffixes: []
+        separators:
+            - '-'
+    results:
+        auto_confirm_wisemed: false
+    storage-sqlite:
+        path: ./gemini-reader-v3.db
+    transport-tcpip:
+        host: 127.0.0.1
+        mode: server
+        port: "9001"
+        remote_host: 127.0.0.1
+        remote_port: 9000
+    wisemed-api:
+        api_key_echipament: '-'
+        base_url: https://api.wisemed.example
+        cfg_wisemed_ip: ldse.wisemed.eu
+        cfg_wisemed_key: 27c490bb-c9e4-47aa-bf6d-ebd2a1add35e
+        cfg_wisemed_path: /wisemed-api/apiv2
+        cfg_wisemed_port: "443"
+        cfg_wisemed_protocol: https
+        cod_echipament: gemini-v3
+        echipament_id: "189"
+        login_token: 970-2c2eeb43ae94110033d88515669e09a9
+        login_user_id: "1"
+        nr_rackuri: "0"
+        numar_serial_echipament: gemini-v3-001
+        nume_pe_raport_final: Gemini / IR Biotyper
+        pozitii_pe_rack: "0"
+        producator_echipament: Gemini
+        tip_de_echipament_id: "4"
+        unitate_medicala_id: "4"
+    wisemed-ws:
+        enabled: true
+        heartbeat_ms: 15000
+        reconnect_delay_ms: 5000
+        url: wss://wslocal.wisemed.eu/ws
+reader:
+    analyzer_code: gemini-v3
+    analyzer_name: Gemini / IR Biotyper
+    db_name: gemini-reader-v3.db
+    id: gemini-v3
+    label: Gemini Reader V3
+results:
+    auto_confirm_wisemed: false
+wisemed_ws:
+    enabled: true
+    heartbeat_ms: 15000
+    reconnect_delay_ms: 5000
+    url: wss://wslocal.wisemed.eu/ws

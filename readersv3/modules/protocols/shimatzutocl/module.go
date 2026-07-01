@@ -32,12 +32,14 @@ type wiseMedSyncService interface {
 type importStore interface {
 	CurrentRoundNo(orderDate string) (int, error)
 	RecordImportedResult(orderDate string, roundNo int, rec coremodel.ImportedRecord, sourceFile string) (coremodel.Order, coremodel.OrderAnalysis, coremodel.OrderAnalysisResult, error)
+	ReapplyOrderTransformations(orderIDs []int64) error
 	ListQCRecords(roundNo int, runDate string) ([]coremodel.QCRecord, error)
 	ListQCAnalyses(recordID int64) ([]coremodel.QCAnalysis, error)
 	ListQCTargets() ([]coremodel.QCTarget, error)
 	SaveQCTarget(item coremodel.QCTarget) (coremodel.QCTarget, error)
 	UpsertQCRecord(item coremodel.QCRecord) (coremodel.QCRecord, error)
 	UpsertQCAnalysis(item coremodel.QCAnalysis) (coremodel.QCAnalysis, error)
+	ReapplyQCTransformations(recordIDs []int64) error
 }
 
 type fileTransportMeta struct {
@@ -180,6 +182,7 @@ func (m *Module) importFile(path, fallbackDate string) (int, int, error) {
 	}
 	roundCache := map[string]int{}
 	autoSaveTargets := map[string]*fileimportbase.AutoSaveTarget{}
+	qcRecordIDs := []int64{}
 	imported := 0
 	sourceFile := filepath.Base(path)
 	for _, item := range data.SampleRecords {
@@ -207,6 +210,7 @@ func (m *Module) importFile(path, fallbackDate string) (int, int, error) {
 			if err != nil {
 				return imported, 0, err
 			}
+			qcRecordIDs = append(qcRecordIDs, savedRecord.ID)
 			if err := m.ensureQCTarget(store, record, result); err != nil {
 				return imported, 0, err
 			}
@@ -217,6 +221,18 @@ func (m *Module) importFile(path, fallbackDate string) (int, int, error) {
 		}
 	}
 	warnings := 0
+	orderIDs := []int64{}
+	for _, target := range fileimportbase.FlattenAutoSaveTargets(autoSaveTargets) {
+		orderIDs = append(orderIDs, target.OrderIDs...)
+	}
+	if err := store.ReapplyOrderTransformations(orderIDs); err != nil {
+		warnings++
+		m.rt.Logf("shimatzu tocl transformation warning %s: %v", path, err)
+	}
+	if err := store.ReapplyQCTransformations(qcRecordIDs); err != nil {
+		warnings++
+		m.rt.Logf("shimatzu tocl qc transformation warning %s: %v", path, err)
+	}
 	if analytesChanged {
 		if err := m.syncAnalytesToWiseMED(); err != nil {
 			warnings++
@@ -593,7 +609,8 @@ func parseShimatzuTOCL(path string, ignored ...func(kind, reason string, payload
 				"source_file":  sourceFile,
 				"imported_tag": result.AnalyteTag,
 			}
-			interpreted := buildInterpreted(result.AnalyteTag, result.RawValue, result.Unit, flags["measured_at"])
+			communicationDetails := buildInterpreted(result.AnalyteTag, result.RawValue, result.Unit, flags["measured_at"])
+			flags["communication_details"] = communicationDetails
 			if isControlSample(sampleID) {
 				key := sampleID + "|" + result.AnalyteTag + "|" + runDate
 				qcResult := shimatzuQCResult{
@@ -601,7 +618,7 @@ func parseShimatzuTOCL(path string, ignored ...func(kind, reason string, payload
 					AnalyteName: result.AnalyteName,
 					ResultValue: result.RawValue,
 					RawValue:    result.RawValue,
-					Interpreted: interpreted,
+					Interpreted: "",
 					Unit:        result.Unit,
 					Flags:       flags,
 				}
@@ -639,9 +656,9 @@ func parseShimatzuTOCL(path string, ignored ...func(kind, reason string, payload
 				PatientName: sampleID,
 				AnalyteTag:  result.AnalyteTag,
 				AnalyteName: result.AnalyteName,
-				ResultValue: result.RawValue,
+				ResultValue: "",
 				RawValue:    result.RawValue,
-				Interpreted: interpreted,
+				Interpreted: "",
 				Flags:       flags,
 				Unit:        result.Unit,
 				Meta:        map[string]interface{}{},

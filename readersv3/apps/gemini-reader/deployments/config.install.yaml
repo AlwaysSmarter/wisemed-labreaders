@@ -60,5 +60,22 @@ modules:
   help:
     help_dir: ./help
   transport-tcpip:
+    mode: server
     host: 127.0.0.1
     port: 9000
+    remote_host: 127.0.0.1
+    remote_port: 9000
+  protocol-astm:
+    send_ack: true
+    frame_timeout_ms: 2000
+    sample_id_paths: ["O.3.1", "O.2.1"]
+    patient_id_paths: ["P.3.1", "P.2.1"]
+    patient_name_paths: ["P.5.1", "P.4.1"]
+    run_date_paths: ["O.7.1", "O.6.1", "H.13.1"]
+    result_id_paths: ["R.2.4", "R.2.1"]
+    result_name_paths: ["R.2.4", "R.2.1"]
+    result_value_paths: ["R.3.1"]
+    result_unit_paths: ["R.4.1"]
+    result_flag_paths: ["R.6.1", "R.8.1"]
+    qc_prefixes: ["QC", "CTRL", "CONTROL"]
+    analyte_mappings: {}

@@ -62,7 +62,7 @@ modules:
         cfg_wisemed_protocol: https
         cod_echipament: shimatzu-tocl
         echipament_id: "161"
-        login_token: 793-4ce2690f826954790bec0f44372cc760
+        login_token: 794-e69c205b545de0691ef62d0a6eda6bb7
         nr_rackuri: "0"
         numar_serial_echipament: shimatzu-tocl-001
         nume_pe_raport_final: Shimatzu TOC-L

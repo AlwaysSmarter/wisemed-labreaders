@@ -24,7 +24,7 @@ analyzer:
 modules:
   app-updates:
     enabled: true
-    app_id: shimatzu-generic-reader
+    app_id: shimatzu-generic-v3
     channel: stable
     base_url: http://127.0.0.1:19090
     auto_download: true

@@ -118,7 +118,7 @@ func (c *Client) Check(currentVersion, osName, arch string) (CheckResponse, erro
 		return CheckResponse{}, err
 	}
 	if resp.StatusCode >= 300 {
-		return out, fmt.Errorf(firstNonEmpty(out.Message, "update check failed"))
+		return out, fmt.Errorf("%s", firstNonEmpty(out.Message, "update check failed"))
 	}
 	return out, nil
 }

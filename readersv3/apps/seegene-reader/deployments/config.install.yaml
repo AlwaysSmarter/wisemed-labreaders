@@ -1,7 +1,7 @@
 reader:
   id: seegene-v3
-  label: Seegene Reader V3
-  analyzer_name: Seegene Viewer
+  label: SeeGene Viewer Reader V3
+  analyzer_name: SeeGene Viewer
   analyzer_code: seegene-v3
   db_name: seegene-reader-v3.db
 logging:
@@ -64,4 +64,4 @@ modules:
     processed_dir: ./processed
     failed_dir: ./failed
     export_dir: ./outbox
-    pattern: "*.xlsx"
+    pattern: "*.csv"

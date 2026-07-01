@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Ajutor WiseMED Seegene Reader</title>
+  <title>Ajutor WiseMED SeeGene Viewer Reader</title>
   <style>
     :root{--bg:#f7f8fc;--panel:#ffffff;--ink:#1d2947;--muted:#60708b;--line:#dbe2ef;--accent:#355aa8;--soft:#edf2fd;--shadow:0 18px 42px rgba(29,41,71,.08)}
     *{box-sizing:border-box} body{margin:0;font:16px/1.6 Arial,sans-serif;background:linear-gradient(180deg,#fcfcfe 0%,var(--bg) 100%);color:var(--ink)}
@@ -17,14 +17,14 @@
   <div class="wrap">
     <section class="hero">
       <p class="eyebrow">Ajutor</p>
-      <h1>WiseMED Seegene Reader</h1>
-      <p class="muted">Ghid pentru importul fișierelor Excel Seegene, verificarea rezultatelor locale și depanarea fluxului bazat pe fișiere.</p>
-      <div><span class="chip">Excel import</span><span class="chip">Seegene</span><span class="chip">File transport</span></div>
+      <h1>WiseMED SeeGene Viewer Reader</h1>
+      <p class="muted">Ghid pentru importul fișierelor CSV exportate din SeeGene Viewer, verificarea rezultatelor locale și depanarea fluxului bazat pe fișiere.</p>
+      <div><span class="chip">CSV import</span><span class="chip">SeeGene Viewer</span><span class="chip">File transport</span></div>
     </section>
 
     <section class="section">
       <h2>1. Ce face aplicația</h2>
-      <p>Seegene Reader procesează fișiere Excel generate de fluxul Seegene și le transformă în rezultate vizibile în consola locală WiseMED. Transportul este pe fișier, iar protocolul activ este <code>seegene-excel</code>.</p>
+      <p>SeeGene Viewer Reader procesează fișiere CSV exportate din SeeGene Viewer și le transformă în rezultate vizibile în consola locală WiseMED. Transportul este pe fișier, iar protocolul activ rămâne <code>seegene-excel</code> pentru compatibilitate internă.</p>
     </section>
 
     <section class="section">
@@ -33,7 +33,7 @@
         <li><code>transport-file.import_dir</code>: directorul de intrare</li>
         <li><code>transport-file.processed_dir</code>: fișiere procesate</li>
         <li><code>transport-file.failed_dir</code>: fișiere cu erori tehnice</li>
-        <li><code>transport-file.pattern</code>: în mod normal <code>*.xlsx</code></li>
+        <li><code>transport-file.pattern</code>: în mod normal <code>*.csv</code></li>
       </ul>
     </section>
 
@@ -41,7 +41,7 @@
       <h2>3. Cum lucrezi din Settings</h2>
       <ul>
         <li><strong>Setări reader</strong>: IP/port local și update server.</li>
-        <li><strong>Analize</strong>: mapările pentru analizele extrase din fișierul Excel.</li>
+        <li><strong>Analize</strong>: mapările pentru analizele extrase din exportul CSV.</li>
         <li><strong>QC</strong>: dacă vrei să filtrezi sau validezi rezultate de control local.</li>
       </ul>
     </section>
@@ -49,7 +49,7 @@
     <section class="section">
       <h2>4. Pași tipici</h2>
       <ol>
-        <li>Copiezi fișierul Excel în <code>import_dir</code>.</li>
+        <li>Copiezi fișierul CSV exportat din SeeGene Viewer în <code>import_dir</code>.</li>
         <li>Readerul îl procesează și îl mută în <code>processed_dir</code> sau <code>failed_dir</code>.</li>
         <li>Verifici în UI secțiunea <strong>Orders</strong> și <strong>Results</strong>.</li>
         <li>Dacă unele câmpuri nu se leagă, ajustezi tag-urile din <strong>Analize</strong>.</li>
@@ -60,7 +60,7 @@
       <h2>5. Troubleshooting</h2>
       <ul>
         <li>dacă fișierul nu este luat în calcul, verifică extensia și directoarele configurate</li>
-        <li>dacă importul eșuează, verifică structura Excel și logurile runtime</li>
+        <li>dacă importul eșuează, verifică structura CSV și logurile runtime</li>
         <li>dacă rezultatele sunt incomplete, verifică mapările de analiză și denumirile din fișier</li>
       </ul>
     </section>

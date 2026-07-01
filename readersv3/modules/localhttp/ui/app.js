@@ -21,8 +21,11 @@ const translations = {
     settingsReader: "Setari reader",
     settingsDailyDetails: "Detalii zilnice",
     settingsQc: "Setari QC",
+    labnovationImageMode: "Imagine Labnovation LD-560",
     repeatModeLabel: "Mod tratare repetari",
     repeatModeHelp: "Stabileste daca selectarea unui alt rezultat schimba doar analiza curenta sau tot grupul de analize lucrate simultan pentru aceeasi proba.",
+    deleteOrdersPreference: "Confirmare stergere cereri",
+    deleteOrdersPreferenceToggle: "Nu mai intreba la stergere",
     repeatModeIndividual: "Repetari individuale pe analiza",
     repeatModeGrouped: "Repetari grupate pe lot de rezultate",
     saveReaderSettings: "Salveaza setarile readerului",
@@ -66,6 +69,8 @@ const translations = {
     refresh: "Refresh",
     analytes: "Analize",
     searchAnalytes: "Cauta dupa tag, code, nume",
+    searchOrders: "Cauta dupa File ID, Sample code, Specimen code",
+    activeFilter: "Filtru activ",
     analyteEditor: "Editor analiza",
     new: "Nou",
     tag: "Tag",
@@ -93,6 +98,19 @@ const translations = {
     analysesForSample: "Analize pentru proba",
     analysisName: "Denumire analiza",
     analysisTag: "Tag",
+    communicationDetails: "Detalii de comunicare",
+    resultsFilter: "Rezultate",
+    wisemedSendFilter: "Trimiteri WiseMED",
+    allStatuses: "Toate",
+    statusReceiveNone: "Neprimite",
+    statusReceivePartial: "Primite partial",
+    statusReceiveFull: "Primite complet",
+    statusSendNone: "Netrimise",
+    statusSendPartial: "Trimise partial",
+    statusSendFull: "Trimise complet",
+    analyzerSendCount: "Trimiteri analizor",
+    syncFlow: "Flux",
+    analysisSendStatus: "Status trimitere WiseMED",
     wisemedSMID: "Serviciu medical ID",
     wisemedFSMID: "FSM ID",
     analysisQualitative: "Rezultat calitativ",
@@ -112,6 +130,7 @@ const translations = {
     syncToWiseMED: "Try WiseMED match",
     syncToWiseMEDSuccess: "Sincronizarea de match cu WiseMED a fost rulata.",
     syncToWiseMEDFailed: "Sincronizarea de match cu WiseMED a esuat.",
+    wisemedMatchTimer: "Syncro Match WiseMED",
     importing: "Se importa...",
     importSuccess: "Import finalizat",
     importFailed: "Import esuat",
@@ -203,8 +222,12 @@ const translations = {
     specimenCode: "Specimen code",
     patientId: "ID solicitant",
     patientName: "Solicitant",
+    orderImage: "Imagine",
     deleteSelection: "Sterge selectia",
     deleteOrdersConfirm: "Stergi cererile selectate si toate rezultatele lor?",
+    deleteOrdersTitle: "Confirmare stergere",
+    dontAskAgain: "Nu mai intreba",
+    cancel: "Renunta",
     deleteQCConfirm: "Stergi inregistrarile QC selectate si toate rezultatele lor?",
     deleteSuccess: "Stergere finalizata",
     dailyWorksheet: "Fisa de lucru",
@@ -247,8 +270,11 @@ const translations = {
     settingsReader: "Reader settings",
     settingsDailyDetails: "Daily Details",
     settingsQc: "QC Settings",
+    labnovationImageMode: "Labnovation LD-560 image",
     repeatModeLabel: "Repeat handling mode",
     repeatModeHelp: "Choose whether selecting another result changes only the current analysis or the whole batch of analyses produced at the same time for the same sample.",
+    deleteOrdersPreference: "Order deletion confirmation",
+    deleteOrdersPreferenceToggle: "Do not ask before deleting",
     repeatModeIndividual: "Individual repeats per analysis",
     repeatModeGrouped: "Grouped repeats per result batch",
     saveReaderSettings: "Save reader settings",
@@ -292,6 +318,8 @@ const translations = {
     refresh: "Refresh",
     analytes: "Analytes",
     searchAnalytes: "Search by tag, code, name",
+    searchOrders: "Search by File ID, Sample code, specimen code",
+    activeFilter: "Active filter",
     analyteEditor: "Analyte editor",
     new: "New",
     tag: "Tag",
@@ -319,6 +347,19 @@ const translations = {
     analysesForSample: "Analyses for sample",
     analysisName: "Analysis name",
     analysisTag: "Tag",
+    communicationDetails: "Communication details",
+    resultsFilter: "Results",
+    wisemedSendFilter: "WiseMED sends",
+    allStatuses: "All",
+    statusReceiveNone: "Not received",
+    statusReceivePartial: "Partially received",
+    statusReceiveFull: "Fully received",
+    statusSendNone: "Not sent",
+    statusSendPartial: "Partially sent",
+    statusSendFull: "Fully sent",
+    analyzerSendCount: "Analyzer sends",
+    syncFlow: "Flow",
+    analysisSendStatus: "WiseMED send status",
     wisemedSMID: "Medical service ID",
     wisemedFSMID: "FSM ID",
     analysisQualitative: "Qualitative result",
@@ -338,6 +379,7 @@ const translations = {
     syncToWiseMED: "Try WiseMED match",
     syncToWiseMEDSuccess: "WiseMED match sync was executed.",
     syncToWiseMEDFailed: "WiseMED match sync failed.",
+    wisemedMatchTimer: "WiseMED Match Sync",
     importing: "Importing...",
     importSuccess: "Import completed",
     importFailed: "Import failed",
@@ -429,8 +471,12 @@ const translations = {
     specimenCode: "Specimen code",
     patientId: "Requester ID",
     patientName: "Requester",
+    orderImage: "Image",
     deleteSelection: "Delete selection",
     deleteOrdersConfirm: "Delete the selected requests and all their results?",
+    deleteOrdersTitle: "Delete confirmation",
+    dontAskAgain: "Do not ask again",
+    cancel: "Cancel",
     deleteQCConfirm: "Delete the selected QC records and all their results?",
     deleteSuccess: "Deletion completed",
     dailyWorksheet: "Worksheet",
@@ -673,6 +719,8 @@ const state = {
   selectedQCAnalyteFilter: "",
   selectedQCTargetID: null,
   editingQCTargetID: null,
+  analyzerLastPacketAt: "",
+  analyzerPulseTimer: null,
   westgardMetrics: null,
   qcWestgardMetrics: null,
   qcWestgardPeriod: "current_month",
@@ -682,6 +730,9 @@ const state = {
   selectedQCAnalysisTag: null,
   selectedOrderAnalysisID: null,
   selectedOrderIDs: [],
+  selectedOrderReceiveFilter: "",
+  selectedOrderSendFilter: "",
+  selectedOrderSearch: "",
   selectedQCRecordIDs: [],
   settingsSubView: "reader",
   dailyDetailDefinitions: [],
@@ -708,7 +759,12 @@ const state = {
   resultsDelivery: { auto_confirm_wisemed: false, send_supported: false },
   wisemedSetup: { settings: {}, configured: false, setup_complete: false, equipment_registered: false },
   wisemedBootstrap: { medical_units: [], analyzer_types: [] },
+  pendingDeleteOrderIDs: [],
+  analyteTransformRules: [],
+  editingTransformRuleIndex: null,
 };
+
+const deleteOrdersSkipConfirmKey = "wmr_skip_delete_orders_confirm";
 
 const els = {
   loginView: document.getElementById("login-view"),
@@ -739,17 +795,20 @@ const els = {
   analyzerDot: document.getElementById("analyzer-dot"),
   wisemedwsPill: document.getElementById("wisemedws-pill"),
   analyzerPill: document.getElementById("analyzer-pill"),
+  resultSyncPill: document.getElementById("result-sync-pill"),
   appToast: document.getElementById("app-toast"),
   appToastBody: document.getElementById("app-toast-body"),
   appToastClose: document.getElementById("app-toast-close"),
   wisemedwsStatusLabel: document.getElementById("wisemedws-status-label"),
   analyzerStatusLabel: document.getElementById("analyzer-status-label"),
+  resultSyncStatusLabel: document.getElementById("result-sync-status-label"),
   logsList: document.getElementById("logs-list"),
   logPollSeconds: document.getElementById("log-poll-seconds"),
   refreshLogsBtn: document.getElementById("refresh-logs"),
   settingsPanelReader: document.getElementById("settings-panel-reader"),
   readerSettingsForm: document.getElementById("reader-settings-form"),
   repeatModeSelect: document.getElementById("repeat-mode-select"),
+  deleteOrdersPreference: document.getElementById("delete-orders-preference"),
   runResultSyncBtn: document.getElementById("run-result-sync"),
   resetResultSyncBtn: document.getElementById("reset-result-sync"),
   resultSyncStatus: document.getElementById("result-sync-status"),
@@ -767,19 +826,40 @@ const els = {
   analyteModal: document.getElementById("analyte-modal"),
   analyteModalBackdrop: document.getElementById("analyte-modal-backdrop"),
   closeAnalyteModalBtn: document.getElementById("close-analyte-modal"),
+  addTransformRuleBtn: document.getElementById("add-transform-rule"),
+  transformRulesList: document.getElementById("transform-rules-list"),
+  transformRuleModal: document.getElementById("transform-rule-modal"),
+  transformRuleModalBackdrop: document.getElementById("transform-rule-modal-backdrop"),
+  closeTransformRuleModalBtn: document.getElementById("close-transform-rule-modal"),
+  transformRuleForm: document.getElementById("transform-rule-form"),
+  transformRuleMessage: document.getElementById("transform-rule-message"),
+  transformFormulaFunctions: document.getElementById("transform-formula-functions"),
+  transformFormulaVariables: document.getElementById("transform-formula-variables"),
   analyteSearch: document.getElementById("analyte-search"),
   refreshOrdersBtn: document.getElementById("refresh-orders"),
   orderDate: document.getElementById("order-date"),
   roundSelect: document.getElementById("round-select"),
   ordersSelectAll: document.getElementById("orders-select-all"),
+  ordersReceivedFilter: document.getElementById("orders-received-filter"),
+  ordersSentFilter: document.getElementById("orders-sent-filter"),
+  ordersSearch: document.getElementById("orders-search"),
+  ordersFilterActive: document.getElementById("orders-filter-active"),
   ordersSelectAllBox: document.getElementById("orders-select-all-box"),
   ordersSelectAllLabel: document.getElementById("orders-select-all-label"),
   importOrdersBtn: document.getElementById("import-orders"),
   exportOrdersBtn: document.getElementById("export-orders"),
   syncOrdersWiseMEDBtn: document.getElementById("sync-orders-wisemed"),
+  reapplyOrderTransformationsBtn: document.getElementById("reapply-order-transformations"),
   sendOrdersWiseMEDBtn: document.getElementById("send-orders-wisemed"),
   worklistOrdersBtn: document.getElementById("worklist-orders"),
   deleteOrdersBtn: document.getElementById("delete-orders"),
+  ordersDeleteModal: document.getElementById("orders-delete-modal"),
+  ordersDeleteModalBackdrop: document.getElementById("orders-delete-modal-backdrop"),
+  closeOrdersDeleteModalBtn: document.getElementById("close-orders-delete-modal"),
+  ordersDeleteMessage: document.getElementById("orders-delete-message"),
+  ordersDeleteSkipConfirm: document.getElementById("orders-delete-skip-confirm"),
+  ordersDeleteConfirmBtn: document.getElementById("orders-delete-confirm"),
+  ordersDeleteCancelBtn: document.getElementById("orders-delete-cancel"),
   newRoundBtn: document.getElementById("new-round"),
   ordersImportFile: document.getElementById("orders-import-file"),
   ordersLayout: document.getElementById("orders-layout"),
@@ -916,17 +996,26 @@ function bindEvents() {
   if (els.loginAppUpdateIndicator) els.loginAppUpdateIndicator.addEventListener("click", onAppUpdateIndicatorClick);
   if (els.dashboardAppUpdateIndicator) els.dashboardAppUpdateIndicator.addEventListener("click", onAppUpdateIndicatorClick);
   bindAsyncClick(els.refreshLogsBtn, loadLogs);
+  bindAsyncClick(els.resultSyncPill, onRunResultSync);
   els.logPollSeconds.addEventListener("change", onLogPollChange);
   bindAsyncClick(els.refreshOrdersBtn, onRefreshOrdersClick);
   els.orderDate.addEventListener("change", onOrderDateChange);
   els.roundSelect.addEventListener("change", onRoundChange);
   els.ordersSelectAll.addEventListener("change", onOrdersSelectAllChange);
+  if (els.ordersReceivedFilter) els.ordersReceivedFilter.addEventListener("change", onOrdersReceiveFilterChange);
+  if (els.ordersSentFilter) els.ordersSentFilter.addEventListener("change", onOrdersSendFilterChange);
+  if (els.ordersSearch) els.ordersSearch.addEventListener("input", onOrdersSearchInput);
   els.importOrdersBtn.addEventListener("click", onImportOrdersClick);
   bindAsyncClick(els.exportOrdersBtn, onExportOrdersClick);
   bindAsyncClick(els.syncOrdersWiseMEDBtn, onSyncOrdersWiseMEDClick);
+  bindAsyncClick(els.reapplyOrderTransformationsBtn, onReapplyOrderTransformationsClick);
   bindAsyncClick(els.sendOrdersWiseMEDBtn, onSendOrdersWiseMEDClick);
   bindAsyncClick(els.worklistOrdersBtn, onWorklistOrdersClick);
   bindAsyncClick(els.deleteOrdersBtn, onDeleteOrdersClick);
+  if (els.ordersDeleteModalBackdrop) els.ordersDeleteModalBackdrop.addEventListener("click", closeOrdersDeleteModal);
+  if (els.closeOrdersDeleteModalBtn) els.closeOrdersDeleteModalBtn.addEventListener("click", closeOrdersDeleteModal);
+  if (els.ordersDeleteCancelBtn) els.ordersDeleteCancelBtn.addEventListener("click", closeOrdersDeleteModal);
+  if (els.ordersDeleteConfirmBtn) bindAsyncClick(els.ordersDeleteConfirmBtn, onConfirmDeleteOrdersClick);
   bindAsyncClick(els.newRoundBtn, onNewRoundClick);
   bindAsyncClick(els.refreshQCBtn, loadQCRecords);
   els.newQCRecordBtn.addEventListener("click", openQCRecordModal);
@@ -943,12 +1032,19 @@ function bindEvents() {
   els.newAnalyteBtn.addEventListener("click", () => openAnalyteModal());
   bindAsyncClick(els.refreshAnalytesBtn, onRefreshAnalytesClick);
   if (els.readerSettingsForm) bindAsyncSubmit(els.readerSettingsForm, onSaveReaderSettings);
+  if (els.deleteOrdersPreference) els.deleteOrdersPreference.addEventListener("change", onDeleteOrdersPreferenceChange);
   if (els.readerSettingsForm?.elements?.analyzer_comm_type) els.readerSettingsForm.elements.analyzer_comm_type.addEventListener("change", syncReaderSettingsTransportFields);
   if (els.readerSettingsForm?.elements?.tcpip_mode) els.readerSettingsForm.elements.tcpip_mode.addEventListener("change", syncReaderSettingsTransportFields);
   if (els.runResultSyncBtn) bindAsyncClick(els.runResultSyncBtn, onRunResultSync);
   if (els.resetResultSyncBtn) bindAsyncClick(els.resetResultSyncBtn, onResetResultSync);
   bindAsyncClick(els.deleteAnalyteBtn, onDeleteAnalyte);
   bindAsyncSubmit(els.analyteForm, onSaveAnalyte);
+  if (els.addTransformRuleBtn) els.addTransformRuleBtn.addEventListener("click", () => openTransformRuleModal());
+  if (els.transformRuleForm) bindAsyncSubmit(els.transformRuleForm, onSaveTransformRule);
+  if (els.transformRuleModalBackdrop) els.transformRuleModalBackdrop.addEventListener("click", closeTransformRuleModal);
+  if (els.closeTransformRuleModalBtn) els.closeTransformRuleModalBtn.addEventListener("click", closeTransformRuleModal);
+  if (els.transformRuleForm?.elements?.type) els.transformRuleForm.elements.type.addEventListener("change", syncTransformRuleFormVisibility);
+  if (els.transformRuleForm?.elements?.target_field) els.transformRuleForm.elements.target_field.addEventListener("change", syncTransformRuleFormVisibility);
   els.analyteSearch.addEventListener("input", renderAnalyteList);
   if (els.dailyDetailDefinitionForm) bindAsyncSubmit(els.dailyDetailDefinitionForm, onSaveDailyDetailDefinition);
   if (els.dailyDetailDefinitionSearch) els.dailyDetailDefinitionSearch.addEventListener("input", renderDailyDetailDefinitionList);
@@ -1006,6 +1102,10 @@ function bindEvents() {
     activateView(link.dataset.view || "analytes");
   }));
   document.addEventListener("keydown", (event) => {
+    if (els.transformRuleModal && !els.transformRuleModal.hidden && event.key === "Escape") {
+      closeTransformRuleModal();
+      return;
+    }
     if (event.key === "Escape" && !els.analyteModal.hidden) {
       closeAnalyteModal();
       return;
@@ -1024,6 +1124,10 @@ function bindEvents() {
     }
     if (event.key === "Escape" && !els.qcWestgardModal.hidden) {
       closeQCWestgardModal();
+      return;
+    }
+    if (els.ordersDeleteModal && !els.ordersDeleteModal.hidden && event.key === "Escape") {
+      closeOrdersDeleteModal();
     }
   });
   window.addEventListener("popstate", () => {
@@ -1699,6 +1803,7 @@ async function loadReaderSettings() {
     file_pattern: String(resp.settings?.file_pattern || "*"),
     logging_verbose_level: String(resp.settings?.logging_verbose_level || "1"),
     results_auto_confirm_wisemed: String(resp.settings?.results_auto_confirm_wisemed || "false"),
+    wisemed_reagent_set_name: String(resp.settings?.wisemed_reagent_set_name || ""),
     results_send_supported: Boolean(resp.settings?.results_send_supported),
     app_updates_enabled: String(resp.settings?.app_updates_enabled || "true"),
     app_updates_app_id: String(resp.settings?.app_updates_app_id || ""),
@@ -1714,6 +1819,7 @@ async function loadReaderSettings() {
     result_sync_separators: String(resp.settings?.result_sync_separators || "-"),
     result_sync_qc_prefixes: String(resp.settings?.result_sync_qc_prefixes || ""),
     protocol_subtype: String(resp.settings?.protocol_subtype || "auto"),
+    labnovation_enabled: Boolean(resp.settings?.labnovation_enabled),
   };
   state.resultsDelivery = {
     ...(state.resultsDelivery || {}),
@@ -1748,6 +1854,7 @@ async function loadReaderSettings() {
     form.elements.file_pattern.value = state.readerSettings.file_pattern;
     form.elements.logging_verbose_level.value = state.readerSettings.logging_verbose_level;
     form.elements.results_auto_confirm_wisemed.value = state.readerSettings.results_auto_confirm_wisemed;
+    form.elements.wisemed_reagent_set_name.value = state.readerSettings.wisemed_reagent_set_name;
     form.elements.app_updates_enabled.value = state.readerSettings.app_updates_enabled;
     form.elements.app_updates_app_id.value = state.readerSettings.app_updates_app_id;
     form.elements.app_updates_current_version.value = state.readerSettings.app_updates_current_version;
@@ -1765,6 +1872,7 @@ async function loadReaderSettings() {
     syncReaderSettingsTransportFields();
   }
   els.repeatModeSelect.value = state.readerSettings.repeat_mode;
+  syncDeleteOrdersPreferenceControls();
   await loadResultSyncStatus();
   if (els.readerSettingsMessage) {
     els.readerSettingsMessage.textContent = "";
@@ -1799,6 +1907,7 @@ async function onSaveReaderSettings(event) {
     file_pattern: String(form.elements.file_pattern.value || "*").trim(),
     logging_verbose_level: String(form.elements.logging_verbose_level.value || "1").trim(),
     results_auto_confirm_wisemed: String(form.elements.results_auto_confirm_wisemed.value || "false").trim(),
+    wisemed_reagent_set_name: String(form.elements.wisemed_reagent_set_name.value || "").trim(),
     app_updates_enabled: String(form.elements.app_updates_enabled.value || "true").trim(),
     app_updates_app_id: String(form.elements.app_updates_app_id.value || "").trim(),
     app_updates_current_version: String(form.elements.app_updates_current_version.value || "0.0.0").trim(),
@@ -1819,6 +1928,7 @@ async function onSaveReaderSettings(event) {
     method: "PUT",
     body: JSON.stringify(payload),
   });
+  rememberDeleteOrdersConfirmPreference(Boolean(els.deleteOrdersPreference?.checked));
   state.readerSettings = {
     repeat_mode: String(resp.settings?.repeat_mode || payload.repeat_mode),
     reader_id: String(resp.settings?.reader_id || payload.reader_id),
@@ -1847,6 +1957,7 @@ async function onSaveReaderSettings(event) {
     file_pattern: String(resp.settings?.file_pattern || payload.file_pattern),
     logging_verbose_level: String(resp.settings?.logging_verbose_level || payload.logging_verbose_level),
     results_auto_confirm_wisemed: String(resp.settings?.results_auto_confirm_wisemed || payload.results_auto_confirm_wisemed),
+    wisemed_reagent_set_name: String(resp.settings?.wisemed_reagent_set_name || payload.wisemed_reagent_set_name),
     results_send_supported: Boolean(resp.settings?.results_send_supported),
     app_updates_enabled: String(resp.settings?.app_updates_enabled || payload.app_updates_enabled),
     app_updates_app_id: String(resp.settings?.app_updates_app_id || payload.app_updates_app_id),
@@ -1862,8 +1973,10 @@ async function onSaveReaderSettings(event) {
     result_sync_separators: String(resp.settings?.result_sync_separators || payload.result_sync_separators),
     result_sync_qc_prefixes: String(resp.settings?.result_sync_qc_prefixes || payload.result_sync_qc_prefixes),
     protocol_subtype: String(resp.settings?.protocol_subtype || payload.protocol_subtype),
+    labnovation_enabled: Boolean(resp.settings?.labnovation_enabled),
   };
   els.repeatModeSelect.value = state.readerSettings.repeat_mode;
+  syncDeleteOrdersPreferenceControls();
   syncReaderSettingsTransportFields();
   if (els.readerSettingsMessage) {
     els.readerSettingsMessage.textContent = t("readerSettingsSaved");
@@ -1931,7 +2044,7 @@ function syncReaderSettingsTransportFields() {
 }
 
 async function loadResultSyncStatus() {
-  if (!els.resultSyncStatus) return;
+  if (!els.resultSyncStatus && !els.resultSyncStatusLabel) return;
   try {
     const resp = await api("/api/result-sync/status");
     const parts = [];
@@ -1942,9 +2055,14 @@ async function loadResultSyncStatus() {
       parts.push(`matched ${resp.last_summary.matched || 0}/${resp.last_summary.processed || 0}`);
     }
     if (resp.last_error) parts.push(`eroare: ${resp.last_error}`);
-    els.resultSyncStatus.textContent = parts.join(" • ");
+    if (els.resultSyncStatus) els.resultSyncStatus.textContent = parts.join(" • ");
+    if (els.resultSyncStatusLabel) {
+      const timer = formatNextSyncCountdown(resp.next_run_at);
+      els.resultSyncStatusLabel.textContent = `${t("wisemedMatchTimer")} · ${timer}`;
+    }
   } catch (error) {
-    els.resultSyncStatus.textContent = error?.message || "Nu se poate incarca statusul sincronizarii";
+    if (els.resultSyncStatus) els.resultSyncStatus.textContent = error?.message || "Nu se poate incarca statusul sincronizarii";
+    if (els.resultSyncStatusLabel) els.resultSyncStatusLabel.textContent = `${t("wisemedMatchTimer")} · --:--`;
   }
 }
 
@@ -2615,8 +2733,9 @@ async function loadOrders() {
   const requestedRoundNo = state.selectedRoundNo;
   const params = new URLSearchParams();
   params.set("include_analysis", "1");
-  if (requestedRoundNo > 0) params.set("round_no", String(requestedRoundNo));
+  if (requestedRoundNo > 0 && !state.selectedOrderSearch.trim()) params.set("round_no", String(requestedRoundNo));
   if (state.selectedOrderDate) params.set("order_date", state.selectedOrderDate);
+  if (state.selectedOrderSearch.trim()) params.set("search", state.selectedOrderSearch.trim());
   const query = params.toString() ? `?${params.toString()}` : "";
   const resp = await api(`/api/orders${query}`);
   state.orders = resp.orders || [];
@@ -2634,6 +2753,7 @@ async function loadOrders() {
   }
   syncOrderControls();
   renderRoundSelect();
+  renderOrderStatusFilters();
   if (!state.selectedOrderId && state.orders.length > 0) {
     state.selectedOrderId = state.orders[0].order.id;
   }
@@ -2651,6 +2771,7 @@ function syncOrderControls() {
     els.importOrdersBtn.hidden = true;
     els.exportOrdersBtn.hidden = true;
     if (els.syncOrdersWiseMEDBtn) els.syncOrdersWiseMEDBtn.hidden = true;
+    if (els.reapplyOrderTransformationsBtn) els.reapplyOrderTransformationsBtn.hidden = true;
     if (els.sendOrdersWiseMEDBtn) els.sendOrdersWiseMEDBtn.hidden = true;
     els.worklistOrdersBtn.hidden = true;
     if (els.deleteOrdersBtn) els.deleteOrdersBtn.hidden = true;
@@ -2665,14 +2786,18 @@ function syncOrderControls() {
   }
   const fileMode = state.commType === "file";
   const caryMode = String(state.readerInfo?.protocol || state.readerInfo?.analyzer_code || "").toLowerCase() === "cary60-uvvis";
+  const canOperateOrders = !state.barcodeMode;
   els.importOrdersBtn.hidden = !fileMode;
   els.exportOrdersBtn.hidden = !fileMode;
-  if (els.syncOrdersWiseMEDBtn) els.syncOrdersWiseMEDBtn.hidden = !fileMode;
-  if (els.sendOrdersWiseMEDBtn) els.sendOrdersWiseMEDBtn.hidden = !(fileMode && state.resultsDelivery?.send_supported);
+  if (els.syncOrdersWiseMEDBtn) els.syncOrdersWiseMEDBtn.hidden = !canOperateOrders;
+  if (els.reapplyOrderTransformationsBtn) els.reapplyOrderTransformationsBtn.hidden = !canOperateOrders;
+  if (els.sendOrdersWiseMEDBtn) els.sendOrdersWiseMEDBtn.hidden = !(canOperateOrders && state.resultsDelivery?.send_supported);
   els.worklistOrdersBtn.hidden = !(fileMode && caryMode);
-  if (els.deleteOrdersBtn) els.deleteOrdersBtn.hidden = !fileMode;
-  els.newRoundBtn.hidden = !fileMode;
-  els.ordersSelectAllBox.hidden = !fileMode;
+  if (els.deleteOrdersBtn) els.deleteOrdersBtn.hidden = !canOperateOrders;
+  els.newRoundBtn.hidden = !canOperateOrders;
+  els.ordersSelectAllBox.hidden = !canOperateOrders;
+  if (els.ordersSearch) els.ordersSearch.value = state.selectedOrderSearch || "";
+  if (els.ordersFilterActive) els.ordersFilterActive.hidden = !state.selectedOrderSearch.trim();
 }
 
 function onRefreshOrdersClick() {
@@ -2733,6 +2858,15 @@ function onRoundChange() {
   state.selectedRoundNo = Number(els.roundSelect.value || 0);
   state.selectedOrderId = null;
   state.selectedOrderAnalysisID = null;
+  loadOrdersWithFeedback();
+}
+
+function onOrdersSearchInput() {
+  state.selectedOrderSearch = String(els.ordersSearch?.value || "").trim();
+  state.selectedOrderId = null;
+  state.selectedOrderAnalysisID = null;
+  state.selectedOrderIDs = [];
+  syncOrderControls();
   loadOrdersWithFeedback();
 }
 
@@ -2885,18 +3019,101 @@ function onPrintDailyWorksheetClick() {
 }
 
 function onOrdersSelectAllChange() {
+  const visibleOrders = filteredOrders();
   if (els.ordersSelectAll.checked) {
-    state.selectedOrderIDs = state.orders.map((item) => item.order.id);
+    state.selectedOrderIDs = visibleOrders.map((item) => item.order.id);
   } else {
-    state.selectedOrderIDs = [];
+    const visibleIDs = new Set(visibleOrders.map((item) => item.order.id));
+    state.selectedOrderIDs = state.selectedOrderIDs.filter((id) => !visibleIDs.has(id));
   }
+  renderOrdersLayout();
+}
+
+function onOrdersReceiveFilterChange() {
+  state.selectedOrderReceiveFilter = String(els.ordersReceivedFilter?.value || "").trim();
+  renderOrdersLayout();
+}
+
+function onOrdersSendFilterChange() {
+  state.selectedOrderSendFilter = String(els.ordersSentFilter?.value || "").trim();
   renderOrdersLayout();
 }
 
 async function onDeleteOrdersClick() {
   const ids = state.selectedOrderIDs.length ? [...state.selectedOrderIDs] : (state.selectedOrderId ? [state.selectedOrderId] : []);
   if (!ids.length) return;
-  if (!window.confirm(t("deleteOrdersConfirm"))) return;
+  if (shouldSkipDeleteOrdersConfirm()) {
+    await deleteOrders(ids);
+    return;
+  }
+  openOrdersDeleteModal(ids);
+}
+
+async function onConfirmDeleteOrdersClick() {
+  const ids = state.pendingDeleteOrderIDs.length ? [...state.pendingDeleteOrderIDs] : [];
+  if (!ids.length) {
+    closeOrdersDeleteModal();
+    return;
+  }
+  rememberDeleteOrdersConfirmPreference(Boolean(els.ordersDeleteSkipConfirm?.checked));
+  await deleteOrders(ids);
+  closeOrdersDeleteModal();
+}
+
+function openOrdersDeleteModal(ids) {
+  state.pendingDeleteOrderIDs = Array.isArray(ids) ? [...ids] : [];
+  if (els.ordersDeleteSkipConfirm) {
+    els.ordersDeleteSkipConfirm.checked = false;
+  }
+  if (els.ordersDeleteMessage) {
+    els.ordersDeleteMessage.textContent = t("deleteOrdersConfirm");
+  }
+  if (els.ordersDeleteModal) {
+    els.ordersDeleteModal.hidden = false;
+  }
+}
+
+function closeOrdersDeleteModal() {
+  state.pendingDeleteOrderIDs = [];
+  if (els.ordersDeleteSkipConfirm) {
+    els.ordersDeleteSkipConfirm.checked = false;
+  }
+  if (els.ordersDeleteModal) {
+    els.ordersDeleteModal.hidden = true;
+  }
+}
+
+function shouldSkipDeleteOrdersConfirm() {
+  try {
+    return window.localStorage.getItem(deleteOrdersSkipConfirmKey) === "1";
+  } catch (_) {
+    return false;
+  }
+}
+
+function rememberDeleteOrdersConfirmPreference(skip) {
+  try {
+    if (skip) {
+      window.localStorage.setItem(deleteOrdersSkipConfirmKey, "1");
+    } else {
+      window.localStorage.removeItem(deleteOrdersSkipConfirmKey);
+    }
+  } catch (_) {
+  }
+  syncDeleteOrdersPreferenceControls();
+}
+
+function syncDeleteOrdersPreferenceControls() {
+  if (els.deleteOrdersPreference) {
+    els.deleteOrdersPreference.checked = shouldSkipDeleteOrdersConfirm();
+  }
+}
+
+function onDeleteOrdersPreferenceChange() {
+  rememberDeleteOrdersConfirmPreference(Boolean(els.deleteOrdersPreference?.checked));
+}
+
+async function deleteOrders(ids) {
   try {
     await api("/api/orders/delete", {
       method: "POST",
@@ -2912,19 +3129,34 @@ async function onDeleteOrdersClick() {
   }
 }
 
+function selectedOrderIDsForAction() {
+  if (state.selectedOrderIDs.length) {
+    return [...state.selectedOrderIDs];
+  }
+  if (state.selectedOrderId) {
+    return [state.selectedOrderId];
+  }
+  const visibleOrders = filteredOrders();
+  if (visibleOrders.length === 1) {
+    return [visibleOrders[0].order.id];
+  }
+  return [];
+}
+
 async function onSendOrdersWiseMEDClick() {
-  const ids = state.selectedOrderIDs.length ? [...state.selectedOrderIDs] : (state.selectedOrderId ? [state.selectedOrderId] : []);
+  const ids = selectedOrderIDsForAction();
   if (!ids.length) {
-    showToast("Selecteaza cel putin o cerere.", "error");
+    showToast("Selecteaza o cerere sau bifeaza cel putin o linie.", "error");
     return;
   }
   try {
+    showToast(`Se trimit ${ids.length} cereri in buletin...`, "success");
     const resp = await api("/api/orders/send-to-bulletin", {
       method: "POST",
       body: JSON.stringify({
         order_ids: ids,
         order_date: state.selectedOrderDate || localISODate(),
-        round_no: Number(state.selectedRoundNo || 0),
+        round_no: Number(state.selectedRoundNo || state.rounds[state.rounds.length - 1] || 0),
       }),
     });
     showToast(resp?.ok === false ? t("sendToBulletinFailed") : t("sendToBulletinSuccess"), resp?.ok === false ? "error" : "success");
@@ -2936,9 +3168,9 @@ async function onSendOrdersWiseMEDClick() {
 }
 
 async function onSyncOrdersWiseMEDClick() {
-  const ids = state.selectedOrderIDs.length ? [...state.selectedOrderIDs] : (state.selectedOrderId ? [state.selectedOrderId] : []);
+  const ids = selectedOrderIDsForAction();
   if (!ids.length) {
-    showToast("Selecteaza cel putin o cerere.", "error");
+    showToast("Selecteaza o cerere sau bifeaza cel putin o linie.", "error");
     return;
   }
   try {
@@ -2955,6 +3187,25 @@ async function onSyncOrdersWiseMEDClick() {
     await Promise.all([loadOrders(), loadResultSyncStatus(), loadLogs().catch(() => {})]);
   } catch (error) {
     showToast(error?.message || t("syncToWiseMEDFailed"), "error");
+    await loadLogs().catch(() => {});
+  }
+}
+
+async function onReapplyOrderTransformationsClick() {
+  const ids = selectedOrderIDsForAction();
+  if (!ids.length) {
+    showToast("Selecteaza o cerere sau bifeaza cel putin o linie.", "error");
+    return;
+  }
+  try {
+    await api("/api/orders/reapply-transformations", {
+      method: "POST",
+      body: JSON.stringify({ order_ids: ids }),
+    });
+    showToast("Transformarile au fost reaplicate.", "success");
+    await Promise.all([loadOrders(), loadLogs().catch(() => {})]);
+  } catch (error) {
+    showToast(error?.message || "Nu s-au putut reaplica transformarile.", "error");
     await loadLogs().catch(() => {});
   }
 }
@@ -3285,7 +3536,7 @@ function renderAnalyteList() {
                 <td class="col-code"><span class="cell-ellipsis" title="${escapeHtml(item.code || "-")}">${escapeHtml(item.code || "-")}</span></td>
                 <td>
                   <div class="analyte-main">
-                    <strong>${escapeHtml(item.name || "-")}</strong>
+                    <strong>${escapeHtml(item.name || "-")}${Array.isArray(item.transform_rules) && item.transform_rules.length > 0 ? ` <span class="transform-indicator" title="Are reguli de transformare active">↺</span>` : ""}</strong>
                     <div class="small muted">${escapeHtml(item.description || "")}</div>
                   </div>
                 </td>
@@ -3664,9 +3915,11 @@ function renderDailyDetailValuesWorkspace() {
 function fillAnalyteForm(item = null) {
   state.selectedAnalyteId = item?.id || null;
   state.selectedTag = item?.tag || null;
+  state.analyteTransformRules = normalizeTransformRules(item?.transform_rules || []);
   const form = els.analyteForm;
   form.tag.value = item?.tag || "";
   form.code.value = item?.code || "";
+  form.result_formula_code.value = item?.result_formula_code || "";
   form.name.value = item?.name || "";
   form.description.value = item?.description || "";
   form.result_type.value = item?.result_type || "text";
@@ -3675,10 +3928,28 @@ function fillAnalyteForm(item = null) {
   form.result_measure_unit.value = item?.result_measure_unit || "";
   form.result_reagents_set.value = item?.result_reagents_set || "";
   form.worklist_label.value = item?.protocol_options?.worklist_label || "";
+  form.detected_max_cq.value = item?.protocol_options?.detected_max_cq ?? "";
   form.active.checked = item ? !!item.active : true;
+  syncTransformRulesField();
+  renderTransformRulesEditor();
+  syncAnalyteProtocolFields();
   els.deleteAnalyteBtn.hidden = !item;
   els.analyteMessage.textContent = item ? `${t("editing")} ${item.tag}` : t("readyNew");
   renderAnalyteList();
+}
+
+function analyteUsesDetectedMaxCq() {
+  return String(state.readerInfo?.protocol || state.readerSettings?.analyzer_protocol || "").trim().toLowerCase() === "cfx96-quantitation";
+}
+
+function syncAnalyteProtocolFields() {
+  const field = document.getElementById("analyte-detected-max-cq-field");
+  if (!field || !els.analyteForm) return;
+  const visible = analyteUsesDetectedMaxCq();
+  field.hidden = !visible;
+  if (!visible) {
+    els.analyteForm.detected_max_cq.value = "";
+  }
 }
 
 function openAnalyteModal(item = null) {
@@ -3688,7 +3959,269 @@ function openAnalyteModal(item = null) {
 
 function closeAnalyteModal() {
   els.analyteModal.hidden = true;
+  closeTransformRuleModal();
   els.analyteMessage.textContent = "";
+}
+
+function normalizeTransformRules(rules) {
+  return (Array.isArray(rules) ? rules : []).map((rule, index) => ({
+    id: String(rule?.id || `regula-${index + 1}`).trim(),
+    order: Number(rule?.order || (index + 1) * 10),
+    enabled: rule?.enabled !== false,
+    type: String(rule?.type || "value_map").trim() || "value_map",
+    source_field: String(rule?.source_field || "source_result").trim() || "source_result",
+    target_field: String(rule?.target_field || "result_value").trim() || "result_value",
+    target_mode: String(rule?.target_mode || "").trim(),
+    match_value: String(rule?.match_value || "").trim(),
+    match_ignore_case: rule?.match_ignore_case !== false,
+    output_value: String(rule?.output_value || "").trim(),
+    formula: String(rule?.formula || "").trim(),
+    stop_after_apply: rule?.stop_after_apply !== false,
+  }));
+}
+
+function syncTransformRulesField() {
+  if (!els.analyteForm?.elements?.transform_rules) return;
+  els.analyteForm.elements.transform_rules.value = JSON.stringify(
+    state.analyteTransformRules.map((rule, index) => ({
+      ...rule,
+      order: (index + 1) * 10,
+    }))
+  );
+}
+
+function transformRuleTypeLabel(type) {
+  return String(type || "").trim() === "formula" ? "Formula" : "Valoare -> valoare";
+}
+
+function transformRuleTargetLabel(target) {
+  switch (String(target || "").trim()) {
+    case "raw_value":
+      return "Rezultat cantitativ";
+    case "interpreted":
+      return "Interpretare";
+    default:
+      return "Rezultat calitativ";
+  }
+}
+
+function formatTransformRuleSummary(rule) {
+  if (String(rule?.type || "").trim() === "formula") {
+    return rule?.formula || "Formula lipsa";
+  }
+  return `${rule?.match_value || "(gol)"} -> ${rule?.output_value || "(gol)"}`;
+}
+
+function renderTransformRulesEditor() {
+  if (!els.transformRulesList) return;
+  syncTransformRulesField();
+  if (!state.analyteTransformRules.length) {
+    els.transformRulesList.innerHTML = `<div class="transform-rule-empty">Nu exista reguli definite.</div>`;
+    return;
+  }
+  els.transformRulesList.innerHTML = state.analyteTransformRules.map((rule, index) => `
+    <div class="transform-rule-card ${rule.enabled === false ? "is-disabled" : ""}">
+      <div class="transform-rule-card-main">
+        <div class="transform-rule-card-title">
+          <strong>${escapeHtml(rule.id || `Regula ${index + 1}`)}</strong>
+          <span class="badge">${escapeHtml(transformRuleTypeLabel(rule.type))}</span>
+          <span class="badge">${escapeHtml(transformRuleTargetLabel(rule.target_field))}</span>
+          ${rule.enabled === false ? `<span class="badge">Inactiva</span>` : ""}
+        </div>
+        <div class="small muted">${escapeHtml(formatTransformRuleSummary(rule))}</div>
+        <div class="small muted">${escapeHtml(rule.stop_after_apply ? "Opreste dupa aplicare" : "Continua cu regula urmatoare")}</div>
+      </div>
+      <div class="transform-rule-card-actions">
+        <button type="button" class="ghost" data-rule-move="up" data-rule-index="${index}" ${index === 0 ? "disabled" : ""}>Sus</button>
+        <button type="button" class="ghost" data-rule-move="down" data-rule-index="${index}" ${index === state.analyteTransformRules.length - 1 ? "disabled" : ""}>Jos</button>
+        <button type="button" class="ghost" data-rule-edit="${index}">Editeaza</button>
+        <button type="button" class="danger" data-rule-delete="${index}">Sterge</button>
+      </div>
+    </div>`).join("");
+  [...els.transformRulesList.querySelectorAll("[data-rule-edit]")].forEach((button) => {
+    button.addEventListener("click", () => openTransformRuleModal(Number(button.dataset.ruleEdit || -1)));
+  });
+  [...els.transformRulesList.querySelectorAll("[data-rule-delete]")].forEach((button) => {
+    button.addEventListener("click", () => deleteTransformRule(Number(button.dataset.ruleDelete || -1)));
+  });
+  [...els.transformRulesList.querySelectorAll("[data-rule-move]")].forEach((button) => {
+    button.addEventListener("click", () => moveTransformRule(Number(button.dataset.ruleIndex || -1), button.dataset.ruleMove || ""));
+  });
+}
+
+function defaultTransformRule() {
+  return {
+    id: `regula-${state.analyteTransformRules.length + 1}`,
+    type: "value_map",
+    source_field: "source_result",
+    target_field: "result_value",
+    target_mode: "",
+    match_value: "",
+    match_ignore_case: true,
+    output_value: "",
+    formula: "",
+    enabled: true,
+    stop_after_apply: true,
+  };
+}
+
+const transformFormulaTemplates = [
+  { label: "IF", insert: 'IF(SRC_RAW > 40, "NEDETECTABIL", "DETECTABIL")' },
+  { label: "SQRT", insert: "SQRT(SRC_RAW)" },
+  { label: "ABS", insert: "ABS(SRC_RAW)" },
+  { label: "ROUND", insert: "ROUND(SRC_RAW, 2)" },
+  { label: "SUM", insert: "SUM(SRC_RAW, RES_FCAT)" },
+  { label: "AVG", insert: "AVG(SRC_RAW, RES_FCAT, RES_FPT)" },
+  { label: "MIN", insert: "MIN(SRC_RAW, RES_FCAT)" },
+  { label: "MAX", insert: "MAX(SRC_RAW, RES_FCAT)" },
+  { label: "POW", insert: "POW(SRC_RAW, 2)" },
+];
+
+function transformFormulaVariables() {
+  const base = [
+    { label: "SRC_RESULT", insert: "SRC_RESULT", title: "Rezultatul brut calitativ primit de la analizor" },
+    { label: "SRC_RAW", insert: "SRC_RAW", title: "Rezultatul brut cantitativ primit de la analizor" },
+    { label: "CUR_RESULT", insert: "CUR_RESULT", title: "Rezultatul curent calitativ dupa reguli anterioare" },
+    { label: "CUR_RAW", insert: "CUR_RAW", title: "Rezultatul curent cantitativ dupa reguli anterioare" },
+    { label: "RAW", insert: "RAW", title: "Alias pentru SRC_RAW" },
+    { label: "CUR", insert: "CUR", title: "Alias pentru CUR_RAW" },
+  ];
+  const analyteVars = (Array.isArray(state.analytes) ? state.analytes : [])
+    .map((item) => {
+      const code = String(item?.result_formula_code || "").trim().toUpperCase();
+      if (!code) return null;
+      return {
+        label: `RES_${code}`,
+        insert: `RES_${code}`,
+        title: `${item?.tag || "-"} - ${item?.name || ""}`.trim(),
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.label.localeCompare(b.label));
+  return [...base, ...analyteVars];
+}
+
+function insertTransformFormulaText(text) {
+  const field = els.transformRuleForm?.elements?.formula;
+  if (!field) return;
+  const start = field.selectionStart ?? field.value.length;
+  const end = field.selectionEnd ?? field.value.length;
+  const before = field.value.slice(0, start);
+  const after = field.value.slice(end);
+  const needsSpaceBefore = before && !/\s|\(|,|\n$/.test(before.slice(-1));
+  const needsSpaceAfter = after && !/^\s|\)|,|\n/.test(after.charAt(0));
+  const insertion = `${needsSpaceBefore ? " " : ""}${text}${needsSpaceAfter ? " " : ""}`;
+  field.value = `${before}${insertion}${after}`;
+  const cursor = before.length + insertion.length;
+  field.focus();
+  field.setSelectionRange(cursor, cursor);
+}
+
+function renderTransformFormulaHelpers() {
+  if (els.transformFormulaFunctions) {
+    els.transformFormulaFunctions.innerHTML = transformFormulaTemplates.map((item) => (
+      `<button type="button" class="transform-formula-chip" data-transform-formula-insert="${escapeHtml(item.insert)}" title="${escapeHtml(item.insert)}">${escapeHtml(item.label)}</button>`
+    )).join("");
+  }
+  if (els.transformFormulaVariables) {
+    els.transformFormulaVariables.innerHTML = transformFormulaVariables().map((item) => (
+      `<button type="button" class="transform-formula-chip" data-transform-formula-insert="${escapeHtml(item.insert)}" title="${escapeHtml(item.title || item.insert)}">${escapeHtml(item.label)}</button>`
+    )).join("");
+  }
+  [...document.querySelectorAll("[data-transform-formula-insert]")].forEach((button) => {
+    button.addEventListener("click", () => insertTransformFormulaText(button.dataset.transformFormulaInsert || ""));
+  });
+}
+
+function openTransformRuleModal(index = null) {
+  if (!els.transformRuleModal || !els.transformRuleForm) return;
+  state.editingTransformRuleIndex = Number.isInteger(index) && index >= 0 ? index : null;
+  const rule = state.editingTransformRuleIndex === null ? defaultTransformRule() : { ...state.analyteTransformRules[state.editingTransformRuleIndex] };
+  els.transformRuleForm.elements.id.value = rule.id || "";
+  els.transformRuleForm.elements.type.value = rule.type || "value_map";
+  els.transformRuleForm.elements.source_field.value = rule.source_field || "source_result";
+  els.transformRuleForm.elements.target_field.value = rule.target_field || "result_value";
+  els.transformRuleForm.elements.target_mode.value = rule.target_mode || "";
+  els.transformRuleForm.elements.stop_after_apply.value = rule.stop_after_apply === false ? "false" : "true";
+  els.transformRuleForm.elements.match_value.value = rule.match_value || "";
+  els.transformRuleForm.elements.output_value.value = rule.output_value || "";
+  els.transformRuleForm.elements.formula.value = rule.formula || "";
+  els.transformRuleForm.elements.enabled.checked = rule.enabled !== false;
+  els.transformRuleForm.elements.match_ignore_case.checked = rule.match_ignore_case !== false;
+  els.transformRuleMessage.textContent = state.editingTransformRuleIndex === null ? "Defineste o regula noua." : `Editezi regula ${rule.id || state.editingTransformRuleIndex + 1}.`;
+  renderTransformFormulaHelpers();
+  syncTransformRuleFormVisibility();
+  els.transformRuleModal.hidden = false;
+}
+
+function closeTransformRuleModal() {
+  if (!els.transformRuleModal) return;
+  els.transformRuleModal.hidden = true;
+  state.editingTransformRuleIndex = null;
+  if (els.transformRuleMessage) els.transformRuleMessage.textContent = "";
+}
+
+function syncTransformRuleFormVisibility() {
+  if (!els.transformRuleForm) return;
+  const type = String(els.transformRuleForm.elements.type.value || "value_map").trim();
+  const targetField = String(els.transformRuleForm.elements.target_field.value || "result_value").trim();
+  const mapFields = els.transformRuleForm.querySelector(".transform-rule-map-fields");
+  const formulaField = els.transformRuleForm.querySelector(".transform-rule-formula-field");
+  const targetModeField = els.transformRuleForm.elements.target_mode?.closest("label");
+  if (mapFields) mapFields.hidden = type === "formula";
+  if (formulaField) formulaField.hidden = type !== "formula";
+  if (targetModeField) targetModeField.hidden = targetField !== "interpreted";
+}
+
+function moveTransformRule(index, direction) {
+  if (index < 0 || index >= state.analyteTransformRules.length) return;
+  const nextIndex = direction === "up" ? index - 1 : index + 1;
+  if (nextIndex < 0 || nextIndex >= state.analyteTransformRules.length) return;
+  const rules = [...state.analyteTransformRules];
+  [rules[index], rules[nextIndex]] = [rules[nextIndex], rules[index]];
+  state.analyteTransformRules = rules;
+  renderTransformRulesEditor();
+}
+
+function deleteTransformRule(index) {
+  if (index < 0 || index >= state.analyteTransformRules.length) return;
+  state.analyteTransformRules = state.analyteTransformRules.filter((_, itemIndex) => itemIndex !== index);
+  renderTransformRulesEditor();
+}
+
+async function onSaveTransformRule(event) {
+  event.preventDefault();
+  const form = new FormData(els.transformRuleForm);
+  const type = String(form.get("type") || "value_map").trim();
+  const targetField = String(form.get("target_field") || "result_value").trim();
+  const rule = {
+    id: String(form.get("id") || "").trim() || `regula-${state.analyteTransformRules.length + 1}`,
+    type,
+    source_field: String(form.get("source_field") || "source_result").trim(),
+    target_field: targetField,
+    target_mode: targetField === "interpreted" ? String(form.get("target_mode") || "").trim() : "",
+    match_value: String(form.get("match_value") || "").trim(),
+    match_ignore_case: !!form.get("match_ignore_case"),
+    output_value: String(form.get("output_value") || "").trim(),
+    formula: String(form.get("formula") || "").trim(),
+    enabled: !!form.get("enabled"),
+    stop_after_apply: String(form.get("stop_after_apply") || "true").trim() !== "false",
+  };
+  if (type === "formula" && !rule.formula) {
+    els.transformRuleMessage.textContent = "Formula este obligatorie.";
+    return;
+  }
+  if (type !== "formula" && !rule.match_value && !rule.output_value) {
+    els.transformRuleMessage.textContent = "Completeaza valoarea cautata si valoarea rezultata.";
+    return;
+  }
+  if (state.editingTransformRuleIndex === null) {
+    state.analyteTransformRules = [...state.analyteTransformRules, rule];
+  } else {
+    state.analyteTransformRules = state.analyteTransformRules.map((item, index) => index === state.editingTransformRuleIndex ? rule : item);
+  }
+  renderTransformRulesEditor();
+  closeTransformRuleModal();
 }
 
 function openQCTargetModal(target = null) {
@@ -3735,10 +4268,36 @@ async function onRefreshQCTargetsClick() {
 async function onSaveAnalyte(event) {
   event.preventDefault();
   const form = new FormData(els.analyteForm);
+  const existing = state.analytes.find((item) => item.id === state.selectedAnalyteId) || state.analytes.find((item) => item.tag === state.selectedTag) || null;
+  const protocolOptions = { ...(existing?.protocol_options || {}) };
+  protocolOptions.worklist_label = String(form.get("worklist_label") || "").trim();
+  const detectedMaxCq = String(form.get("detected_max_cq") || "").trim();
+  if (analyteUsesDetectedMaxCq() && detectedMaxCq) {
+    protocolOptions.detected_max_cq = Number(detectedMaxCq);
+  } else {
+    delete protocolOptions.detected_max_cq;
+  }
+  const transformRulesRaw = String(form.get("transform_rules") || "").trim();
+  let transformRules = [];
+  if (transformRulesRaw) {
+    try {
+      const parsed = JSON.parse(transformRulesRaw);
+      if (!Array.isArray(parsed)) {
+        throw new Error("Regulile de transformare trebuie sa fie un array JSON.");
+      }
+      transformRules = parsed;
+    } catch (error) {
+      const message = error?.message || "JSON invalid pentru regulile de transformare";
+      els.analyteMessage.textContent = message;
+      showToast(message, "error");
+      return;
+    }
+  }
   const payload = {
     id: state.selectedAnalyteId || 0,
     tag: String(form.get("tag") || "").trim(),
     code: String(form.get("code") || "").trim(),
+    result_formula_code: String(form.get("result_formula_code") || "").trim(),
     name: String(form.get("name") || "").trim(),
     description: String(form.get("description") || "").trim(),
     result_type: String(form.get("result_type") || "text").trim(),
@@ -3746,9 +4305,8 @@ async function onSaveAnalyte(event) {
     result_weighting: Number(form.get("result_weighting") || 1),
     result_measure_unit: String(form.get("result_measure_unit") || "").trim(),
     result_reagents_set: String(form.get("result_reagents_set") || "").trim(),
-    protocol_options: {
-      worklist_label: String(form.get("worklist_label") || "").trim(),
-    },
+    transform_rules: transformRules,
+    protocol_options: protocolOptions,
     active: !!form.get("active"),
   };
   const method = state.selectedAnalyteId ? "PUT" : "POST";
@@ -3984,7 +4542,8 @@ function formatMetricNumber(value) {
 }
 
 function renderOrdersLayout() {
-  if (state.orders.length === 0) {
+  const visibleOrders = filteredOrders();
+  if (visibleOrders.length === 0) {
     els.ordersSelectAll.checked = false;
     els.ordersLayout.innerHTML = `<div class="log-item">${escapeHtml(t("noOrders"))}</div>`;
     return;
@@ -3992,7 +4551,7 @@ function renderOrdersLayout() {
   const layoutKind = inferLayoutKind();
   if (layoutKind === "rack_positions") {
     const racks = new Map();
-    state.orders.forEach((bundle) => {
+    visibleOrders.forEach((bundle) => {
       const rackNo = bundle.order.rack_no || 1;
       if (!racks.has(rackNo)) racks.set(rackNo, []);
       racks.get(rackNo).push(bundle);
@@ -4009,13 +4568,15 @@ function renderOrdersLayout() {
           <thead>
             <tr>
               <th class="col-check"></th>
+              <th class="col-flow">${escapeHtml(t("syncFlow"))}</th>
               <th class="col-slot">${escapeHtml(t("slot"))}</th>
               <th class="col-sample">${escapeHtml(t("sample"))}</th>
               <th class="col-status">${escapeHtml(t("status"))}</th>
+              <th class="col-send-count">${escapeHtml(t("analyzerSendCount"))}</th>
               <th class="col-analyses">${escapeHtml(t("analyses"))}</th>
             </tr>
           </thead>
-          <tbody>${state.orders.sort((a, b) => {
+          <tbody>${visibleOrders.sort((a, b) => {
             const aSampleNo = a.order.sample_no || 0;
             const bSampleNo = b.order.sample_no || 0;
             if (aSampleNo !== bSampleNo) return aSampleNo - bSampleNo;
@@ -4045,16 +4606,46 @@ function renderOrdersLayout() {
       } else {
         state.selectedOrderIDs = state.selectedOrderIDs.filter((item) => item !== id);
       }
-      els.ordersSelectAll.checked = state.orders.length > 0 && state.orders.every((item) => state.selectedOrderIDs.includes(item.order.id));
+      const visibleOrders = filteredOrders();
+      els.ordersSelectAll.checked = visibleOrders.length > 0 && visibleOrders.every((item) => state.selectedOrderIDs.includes(item.order.id));
     });
   });
-  els.ordersSelectAll.checked = state.orders.length > 0 && state.orders.every((item) => state.selectedOrderIDs.includes(item.order.id));
+  els.ordersSelectAll.checked = visibleOrders.length > 0 && visibleOrders.every((item) => state.selectedOrderIDs.includes(item.order.id));
+}
+
+function filteredOrders() {
+  return state.orders.filter((bundle) => {
+    const receiveOk = !state.selectedOrderReceiveFilter || orderReceiveStatus(bundle) === state.selectedOrderReceiveFilter;
+    const sendOk = !state.selectedOrderSendFilter || orderSendStatus(bundle) === state.selectedOrderSendFilter;
+    return receiveOk && sendOk;
+  });
 }
 
 function renderRoundSelect() {
   if (!els.roundSelect) return;
   els.roundSelect.innerHTML = state.rounds.map((roundNo) => `<option value="${roundNo}">${roundNo}</option>`).join("");
   els.roundSelect.value = String(state.selectedRoundNo > 0 ? state.selectedRoundNo : (state.rounds[0] || 1));
+}
+
+function renderOrderStatusFilters() {
+  if (els.ordersReceivedFilter) {
+    els.ordersReceivedFilter.innerHTML = [
+      `<option value="">${escapeHtml(t("allStatuses"))}</option>`,
+      `<option value="none">${escapeHtml(t("statusReceiveNone"))}</option>`,
+      `<option value="partial">${escapeHtml(t("statusReceivePartial"))}</option>`,
+      `<option value="full">${escapeHtml(t("statusReceiveFull"))}</option>`,
+    ].join("");
+    els.ordersReceivedFilter.value = state.selectedOrderReceiveFilter || "";
+  }
+  if (els.ordersSentFilter) {
+    els.ordersSentFilter.innerHTML = [
+      `<option value="">${escapeHtml(t("allStatuses"))}</option>`,
+      `<option value="none">${escapeHtml(t("statusSendNone"))}</option>`,
+      `<option value="partial">${escapeHtml(t("statusSendPartial"))}</option>`,
+      `<option value="full">${escapeHtml(t("statusSendFull"))}</option>`,
+    ].join("");
+    els.ordersSentFilter.value = state.selectedOrderSendFilter || "";
+  }
 }
 
 function renderQCRoundSelect() {
@@ -4161,10 +4752,14 @@ function renderSimpleRow(bundle) {
   const specimenCode = orderSpecimenCode(order);
   const patientID = orderPatientID(order);
   const patientName = orderPatientName(order);
+  const receiveStatus = orderReceiveStatus(bundle);
+  const sendStatus = orderSendStatus(bundle);
+  const analyzerSendCount = orderAnalyzerSendCount(order);
   return `<tr class="${order.id === state.selectedOrderId ? "active" : ""}" data-order-id="${order.id}">
     <td class="col-check">
-      ${state.commType === "file" ? `<span class="order-select"><input type="checkbox" data-order-check="${order.id}" ${state.selectedOrderIDs.includes(order.id) ? "checked" : ""}></span>` : ""}
+      ${!state.barcodeMode ? `<span class="order-select"><input type="checkbox" data-order-check="${order.id}" ${state.selectedOrderIDs.includes(order.id) ? "checked" : ""}></span>` : ""}
     </td>
+    <td class="col-flow"><div class="orders-flow"><span class="status-stack"><span class="status-bar receive ${escapeHtml(receiveStatus)}"></span><span class="status-bar send ${escapeHtml(sendStatus)}"></span></span></div></td>
     <td class="col-slot"><span class="slot-pill">${escapeHtml(slotLabel(order))}</span></td>
     <td class="col-sample">
         <div class="sample-main">
@@ -4181,8 +4776,73 @@ function renderSimpleRow(bundle) {
       </div>
     </td>
     <td class="col-status"><span class="status-pill-soft">${escapeHtml(localizeOrderStatus(order.status || ""))}</span></td>
+    <td class="col-send-count"><span class="count-pill">${escapeHtml(String(analyzerSendCount))}</span></td>
     <td class="col-analyses"><span class="count-pill">${escapeHtml(String(analysesCount))}</span></td>
   </tr>`;
+}
+
+function orderReceiveStatus(bundle) {
+  const analyses = bundle?.analyses || [];
+  if (!analyses.length) return "none";
+  const received = analyses.filter((item) => {
+    const analysis = item.analysis || {};
+    return String(analysis.raw_value || "").trim() || String(analysis.result_value || "").trim();
+  }).length;
+  if (received <= 0) return "none";
+  if (received < analyses.length) return "partial";
+  return "full";
+}
+
+function analysisSendStatus(analysis) {
+  const status = String(analysis?.flags?.wisemed_send_status || "").trim().toLowerCase();
+  if (status === "sent") return "full";
+  if (status === "pending") return "none";
+  return "none";
+}
+
+function orderSendStatus(bundle) {
+  const analyses = bundle?.analyses || [];
+  if (!analyses.length) return "none";
+  const sendable = analyses.filter((item) => {
+    const analysis = item.analysis || {};
+    return String(analysis.raw_value || "").trim() || String(analysis.result_value || "").trim();
+  });
+  if (!sendable.length) return "none";
+  const sent = sendable.filter((item) => analysisSendStatus(item.analysis) === "full").length;
+  if (sent <= 0) return "none";
+  if (sent < sendable.length) return "partial";
+  return "full";
+}
+
+function orderAnalyzerSendCount(order) {
+  const value = Number(order?.meta?.analyzer_send_count || 0);
+  return Number.isFinite(value) && value > 0 ? value : 0;
+}
+
+function analysisCommunicationDetails(analysis) {
+  return String(analysis?.flags?.communication_details || analysis?.interpreted_value || "").trim();
+}
+
+function localizeSendStatus(status) {
+  switch (status) {
+    case "full":
+      return t("statusSendFull");
+    case "partial":
+      return t("statusSendPartial");
+    default:
+      return t("statusSendNone");
+  }
+}
+
+function formatNextSyncCountdown(nextRunAt) {
+  if (!nextRunAt) return "--:--";
+  const target = new Date(nextRunAt).getTime();
+  const now = Date.now();
+  const diffMs = Math.max(0, target - now);
+  const totalSeconds = Math.floor(diffMs / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }
 
 function slotLabel(order) {
@@ -4209,6 +4869,9 @@ function renderOrderDetails() {
   const specimenCode = orderSpecimenCode(bundle.order);
   const patientID = orderPatientID(bundle.order);
   const patientName = orderPatientName(bundle.order);
+  const imagePath = String(bundle.order?.meta?.labnovation_image_path || "").trim();
+  const receiveStatus = orderReceiveStatus(bundle);
+  const sendStatus = orderSendStatus(bundle);
   els.orderDetails.innerHTML = `
     <div class="order-card">
       <div class="order-headline">
@@ -4216,7 +4879,7 @@ function renderOrderDetails() {
           <strong>${escapeHtml(bundle.order.sample_id)}</strong>
           <div class="small muted">${escapeHtml(`${t("sentSampleCode")}: ${sentSampleCode || "-"}`)}</div>
         </div>
-        <span class="slot-pill">${escapeHtml(`${t("round")} ${bundle.order.round_no || 1}`)}</span>
+        <div class="analysis-send-pill"><span class="status-stack"><span class="status-bar receive ${escapeHtml(receiveStatus)}"></span><span class="status-bar send ${escapeHtml(sendStatus)}"></span></span><span class="slot-pill">${escapeHtml(`${t("round")} ${bundle.order.round_no || 1}`)}</span></div>
       </div>
       <div class="order-meta-grid">
         <div class="meta-kpi">
@@ -4252,6 +4915,11 @@ function renderOrderDetails() {
           <span class="value">${escapeHtml(patientName || "-")}</span>
         </div>
       </div>
+      ${imagePath ? `
+        <div class="order-image-preview">
+          <span class="label">${escapeHtml(t("orderImage"))}</span>
+          <img src="/api/order-image?path=${encodeURIComponent(imagePath)}" alt="${escapeHtml(t("orderImage"))}" loading="lazy">
+        </div>` : ""}
     </div>
     <div class="analysis-list">
       <div class="analysis-card">
@@ -4263,6 +4931,8 @@ function renderOrderDetails() {
                 <tr>
                   <th>${escapeHtml(t("analysisName"))}</th>
                   <th>${escapeHtml(t("analysisTag"))}</th>
+                  <th>Eroare</th>
+                  <th>${escapeHtml(t("analysisSendStatus"))}</th>
                   <th>${escapeHtml(t("analysisQualitative"))}</th>
                   <th>${escapeHtml(t("analysisQuantitative"))}</th>
                 </tr>
@@ -4277,6 +4947,8 @@ function renderOrderDetails() {
                       <div class="small muted">${escapeHtml(`${t("wisemedFSMID")}: ${item.analysis.wisemed_fsm_id || "-"}`)}</div>
                     </td>
                     <td>${escapeHtml(item.analysis.analyte_tag || "-")}</td>
+                    <td>${item.analysis.flags?.transformation_error ? `<span title="${escapeHtml(String(item.analysis.flags?.transformation_error_message || "Eroare transformare"))}">!</span>` : ""}</td>
+                    <td><span class="analysis-send-pill"><span class="status-bar send ${escapeHtml(analysisSendStatus(item.analysis))}"></span><span>${escapeHtml(localizeSendStatus(analysisSendStatus(item.analysis)))}</span></span></td>
                     <td>${escapeHtml(item.analysis.result_value || t("noResult"))}</td>
                     <td>${escapeHtml(item.analysis.raw_value || "-")}</td>
                   </tr>`).join("")}
@@ -4293,12 +4965,14 @@ function renderOrderDetails() {
               <div class="small muted">${escapeHtml(selectedAnalysisBundle.analysis.analyte_description || "")}</div>
               <div class="small muted">${escapeHtml(`${t("wisemedSMID")}: ${selectedAnalysisBundle.analysis.wisemed_sm_id || "-"}`)}</div>
               <div class="small muted">${escapeHtml(`${t("wisemedFSMID")}: ${selectedAnalysisBundle.analysis.wisemed_fsm_id || "-"}`)}</div>
+              <div class="small muted">${escapeHtml(`${t("analysisSendStatus")}: ${localizeSendStatus(analysisSendStatus(selectedAnalysisBundle.analysis))}`)}</div>
+              ${selectedAnalysisBundle.analysis.flags?.transformation_error ? `<div class="small muted">Eroare transformare: ${escapeHtml(String(selectedAnalysisBundle.analysis.flags?.transformation_error_message || "-"))}</div>` : ""}
             </div>
             <div class="analysis-value-box">
               <div class="small muted">${escapeHtml(t("currentResult"))}</div>
-              <strong>${escapeHtml(selectedAnalysisBundle.analysis.result_value || t("noResult"))}</strong>
+              <strong>${escapeHtml(selectedAnalysisBundle.analysis.result_value || selectedAnalysisBundle.analysis.raw_value || t("noResult"))}</strong>
               <div class="small muted">${escapeHtml(`${t("analysisQuantitative")}: ${selectedAnalysisBundle.analysis.raw_value || "-"}`)}</div>
-              <div class="small muted">${escapeHtml(selectedAnalysisBundle.analysis.interpreted_value || "")}</div>
+              <div class="small muted">${escapeHtml(`${t("communicationDetails")}: ${analysisCommunicationDetails(selectedAnalysisBundle.analysis) || "-"}`)}</div>
             </div>
           </div>
           <label class="stack">
@@ -4555,6 +5229,8 @@ function applyLanguage() {
   if (document.getElementById("reader-settings-title")) document.getElementById("reader-settings-title").textContent = t("settingsReader");
   if (document.getElementById("repeat-mode-label")) document.getElementById("repeat-mode-label").textContent = t("repeatModeLabel");
   if (document.getElementById("repeat-mode-help")) document.getElementById("repeat-mode-help").textContent = t("repeatModeHelp");
+  if (document.getElementById("delete-orders-preference-label")) document.getElementById("delete-orders-preference-label").textContent = t("deleteOrdersPreference");
+  if (document.getElementById("delete-orders-preference-toggle-label")) document.getElementById("delete-orders-preference-toggle-label").textContent = t("deleteOrdersPreferenceToggle");
   if (document.getElementById("save-reader-settings")) document.getElementById("save-reader-settings").textContent = t("saveReaderSettings");
   if (els.repeatModeSelect) {
     const options = els.repeatModeSelect.querySelectorAll("option");
@@ -4615,12 +5291,20 @@ function applyLanguage() {
   document.getElementById("order-date-label").textContent = t("orderDate");
   document.getElementById("round-label").textContent = t("round");
   document.getElementById("orders-select-all-label").textContent = t("selectAll");
+  if (document.getElementById("orders-received-filter-label")) document.getElementById("orders-received-filter-label").textContent = t("resultsFilter");
+  if (document.getElementById("orders-sent-filter-label")) document.getElementById("orders-sent-filter-label").textContent = t("wisemedSendFilter");
   document.getElementById("import-orders").textContent = t("importFile");
   document.getElementById("export-orders").textContent = t("exportFile");
   document.getElementById("sync-orders-wisemed").textContent = t("syncToWiseMED");
   document.getElementById("send-orders-wisemed").textContent = t("sendToBulletin");
+  renderOrderStatusFilters();
   document.getElementById("worklist-orders").textContent = t("getWorklist");
   document.getElementById("delete-orders").textContent = t("deleteSelection");
+  if (document.getElementById("orders-delete-title")) document.getElementById("orders-delete-title").textContent = t("deleteOrdersTitle");
+  if (document.getElementById("orders-delete-message")) document.getElementById("orders-delete-message").textContent = t("deleteOrdersConfirm");
+  if (document.getElementById("orders-delete-skip-confirm-label")) document.getElementById("orders-delete-skip-confirm-label").textContent = t("dontAskAgain");
+  if (document.getElementById("orders-delete-confirm")) document.getElementById("orders-delete-confirm").textContent = t("delete");
+  if (document.getElementById("orders-delete-cancel")) document.getElementById("orders-delete-cancel").textContent = t("cancel");
   document.getElementById("new-round").textContent = t("newRound");
   document.getElementById("editor-title").textContent = t("analyteEditor");
   document.getElementById("help-title").textContent = t("howTo");
@@ -4688,6 +5372,7 @@ function toggleLogsAccess(canViewLogs) {
 function updateConnectionPills(connections) {
   const wsConnected = !!connections.wisemed_ws_connected;
   const analyzerConnected = !!connections.analyzer_connected;
+  const analyzerLastPacketAt = String(connections.analyzer_last_packet_at || "").trim();
   els.wisemedwsPill.classList.toggle("connected", wsConnected);
   els.wisemedwsPill.classList.toggle("disconnected", !wsConnected);
   if (state.barcodeMode) {
@@ -4701,6 +5386,27 @@ function updateConnectionPills(connections) {
   els.analyzerDot.classList.toggle("offline", !analyzerConnected);
   els.wisemedwsStatusLabel.textContent = `${t("wisemedws")} · ${wsConnected ? t("connected") : t("disconnected")}`;
   els.analyzerStatusLabel.textContent = `${t("analyzer")} · ${analyzerConnected ? t("connected") : t("disconnected")}`;
+  if (analyzerLastPacketAt && analyzerLastPacketAt !== state.analyzerLastPacketAt) {
+    pulseAnalyzerIndicator();
+  }
+  state.analyzerLastPacketAt = analyzerLastPacketAt;
+}
+
+function pulseAnalyzerIndicator() {
+  if (!els.analyzerPill || !els.analyzerDot) return;
+  els.analyzerPill.classList.remove("pulse");
+  els.analyzerDot.classList.remove("pulse");
+  void els.analyzerPill.offsetWidth;
+  els.analyzerPill.classList.add("pulse");
+  els.analyzerDot.classList.add("pulse");
+  if (state.analyzerPulseTimer) {
+    clearTimeout(state.analyzerPulseTimer);
+  }
+  state.analyzerPulseTimer = setTimeout(() => {
+    els.analyzerPill.classList.remove("pulse");
+    els.analyzerDot.classList.remove("pulse");
+    state.analyzerPulseTimer = null;
+  }, 1800);
 }
 
 function inferReaderCategory(readerInfo = {}) {

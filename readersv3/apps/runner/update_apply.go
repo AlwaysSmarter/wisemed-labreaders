@@ -94,54 +94,68 @@ func extractUpdateArchive(archivePath string) (string, error) {
 }
 
 func launchWindowsArchiveUpdate(stageDir, appDir, exePath, configPath string, cfg *config.Config) error {
-	scriptPath := filepath.Join(stageDir, "apply-update.cmd")
+	scriptPath := filepath.Join(stageDir, "apply-update.ps1")
 	logPath := filepath.Join(stageDir, "apply-update.log")
-	exeName := filepath.Base(exePath)
-	restartLine := fmt.Sprintf("start \"\" \"%s\" -config \"%s\"", exePath, configPath)
+	restartLines := []string{
+		"if ([string]::IsNullOrWhiteSpace($ConfigPath)) {",
+		"  Start-Process -FilePath $ExePath | Out-Null",
+		"} else {",
+		"  Start-Process -FilePath $ExePath -ArgumentList @('-config', $ConfigPath) | Out-Null",
+		"}",
+	}
 	if currentRunsAsService() && cfg != nil {
 		if info, err := buildServiceInstallInfo(cfg); err == nil && strings.TrimSpace(info.ServiceName) != "" {
-			restartLine = strings.Join([]string{
-				fmt.Sprintf("sc.exe start \"%s\" >nul 2>&1", info.ServiceName),
-				"if errorlevel 1 (",
-				fmt.Sprintf("  start \"\" \"%s\" -config \"%s\"", exePath, configPath),
-				")",
-			}, "\r\n")
+			restartLines = []string{
+				fmt.Sprintf("$serviceName = %s", powerShellQuote(info.ServiceName)),
+				`& sc.exe start $serviceName *> $null`,
+				"if ($LASTEXITCODE -ne 0) {",
+			}
+			restartLines = append(restartLines,
+				"  if ([string]::IsNullOrWhiteSpace($ConfigPath)) {",
+				"    Start-Process -FilePath $ExePath | Out-Null",
+				"  } else {",
+				"    Start-Process -FilePath $ExePath -ArgumentList @('-config', $ConfigPath) | Out-Null",
+				"  }",
+				"}",
+			)
 		}
 	}
-	body := strings.Join([]string{
-		"@echo off",
-		"setlocal enableextensions",
-		fmt.Sprintf("set \"APP_DIR=%s\"", appDir),
-		fmt.Sprintf("set \"STAGE_DIR=%s\"", stageDir),
-		fmt.Sprintf("set \"EXE_NAME=%s\"", exeName),
-		fmt.Sprintf("set \"LOG_PATH=%s\"", logPath),
-		"echo [apply-update] start %date% %time%>\"%LOG_PATH%\"",
-		"echo [apply-update] APP_DIR=%APP_DIR%>>\"%LOG_PATH%\"",
-		"echo [apply-update] STAGE_DIR=%STAGE_DIR%>>\"%LOG_PATH%\"",
-		"echo [apply-update] EXE_NAME=%EXE_NAME%>>\"%LOG_PATH%\"",
-		":waitloop",
-		fmt.Sprintf("tasklist /FI \"PID eq %d\" | find \"%d\" >nul", os.Getpid(), os.Getpid()),
-		"if not errorlevel 1 (",
-		"  echo [apply-update] waiting for current pid to exit>>\"%LOG_PATH%\"",
-		"  timeout /t 1 /nobreak >nul",
-		"  goto waitloop",
-		")",
-		"echo [apply-update] copying staged files>>\"%LOG_PATH%\"",
-		"xcopy \"%STAGE_DIR%\\*\" \"%APP_DIR%\\\" /E /I /Y /Q >>\"%LOG_PATH%\" 2>&1",
-		"if errorlevel 1 (",
-		"  echo [apply-update] xcopy failed with errorlevel %errorlevel%>>\"%LOG_PATH%\"",
-		"  exit /b 1",
-		")",
-		"echo [apply-update] copy finished>>\"%LOG_PATH%\"",
-		"echo [apply-update] restarting application>>\"%LOG_PATH%\"",
-		restartLine,
-		"echo [apply-update] restart command dispatched>>\"%LOG_PATH%\"",
-		"exit /b 0",
-	}, "\r\n") + "\r\n"
+	lines := []string{
+		"$ErrorActionPreference = 'Stop'",
+		fmt.Sprintf("$AppDir = %s", powerShellQuote(appDir)),
+		fmt.Sprintf("$StageDir = %s", powerShellQuote(stageDir)),
+		fmt.Sprintf("$ExePath = %s", powerShellQuote(exePath)),
+		fmt.Sprintf("$ConfigPath = %s", powerShellQuote(configPath)),
+		fmt.Sprintf("$LogPath = %s", powerShellQuote(logPath)),
+		fmt.Sprintf("$CurrentPid = %d", os.Getpid()),
+		"function Write-Log([string]$Message) {",
+		"  Add-Content -LiteralPath $LogPath -Value (\"[apply-update] \" + $Message)",
+		"}",
+		"New-Item -ItemType Directory -Force -Path (Split-Path -Parent $LogPath) | Out-Null",
+		"Set-Content -LiteralPath $LogPath -Value (\"[apply-update] start \" + (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'))",
+		"Write-Log (\"APP_DIR=\" + $AppDir)",
+		"Write-Log (\"STAGE_DIR=\" + $StageDir)",
+		"Write-Log (\"EXE_PATH=\" + $ExePath)",
+		"while (Get-Process -Id $CurrentPid -ErrorAction SilentlyContinue) {",
+		"  Write-Log 'waiting for current pid to exit'",
+		"  Start-Sleep -Seconds 1",
+		"}",
+		"Write-Log 'copying staged files'",
+		"$copyItems = Get-ChildItem -LiteralPath $StageDir -Force | Where-Object { $_.Name -notin @('apply-update.ps1', 'apply-update.log') }",
+		"foreach ($item in $copyItems) {",
+		"  $destination = Join-Path $AppDir $item.Name",
+		"  Copy-Item -LiteralPath $item.FullName -Destination $destination -Recurse -Force",
+		"}",
+		"Write-Log 'copy finished'",
+		"Write-Log 'restarting application'",
+	}
+	lines = append(lines, restartLines...)
+	lines = append(lines, "Write-Log 'restart command dispatched'")
+	body := strings.Join(lines, "\r\n") + "\r\n"
 	if err := os.WriteFile(scriptPath, []byte(body), 0o644); err != nil {
 		return err
 	}
-	cmd := exec.Command("cmd", "/C", "start", "", scriptPath)
+	cmd := exec.Command("cmd.exe", "/C", "start", "", "powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-WindowStyle", "Hidden", "-File", scriptPath)
 	return cmd.Start()
 }
 
@@ -168,4 +182,8 @@ func launchUnixArchiveUpdate(stageDir, appDir, exePath, configPath string) error
 
 func shellQuotePath(value string) string {
 	return "'" + strings.ReplaceAll(value, "'", "'\"'\"'") + "'"
+}
+
+func powerShellQuote(value string) string {
+	return "'" + strings.ReplaceAll(value, "'", "''") + "'"
 }

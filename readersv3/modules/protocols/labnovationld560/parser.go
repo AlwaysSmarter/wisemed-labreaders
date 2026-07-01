@@ -3,6 +3,8 @@ package labnovationld560
 import (
 	"bufio"
 	"bytes"
+	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"io"
@@ -13,17 +15,23 @@ import (
 )
 
 type parsedMessage struct {
-	RunDate      string
-	SampleID     string
-	SampleNo     string
-	RackNo       string
-	RackPosition string
-	PatientID    string
-	PatientName  string
-	FileID       string
-	ControlLevel string
-	IsQC         bool
-	Results      []parsedResult
+	InstrumentModel            string
+	InstrumentSequentialNumber string
+	RunDate                    string
+	RunTime                    string
+	Sample                     string
+	SampleID                   string
+	SampleNo                   string
+	RackNo                     string
+	RackPosition               string
+	PatientID                  string
+	PatientName                string
+	FileID                     string
+	SampleType                 string
+	ControlLevel               string
+	IsQC                       bool
+	Results                    []parsedResult
+	image                      *parsedImage
 }
 
 type parsedResult struct {
@@ -35,6 +43,14 @@ type parsedResult struct {
 	Unit            string
 	Flags           map[string]interface{}
 	ProtocolOptions map[string]interface{}
+}
+
+type parsedImage struct {
+	tag      string
+	name     string
+	format   string
+	encoding string
+	data     []byte
 }
 
 type ignoreLogger func(kind, reason string, payload map[string]interface{})
@@ -64,6 +80,7 @@ type simpleSettings struct {
 	SampleModeQCValues []string
 	AnalyteMappings    map[string]string
 	AnalyteUnits       map[string]string
+	ImageMode          string
 }
 
 type hl7Message struct {
@@ -124,6 +141,7 @@ func defaultSimpleSettings() map[string]interface{} {
 			"HbA0":  "%",
 			"eAG":   "",
 		},
+		"image_mode": "no_image",
 	}
 }
 
@@ -155,6 +173,7 @@ func simpleSettingsFromMap(raw map[string]interface{}) simpleSettings {
 		SampleModeQCValues: stringList(raw["sample_mode_qc_values"]),
 		AnalyteMappings:    stringMap(raw["analyte_mappings"]),
 		AnalyteUnits:       stringMap(raw["analyte_units"]),
+		ImageMode:          normalizeImageMode(asString(raw["image_mode"])),
 	}
 }
 
@@ -319,24 +338,25 @@ func parseSimpleResults(raw []byte, settings simpleSettings, ignored ...ignoreLo
 	if !strings.Contains(text, "<TRANSMIT>") {
 		return nil, errors.New("invalid simple payload")
 	}
+	model, serial := parseSimpleInstrument(text)
 	message := parsedMessage{
-		RunDate: normalizeRunDate(extractFirst(text, `<I>[^<|]*\|([^|<]+)`)),
-		FileID:  extractFirst(text, `<M>[^|<]*\|([^<|]+)`),
+		InstrumentModel:            model,
+		InstrumentSequentialNumber: serial,
 	}
 	info := extractFirst(text, `<I>(.*?)</I>`)
 	parts := strings.Split(info, "|")
-	if len(parts) >= 7 {
-		message.SampleID = strings.TrimSpace(parts[3])
-		message.SampleNo = strings.TrimSpace(parts[2])
-		message.RackNo = strings.TrimSpace(parts[4])
-		message.RackPosition = strings.TrimSpace(parts[5])
-		mode := strings.TrimSpace(parts[6])
-		message.IsQC = containsFold(settings.SampleModeQCValues, mode)
-		message.ControlLevel = mode
-	}
+	message.Sample = fieldAt(parts, 0)
+	rawTimestamp := fieldAt(parts, 1)
+	message.RunDate = normalizeRunDate(rawTimestamp)
+	message.RunTime = normalizeRunTime(rawTimestamp)
+	parseSimpleInfoFields(&message, parts, settings)
 	if message.RunDate == "" {
 		message.RunDate = time.Now().Format("2006-01-02")
 	}
+	if message.SampleID == "" {
+		message.SampleID = firstNonEmpty(message.FileID, message.SampleNo)
+	}
+	message.image = extractSimpleImage(raw, settings.ImageMode)
 	resultBody := extractFirst(text, `<R>(.*?)</R>`)
 	if strings.TrimSpace(resultBody) == "" {
 		return nil, errors.New("simple payload does not contain results")
@@ -376,6 +396,127 @@ func parseSimpleResults(raw []byte, settings simpleSettings, ignored ...ignoreLo
 		})
 	}
 	return []parsedMessage{message}, nil
+}
+
+func extractSimpleImage(raw []byte, imageMode string) *parsedImage {
+	imageMode = normalizeImageMode(imageMode)
+	if imageMode == "no_image" {
+		return nil
+	}
+	upper := bytes.ToUpper(raw)
+	for _, tag := range []string{"IMG", "IMAGE", "PIC", "PHOTO", "GRAPH"} {
+		start := bytes.Index(upper, []byte("<"+tag))
+		if start < 0 {
+			continue
+		}
+		gt := bytes.IndexByte(upper[start:], '>')
+		if gt < 0 {
+			continue
+		}
+		bodyStart := start + gt + 1
+		end := bytes.Index(upper[bodyStart:], []byte("</"+tag+">"))
+		if end < 0 {
+			continue
+		}
+		body := bytes.TrimSpace(raw[bodyStart : bodyStart+end])
+		name := extractFirst(string(body), `<NAME>(.*?)</NAME>`)
+		dataBody := extractFirst(string(body), `<DATA>(.*?)</DATA>`)
+		if strings.TrimSpace(dataBody) != "" {
+			body = []byte(dataBody)
+		}
+		data, format, ok := decodeSimpleImageBody(body, imageMode)
+		if !ok || len(data) == 0 {
+			continue
+		}
+		if format == "bin" && strings.TrimSpace(name) != "" {
+			switch strings.ToLower(strings.TrimPrefix(filepathExt(name), ".")) {
+			case "png", "bmp", "jpg", "jpeg", "gif":
+				format = strings.ToLower(strings.TrimPrefix(filepathExt(name), "."))
+				if format == "jpeg" {
+					format = "jpg"
+				}
+			}
+		}
+		return &parsedImage{
+			tag:      tag,
+			name:     strings.TrimSpace(name),
+			format:   format,
+			encoding: imageMode,
+			data:     data,
+		}
+	}
+	return nil
+}
+
+func decodeSimpleImageBody(body []byte, imageMode string) ([]byte, string, bool) {
+	body = bytes.TrimSpace(body)
+	if len(body) == 0 {
+		return nil, "", false
+	}
+	if imageMode == "base64" {
+		decoded, err := base64.StdEncoding.DecodeString(removeWhitespace(string(body)))
+		if err == nil && len(decoded) > 0 {
+			return decoded, detectImageFormat(decoded), true
+		}
+	}
+	if decoded, ok := decodeHexImage(body); ok {
+		return decoded, detectImageFormat(decoded), true
+	}
+	if imageMode == "bitmap" && len(body) > 0 {
+		return append([]byte(nil), body...), detectImageFormat(body), true
+	}
+	if decoded, err := base64.StdEncoding.DecodeString(removeWhitespace(string(body))); err == nil && len(decoded) > 0 {
+		return decoded, detectImageFormat(decoded), true
+	}
+	return nil, "", false
+}
+
+func decodeHexImage(body []byte) ([]byte, bool) {
+	normalized := removeWhitespace(string(body))
+	if normalized == "" || len(normalized)%2 != 0 {
+		return nil, false
+	}
+	for _, ch := range normalized {
+		if !((ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F')) {
+			return nil, false
+		}
+	}
+	decoded, err := hex.DecodeString(normalized)
+	if err != nil || len(decoded) == 0 {
+		return nil, false
+	}
+	return decoded, true
+}
+
+func detectImageFormat(data []byte) string {
+	switch {
+	case len(data) >= 2 && data[0] == 'B' && data[1] == 'M':
+		return "bmp"
+	case len(data) >= 8 && bytes.Equal(data[:8], []byte{0x89, 'P', 'N', 'G', 0x0d, 0x0a, 0x1a, 0x0a}):
+		return "png"
+	case len(data) >= 3 && data[0] == 0xff && data[1] == 0xd8 && data[2] == 0xff:
+		return "jpg"
+	case len(data) >= 6 && (bytes.Equal(data[:6], []byte("GIF87a")) || bytes.Equal(data[:6], []byte("GIF89a"))):
+		return "gif"
+	default:
+		return "bin"
+	}
+}
+
+func removeWhitespace(value string) string {
+	value = strings.ReplaceAll(value, "\r", "")
+	value = strings.ReplaceAll(value, "\n", "")
+	value = strings.ReplaceAll(value, "\t", "")
+	value = strings.ReplaceAll(value, " ", "")
+	return strings.TrimSpace(value)
+}
+
+func filepathExt(name string) string {
+	idx := strings.LastIndex(strings.TrimSpace(name), ".")
+	if idx < 0 {
+		return ""
+	}
+	return name[idx:]
 }
 
 func parseHL7Message(raw []byte) (hl7Message, error) {
@@ -528,6 +669,62 @@ func parseSimpleResultPairs(body string) map[string]string {
 	return out
 }
 
+func parseSimpleInstrument(text string) (string, string) {
+	re := regexp.MustCompile(`<M>\s*([^|<]+)\|([^<|]+)`)
+	match := re.FindStringSubmatch(text)
+	if len(match) < 3 {
+		return "", ""
+	}
+	return strings.TrimSpace(match[1]), strings.TrimSpace(match[2])
+}
+
+func parseSimpleInfoFields(message *parsedMessage, parts []string, settings simpleSettings) {
+	if message == nil {
+		return
+	}
+	switch len(parts) {
+	case 7:
+		message.SampleNo = fieldAt(parts, 2)
+		message.SampleID = fieldAt(parts, 3)
+		message.RackNo = fieldAt(parts, 4)
+		message.RackPosition = fieldAt(parts, 5)
+		message.SampleType = fieldAt(parts, 6)
+	default:
+		message.SampleNo = fieldAt(parts, 2)
+		message.FileID = fieldAt(parts, 3)
+		rackNo, rackPosition := splitCompactRackPosition(fieldAt(parts, 4))
+		message.RackNo = rackNo
+		message.RackPosition = rackPosition
+		message.SampleType = fieldAt(parts, 5)
+	}
+	message.ControlLevel = message.SampleType
+	message.IsQC = containsFold(settings.SampleModeQCValues, message.SampleType)
+	if message.FileID == "" && len(parts) >= 7 {
+		message.FileID = fieldAt(parts, 3)
+	}
+	if message.SampleID == "" {
+		message.SampleID = firstNonEmpty(message.FileID, message.SampleNo)
+	}
+}
+
+func splitCompactRackPosition(value string) (string, string) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "", ""
+	}
+	if len(value) == 1 {
+		return "", value
+	}
+	return strings.TrimSpace(value[:1]), strings.TrimSpace(value[1:])
+}
+
+func fieldAt(parts []string, index int) string {
+	if index < 0 || index >= len(parts) {
+		return ""
+	}
+	return strings.TrimSpace(parts[index])
+}
+
 func normalizeRunDate(raw string) string {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
@@ -550,6 +747,28 @@ func normalizeRunDate(raw string) string {
 		return raw[:10]
 	}
 	return raw
+}
+
+func normalizeRunTime(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ""
+	}
+	layouts := []string{
+		"2006-01-02 15:04:05",
+		"20060102150405",
+		"200601021504",
+		"2006/01/02 15:04:05",
+	}
+	for _, layout := range layouts {
+		if parsed, err := time.Parse(layout, raw); err == nil {
+			return parsed.Format("15:04:05")
+		}
+	}
+	if len(raw) >= 14 {
+		return raw[8:10] + ":" + raw[10:12] + ":" + raw[12:14]
+	}
+	return ""
 }
 
 func mapAnalyte(identifier, name string, mappings map[string]string) string {
@@ -577,7 +796,7 @@ func containsFold(values []string, needle string) bool {
 }
 
 func extractFirst(text, pattern string) string {
-	re := regexp.MustCompile(pattern)
+	re := regexp.MustCompile(`(?is)` + pattern)
 	match := re.FindStringSubmatch(text)
 	if len(match) < 2 {
 		return ""

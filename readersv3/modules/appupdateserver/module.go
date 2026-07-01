@@ -18,6 +18,7 @@ import (
 	"io"
 	"io/fs"
 	"mime/multipart"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -32,6 +33,7 @@ import (
 	"wisemed-labreaders/readersv3/core/module"
 	"wisemed-labreaders/readersv3/modules/wisemedapi"
 	"wisemed-labreaders/readersv3/shared/appupdates"
+	"wisemed-labreaders/readersv3/shared/bindguard"
 
 	"gopkg.in/yaml.v3"
 	_ "modernc.org/sqlite"
@@ -166,41 +168,62 @@ func (m *Module) Start(ctx context.Context) error {
 		addr = "127.0.0.1:19090"
 	}
 	useTLS := parseBoolString(asString(m.rt.ModuleSettings("local-http")["tls"]))
-	m.server = &http.Server{
-		Addr:              addr,
-		Handler:           m.rt.Mux(),
-		ReadHeaderTimeout: 10 * time.Second,
-	}
-	m.mu.Lock()
-	m.tlsEnabled = useTLS
-	m.mu.Unlock()
-	go func() {
-		<-ctx.Done()
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		if m.server != nil {
-			_ = m.server.Shutdown(shutdownCtx)
+	for {
+		m.server = &http.Server{
+			Addr:              addr,
+			Handler:           m.rt.Mux(),
+			ReadHeaderTimeout: 10 * time.Second,
 		}
-		if m.db != nil {
-			_ = m.db.Close()
-		}
-	}()
-	if useTLS {
-		certFile, keyFile, err := ensureLocalHTTPSMaterial(m.rt.ConfigDir(), addr)
+		m.mu.Lock()
+		m.tlsEnabled = useTLS
+		m.mu.Unlock()
+		go func() {
+			<-ctx.Done()
+			shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			if m.server != nil {
+				_ = m.server.Shutdown(shutdownCtx)
+			}
+			if m.db != nil {
+				_ = m.db.Close()
+			}
+		}()
+		listener, err := net.Listen("tcp", addr)
 		if err != nil {
+			if bindguard.IsAddressInUse(err) {
+				nextAddr, _, handleErr := bindguard.HandleAddressInUse(m.rt.ConfigPath(), addr, map[string]interface{}{
+					"local_http.address":         addr,
+					"modules.local-http.address": addr,
+				}, m.rt.Logf)
+				if handleErr != nil {
+					return err
+				}
+				msg := fmt.Sprintf("app update server nu se poate binda la %s: %v. Propun %s si scriu aceasta valoare in config.yaml", addr, err, nextAddr)
+				fmt.Println(msg)
+				m.rt.Logf(msg)
+				addr = nextAddr
+				continue
+			}
 			return err
 		}
-		m.rt.Logf("app update server listening on https://%s", addr)
-		if err := m.server.ListenAndServeTLS(certFile, keyFile); err != nil && err != http.ErrServerClosed {
+		if useTLS {
+			certFile, keyFile, err := ensureLocalHTTPSMaterial(m.rt.ConfigDir(), addr)
+			if err != nil {
+				_ = listener.Close()
+				return err
+			}
+			m.rt.Logf("app update server listening on https://%s", addr)
+			if err := m.server.ServeTLS(listener, certFile, keyFile); err != nil && err != http.ErrServerClosed {
+				return err
+			}
+			return nil
+		}
+		m.rt.Logf("app update server listening on http://%s", addr)
+		if err := m.server.Serve(listener); err != nil && err != http.ErrServerClosed {
 			return err
 		}
 		return nil
 	}
-	m.rt.Logf("app update server listening on http://%s", addr)
-	if err := m.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		return err
-	}
-	return nil
 }
 
 func (m *Module) handleIndex(w http.ResponseWriter, r *http.Request) {

@@ -60,6 +60,16 @@
     "supportsHeadless": true
   },
   {
+    "id": "cfx96-reader",
+    "title": "CFX96 Reader",
+    "binaryName": "cfx96-reader",
+    "serviceName": "wisemed-cfx96-reader",
+    "displayName": "WiseMED CFX-96 Reader",
+    "description": "WiseMED readersv3 CFX-96 Reader background service",
+    "bundleId": "eu.wisemed.readersv3.cfx96.reader",
+    "supportsHeadless": true
+  },
+  {
     "id": "gemini-reader",
     "title": "Gemini Reader",
     "binaryName": "gemini-reader",

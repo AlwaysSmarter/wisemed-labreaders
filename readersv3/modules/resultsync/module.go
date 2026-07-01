@@ -13,6 +13,7 @@ import (
 	coremodel "wisemed-labreaders/readersv3/modules/core/model"
 
 	"wisemed-labreaders/readersv3/core/module"
+	"wisemed-labreaders/readersv3/modules/wisemedapi"
 )
 
 type orderStore interface {
@@ -163,6 +164,11 @@ func (m *Module) RunOrders(orderIDs []int64, roundNo int, orderDate string) (map
 	return m.runOrders(context.Background(), orderIDs, roundNo, orderDate)
 }
 
+func (m *Module) RunOrdersWithSettings(orderIDs []int64, roundNo int, orderDate string, settings map[string]string) (map[string]interface{}, error) {
+	client := wisemedapi.NewOverrideClient(settings, "ReaderV3")
+	return m.runOrdersWithWiseMED(context.Background(), orderIDs, roundNo, orderDate, client)
+}
+
 func (m *Module) Reset() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -231,6 +237,10 @@ func (m *Module) runOnce(ctx context.Context) (map[string]interface{}, error) {
 			default:
 			}
 			order := bundle.Order
+			if orderHasCompleteWiseMEDMatch(order) {
+				summary["skipped_complete"] = summary["skipped_complete"].(int) + 1
+				continue
+			}
 			result, updatedOrder, updatedAnalyses := m.processOrder(settings, order, bundle.Analyses, equipmentID, wiseMED)
 			recordSummaryStatus(summary, result)
 			updatedOrder.Meta = mergeMeta(updatedOrder.Meta, result)
@@ -250,6 +260,16 @@ func (m *Module) runOnce(ctx context.Context) (map[string]interface{}, error) {
 }
 
 func (m *Module) runOrders(ctx context.Context, orderIDs []int64, roundNo int, orderDate string) (map[string]interface{}, error) {
+	wiseMED := m.wiseMED()
+	if wiseMED == nil {
+		err := fmt.Errorf("wisemed api service unavailable")
+		m.finishRun(err, map[string]interface{}{"processed": 0, "errors": 1})
+		return nil, err
+	}
+	return m.runOrdersWithWiseMED(ctx, orderIDs, roundNo, orderDate, wiseMED)
+}
+
+func (m *Module) runOrdersWithWiseMED(ctx context.Context, orderIDs []int64, roundNo int, orderDate string, wiseMED wiseMedLookupService) (map[string]interface{}, error) {
 	m.mu.Lock()
 	if m.running {
 		m.mu.Unlock()
@@ -266,12 +286,6 @@ func (m *Module) runOrders(ctx context.Context, orderIDs []int64, roundNo int, o
 	store := m.orderStore()
 	if store == nil {
 		err := fmt.Errorf("storage service unavailable")
-		m.finishRun(err, map[string]interface{}{"processed": 0, "errors": 1})
-		return nil, err
-	}
-	wiseMED := m.wiseMED()
-	if wiseMED == nil {
-		err := fmt.Errorf("wisemed api service unavailable")
 		m.finishRun(err, map[string]interface{}{"processed": 0, "errors": 1})
 		return nil, err
 	}
@@ -330,6 +344,7 @@ func (m *Module) processOrder(settings syncSettings, order coremodel.Order, anal
 		"sample_code_reason":      info.Reason,
 		"sample_code_updated_at":  time.Now().UTC().Format(time.RFC3339),
 	}
+	setMatchMeta(meta, 1, 0, targetAnalysisCount(analyses), false)
 	if info.QCPrefix != "" {
 		meta["sample_code_qc_prefix"] = info.QCPrefix
 	}
@@ -370,6 +385,8 @@ func (m *Module) processOrder(settings syncSettings, order coremodel.Order, anal
 		meta["sync_match"] = candidate
 		meta["sync_result_summary"] = summarizeAnalyses(analyses)
 		updatedAnalyses := applyWiseMEDMatch(&order, analyses, resp, candidate)
+		updatedAnalyses = applyMatchFlags(updatedAnalyses, analyses, true)
+		applyOrderMatchState(&order, updatedAnalyses, analyses, true)
 		m.logProcessOutcome(order, meta)
 		return meta, order, updatedAnalyses
 	}
@@ -377,6 +394,8 @@ func (m *Module) processOrder(settings syncSettings, order coremodel.Order, anal
 	meta["sync_message"] = "WiseMED file loaded, but no exact probe/specimen match was found"
 	meta["sync_result_summary"] = summarizeAnalyses(analyses)
 	updatedAnalyses := applyWiseMEDTestsOnly(analyses, resp)
+	updatedAnalyses = applyMatchFlags(updatedAnalyses, analyses, true)
+	applyOrderMatchState(&order, updatedAnalyses, analyses, true)
 	m.logProcessOutcome(order, meta)
 	return meta, order, updatedAnalyses
 }
@@ -397,6 +416,9 @@ func (m *Module) finishRun(err error, summary map[string]interface{}) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.lastRunAt = time.Now()
+	if m.lastSettings.Enabled && m.lastSettings.IntervalMinutes > 0 {
+		m.nextRunAt = time.Now().Add(time.Duration(m.lastSettings.IntervalMinutes) * time.Minute)
+	}
 	if err != nil {
 		m.lastError = err.Error()
 	} else {
@@ -723,6 +745,129 @@ func applyWiseMEDTestsOnly(analyses []coremodel.OrderAnalysisBundle, payload map
 		updated = append(updated, next)
 	}
 	return updated
+}
+
+func applyMatchFlags(updated []coremodel.OrderAnalysis, analyses []coremodel.OrderAnalysisBundle, attempted bool) []coremodel.OrderAnalysis {
+	if !attempted {
+		return updated
+	}
+	targetCount := targetAnalysisCount(analyses)
+	matchedCount := matchCount(updated)
+	orderFlag := deriveMatchFlag(attempted, matchedCount, targetCount)
+	updatedByID := map[int64]*coremodel.OrderAnalysis{}
+	for i := range updated {
+		updatedByID[updated[i].ID] = &updated[i]
+	}
+	for _, item := range analyses {
+		next := updatedByID[item.Analysis.ID]
+		if next == nil {
+			copyItem := item.Analysis
+			updated = append(updated, copyItem)
+			next = &updated[len(updated)-1]
+			updatedByID[next.ID] = next
+		}
+		flags := cloneMap(next.Flags)
+		if flags == nil {
+			flags = map[string]interface{}{}
+		}
+		matched := strings.TrimSpace(next.WiseMEDFSMID) != "" || strings.TrimSpace(next.WiseMEDSMID) != ""
+		analysisFlag := 2
+		switch {
+		case matched:
+			analysisFlag = 4
+		case orderFlag == 3:
+			analysisFlag = 3
+		}
+		flags["wisemed_match_flag"] = analysisFlag
+		flags["wisemed_match_attempted"] = true
+		flags["wisemed_match_attempted_at"] = time.Now().UTC().Format(time.RFC3339)
+		next.Flags = flags
+	}
+	return updated
+}
+
+func applyOrderMatchState(order *coremodel.Order, updated []coremodel.OrderAnalysis, analyses []coremodel.OrderAnalysisBundle, attempted bool) {
+	if order == nil || !attempted {
+		return
+	}
+	targetCount := targetAnalysisCount(analyses)
+	matchedCount := matchCount(updated)
+	flag := deriveMatchFlag(true, matchedCount, targetCount)
+	if order.Meta == nil {
+		order.Meta = map[string]interface{}{}
+	}
+	setMatchMeta(order.Meta, flag, matchedCount, targetCount, true)
+}
+
+func setMatchMeta(meta map[string]interface{}, flag, matchedCount, targetCount int, attempted bool) {
+	if meta == nil {
+		return
+	}
+	meta["wisemed_match_flag"] = flag
+	meta["wisemed_match_attempted"] = attempted
+	meta["wisemed_match_matched_count"] = matchedCount
+	meta["wisemed_match_target_count"] = targetCount
+	meta["wisemed_match_updated_at"] = time.Now().UTC().Format(time.RFC3339)
+}
+
+func targetAnalysisCount(analyses []coremodel.OrderAnalysisBundle) int {
+	withResults := 0
+	for _, item := range analyses {
+		if hasAnalysisResult(item.Analysis) {
+			withResults++
+		}
+	}
+	if withResults > 0 {
+		return withResults
+	}
+	return len(analyses)
+}
+
+func matchCount(updated []coremodel.OrderAnalysis) int {
+	count := 0
+	for _, item := range updated {
+		if strings.TrimSpace(item.WiseMEDFSMID) != "" || strings.TrimSpace(item.WiseMEDSMID) != "" {
+			count++
+		}
+	}
+	return count
+}
+
+func deriveMatchFlag(attempted bool, matchedCount, targetCount int) int {
+	if !attempted {
+		return 1
+	}
+	if matchedCount <= 0 {
+		return 2
+	}
+	if targetCount > 0 && matchedCount >= targetCount {
+		return 4
+	}
+	return 3
+}
+
+func orderHasCompleteWiseMEDMatch(order coremodel.Order) bool {
+	return intValue(order.Meta["wisemed_match_flag"]) == 4
+}
+
+func hasAnalysisResult(item coremodel.OrderAnalysis) bool {
+	return strings.TrimSpace(item.RawValue) != "" || strings.TrimSpace(item.ResultValue) != ""
+}
+
+func intValue(value interface{}) int {
+	switch typed := value.(type) {
+	case int:
+		return typed
+	case int64:
+		return int(typed)
+	case float64:
+		return int(typed)
+	case string:
+		v, _ := strconv.Atoi(strings.TrimSpace(typed))
+		return v
+	default:
+		return 0
+	}
 }
 
 func collectWiseMEDCandidates(value interface{}) []map[string]interface{} {

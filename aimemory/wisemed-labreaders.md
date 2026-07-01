@@ -16,6 +16,13 @@
 - Do not add extra text on the main canvas, and do not add extra colored geometric decorations beyond the badge itself.
 - Use a visible colored badge with high-contrast text; the `CARY60` `UV` badge style is the preferred reference for short app markers.
 
+## Protocol docs
+
+- For protocol and communication specifications, prefer the per-app docs directory under `readersv3/apps/<app-name>/docs/`.
+- Treat `readersv3/apps/<app-name>/docs/` as the primary local source for analyzer communication notes, payload examples, and protocol exceptions observed in the field.
+- If protocol notes also exist in module-level docs, keep them aligned with the app-level docs and assume app-level docs are the more current operational reference.
+- For `labnovation-ld-560`, the real `Simple` payload observed in the field can differ from the original `LD-560LIS connection protocol.docx`; do not assume the `<I>` field layout from the old document is always authoritative.
+
 ## High-level purpose
 
 `generic-test-reader` is a local WiseMED reader runtime that:

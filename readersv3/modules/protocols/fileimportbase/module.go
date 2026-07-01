@@ -17,6 +17,7 @@ import (
 	"wisemed-labreaders/readersv3/core/module"
 	coremodel "wisemed-labreaders/readersv3/modules/core/model"
 	"wisemed-labreaders/readersv3/modules/wisemedapi"
+	"wisemed-labreaders/readersv3/shared/commtrace"
 )
 
 type analyteStore interface {
@@ -24,9 +25,14 @@ type analyteStore interface {
 	SaveAnalyte(item coremodel.Analyte) (coremodel.Analyte, error)
 }
 
+type analyzerActivityTracker interface {
+	Packet(direction, transport string)
+}
+
 type importStore interface {
 	CurrentRoundNo(orderDate string) (int, error)
 	RecordImportedResult(orderDate string, roundNo int, rec coremodel.ImportedRecord, sourceFile string) (coremodel.Order, coremodel.OrderAnalysis, coremodel.OrderAnalysisResult, error)
+	ReapplyOrderTransformations(orderIDs []int64) error
 	ListOrderBundles(roundNo int, orderDate string) ([]coremodel.OrderBundle, error)
 	ListQCRecords(roundNo int, runDate string) ([]coremodel.QCRecord, error)
 	ListQCAnalyses(recordID int64) ([]coremodel.QCAnalysis, error)
@@ -34,6 +40,7 @@ type importStore interface {
 	SaveQCTarget(item coremodel.QCTarget) (coremodel.QCTarget, error)
 	UpsertQCRecord(item coremodel.QCRecord) (coremodel.QCRecord, error)
 	UpsertQCAnalysis(item coremodel.QCAnalysis) (coremodel.QCAnalysis, error)
+	ReapplyQCTransformations(recordIDs []int64) error
 }
 
 type FileTransportMeta struct {
@@ -117,6 +124,12 @@ type wiseMedResultsService interface {
 
 type resultSyncService interface {
 	RunOrders(orderIDs []int64, roundNo int, orderDate string) (map[string]interface{}, error)
+	RunOrdersWithSettings(orderIDs []int64, roundNo int, orderDate string, settings map[string]string) (map[string]interface{}, error)
+}
+
+type autoSavePersistenceStore interface {
+	UpsertOrder(item coremodel.Order) (coremodel.Order, error)
+	SaveOrderAnalysis(item coremodel.OrderAnalysis) (coremodel.OrderAnalysis, error)
 }
 
 type AutoSaveTarget struct {
@@ -233,7 +246,7 @@ func (m *Module) scanImportDir() {
 		func() {
 			defer m.end(path)
 			if _, _, err := m.importFile(path, ""); err != nil {
-				m.rt.Logf("%s import failed %s: %v", m.spec.ID, path, err)
+				m.rt.Logf("%s import failed file=%s reason=%v", m.spec.ID, filepath.Base(path), err)
 				_ = m.archive(path, "failed_dir")
 				return
 			}
@@ -248,6 +261,7 @@ func (m *Module) importFile(path, fallbackDate string) (int, int, error) {
 		return 0, 0, errors.New("storage service unavailable")
 	}
 	m.logf(4, "%s import start file=%s fallback_date=%s", m.spec.ID, path, EffectiveDate(fallbackDate))
+	m.logInboundFile(path)
 	data, err := m.spec.Parse(path, m.rt)
 	if err != nil {
 		return 0, 0, err
@@ -269,7 +283,9 @@ func (m *Module) importFile(path, fallbackDate string) (int, int, error) {
 	}
 	roundCache := map[string]int{}
 	autoSaveTargets := map[string]*AutoSaveTarget{}
+	qcRecordIDs := []int64{}
 	imported := 0
+	warnings := 0
 	sourceFile := filepath.Base(path)
 	for _, item := range data.SampleRecords {
 		item.Record = NormalizeImportedRecord(item.Record, rules)
@@ -296,6 +312,7 @@ func (m *Module) importFile(path, fallbackDate string) (int, int, error) {
 			if err != nil {
 				return imported, 0, err
 			}
+			qcRecordIDs = append(qcRecordIDs, savedRecord.ID)
 			if err := m.ensureQCTarget(store, record, result); err != nil {
 				return imported, 0, err
 			}
@@ -305,7 +322,10 @@ func (m *Module) importFile(path, fallbackDate string) (int, int, error) {
 			imported++
 		}
 	}
-	warnings := 0
+	if err := m.reapplyImportedTransformations(store, autoSaveTargets, qcRecordIDs); err != nil {
+		warnings++
+		m.rt.Logf("%s transformation warning %s: %v", m.spec.ID, path, err)
+	}
 	if m.spec.AfterImport != nil {
 		if err := m.spec.AfterImport(path, data, m.rt); err != nil {
 			warnings++
@@ -355,6 +375,24 @@ func (m *Module) importStore() importStore {
 	}
 	store, _ := service.(importStore)
 	return store
+}
+
+func (m *Module) reapplyImportedTransformations(store importStore, autoSaveTargets map[string]*AutoSaveTarget, qcRecordIDs []int64) error {
+	if store == nil {
+		return nil
+	}
+	orderTargets := FlattenAutoSaveTargets(autoSaveTargets)
+	orderIDs := []int64{}
+	for _, target := range orderTargets {
+		orderIDs = append(orderIDs, target.OrderIDs...)
+	}
+	if err := store.ReapplyOrderTransformations(orderIDs); err != nil {
+		return err
+	}
+	if err := store.ReapplyQCTransformations(qcRecordIDs); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (m *Module) fileTransport() FileTransportMeta {
@@ -504,6 +542,17 @@ func SaveOrderBundlesToWiseMED(rt module.Runtime, bundles []coremodel.OrderBundl
 	return saveOrderBundlesToWiseMED(api, bundles, rt)
 }
 
+func SaveOrderBundlesToWiseMEDWithSettings(settings map[string]string, bundles []coremodel.OrderBundle, rt module.Runtime) (map[string]interface{}, error) {
+	if len(settings) == 0 {
+		return SaveOrderBundlesToWiseMED(rt, bundles)
+	}
+	api := wisemedapi.NewOverrideClient(settings, "ReaderV3")
+	if api == nil || !api.SetupComplete() {
+		return nil, errors.New("wisemed-api settings override unavailable or setup incomplete")
+	}
+	return saveOrderBundlesToWiseMED(api, bundles, rt)
+}
+
 func autoConfirmWiseMEDEnabled(rt module.Runtime) bool {
 	return boolString(asString(rt.ModuleSettings("results")["auto_confirm_wisemed"]))
 }
@@ -539,12 +588,15 @@ func saveOrderBundlesToWiseMED(api wiseMedResultsService, bundles []coremodel.Or
 	saved := 0
 	skipped := 0
 	files := make([]map[string]interface{}, 0, len(bundles))
+	persistence := autoSavePersistence(rt)
+	rt.Logf("wisemed send-to-bulletin: begin bundles=%d", len(bundles))
 	for _, bundle := range bundles {
 		fileID := strings.TrimSpace(bundle.Order.FileID)
 		if fileID == "" {
 			fileID = strings.TrimSpace(asString(bundle.Order.Meta["file_id"]))
 		}
 		if fileID == "" {
+			rt.Logf("wisemed send-to-bulletin: skip order_id=%d reason=missing_file_id", bundle.Order.ID)
 			skipped++
 			files = append(files, map[string]interface{}{
 				"order_id": bundle.Order.ID,
@@ -554,14 +606,15 @@ func saveOrderBundlesToWiseMED(api wiseMedResultsService, bundles []coremodel.Or
 			continue
 		}
 		entries := make([]wisemedapi.ServiceResultEntry, 0, len(bundle.Analyses))
+		sentAnalysisIDs := make([]int64, 0, len(bundle.Analyses))
 		for _, item := range bundle.Analyses {
 			fsmID := strings.TrimSpace(item.Analysis.WiseMEDFSMID)
 			if fsmID == "" {
 				continue
 			}
-			result := strings.TrimSpace(item.Analysis.ResultValue)
+			result := strings.TrimSpace(item.Analysis.RawValue)
 			if result == "" {
-				result = strings.TrimSpace(item.Analysis.RawValue)
+				result = strings.TrimSpace(item.Analysis.ResultValue)
 			}
 			if result == "" {
 				continue
@@ -569,11 +622,14 @@ func saveOrderBundlesToWiseMED(api wiseMedResultsService, bundles []coremodel.Or
 			entries = append(entries, wisemedapi.ServiceResultEntry{
 				FSMID:          fsmID,
 				Result:         result,
-				Interpretation: strings.TrimSpace(item.Analysis.Interpreted),
-				Conclusion:     extractConclusion(item.Analysis.Flags),
+				Interpretation: "",
+				Conclusion:     "",
 			})
+			sentAnalysisIDs = append(sentAnalysisIDs, item.Analysis.ID)
 		}
 		if len(entries) == 0 {
+			rt.Logf("wisemed send-to-bulletin: skip order_id=%d file_id=%s reason=no_entries", bundle.Order.ID, fileID)
+			persistWiseMEDSendStates(persistence, bundle, nil, false)
 			skipped++
 			files = append(files, map[string]interface{}{
 				"order_id": bundle.Order.ID,
@@ -586,12 +642,15 @@ func saveOrderBundlesToWiseMED(api wiseMedResultsService, bundles []coremodel.Or
 		rt.Logf("wisemed autosave: patch results order_id=%d file_id=%s entries=%d", bundle.Order.ID, fileID, len(entries))
 		resp, err := api.SaveFileServiceResults(fileID, entries)
 		if err != nil {
+			rt.Logf("wisemed send-to-bulletin: patch failed order_id=%d file_id=%s err=%v", bundle.Order.ID, fileID, err)
 			return map[string]interface{}{
 				"saved_orders":   saved,
 				"skipped_orders": skipped,
 				"files":          files,
 			}, err
 		}
+		rt.Logf("wisemed send-to-bulletin: patch ok order_id=%d file_id=%s entries=%d response=%v", bundle.Order.ID, fileID, len(entries), resp)
+		persistWiseMEDSendStates(persistence, bundle, sentAnalysisIDs, true)
 		saved++
 		files = append(files, map[string]interface{}{
 			"order_id": bundle.Order.ID,
@@ -601,6 +660,7 @@ func saveOrderBundlesToWiseMED(api wiseMedResultsService, bundles []coremodel.Or
 			"response": resp,
 		})
 	}
+	rt.Logf("wisemed send-to-bulletin: done saved=%d skipped=%d", saved, skipped)
 	return map[string]interface{}{
 		"saved_orders":   saved,
 		"skipped_orders": skipped,
@@ -608,16 +668,88 @@ func saveOrderBundlesToWiseMED(api wiseMedResultsService, bundles []coremodel.Or
 	}, nil
 }
 
-func extractConclusion(flags map[string]interface{}) string {
-	if len(flags) == 0 {
-		return ""
+func autoSavePersistence(rt module.Runtime) autoSavePersistenceStore {
+	service, ok := rt.Service("storage")
+	if !ok {
+		return nil
 	}
-	for _, key := range []string{"conclusion", "final_conclusion", "result_conclusion"} {
-		if value := strings.TrimSpace(asString(flags[key])); value != "" {
-			return value
+	store, _ := service.(autoSavePersistenceStore)
+	return store
+}
+
+func persistWiseMEDSendStates(store autoSavePersistenceStore, bundle coremodel.OrderBundle, sentAnalysisIDs []int64, success bool) {
+	if store == nil {
+		return
+	}
+	now := time.Now().UTC().Format(time.RFC3339)
+	sentIDs := make(map[int64]struct{}, len(sentAnalysisIDs))
+	for _, id := range sentAnalysisIDs {
+		sentIDs[id] = struct{}{}
+	}
+	sentCount := 0
+	totalSendable := 0
+	for _, item := range bundle.Analyses {
+		next := item.Analysis
+		flags := cloneMap(next.Flags)
+		if flags == nil {
+			flags = map[string]interface{}{}
 		}
+		if hasAnalysisResult(next) {
+			totalSendable++
+		}
+		if _, ok := sentIDs[next.ID]; ok && success {
+			flags["wisemed_send_status"] = "sent"
+			flags["wisemed_sent_at"] = now
+			flags["wisemed_send_count"] = intValue(flags["wisemed_send_count"]) + 1
+			sentCount++
+		} else if hasAnalysisResult(next) {
+			flags["wisemed_send_status"] = "pending"
+		}
+		next.Flags = flags
+		_, _ = store.SaveOrderAnalysis(next)
 	}
-	return ""
+	order := bundle.Order
+	meta := cloneMap(order.Meta)
+	if meta == nil {
+		meta = map[string]interface{}{}
+	}
+	meta["wisemed_sent_analyses"] = sentCount
+	meta["wisemed_total_sendable_analyses"] = totalSendable
+	if totalSendable == 0 {
+		meta["wisemed_send_status"] = "none"
+	} else if sentCount <= 0 {
+		meta["wisemed_send_status"] = "none"
+	} else if sentCount < totalSendable {
+		meta["wisemed_send_status"] = "partial"
+	} else {
+		meta["wisemed_send_status"] = "full"
+	}
+	if success && sentCount > 0 {
+		meta["wisemed_send_count"] = intValue(meta["wisemed_send_count"]) + 1
+		meta["wisemed_sent_at"] = now
+	}
+	order.Meta = meta
+	_, _ = store.UpsertOrder(order)
+}
+
+func hasAnalysisResult(item coremodel.OrderAnalysis) bool {
+	return strings.TrimSpace(item.RawValue) != "" || strings.TrimSpace(item.ResultValue) != ""
+}
+
+func intValue(value interface{}) int {
+	switch typed := value.(type) {
+	case int:
+		return typed
+	case int64:
+		return int(typed)
+	case float64:
+		return int(typed)
+	case string:
+		value, _ := strconv.Atoi(strings.TrimSpace(typed))
+		return value
+	default:
+		return 0
+	}
 }
 
 func CollectAutoSaveTarget(items map[string]*AutoSaveTarget, orderDate string, roundNo int, orderID int64) {
@@ -740,6 +872,49 @@ func (m *Module) logParsedPreview(path string, data ImportData) {
 	if err == nil {
 		m.rt.Logf("%s parse preview %s", m.spec.ID, string(blob))
 	}
+}
+
+func (m *Module) logInboundFile(path string) {
+	if m.verboseLevel() < 4 {
+		m.markAnalyzerPacket("filesys")
+		return
+	}
+	if isSpreadsheetFile(path) {
+		if info, err := os.Stat(path); err == nil {
+			m.markAnalyzerPacket("filesys")
+			m.rt.Logf("%s inbound spreadsheet file=%s bytes=%d", m.spec.ID, filepath.Base(path), info.Size())
+			return
+		}
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		m.rt.Logf("%s file wire log skipped file=%s err=%v", m.spec.ID, path, err)
+		m.markAnalyzerPacket("filesys")
+		return
+	}
+	m.markAnalyzerPacket("filesys")
+	m.rt.Logf("%s %s", m.spec.ID, commtrace.Format("in", "filesys", fmt.Sprintf("file=%s bytes=%d", filepath.Base(path), len(raw)), raw, m.verboseLevel()))
+}
+
+func isSpreadsheetFile(path string) bool {
+	switch strings.ToLower(strings.TrimSpace(filepath.Ext(path))) {
+	case ".xls", ".xlsx":
+		return true
+	default:
+		return false
+	}
+}
+
+func (m *Module) markAnalyzerPacket(transport string) {
+	service, ok := m.rt.Service("analyzer-activity")
+	if !ok {
+		return
+	}
+	tracker, ok := service.(analyzerActivityTracker)
+	if !ok {
+		return
+	}
+	tracker.Packet("in", transport)
 }
 
 func minInt(a, b int) int {

@@ -1,0 +1,44 @@
+reader:
+  id: signing-pad-utility
+  label: Signing Pad Utility
+  analyzer_name: Signing Pad Utility
+  analyzer_code: signing-pad-utility
+  db_name: signing-pad-utility.db
+local_http:
+  enabled: true
+  address: 0.0.0.0:19110
+  language: ro
+  tls: false
+wisemed_ws:
+  enabled: false
+  url: ""
+  heartbeat_ms: 15000
+  reconnect_delay_ms: 5000
+analyzer:
+  comm_type: utility
+  protocol: signing-pad
+modules:
+  signing-pad:
+    address: 0.0.0.0:19110
+    tls: false
+    cors_allowed_origins: "*"
+    storage_dir: ./signatures
+    session_timeout_seconds: "180"
+    helper_command: java
+    helper_args:
+      - -jar
+      - ./java-helper/signing-pad-helper.jar
+    sdk_mode: pure-tcpip
+    device_type: evolis-sig200
+    device_host: 127.0.0.1
+    device_port: "10000"
+    sdk_classpath: ./java-sdk/*
+    sdk_library_path: ./java-sdk/native
+  help:
+    help_dir: ./help
+  wisemed-api:
+    cfg_wisemed_protocol: https
+    cfg_wisemed_ip: ldse.wisemed.eu
+    cfg_wisemed_port: "443"
+    cfg_wisemed_path: /wisemed-api/apiv2
+    cfg_wisemed_key: 27c490bb-c9e4-47aa-bf6d-ebd2a1add35e

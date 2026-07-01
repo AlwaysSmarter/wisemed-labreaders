@@ -42,6 +42,9 @@ func Run(configPath string, defaultModules []string, opts RunOptions) error {
 	if ensureResult.Merged {
 		log.Printf("configuration merged with new defaults from %s", ensureResult.TemplatePath)
 	}
+	if opts.ShowLog {
+		fmt.Println("flag -showlog activ: logurile runtime vor fi afisate si in consola.")
+	}
 	cfg.EnabledModules = append([]string(nil), defaultModules...)
 	changed, err := ensureBootstrap(cfg, opts.Reconfigure)
 	if err != nil {
@@ -55,6 +58,9 @@ func Run(configPath string, defaultModules []string, opts RunOptions) error {
 		return err
 	}
 	defer closeLog()
+	if opts.ShowLog {
+		startupConsolef("flag -showlog confirmat: logurile runtime sunt afisate in consola si salvate in fisier.")
+	}
 	log.Printf("runtime log file: %s", logPath)
 	startupConsolef("versiune aplicatie: %s", appmeta.CurrentVersion())
 	if changed {

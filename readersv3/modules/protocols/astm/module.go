@@ -1,23 +1,1071 @@
 package astm
 
 import (
+	"bufio"
 	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"net"
+	"net/http"
+	"path/filepath"
+	"sort"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
+	"unicode"
 
 	"wisemed-labreaders/readersv3/core/module"
+	coremodel "wisemed-labreaders/readersv3/modules/core/model"
+	"wisemed-labreaders/readersv3/shared/analyzeractivity"
+	"wisemed-labreaders/readersv3/shared/bindguard"
+	"wisemed-labreaders/readersv3/shared/commtrace"
 )
 
-type Module struct{ rt module.Runtime }
+const (
+	ctrlENQ = byte(0x05)
+	ctrlACK = byte(0x06)
+	ctrlNAK = byte(0x15)
+	ctrlEOT = byte(0x04)
+	ctrlSTX = byte(0x02)
+	ctrlETX = byte(0x03)
+	ctrlETB = byte(0x17)
+)
 
-func New() module.Module     { return &Module{} }
+type analyteStore interface {
+	ListAnalytes() ([]coremodel.Analyte, error)
+	SaveAnalyte(item coremodel.Analyte) (coremodel.Analyte, error)
+}
+
+type importStore interface {
+	CurrentRoundNo(orderDate string) (int, error)
+	RecordImportedResult(orderDate string, roundNo int, rec coremodel.ImportedRecord, sourceFile string) (coremodel.Order, coremodel.OrderAnalysis, coremodel.OrderAnalysisResult, error)
+	ReapplyOrderTransformations(orderIDs []int64) error
+	UpsertQCRecord(item coremodel.QCRecord) (coremodel.QCRecord, error)
+	UpsertQCAnalysis(item coremodel.QCAnalysis) (coremodel.QCAnalysis, error)
+	ReapplyQCTransformations(recordIDs []int64) error
+}
+
+type auditLogger interface {
+	AppendAuditLog(level, actor, eventType, message string, meta map[string]interface{}) error
+}
+
+type analyzerActivityTracker interface {
+	Connected(delta int)
+	Packet(direction, transport string)
+	Snapshot() analyzeractivity.Snapshot
+}
+
+type tcpConfig struct {
+	CommType      string
+	Mode          string
+	ListenHost    string
+	ListenPort    string
+	RemoteHost    string
+	RemotePort    string
+	SendACK       bool
+	FrameTimeout  time.Duration
+	SampleIDPaths []string
+	PatientIDPath []string
+	PatientName   []string
+	RunDatePaths  []string
+	ResultIDPaths []string
+	ResultName    []string
+	ResultValue   []string
+	ResultUnit    []string
+	ResultFlag    []string
+	QCPrefixes    []string
+	AnalyteMap    map[string]string
+}
+
+type protocolStatus struct {
+	ConnectedClients int       `json:"connected_clients"`
+	LastMessageAt    time.Time `json:"last_message_at"`
+	LastImportCount  int       `json:"last_import_count"`
+	LastError        string    `json:"last_error"`
+	LastSource       string    `json:"last_source"`
+}
+
+type astmRecord struct {
+	Type   string
+	Fields []string
+	Raw    string
+}
+
+type astmOrder struct {
+	SampleID    string
+	FileID      string
+	PatientID   string
+	PatientName string
+	RunDate     string
+	IsQC        bool
+}
+
+type astmResult struct {
+	Order       astmOrder
+	AnalyteTag  string
+	AnalyteName string
+	Value       string
+	RawValue    string
+	Unit        string
+	Flag        string
+}
+
+type Module struct {
+	rt module.Runtime
+
+	mu      sync.Mutex
+	clients int
+	status  protocolStatus
+}
+
+func New() module.Module { return &Module{} }
+
 func (m *Module) ID() string { return "protocol-astm" }
+
 func (m *Module) Init(rt module.Runtime) error {
 	m.rt = rt
-	m.rt.AddMenu(module.MenuEntry{ID: "protocol-astm", Group: "admin", Label: "Protocol ASTM", Path: "/settings/protocol/astm", Order: 45})
+	rt.AddMenu(module.MenuEntry{ID: "protocol-astm", Group: "admin", Label: "Protocol ASTM", Path: "/settings/protocol/astm", Order: 45})
+	rt.Handle("/api/protocol/meta", http.HandlerFunc(m.handleMeta))
+	rt.Handle("/api/protocol/astm/status", http.HandlerFunc(m.handleStatus))
+	rt.Handle("/settings/protocol/astm", http.HandlerFunc(m.handleSettingsPage))
+	rt.RegisterService("protocol-astm-status", m)
 	return nil
 }
 
 func (m *Module) Start(ctx context.Context) error {
-	m.rt.Logf("astm protocol module active")
-	<-ctx.Done()
+	for {
+		cfg := m.readConfig()
+		if !strings.EqualFold(cfg.CommType, "tcpip") {
+			m.rt.Logf("astm protocol idle: comm_type=%q", cfg.CommType)
+			<-ctx.Done()
+			return nil
+		}
+		runCtx, cancel := context.WithCancel(ctx)
+		errCh := make(chan error, 1)
+		go func(current tcpConfig) {
+			if strings.EqualFold(current.Mode, "client") {
+				errCh <- m.runTCPClient(runCtx, current)
+				return
+			}
+			errCh <- m.runTCPServer(runCtx, current)
+		}(cfg)
+
+		select {
+		case <-ctx.Done():
+			cancel()
+			<-errCh
+			return nil
+		case err := <-errCh:
+			cancel()
+			if ctx.Err() != nil {
+				return nil
+			}
+			if err == nil {
+				time.Sleep(1 * time.Second)
+				continue
+			}
+			m.setError(err)
+			m.rt.Logf("astm communication error: %v", err)
+			select {
+			case <-ctx.Done():
+				return nil
+			case <-time.After(3 * time.Second):
+			}
+		}
+	}
+}
+
+func (m *Module) Snapshot() protocolStatus {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.status
+}
+
+func (m *Module) ConnectedClients() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.clients
+}
+
+func (m *Module) handleMeta(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"ok":            true,
+		"protocol":      "astm",
+		"communication": "tcpip",
+		"tcp_mode":      m.readConfig().Mode,
+	})
+}
+
+func (m *Module) handleStatus(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]interface{}{"ok": false, "error": "method not allowed"})
+		return
+	}
+	cfg := m.readConfig()
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"ok":     true,
+		"status": m.Snapshot(),
+		"tcpip": map[string]string{
+			"mode":        cfg.Mode,
+			"host":        cfg.ListenHost,
+			"port":        cfg.ListenPort,
+			"remote_host": cfg.RemoteHost,
+			"remote_port": cfg.RemotePort,
+		},
+	})
+}
+
+func (m *Module) handleSettingsPage(w http.ResponseWriter, _ *http.Request) {
+	cfg := m.readConfig()
+	payload, _ := json.MarshalIndent(map[string]interface{}{
+		"comm_type": cfg.CommType,
+		"tcpip": map[string]string{
+			"mode":        cfg.Mode,
+			"host":        cfg.ListenHost,
+			"port":        cfg.ListenPort,
+			"remote_host": cfg.RemoteHost,
+			"remote_port": cfg.RemotePort,
+		},
+		"paths": map[string][]string{
+			"sample_id":    cfg.SampleIDPaths,
+			"patient_id":   cfg.PatientIDPath,
+			"patient_name": cfg.PatientName,
+			"run_date":     cfg.RunDatePaths,
+			"result_id":    cfg.ResultIDPaths,
+			"result_name":  cfg.ResultName,
+			"result_value": cfg.ResultValue,
+			"result_unit":  cfg.ResultUnit,
+			"result_flag":  cfg.ResultFlag,
+		},
+		"qc_prefixes": cfg.QCPrefixes,
+	}, "", "  ")
+	html := fmt.Sprintf(`<!doctype html><html lang="ro"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Protocol ASTM</title><style>body{font:15px/1.5 Arial,sans-serif;margin:24px;color:#1f2937}pre{background:#111827;color:#e5e7eb;padding:16px;border-radius:12px;overflow:auto}code{background:#f3f4f6;padding:2px 6px;border-radius:6px}</style></head><body><h1>Protocol ASTM</h1><p>Stack activ pentru Gemini `+"`TCP/IP + ASTM`"+`. Status live: <code>/api/protocol/astm/status</code>.</p><pre>%s</pre></body></html>`, string(payload))
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_, _ = w.Write([]byte(html))
+}
+
+func (m *Module) runTCPServer(ctx context.Context, cfg tcpConfig) error {
+	addr := net.JoinHostPort(cfg.ListenHost, cfg.ListenPort)
+	ln, err := net.Listen("tcp", addr)
+	if err != nil {
+		if bindguard.IsAddressInUse(err) {
+			nextAddr, _, handleErr := bindguard.HandleAddressInUse(m.rt.ConfigPath(), addr, map[string]interface{}{
+				"modules.transport-tcpip.host": cfg.ListenHost,
+				"modules.transport-tcpip.port": cfg.ListenPort,
+			}, m.rt.Logf)
+			if handleErr == nil {
+				msg := fmt.Sprintf("astm nu se poate binda la %s: %v. Propun %s si scriu aceasta valoare in config.yaml", addr, err, nextAddr)
+				fmt.Println(msg)
+				m.rt.Logf(msg)
+				host, port, splitErr := net.SplitHostPort(nextAddr)
+				if splitErr == nil {
+					cfg.ListenHost = host
+					cfg.ListenPort = port
+					return m.runTCPServer(ctx, cfg)
+				}
+			}
+		}
+		return err
+	}
+	defer ln.Close()
+	m.rt.Logf("astm listening as tcp server on %s", addr)
+	go func() {
+		<-ctx.Done()
+		_ = ln.Close()
+	}()
+	for {
+		conn, err := ln.Accept()
+		if err != nil {
+			select {
+			case <-ctx.Done():
+				return nil
+			default:
+				return err
+			}
+		}
+		go m.handleConn(ctx, conn, cfg, "server")
+	}
+}
+
+func (m *Module) runTCPClient(ctx context.Context, cfg tcpConfig) error {
+	target := net.JoinHostPort(cfg.RemoteHost, cfg.RemotePort)
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		default:
+		}
+		conn, err := net.DialTimeout("tcp", target, 10*time.Second)
+		if err != nil {
+			select {
+			case <-ctx.Done():
+				return nil
+			case <-time.After(5 * time.Second):
+				continue
+			}
+		}
+		m.handleConn(ctx, conn, cfg, "client")
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-time.After(2 * time.Second):
+		}
+	}
+}
+
+func (m *Module) handleConn(ctx context.Context, conn net.Conn, cfg tcpConfig, mode string) {
+	defer conn.Close()
+	m.connected(1)
+	defer m.connected(-1)
+	if tracker := m.activityTracker(); tracker != nil {
+		tracker.Connected(1)
+		defer tracker.Connected(-1)
+	}
+	remote := conn.RemoteAddr().String()
+	m.rt.Logf("astm client connected mode=%s remote=%s", mode, remote)
+	reader := bufio.NewReader(conn)
+	var frames []string
+	var rawLines []string
+	var lineBuf strings.Builder
+	for {
+		if cfg.FrameTimeout > 0 {
+			_ = conn.SetReadDeadline(time.Now().Add(cfg.FrameTimeout))
+		}
+		b, err := reader.ReadByte()
+		if err != nil {
+			if ne, ok := err.(net.Error); ok && ne.Timeout() {
+				if len(frames) > 0 {
+					_ = m.processBatch(strings.Join(frames, ""), remote, cfg)
+					frames = nil
+				}
+				continue
+			}
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			m.setError(err)
+			m.rt.Logf("astm read error remote=%s: %v", remote, err)
+			break
+		}
+		m.trace("in", "tcpip", remote, []byte{b})
+		if tracker := m.activityTracker(); tracker != nil {
+			tracker.Packet("in", "tcpip")
+		}
+		switch b {
+		case ctrlENQ:
+			if cfg.SendACK {
+				_, _ = conn.Write([]byte{ctrlACK})
+				m.trace("out", "tcpip", remote+" ACK", []byte{ctrlACK})
+			}
+			frames = nil
+			rawLines = nil
+			lineBuf.Reset()
+		case ctrlSTX:
+			frame, ferr := readFrame(reader)
+			if ferr != nil {
+				m.setError(ferr)
+				if cfg.SendACK {
+					_, _ = conn.Write([]byte{ctrlNAK})
+					m.trace("out", "tcpip", remote+" NAK", []byte{ctrlNAK})
+				}
+				continue
+			}
+			frames = append(frames, frame)
+			m.trace("in", "tcpip", remote+" FRAME", []byte(frame))
+			if cfg.SendACK {
+				_, _ = conn.Write([]byte{ctrlACK})
+				m.trace("out", "tcpip", remote+" ACK", []byte{ctrlACK})
+			}
+		case ctrlEOT:
+			if len(frames) > 0 {
+				if err := m.processBatch(strings.Join(frames, ""), remote, cfg); err != nil {
+					m.setError(err)
+				}
+				frames = nil
+			}
+		case '\r', '\n':
+			line := strings.TrimSpace(lineBuf.String())
+			lineBuf.Reset()
+			if line == "" {
+				continue
+			}
+			rawLines = append(rawLines, line)
+			if strings.HasPrefix(line, "L|") {
+				if err := m.processBatch(strings.Join(rawLines, "\r"), remote, cfg); err != nil {
+					m.setError(err)
+				}
+				rawLines = nil
+			}
+		default:
+			if isProtocolByte(b) {
+				lineBuf.WriteByte(b)
+			}
+		}
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+	}
+	if len(frames) > 0 {
+		_ = m.processBatch(strings.Join(frames, ""), remote, cfg)
+	}
+	if len(rawLines) > 0 {
+		_ = m.processBatch(strings.Join(rawLines, "\r"), remote, cfg)
+	}
+}
+
+func (m *Module) processBatch(payload, remote string, cfg tcpConfig) error {
+	records := parseRecords(payload)
+	if len(records) == 0 {
+		return nil
+	}
+	results := parseBatch(records, cfg)
+	if len(results) == 0 {
+		return errors.New("astm payload parsed but produced no results")
+	}
+	store := m.importStore()
+	if store == nil {
+		return errors.New("storage service unavailable")
+	}
+	known, _ := m.knownAnalytes()
+	imported := 0
+	qcCache := map[string]coremodel.QCRecord{}
+	roundCache := map[string]int{}
+	orderIDs := []int64{}
+	qcRecordIDs := []int64{}
+	sourceName := sanitizeSourceName(remote)
+	for _, item := range results {
+		tag := normalizeTag(firstNonEmpty(mappedAnalyte(cfg.AnalyteMap, item.AnalyteTag), item.AnalyteName))
+		if tag == "" || strings.TrimSpace(item.Value) == "" {
+			continue
+		}
+		name := firstNonEmpty(mappedAnalyte(cfg.AnalyteMap, item.AnalyteName), item.AnalyteTag, tag)
+		if err := m.ensureAnalyte(known, tag, name, item.Unit); err != nil {
+			return err
+		}
+		runDate := effectiveDate(item.Order.RunDate)
+		if item.Order.IsQC {
+			recordKey := runDate + "|" + item.Order.SampleID
+			record := qcCache[recordKey]
+			if record.ID == 0 {
+				saved, err := store.UpsertQCRecord(coremodel.QCRecord{
+					RunDate:      runDate,
+					ControlLabel: firstNonEmpty(item.Order.SampleID, "QC"),
+					ControlLevel: detectQCLevel(item.Order.SampleID),
+					LotNo:        "-",
+					FileID:       item.Order.FileID,
+					Status:       "completed",
+					SourceFile:   sourceName,
+				})
+				if err != nil {
+					return err
+				}
+				record = saved
+				qcCache[recordKey] = saved
+			}
+			qcRecordIDs = append(qcRecordIDs, record.ID)
+			if _, err := store.UpsertQCAnalysis(coremodel.QCAnalysis{
+				QCRecordID:  record.ID,
+				AnalyteTag:  tag,
+				AnalyteName: name,
+				Status:      "completed",
+				ResultValue: strings.TrimSpace(item.Value),
+				RawValue:    strings.TrimSpace(item.RawValue),
+				Interpreted: strings.TrimSpace(item.Flag),
+				Unit:        strings.TrimSpace(item.Unit),
+				SourceFile:  sourceName,
+				Flags: map[string]interface{}{
+					"protocol":   "astm",
+					"remote":     remote,
+					"sample_id":  item.Order.SampleID,
+					"patient_id": item.Order.PatientID,
+				},
+			}); err != nil {
+				return err
+			}
+			imported++
+			continue
+		}
+		roundNo := roundCache[runDate]
+		if roundNo == 0 {
+			current, err := store.CurrentRoundNo(runDate)
+			if err != nil {
+				return err
+			}
+			roundNo = current
+			roundCache[runDate] = roundNo
+		}
+		order, _, _, err := store.RecordImportedResult(runDate, roundNo, coremodel.ImportedRecord{
+			SampleID:    item.Order.SampleID,
+			FileID:      firstNonEmpty(item.Order.FileID, item.Order.SampleID),
+			PatientID:   item.Order.PatientID,
+			PatientName: item.Order.PatientName,
+			AnalyteTag:  tag,
+			AnalyteName: name,
+			ResultValue: strings.TrimSpace(item.Value),
+			RawValue:    strings.TrimSpace(item.RawValue),
+			Interpreted: strings.TrimSpace(item.Flag),
+			Unit:        strings.TrimSpace(item.Unit),
+			Meta: map[string]interface{}{
+				"protocol": "astm",
+				"remote":   remote,
+			},
+		}, sourceName)
+		if err != nil {
+			return err
+		}
+		orderIDs = append(orderIDs, order.ID)
+		imported++
+	}
+	if err := store.ReapplyOrderTransformations(orderIDs); err != nil {
+		return err
+	}
+	if err := store.ReapplyQCTransformations(qcRecordIDs); err != nil {
+		return err
+	}
+	m.setImport(imported, remote)
+	m.appendAudit("info", "protocol-astm", "astm-import", fmt.Sprintf("Import ASTM reusit din %s.", remote), map[string]interface{}{
+		"imported": imported,
+		"source":   remote,
+	})
+	m.rt.Logf("astm import ok source=%s records=%d", remote, imported)
 	return nil
+}
+
+func parseRecords(payload string) []astmRecord {
+	lines := strings.FieldsFunc(payload, func(r rune) bool { return r == '\r' || r == '\n' })
+	out := make([]astmRecord, 0, len(lines))
+	for _, raw := range lines {
+		line := strings.TrimSpace(stripFrameSequence(raw))
+		if line == "" {
+			continue
+		}
+		fields := strings.Split(line, "|")
+		if len(fields) == 0 {
+			continue
+		}
+		out = append(out, astmRecord{
+			Type:   strings.ToUpper(strings.TrimSpace(fields[0])),
+			Fields: fields,
+			Raw:    line,
+		})
+	}
+	return out
+}
+
+func parseBatch(records []astmRecord, cfg tcpConfig) []astmResult {
+	results := []astmResult{}
+	currentPatientID := ""
+	currentPatientName := ""
+	currentRunDate := ""
+	currentOrder := astmOrder{}
+	for _, rec := range records {
+		switch rec.Type {
+		case "P":
+			currentPatientID = firstFromPaths(rec, cfg.PatientIDPath)
+			currentPatientName = normalizePersonName(firstFromPaths(rec, cfg.PatientName))
+		case "O":
+			sampleID := firstFromPaths(rec, cfg.SampleIDPaths)
+			if strings.TrimSpace(sampleID) == "" {
+				sampleID = currentPatientID
+			}
+			currentRunDate = firstNonEmpty(parseRunDate(firstFromPaths(rec, cfg.RunDatePaths)), currentRunDate)
+			currentOrder = astmOrder{
+				SampleID:    sampleID,
+				FileID:      firstNonEmpty(sampleID, currentPatientID),
+				PatientID:   currentPatientID,
+				PatientName: currentPatientName,
+				RunDate:     currentRunDate,
+				IsQC:        isQCSample(sampleID, cfg.QCPrefixes),
+			}
+		case "R":
+			if currentOrder.SampleID == "" {
+				continue
+			}
+			analyteTag := normalizeTag(firstFromPaths(rec, cfg.ResultIDPaths))
+			analyteName := firstNonEmpty(firstFromPaths(rec, cfg.ResultName), analyteTag)
+			value := firstFromPaths(rec, cfg.ResultValue)
+			unit := firstFromPaths(rec, cfg.ResultUnit)
+			flag := firstFromPaths(rec, cfg.ResultFlag)
+			results = append(results, astmResult{
+				Order:       currentOrder,
+				AnalyteTag:  analyteTag,
+				AnalyteName: analyteName,
+				Value:       strings.TrimSpace(value),
+				RawValue:    strings.TrimSpace(value),
+				Unit:        strings.TrimSpace(unit),
+				Flag:        strings.TrimSpace(flag),
+			})
+		}
+	}
+	return results
+}
+
+func readFrame(r *bufio.Reader) (string, error) {
+	var payload []byte
+	for {
+		b, err := r.ReadByte()
+		if err != nil {
+			return "", err
+		}
+		if b == ctrlETX || b == ctrlETB {
+			break
+		}
+		payload = append(payload, b)
+	}
+	checksum := make([]byte, 2)
+	if _, err := io.ReadFull(r, checksum); err != nil {
+		return "", err
+	}
+	_, _ = r.ReadByte()
+	_, _ = r.ReadByte()
+	text := string(payload)
+	if text != "" && unicode.IsDigit(rune(text[0])) {
+		text = text[1:]
+	}
+	return text, nil
+}
+
+func stripFrameSequence(value string) string {
+	if len(value) > 0 && unicode.IsDigit(rune(value[0])) {
+		return value[1:]
+	}
+	return value
+}
+
+func isProtocolByte(b byte) bool {
+	return b == '|' || b == '^' || b == '\\' || b == '&' || b == '.' || b == '-' || b == '_' || b == ' ' || unicode.IsPrint(rune(b))
+}
+
+func firstFromPaths(rec astmRecord, paths []string) string {
+	for _, path := range paths {
+		if value := astmPath(rec, path); value != "" {
+			return value
+		}
+	}
+	return ""
+}
+
+func astmPath(rec astmRecord, path string) string {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return ""
+	}
+	parts := strings.Split(path, ".")
+	if len(parts) < 2 {
+		return ""
+	}
+	if !strings.EqualFold(strings.TrimSpace(parts[0]), rec.Type) {
+		return ""
+	}
+	fieldIdx, err := strconv.Atoi(strings.TrimSpace(parts[1]))
+	if err != nil || fieldIdx <= 0 || fieldIdx >= len(rec.Fields) {
+		return ""
+	}
+	value := rec.Fields[fieldIdx]
+	if len(parts) >= 3 {
+		compIdx, err := strconv.Atoi(strings.TrimSpace(parts[2]))
+		if err != nil || compIdx <= 0 {
+			return ""
+		}
+		components := strings.Split(value, "^")
+		if compIdx > len(components) {
+			return ""
+		}
+		value = components[compIdx-1]
+	}
+	return strings.TrimSpace(value)
+}
+
+func (m *Module) readConfig() tcpConfig {
+	transport := m.rt.ModuleSettings("transport-tcpip")
+	settings := m.rt.ModuleSettings(m.ID())
+	return tcpConfig{
+		CommType:      firstNonEmpty(asString(moduleServiceValue(m.rt, "analyzer-config", "comm_type")), "tcpip"),
+		Mode:          firstNonEmpty(asString(transport["mode"]), "server"),
+		ListenHost:    firstNonEmpty(asString(transport["host"]), "127.0.0.1"),
+		ListenPort:    firstNonEmpty(asString(transport["port"]), "9000"),
+		RemoteHost:    firstNonEmpty(asString(transport["remote_host"]), "127.0.0.1"),
+		RemotePort:    firstNonEmpty(asString(transport["remote_port"]), firstNonEmpty(asString(transport["port"]), "9000")),
+		SendACK:       boolSetting(settings, "send_ack", true),
+		FrameTimeout:  time.Duration(intSetting(settings, "frame_timeout_ms", 2000)) * time.Millisecond,
+		SampleIDPaths: listSetting(settings, "sample_id_paths", []string{"O.3.1", "O.2.1"}),
+		PatientIDPath: listSetting(settings, "patient_id_paths", []string{"P.3.1", "P.2.1"}),
+		PatientName:   listSetting(settings, "patient_name_paths", []string{"P.5.1", "P.4.1"}),
+		RunDatePaths:  listSetting(settings, "run_date_paths", []string{"O.7.1", "O.6.1", "H.13.1"}),
+		ResultIDPaths: listSetting(settings, "result_id_paths", []string{"R.2.4", "R.2.1"}),
+		ResultName:    listSetting(settings, "result_name_paths", []string{"R.2.4", "R.2.1"}),
+		ResultValue:   listSetting(settings, "result_value_paths", []string{"R.3.1"}),
+		ResultUnit:    listSetting(settings, "result_unit_paths", []string{"R.4.1"}),
+		ResultFlag:    listSetting(settings, "result_flag_paths", []string{"R.6.1", "R.8.1"}),
+		QCPrefixes:    listSetting(settings, "qc_prefixes", []string{"QC", "CTRL", "CONTROL"}),
+		AnalyteMap:    stringMapSetting(settings, "analyte_mappings"),
+	}
+}
+
+func (m *Module) importStore() importStore {
+	service, ok := m.rt.Service("storage")
+	if !ok {
+		return nil
+	}
+	store, _ := service.(importStore)
+	return store
+}
+
+func (m *Module) analyteStore() analyteStore {
+	service, ok := m.rt.Service("storage")
+	if !ok {
+		return nil
+	}
+	store, _ := service.(analyteStore)
+	return store
+}
+
+func (m *Module) activityTracker() analyzerActivityTracker {
+	service, ok := m.rt.Service("analyzer-activity")
+	if !ok {
+		return nil
+	}
+	tracker, _ := service.(analyzerActivityTracker)
+	return tracker
+}
+
+func (m *Module) knownAnalytes() (map[string]coremodel.Analyte, error) {
+	store := m.analyteStore()
+	if store == nil {
+		return map[string]coremodel.Analyte{}, nil
+	}
+	items, err := store.ListAnalytes()
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[string]coremodel.Analyte, len(items))
+	for _, item := range items {
+		out[strings.ToUpper(strings.TrimSpace(item.Tag))] = item
+	}
+	return out, nil
+}
+
+func (m *Module) ensureAnalyte(known map[string]coremodel.Analyte, tag, name, unit string) error {
+	store := m.analyteStore()
+	if store == nil {
+		return nil
+	}
+	key := strings.ToUpper(strings.TrimSpace(tag))
+	if _, ok := known[key]; ok {
+		return nil
+	}
+	saved, err := store.SaveAnalyte(coremodel.Analyte{
+		Active:            true,
+		Tag:               tag,
+		Code:              tag,
+		Name:              firstNonEmpty(strings.TrimSpace(name), tag),
+		ResultType:        "text",
+		ResultFormatting:  "raw",
+		ResultMeasureUnit: strings.TrimSpace(unit),
+		ProtocolOptions: map[string]interface{}{
+			"source_protocol": "astm",
+		},
+	})
+	if err != nil {
+		return err
+	}
+	known[key] = saved
+	return nil
+}
+
+func (m *Module) appendAudit(level, actor, eventType, message string, meta map[string]interface{}) {
+	service, ok := m.rt.Service("storage")
+	if !ok {
+		return
+	}
+	logger, ok := service.(auditLogger)
+	if !ok {
+		return
+	}
+	_ = logger.AppendAuditLog(level, actor, eventType, message, meta)
+}
+
+func (m *Module) trace(direction, transport, details string, payload []byte) {
+	level := intSetting(m.rt.ModuleSettings("logging"), "verbose_level", 1)
+	if level <= 0 {
+		level = 1
+	}
+	m.rt.Logf("%s", commtrace.Format(direction, transport, details, payload, level))
+}
+
+func (m *Module) connected(delta int) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.clients += delta
+	if m.clients < 0 {
+		m.clients = 0
+	}
+	m.status.ConnectedClients = m.clients
+}
+
+func (m *Module) setError(err error) {
+	if err == nil {
+		return
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.status.LastError = err.Error()
+}
+
+func (m *Module) setImport(count int, source string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.status.LastImportCount = count
+	m.status.LastMessageAt = time.Now()
+	m.status.LastSource = source
+	m.status.LastError = ""
+}
+
+func mappedAnalyte(mapping map[string]string, value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ""
+	}
+	for key, mapped := range mapping {
+		if strings.EqualFold(strings.TrimSpace(key), value) {
+			return strings.TrimSpace(mapped)
+		}
+	}
+	return value
+}
+
+func moduleServiceValue(rt module.Runtime, serviceName, key string) interface{} {
+	service, ok := rt.Service(serviceName)
+	if !ok {
+		return nil
+	}
+	payload, ok := service.(map[string]interface{})
+	if !ok {
+		return nil
+	}
+	return payload[key]
+}
+
+func writeJSON(w http.ResponseWriter, status int, payload interface{}) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(payload)
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value != "" {
+			return value
+		}
+	}
+	return ""
+}
+
+func asString(value interface{}) string {
+	switch typed := value.(type) {
+	case string:
+		return typed
+	case fmt.Stringer:
+		return typed.String()
+	case int:
+		return strconv.Itoa(typed)
+	case int64:
+		return strconv.FormatInt(typed, 10)
+	case float64:
+		return strconv.FormatInt(int64(typed), 10)
+	default:
+		return ""
+	}
+}
+
+func boolSetting(settings map[string]interface{}, key string, fallback bool) bool {
+	raw, ok := settings[key]
+	if !ok {
+		return fallback
+	}
+	switch typed := raw.(type) {
+	case bool:
+		return typed
+	case string:
+		switch strings.ToLower(strings.TrimSpace(typed)) {
+		case "1", "true", "yes", "on":
+			return true
+		case "0", "false", "no", "off":
+			return false
+		}
+	}
+	return fallback
+}
+
+func intSetting(settings map[string]interface{}, key string, fallback int) int {
+	raw, ok := settings[key]
+	if !ok {
+		return fallback
+	}
+	switch typed := raw.(type) {
+	case int:
+		return typed
+	case int64:
+		return int(typed)
+	case float64:
+		return int(typed)
+	case string:
+		if parsed, err := strconv.Atoi(strings.TrimSpace(typed)); err == nil {
+			return parsed
+		}
+	}
+	return fallback
+}
+
+func listSetting(settings map[string]interface{}, key string, fallback []string) []string {
+	raw, ok := settings[key]
+	if !ok {
+		return append([]string(nil), fallback...)
+	}
+	switch typed := raw.(type) {
+	case []string:
+		out := make([]string, 0, len(typed))
+		for _, item := range typed {
+			if value := strings.TrimSpace(item); value != "" {
+				out = append(out, value)
+			}
+		}
+		if len(out) > 0 {
+			return out
+		}
+	case []interface{}:
+		out := []string{}
+		for _, item := range typed {
+			if value := strings.TrimSpace(asString(item)); value != "" {
+				out = append(out, value)
+			}
+		}
+		if len(out) > 0 {
+			return out
+		}
+	}
+	return append([]string(nil), fallback...)
+}
+
+func stringMapSetting(settings map[string]interface{}, key string) map[string]string {
+	raw, ok := settings[key]
+	if !ok {
+		return map[string]string{}
+	}
+	items, ok := raw.(map[string]interface{})
+	if !ok {
+		return map[string]string{}
+	}
+	out := make(map[string]string, len(items))
+	keys := make([]string, 0, len(items))
+	for key := range items {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		out[key] = strings.TrimSpace(asString(items[key]))
+	}
+	return out
+}
+
+func normalizeTag(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ""
+	}
+	var b strings.Builder
+	lastUnderscore := false
+	for _, r := range strings.ToUpper(value) {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			b.WriteRune(r)
+			lastUnderscore = false
+			continue
+		}
+		if lastUnderscore {
+			continue
+		}
+		b.WriteByte('_')
+		lastUnderscore = true
+	}
+	return strings.Trim(b.String(), "_")
+}
+
+func sanitizeSourceName(remote string) string {
+	remote = strings.TrimSpace(remote)
+	if remote == "" {
+		return "astm-live"
+	}
+	remote = strings.NewReplacer(":", "_", "/", "_", "\\", "_").Replace(remote)
+	return filepath.Base("astm_" + remote)
+}
+
+func effectiveDate(value string) string {
+	if parsed := parseRunDate(value); parsed != "" {
+		return parsed
+	}
+	return time.Now().Format("2006-01-02")
+}
+
+func parseRunDate(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ""
+	}
+	digits := strings.Map(func(r rune) rune {
+		if unicode.IsDigit(r) {
+			return r
+		}
+		return -1
+	}, value)
+	if len(digits) < 8 {
+		return ""
+	}
+	raw := digits[:8]
+	if _, err := time.Parse("20060102", raw); err != nil {
+		return ""
+	}
+	return raw[:4] + "-" + raw[4:6] + "-" + raw[6:8]
+}
+
+func isQCSample(sampleID string, prefixes []string) bool {
+	value := strings.ToUpper(strings.TrimSpace(sampleID))
+	for _, prefix := range prefixes {
+		prefix = strings.ToUpper(strings.TrimSpace(prefix))
+		if prefix != "" && strings.HasPrefix(value, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
+func detectQCLevel(sampleID string) string {
+	value := strings.ToUpper(strings.TrimSpace(sampleID))
+	for _, token := range []string{"L1", "L2", "L3", "L4", "L5", "LEVEL1", "LEVEL2", "LEVEL3"} {
+		if strings.Contains(value, token) {
+			return strings.ToLower(token)
+		}
+	}
+	return "control"
+}
+
+func normalizePersonName(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ""
+	}
+	parts := strings.Split(value, "^")
+	out := []string{}
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			out = append(out, part)
+		}
+	}
+	return strings.Join(out, " ")
 }
