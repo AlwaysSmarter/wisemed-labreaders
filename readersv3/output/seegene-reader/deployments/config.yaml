@@ -12,8 +12,8 @@ logging:
 modules:
     app-updates:
         app_id: seegene-v3
-        auto_download: true
-        base_url: http://127.0.0.1:19090
+        auto_download: false
+        base_url: https://us.wisemed.eu
         channel: stable
         current_version: 1.0.0
         download_dir: ./updates
@@ -76,7 +76,7 @@ modules:
         cfg_wisemed_protocol: https
         cod_echipament: seegene-v3
         echipament_id: "184"
-        login_token: 977-73d9663496299072d8bf11bbdf4b3656
+        login_token: 979-1e24f964aa6d02696c18aa4e2128dcf0
         login_user_id: "1"
         nr_rackuri: "0"
         numar_serial_echipament: seegene-v3-001
