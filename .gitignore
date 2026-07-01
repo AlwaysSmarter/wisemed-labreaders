@@ -20,6 +20,9 @@ readersv3/release/
 /readersv3/output/**/deployments/*.db
 /readersv3/output/**/deployments/*.db-shm
 /readersv3/output/**/deployments/*.db-wal
+!/readersv3/output/update-server/deployments/*.db
+!/readersv3/output/update-server/deployments/*.db-shm
+!/readersv3/output/update-server/deployments/*.db-wal
 /readersv3/output/*/deployments/tls/**
 /readersv3/output/*/deployments/files/**
 /readersv3/output/*/deployments/images/**
