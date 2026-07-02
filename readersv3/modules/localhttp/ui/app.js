@@ -16,7 +16,22 @@ const translations = {
     navSettings: "Setari",
     navOrders: "Cereri analize",
     navQc: "Controlul calitatii",
+    navDebug: "Debug",
     navHelp: "Ajutor",
+    debugTitle: "Debug",
+    debugDescription: "Ruleaza scenarii .tst din deployments/test.",
+    debugResultTitle: "Rezultat test",
+    debugNoTests: "Nu exista fisiere .tst in deployments/test.",
+    debugRun: "Ruleaza",
+    debugRunning: "Se ruleaza testul...",
+    debugPassed: "Test trecut",
+    debugFailed: "Test esuat",
+    debugLine: "Linia",
+    debugExpected: "Asteptat",
+    debugActual: "Primit",
+    debugInput: "Input",
+    debugTerminator: "Terminator",
+    debugDuration: "Durata",
     settingsAnalytes: "Analize",
     settingsReader: "Setari reader",
     settingsDailyDetails: "Detalii zilnice",
@@ -265,7 +280,22 @@ const translations = {
     navSettings: "Settings",
     navOrders: "Analysis Requests",
     navQc: "Quality Control",
+    navDebug: "Debug",
     navHelp: "Help",
+    debugTitle: "Debug",
+    debugDescription: "Run .tst scenarios from deployments/test.",
+    debugResultTitle: "Test result",
+    debugNoTests: "No .tst files found in deployments/test.",
+    debugRun: "Run",
+    debugRunning: "Running test...",
+    debugPassed: "Test passed",
+    debugFailed: "Test failed",
+    debugLine: "Line",
+    debugExpected: "Expected",
+    debugActual: "Received",
+    debugInput: "Input",
+    debugTerminator: "Terminator",
+    debugDuration: "Duration",
     settingsAnalytes: "Analytes",
     settingsReader: "Reader settings",
     settingsDailyDetails: "Daily Details",
@@ -762,6 +792,10 @@ const state = {
   pendingDeleteOrderIDs: [],
   analyteTransformRules: [],
   editingTransformRuleIndex: null,
+  debugFiles: [],
+  debugEnabled: false,
+  debugSelectedFile: "",
+  debugLastResult: null,
 };
 
 const deleteOrdersSkipConfirmKey = "wmr_skip_delete_orders_confirm";
@@ -946,6 +980,11 @@ const els = {
   lineChart: document.getElementById("line-chart"),
   lineLegend: document.getElementById("line-legend"),
   logoutBtn: document.getElementById("logout-btn"),
+  debugNavLink: document.getElementById("debug-nav-link"),
+  refreshDebugTestsBtn: document.getElementById("refresh-debug-tests"),
+  debugTestsList: document.getElementById("debug-tests-list"),
+  debugRunStatus: document.getElementById("debug-run-status"),
+  debugResult: document.getElementById("debug-result"),
   logsPanel: document.getElementById("logs-panel"),
   navLinks: [...document.querySelectorAll(".nav-link")],
   navSublinks: [...document.querySelectorAll("#settings-submenu .nav-sublink")],
@@ -955,6 +994,7 @@ const els = {
     "daily-details": document.getElementById("view-daily-details"),
     orders: document.getElementById("view-orders"),
     qc: document.getElementById("view-qc"),
+    debug: document.getElementById("view-debug"),
     help: document.getElementById("view-help"),
   },
 };
@@ -996,6 +1036,7 @@ function bindEvents() {
   if (els.loginAppUpdateIndicator) els.loginAppUpdateIndicator.addEventListener("click", onAppUpdateIndicatorClick);
   if (els.dashboardAppUpdateIndicator) els.dashboardAppUpdateIndicator.addEventListener("click", onAppUpdateIndicatorClick);
   bindAsyncClick(els.refreshLogsBtn, loadLogs);
+  bindAsyncClick(els.refreshDebugTestsBtn, loadDebugTests);
   bindAsyncClick(els.resultSyncPill, onRunResultSync);
   els.logPollSeconds.addEventListener("change", onLogPollChange);
   bindAsyncClick(els.refreshOrdersBtn, onRefreshOrdersClick);
@@ -1439,6 +1480,8 @@ async function mountDashboard(sessionResp) {
   syncLanguageControls();
   applyLanguage();
   toggleLogsAccess(!!sessionResp.permissions?.can_view_logs);
+  state.debugEnabled = !!sessionResp.permissions?.can_debug_tests;
+  syncDebugNavVisibility();
   syncOrderControls();
   if (!state.barcodeMode) {
     activateSettingsSubView(state.settingsSubView || "reader");
@@ -1460,6 +1503,12 @@ async function mountDashboard(sessionResp) {
   }
   restartLogPolling();
   restartStatusPolling();
+  if ((Number(state.session?.user_type) || 0) <= 0) {
+    loadDebugTests().catch(() => {
+      state.debugEnabled = false;
+      syncDebugNavVisibility();
+    });
+  }
   refreshAppUpdateStatus(false).catch(() => {});
 }
 
@@ -1476,6 +1525,99 @@ async function refreshAppUpdateStatus(force = false) {
   state.appUpdateStatus = resp || null;
   renderAppUpdateStatus();
   return resp;
+}
+
+function syncDebugNavVisibility() {
+  if (!els.debugNavLink) return;
+  const enabled = !!state.debugEnabled && (Number(state.session?.user_type) || 0) <= 0;
+  els.debugNavLink.hidden = !enabled;
+  if (!enabled && state.currentView === "debug") {
+    activateView("overview");
+  }
+}
+
+async function loadDebugTests() {
+  if ((Number(state.session?.user_type) || 0) > 0) {
+    state.debugEnabled = false;
+    state.debugFiles = [];
+    syncDebugNavVisibility();
+    renderDebugTests();
+    return;
+  }
+  const resp = await api("/api/debug/tests");
+  state.debugFiles = Array.isArray(resp.files) ? resp.files : [];
+  state.debugEnabled = !!resp.enabled;
+  if (!state.debugFiles.some((item) => item.name === state.debugSelectedFile)) {
+    state.debugSelectedFile = state.debugFiles[0]?.name || "";
+  }
+  syncDebugNavVisibility();
+  renderDebugTests();
+}
+
+function renderDebugTests() {
+  if (!els.debugTestsList) return;
+  if (!state.debugEnabled || !state.debugFiles.length) {
+    els.debugTestsList.innerHTML = `<div class="debug-empty">${escapeHtml(t("debugNoTests"))}</div>`;
+    return;
+  }
+  els.debugTestsList.innerHTML = state.debugFiles.map((item) => `
+    <button class="debug-test-item ${item.name === state.debugSelectedFile ? "active" : ""}" data-debug-file="${escapeHtml(item.name)}">
+      <strong>${escapeHtml(item.name)}</strong>
+      <span>${escapeHtml(t("debugRun"))}</span>
+    </button>
+  `).join("");
+  els.debugTestsList.querySelectorAll("[data-debug-file]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      state.debugSelectedFile = button.dataset.debugFile || "";
+      renderDebugTests();
+      try {
+        await runDebugTest(state.debugSelectedFile);
+      } catch (error) {
+        showToast(error.message || "Debug run failed", "error");
+      }
+    });
+  });
+}
+
+async function runDebugTest(fileName) {
+  if (!fileName) return;
+  if (els.debugRunStatus) {
+    els.debugRunStatus.textContent = `${t("debugRunning")} ${fileName}`;
+  }
+  const resp = await api("/api/debug/tests/run", {
+    method: "POST",
+    body: JSON.stringify({ file: fileName }),
+  });
+  state.debugLastResult = resp.result || null;
+  renderDebugResult();
+}
+
+function renderDebugResult() {
+  if (!els.debugResult || !els.debugRunStatus) return;
+  const result = state.debugLastResult;
+  if (!result) {
+    els.debugRunStatus.textContent = "";
+    els.debugResult.innerHTML = "";
+    return;
+  }
+  els.debugRunStatus.textContent = `${result.script_name || state.debugSelectedFile} · ${result.passed ? t("debugPassed") : t("debugFailed")}`;
+  const steps = Array.isArray(result.steps) ? result.steps : [];
+  els.debugResult.innerHTML = steps.map((step) => `
+    <article class="debug-step ${step.passed ? "passed" : "failed"}">
+      <div class="debug-step-head">
+        <strong>#${escapeHtml(String(step.index || "-"))}</strong>
+        <span>${escapeHtml(t("debugLine"))}: ${escapeHtml(String(step.line || "-"))}</span>
+        <span>${escapeHtml(t("debugTerminator"))}: ${escapeHtml(String(step.terminator || "-").toUpperCase())}</span>
+        <span>${escapeHtml(t("debugDuration"))}: ${escapeHtml(String(step.duration_ms || 0))} ms</span>
+      </div>
+      ${step.error ? `<div class="debug-step-error">${escapeHtml(String(step.error))}</div>` : ""}
+      <div class="debug-step-grid">
+        <section><h4>${escapeHtml(t("debugInput"))}</h4><pre>${escapeHtml(String(step.input_preview || ""))}</pre></section>
+        <section><h4>${escapeHtml(t("debugExpected"))}</h4><pre>${escapeHtml(String(step.expected_output || ""))}</pre></section>
+        <section><h4>${escapeHtml(t("debugActual"))}</h4><pre>${escapeHtml(String(step.actual_output || ""))}</pre></section>
+      </div>
+    </article>
+  `).join("");
 }
 
 function renderAppUpdateStatus() {
@@ -1544,6 +1686,9 @@ function activateView(name, pushHistory = true) {
     window.location.href = "/help/";
     return;
   }
+  if (name === "debug" && (!state.debugEnabled || (Number(state.session?.user_type) || 0) > 0)) {
+    name = "overview";
+  }
   if (state.utilityMode && name === "qc") {
     name = "orders";
   }
@@ -1589,6 +1734,9 @@ function activateView(name, pushHistory = true) {
   if (!state.utilityMode && name === "qc") {
     loadQCRecords().catch(() => {});
   }
+  if (name === "debug") {
+    loadDebugTests().catch(() => {});
+  }
 }
 
 function renderTopbarTitle() {
@@ -1626,6 +1774,10 @@ function renderTopbarTitle() {
     title.textContent = t("navQc");
     return;
   }
+  if (state.currentView === "debug") {
+    title.textContent = t("navDebug");
+    return;
+  }
   if (state.currentView === "help") {
     title.textContent = t("navHelp");
     return;
@@ -1639,6 +1791,7 @@ function viewFromLocation() {
     if (path === "/settings" || path === "/settings/reader" || path === "/settings/analytes" || path === "/settings/qc") return "analytes";
     if (path === "/daily-details") return "daily-details";
     if (path === "/orders") return "orders";
+    if (path === "/debug") return "debug";
     if (path === "/help") return "help";
     return "overview";
   }
@@ -1646,6 +1799,7 @@ function viewFromLocation() {
   if (path === "/daily-details") return "daily-details";
   if (path === "/orders") return "orders";
   if (path === "/qc") return "qc";
+  if (path === "/debug") return "debug";
   if (path === "/help") return "help";
   return "overview";
 }
@@ -1663,6 +1817,7 @@ function pathForView(name) {
     if (name === "analytes") return "/settings";
     if (name === "daily-details") return "/daily-details";
     if (name === "orders") return "/orders";
+    if (name === "debug") return "/debug";
     if (name === "help") return "/help";
     return "/";
   }
@@ -1675,6 +1830,7 @@ function pathForView(name) {
   if (name === "daily-details") return "/daily-details";
   if (name === "orders") return "/orders";
   if (name === "qc") return "/qc";
+  if (name === "debug") return "/debug";
   if (name === "help") return "/help";
   return "/";
 }
@@ -5184,6 +5340,7 @@ function dataI18nKey(key) {
     nav_analytes: "navSettings",
     nav_orders: "navOrders",
     nav_qc: "navQc",
+    nav_debug: "navDebug",
     nav_help: "navHelp",
     settings_analytes: "settingsAnalytes",
     settings_daily_details: "settingsDailyDetails",
@@ -5246,7 +5403,12 @@ function applyLanguage() {
   if (els.navSublinks[1]) els.navSublinks[1].textContent = t("navAnalytes");
   if (els.navSublinks[2]) els.navSublinks[2].textContent = t("settingsDailyDetails");
   if (els.navSublinks[3]) els.navSublinks[3].textContent = t("settingsQc");
+  if (els.debugNavLink) els.debugNavLink.textContent = t("navDebug");
   document.getElementById("orders-title").textContent = t("navOrders");
+  if (document.getElementById("debug-title")) document.getElementById("debug-title").textContent = t("debugTitle");
+  if (document.getElementById("debug-description")) document.getElementById("debug-description").textContent = t("debugDescription");
+  if (document.getElementById("debug-result-title")) document.getElementById("debug-result-title").textContent = t("debugResultTitle");
+  if (els.refreshDebugTestsBtn) els.refreshDebugTestsBtn.textContent = t("refresh");
   document.getElementById("qc-summary-title").textContent = t("qcToday");
   document.getElementById("qc-period-label").textContent = t("westgardPeriod");
   document.getElementById("qc-date-from-label").textContent = t("westgardDateFrom");
@@ -5349,6 +5511,8 @@ function applyLanguage() {
   syncQCWestgardPeriodControls();
   renderTopbarTitle();
   applyBarcodeOverviewLabels();
+  renderDebugTests();
+  renderDebugResult();
 }
 
 function applyBarcodeOverviewLabels() {

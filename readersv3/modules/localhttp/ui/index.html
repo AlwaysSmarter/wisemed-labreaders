@@ -78,6 +78,7 @@
             <button class="nav-sublink" data-view="analytes" data-settings-subview="daily-details" data-i18n="settings_daily_details">Detalii zilnice</button>
             <button class="nav-sublink" data-view="analytes" data-settings-subview="qc" data-i18n="settings_qc">Setari QC</button>
           </div>
+          <button id="debug-nav-link" class="nav-link" data-view="debug" data-i18n="nav_debug" hidden>Debug</button>
           <button class="nav-link" data-view="help" data-i18n="nav_help">Help</button>
         </nav>
         <section id="reader-summary-card" class="reader-card reader-summary-card">
@@ -724,6 +725,23 @@
               <a id="help-open" class="ghost link-button" href="/help/" target="_blank" rel="noreferrer">Deschide separat</a>
             </div>
             <iframe class="help-frame" src="/help/"></iframe>
+          </article>
+        </section>
+        <section id="view-debug" class="panel-grid" hidden>
+          <article class="panel">
+            <div class="panel-head">
+              <h3 id="debug-title">Debug</h3>
+              <button id="refresh-debug-tests" class="ghost" type="button">Refresh</button>
+            </div>
+            <p id="debug-description" class="muted small">Ruleaza scenarii `.tst` din `deployments/test`.</p>
+            <div id="debug-tests-list" class="debug-tests-list"></div>
+          </article>
+          <article class="panel full-span">
+            <div class="panel-head">
+              <h3 id="debug-result-title">Rezultat test</h3>
+            </div>
+            <div id="debug-run-status" class="muted small"></div>
+            <div id="debug-result" class="debug-result"></div>
           </article>
         </section>
       </main>

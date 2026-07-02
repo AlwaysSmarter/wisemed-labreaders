@@ -66,7 +66,7 @@ modules:
         cfg_wisemed_protocol: https
         cod_echipament: reader-v3
         echipament_id: "25"
-        login_token: dc20dfccef99d79788981e33e14bcb01
+        login_token: 4f55770f50837356ade618c4197f1fde
         login_user_id: "1"
         nr_rackuri: "0"
         numar_serial_echipament: reader-v3-001

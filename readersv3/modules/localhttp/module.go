@@ -207,6 +207,7 @@ func (m *Module) Init(rt module.Runtime) error {
 	m.rt.Handle("/settings", m.withNoCache(http.HandlerFunc(m.handleIndex)))
 	m.rt.Handle("/orders", m.withNoCache(http.HandlerFunc(m.handleIndex)))
 	m.rt.Handle("/qc", m.withNoCache(http.HandlerFunc(m.handleIndex)))
+	m.rt.Handle("/debug", m.withNoCache(http.HandlerFunc(m.handleIndex)))
 	m.rt.Handle("/app.js", m.withNoCache(http.HandlerFunc(m.handleStaticAsset("ui/app.js", "application/javascript; charset=utf-8"))))
 	m.rt.Handle("/styles.css", m.withNoCache(http.HandlerFunc(m.handleStaticAsset("ui/styles.css", "text/css; charset=utf-8"))))
 	m.rt.Handle("/api/session", m.withNoCache(http.HandlerFunc(m.handleSessionStatus)))
@@ -249,6 +250,8 @@ func (m *Module) Init(rt module.Runtime) error {
 	m.rt.Handle("/api/result-sync/run", m.withNoCache(m.requireSession(http.HandlerFunc(m.handleResultSyncRun))))
 	m.rt.Handle("/api/result-sync/orders", m.withNoCache(m.requireSession(http.HandlerFunc(m.handleResultSyncOrders))))
 	m.rt.Handle("/api/result-sync/reset", m.withNoCache(m.requireSession(http.HandlerFunc(m.handleResultSyncReset))))
+	m.rt.Handle("/api/debug/tests", m.withNoCache(m.requireDebugSession(http.HandlerFunc(m.handleDebugTests))))
+	m.rt.Handle("/api/debug/tests/run", m.withNoCache(m.requireDebugSession(http.HandlerFunc(m.handleDebugRun))))
 	return nil
 }
 
@@ -529,7 +532,7 @@ func (m *Module) handleIndex(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	switch r.URL.Path {
-	case "/", "/daily-details", "/settings", "/settings/analytes", "/settings/qc", "/settings/daily-details", "/orders", "/qc":
+	case "/", "/daily-details", "/settings", "/settings/analytes", "/settings/qc", "/settings/daily-details", "/orders", "/qc", "/debug":
 	default:
 		http.NotFound(w, r)
 		return
@@ -556,6 +559,8 @@ func (m *Module) handleSessionStatus(w http.ResponseWriter, r *http.Request) {
 	}
 	sess, ok := m.currentSession(r)
 	wisemedState := m.wiseMEDState()
+	debugFiles, _ := m.listDebugTestFiles()
+	canDebugTests := ok && sess.UserType <= 0
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"ok":             true,
 		"authenticated":  ok,
@@ -565,7 +570,13 @@ func (m *Module) handleSessionStatus(w http.ResponseWriter, r *http.Request) {
 			"language": m.currentLanguage(),
 		},
 		"permissions": map[string]interface{}{
-			"can_view_logs": ok,
+			"can_view_logs":   ok,
+			"can_debug_tests": canDebugTests,
+		},
+		"debug": map[string]interface{}{
+			"enabled":     canDebugTests,
+			"has_tests":   len(debugFiles) > 0,
+			"tests_count": len(debugFiles),
 		},
 		"reader":     m.readerPayload(),
 		"wisemed":    wisemedState,

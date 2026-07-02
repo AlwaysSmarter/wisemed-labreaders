@@ -22,6 +22,7 @@ import (
 	"wisemed-labreaders/readersv3/shared/analyzeractivity"
 	"wisemed-labreaders/readersv3/shared/bindguard"
 	"wisemed-labreaders/readersv3/shared/commtrace"
+	"wisemed-labreaders/readersv3/shared/debugreplay"
 )
 
 const (
@@ -132,6 +133,7 @@ func (m *Module) Init(rt module.Runtime) error {
 	rt.Handle("/api/protocol/astm/status", http.HandlerFunc(m.handleStatus))
 	rt.Handle("/settings/protocol/astm", http.HandlerFunc(m.handleSettingsPage))
 	rt.RegisterService("protocol-astm-status", m)
+	rt.RegisterService("debug-replay-runner", m)
 	return nil
 }
 
@@ -245,6 +247,134 @@ func (m *Module) handleSettingsPage(w http.ResponseWriter, _ *http.Request) {
 	html := fmt.Sprintf(`<!doctype html><html lang="ro"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Protocol ASTM</title><style>body{font:15px/1.5 Arial,sans-serif;margin:24px;color:#1f2937}pre{background:#111827;color:#e5e7eb;padding:16px;border-radius:12px;overflow:auto}code{background:#f3f4f6;padding:2px 6px;border-radius:6px}</style></head><body><h1>Protocol ASTM</h1><p>Stack activ pentru Gemini `+"`TCP/IP + ASTM`"+`. Status live: <code>/api/protocol/astm/status</code>.</p><pre>%s</pre></body></html>`, string(payload))
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_, _ = w.Write([]byte(html))
+}
+
+func (m *Module) RunDebugReplay(ctx context.Context, scriptName string, steps []debugreplay.Step) (debugreplay.Result, error) {
+	cfg := m.readConfig()
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		return debugreplay.Result{}, err
+	}
+	defer ln.Close()
+
+	runCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	serverErrCh := make(chan error, 1)
+	go func() {
+		conn, acceptErr := ln.Accept()
+		if acceptErr != nil {
+			serverErrCh <- acceptErr
+			return
+		}
+		m.handleConn(runCtx, conn, cfg, "debug")
+		serverErrCh <- nil
+	}()
+
+	client, err := net.Dial("tcp", ln.Addr().String())
+	if err != nil {
+		return debugreplay.Result{}, err
+	}
+	defer client.Close()
+
+	tcpClient, _ := client.(*net.TCPConn)
+	result := debugreplay.Result{
+		Runner:     m.ID(),
+		ScriptName: scriptName,
+		Passed:     true,
+		StartedAt:  time.Now().UTC(),
+		Steps:      make([]debugreplay.StepResult, 0, len(steps)),
+	}
+
+	for _, step := range steps {
+		stepStarted := time.Now()
+		stepResult := debugreplay.StepResult{
+			Index:          step.Index,
+			Line:           step.Line,
+			Terminator:     step.Terminator,
+			InputPreview:   debugreplay.DescribePayload(step.Input),
+			ExpectedOutput: debugreplay.DescribePayload(step.ExpectedOutput),
+			Passed:         true,
+		}
+		if len(step.Input) > 0 {
+			if _, err := client.Write(step.Input); err != nil {
+				stepResult.Passed = false
+				stepResult.Error = err.Error()
+			}
+		}
+		if stepResult.Passed {
+			switch step.Terminator {
+			case debugreplay.TerminatorOUT:
+				actual, readErr := readReplayOutput(client, 2*time.Second, 250*time.Millisecond)
+				stepResult.ActualOutput = debugreplay.DescribePayload(actual)
+				if readErr != nil {
+					stepResult.Passed = false
+					stepResult.Error = readErr.Error()
+				} else if string(actual) != string(step.ExpectedOutput) {
+					stepResult.Passed = false
+					stepResult.Error = "output mismatch"
+				}
+			case debugreplay.TerminatorEOT:
+				actual, _ := readReplayOutput(client, 250*time.Millisecond, 150*time.Millisecond)
+				stepResult.ActualOutput = debugreplay.DescribePayload(actual)
+				if len(actual) > 0 {
+					stepResult.Passed = false
+					stepResult.Error = "unexpected output"
+				}
+			case debugreplay.TerminatorEOF:
+				if tcpClient != nil {
+					_ = tcpClient.CloseWrite()
+				}
+			}
+		}
+		stepResult.DurationMS = time.Since(stepStarted).Milliseconds()
+		if !stepResult.Passed {
+			result.Passed = false
+		}
+		result.Steps = append(result.Steps, stepResult)
+		if !stepResult.Passed {
+			break
+		}
+	}
+
+	cancel()
+	_ = client.Close()
+	select {
+	case serverErr := <-serverErrCh:
+		if serverErr != nil && !errors.Is(serverErr, net.ErrClosed) && !strings.Contains(strings.ToLower(serverErr.Error()), "closed") {
+			return result, serverErr
+		}
+	case <-time.After(500 * time.Millisecond):
+	}
+	result.FinishedAt = time.Now().UTC()
+	return result, nil
+}
+
+func readReplayOutput(conn net.Conn, startTimeout, quietWindow time.Duration) ([]byte, error) {
+	buf := make([]byte, 256)
+	payload := []byte{}
+	deadline := time.Now().Add(startTimeout)
+	for {
+		_ = conn.SetReadDeadline(deadline)
+		n, err := conn.Read(buf)
+		if n > 0 {
+			payload = append(payload, buf[:n]...)
+			deadline = time.Now().Add(quietWindow)
+			continue
+		}
+		if err != nil {
+			if ne, ok := err.(net.Error); ok && ne.Timeout() {
+				if len(payload) == 0 {
+					return nil, errors.New("timeout waiting for output")
+				}
+				return payload, nil
+			}
+			if errors.Is(err, io.EOF) {
+				return payload, nil
+			}
+			return payload, err
+		}
+	}
 }
 
 func (m *Module) runTCPServer(ctx context.Context, cfg tcpConfig) error {
