@@ -440,6 +440,7 @@ func (m *Module) handleSettings(w http.ResponseWriter, r *http.Request) {
 			"files_dir":          strings.TrimSpace(asString(req["files_dir"])),
 			"public_base_url":    strings.TrimSpace(asString(req["public_base_url"])),
 			"allowed_user_types": strings.TrimSpace(asString(req["allowed_user_types"])),
+			"verbose_level":      strings.TrimSpace(asString(req["verbose_level"])),
 		}
 		if raw := strings.TrimSpace(asString(req["cfg_wisemed_protocol"])); raw != "" {
 			next["cfg_wisemed_protocol"] = raw
@@ -1243,24 +1244,39 @@ func (m *Module) deleteVersion(id int64) error {
 func (m *Module) saveVersion(item versionRecord) (versionRecord, error) {
 	item.Version = appupdates.NormalizeVersion(item.Version)
 	if item.ApplicationID <= 0 || item.Version == "" {
+		m.rt.Logf("update-server: saveVersion invalid input application_id=%d version=%q channel=%q target=%s/%s file_path=%q installer_path=%q",
+			item.ApplicationID, item.Version, strings.TrimSpace(item.Channel), strings.TrimSpace(item.TargetOS), strings.TrimSpace(item.TargetArch), strings.TrimSpace(item.FilePath), strings.TrimSpace(item.InstallerFilePath))
 		return versionRecord{}, errors.New("application_id and version are required")
 	}
+	m.rt.Logf("update-server: saveVersion start id=%d application_id=%d version=%s channel=%s target=%s/%s file_path=%s installer_path=%s active=%t",
+		item.ID, item.ApplicationID, item.Version, strings.TrimSpace(item.Channel), strings.TrimSpace(item.TargetOS), strings.TrimSpace(item.TargetArch), strings.TrimSpace(item.FilePath), strings.TrimSpace(item.InstallerFilePath), item.Active)
 	now := time.Now().UTC().Format(time.RFC3339)
 	if item.ID > 0 {
 		_, err := m.db.Exec(`update app_versions set version=?, channel=?, target_os=?, target_arch=?, mandatory=?, download_url=?, file_name=?, file_path=?, checksum_sha256=?, file_size=?, installer_file_name=?, installer_file_path=?, installer_checksum_sha256=?, installer_file_size=?, release_notes=?, active=? where id=?`,
 			item.Version, strings.TrimSpace(item.Channel), strings.TrimSpace(item.TargetOS), strings.TrimSpace(item.TargetArch), boolToInt(item.Mandatory), strings.TrimSpace(item.DownloadURL), strings.TrimSpace(item.FileName), strings.TrimSpace(item.FilePath), strings.TrimSpace(item.ChecksumSHA256), item.FileSize, strings.TrimSpace(item.InstallerFileName), strings.TrimSpace(item.InstallerFilePath), strings.TrimSpace(item.InstallerChecksumSHA256), item.InstallerFileSize, strings.TrimSpace(item.ReleaseNotes), boolToInt(item.Active), item.ID)
 		if err != nil {
+			m.rt.Logf("update-server: saveVersion update failed id=%d application_id=%d version=%s err=%v", item.ID, item.ApplicationID, item.Version, err)
 			return versionRecord{}, err
 		}
 	} else {
 		res, err := m.db.Exec(`insert into app_versions(application_id, version, channel, target_os, target_arch, mandatory, download_url, file_name, file_path, checksum_sha256, file_size, installer_file_name, installer_file_path, installer_checksum_sha256, installer_file_size, release_notes, uploaded_by, created_at, active) values(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 			item.ApplicationID, item.Version, strings.TrimSpace(item.Channel), strings.TrimSpace(item.TargetOS), strings.TrimSpace(item.TargetArch), boolToInt(item.Mandatory), strings.TrimSpace(item.DownloadURL), strings.TrimSpace(item.FileName), strings.TrimSpace(item.FilePath), strings.TrimSpace(item.ChecksumSHA256), item.FileSize, strings.TrimSpace(item.InstallerFileName), strings.TrimSpace(item.InstallerFilePath), strings.TrimSpace(item.InstallerChecksumSHA256), item.InstallerFileSize, strings.TrimSpace(item.ReleaseNotes), strings.TrimSpace(item.UploadedBy), now, boolToInt(item.Active))
 		if err != nil {
+			m.rt.Logf("update-server: saveVersion insert failed application_id=%d version=%s channel=%s target=%s/%s file_path=%s installer_path=%s err=%v",
+				item.ApplicationID, item.Version, strings.TrimSpace(item.Channel), strings.TrimSpace(item.TargetOS), strings.TrimSpace(item.TargetArch), strings.TrimSpace(item.FilePath), strings.TrimSpace(item.InstallerFilePath), err)
 			return versionRecord{}, err
 		}
 		item.ID, _ = res.LastInsertId()
+		m.rt.Logf("update-server: saveVersion insert ok new_id=%d application_id=%d version=%s", item.ID, item.ApplicationID, item.Version)
 	}
-	return m.getVersion(item.ID)
+	saved, err := m.getVersion(item.ID)
+	if err != nil {
+		m.rt.Logf("update-server: saveVersion reload failed id=%d application_id=%d version=%s err=%v", item.ID, item.ApplicationID, item.Version, err)
+		return versionRecord{}, err
+	}
+	m.rt.Logf("update-server: saveVersion completed id=%d application_id=%d version=%s file_path=%s installer_path=%s",
+		saved.ID, saved.ApplicationID, saved.Version, strings.TrimSpace(saved.FilePath), strings.TrimSpace(saved.InstallerFilePath))
+	return saved, nil
 }
 
 func (m *Module) createVersionFromRequest(r *http.Request, appID int64, actor string) (versionRecord, error) {
@@ -1306,36 +1322,52 @@ func (m *Module) createVersionFromRequest(r *http.Request, appID int64, actor st
 func (m *Module) makeReleaseFromRequest(r *http.Request, appID int64, actor string) (versionRecord, error) {
 	var req releaseRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		m.rt.Logf("update-server: makeRelease invalid json app_id=%d actor=%s err=%v", appID, strings.TrimSpace(actor), err)
 		return versionRecord{}, errors.New("invalid json body")
 	}
 	req.Channel = firstNonEmpty(strings.TrimSpace(req.Channel), "stable")
 	req.TargetOS = strings.TrimSpace(strings.ToLower(req.TargetOS))
 	req.TargetArch = strings.TrimSpace(strings.ToLower(req.TargetArch))
+	m.rt.Logf("update-server: makeRelease request app_id=%d actor=%s channel=%s target=%s/%s mandatory=%t release_notes_len=%d",
+		appID, strings.TrimSpace(actor), req.Channel, req.TargetOS, req.TargetArch, req.Mandatory, len(strings.TrimSpace(req.ReleaseNotes)))
 	if req.TargetOS == "" || req.TargetArch == "" {
+		m.rt.Logf("update-server: makeRelease missing target app_id=%d actor=%s target=%s/%s", appID, strings.TrimSpace(actor), req.TargetOS, req.TargetArch)
 		return versionRecord{}, errors.New("target_os and target_arch are required")
 	}
 	if !isSupportedReleaseTarget(req.TargetOS, req.TargetArch) {
+		m.rt.Logf("update-server: makeRelease unsupported target app_id=%d actor=%s target=%s/%s", appID, strings.TrimSpace(actor), req.TargetOS, req.TargetArch)
 		return versionRecord{}, fmt.Errorf("unsupported target %s/%s", req.TargetOS, req.TargetArch)
 	}
 
 	appItem, err := m.findApplicationByID(appID)
 	if err != nil {
+		m.rt.Logf("update-server: makeRelease application lookup failed app_id=%d actor=%s err=%v", appID, strings.TrimSpace(actor), err)
 		return versionRecord{}, err
 	}
+	m.rt.Logf("update-server: makeRelease application resolved db_id=%d update_app_id=%s display_name=%s",
+		appItem.ID, strings.TrimSpace(appItem.AppID), strings.TrimSpace(appItem.DisplayName))
 	repoRoot, err := m.readersRepoRoot()
 	if err != nil {
+		m.rt.Logf("update-server: makeRelease repo root lookup failed update_app_id=%s err=%v", appItem.AppID, err)
 		return versionRecord{}, err
 	}
+	m.rt.Logf("update-server: makeRelease repo root=%s update_app_id=%s", repoRoot, appItem.AppID)
 	managed, err := discoverManagedReader(repoRoot, appItem.AppID)
 	if err != nil {
+		m.rt.Logf("update-server: makeRelease managed reader discovery failed update_app_id=%s repo=%s err=%v", appItem.AppID, repoRoot, err)
 		return versionRecord{}, err
 	}
+	m.rt.Logf("update-server: makeRelease source mapping update_app_id=%s source_app_id=%s canonical_update_app_id=%s",
+		appItem.AppID, managed.SourceAppID, managed.UpdateAppID)
 	versions, err := m.listVersions(appID)
 	if err != nil {
+		m.rt.Logf("update-server: makeRelease listVersions failed app_id=%d update_app_id=%s err=%v", appID, appItem.AppID, err)
 		return versionRecord{}, err
 	}
+	m.rt.Logf("update-server: makeRelease existing versions app_id=%s count=%d versions=%s", appItem.AppID, len(versions), summarizeVersionRecords(versions))
 	nextVersion := nextReleaseVersion(versions)
 	target := req.TargetOS + "-" + req.TargetArch
+	m.rt.Logf("update-server: makeRelease next version app_id=%s next=%s target=%s", appItem.AppID, nextVersion, target)
 
 	m.rt.Logf("update-server: pregatesc release-ul app_id=%s source_app=%s version=%s target=%s actor=%s", appItem.AppID, managed.SourceAppID, nextVersion, target, strings.TrimSpace(actor))
 
@@ -1344,13 +1376,16 @@ func (m *Module) makeReleaseFromRequest(r *http.Request, appID int64, actor stri
 		m.rt.Logf("update-server: release esuat app_id=%s version=%s target=%s err=%v", appItem.AppID, nextVersion, target, err)
 		return versionRecord{}, err
 	}
-	m.rt.Logf("update-server: compilarea s-a incheiat app_id=%s version=%s target=%s update_artifact=%s", appItem.AppID, nextVersion, target, strings.TrimSpace(releaseResult.Update.Path))
+	m.rt.Logf("update-server: compilarea s-a incheiat app_id=%s version=%s target=%s update_artifact=%s update_checksum=%s update_size=%d installer_artifact=%s",
+		appItem.AppID, nextVersion, target, strings.TrimSpace(releaseResult.Update.Path), strings.TrimSpace(releaseResult.Update.ChecksumSHA256), releaseResult.Update.Size, describeReleaseInstaller(releaseResult.Installer))
 	fileName := sanitizeFileName(releaseResult.Update.FileName)
 	if fileName == "" {
+		m.rt.Logf("update-server: release invalid update artifact app_id=%s version=%s target=%s raw_file_name=%q", appItem.AppID, nextVersion, target, releaseResult.Update.FileName)
 		return versionRecord{}, errors.New("release did not produce a valid update artifact")
 	}
 	relFilePath := filepath.Join(appItem.AppID, nextVersion, fileName)
 	absFilePath := m.resolveFilesPath(relFilePath)
+	m.rt.Logf("update-server: copy update artifact src=%s dst=%s", strings.TrimSpace(releaseResult.Update.Path), absFilePath)
 	if err := copyManagedArtifact(releaseResult.Update.Path, absFilePath); err != nil {
 		m.rt.Logf("update-server: copiere update artifact esuata src=%s dst=%s err=%v", strings.TrimSpace(releaseResult.Update.Path), absFilePath, err)
 		return versionRecord{}, err
@@ -1377,6 +1412,7 @@ func (m *Module) makeReleaseFromRequest(r *http.Request, appID int64, actor stri
 		if installerName != "" {
 			installerRelPath := filepath.Join(appItem.AppID, nextVersion, "installers", installerName)
 			installerAbsPath := m.resolveFilesPath(installerRelPath)
+			m.rt.Logf("update-server: copy installer src=%s dst=%s", strings.TrimSpace(releaseResult.Installer.Path), installerAbsPath)
 			if err := copyManagedArtifact(releaseResult.Installer.Path, installerAbsPath); err != nil {
 				m.rt.Logf("update-server: copiere installer esuata src=%s dst=%s err=%v", strings.TrimSpace(releaseResult.Installer.Path), installerAbsPath, err)
 				return versionRecord{}, err
@@ -1386,18 +1422,52 @@ func (m *Module) makeReleaseFromRequest(r *http.Request, appID int64, actor stri
 			item.InstallerChecksumSHA256 = strings.TrimSpace(releaseResult.Installer.ChecksumSHA256)
 			item.InstallerFileSize = releaseResult.Installer.Size
 			m.rt.Logf("update-server: installer copiat la %s", installerAbsPath)
+		} else {
+			m.rt.Logf("update-server: installer artifact ignored because sanitized file name is empty app_id=%s version=%s target=%s raw_name=%q",
+				appItem.AppID, nextVersion, target, releaseResult.Installer.FileName)
 		}
+	} else {
+		m.rt.Logf("update-server: no installer artifact for app_id=%s version=%s target=%s", appItem.AppID, nextVersion, target)
 	}
+	m.rt.Logf("update-server: persisting release app_id=%s version=%s target=%s file_path=%s installer_path=%s",
+		appItem.AppID, item.Version, target, item.FilePath, item.InstallerFilePath)
 	saved, err := m.saveVersion(item)
 	if err != nil {
 		_ = os.Remove(absFilePath)
 		if strings.TrimSpace(item.InstallerFilePath) != "" {
 			_ = os.Remove(m.resolveFilesPath(item.InstallerFilePath))
 		}
+		m.rt.Logf("update-server: persist release failed app_id=%s version=%s target=%s cleanup_update=%s cleanup_installer=%s err=%v",
+			appItem.AppID, item.Version, target, absFilePath, strings.TrimSpace(item.InstallerFilePath), err)
 		return versionRecord{}, err
 	}
 	m.rt.Logf("update-server: release finalizat app_id=%s version=%s target=%s saved_version_id=%d", appItem.AppID, saved.Version, target, saved.ID)
 	return saved, nil
+}
+
+func summarizeVersionRecords(items []versionRecord) string {
+	if len(items) == 0 {
+		return "-"
+	}
+	parts := make([]string, 0, len(items))
+	for _, item := range items {
+		part := fmt.Sprintf("%s[%s/%s/%s,id=%d,active=%t]", item.Version, firstNonEmpty(strings.TrimSpace(item.Channel), "-"), firstNonEmpty(strings.TrimSpace(item.TargetOS), "-"), firstNonEmpty(strings.TrimSpace(item.TargetArch), "-"), item.ID, item.Active)
+		parts = append(parts, part)
+		if len(parts) >= 12 {
+			break
+		}
+	}
+	if len(items) > len(parts) {
+		parts = append(parts, fmt.Sprintf("...+%d more", len(items)-len(parts)))
+	}
+	return strings.Join(parts, ", ")
+}
+
+func describeReleaseInstaller(installer *releaseCtlArtifact) string {
+	if installer == nil {
+		return "-"
+	}
+	return fmt.Sprintf("%s sha256=%s size=%d", strings.TrimSpace(installer.Path), strings.TrimSpace(installer.ChecksumSHA256), installer.Size)
 }
 
 func copyManagedArtifact(src, dst string) error {
@@ -1465,6 +1535,7 @@ func (m *Module) publicSettings() map[string]interface{} {
 		"public_host":          firstNonEmpty(asString(settings["public_host"]), "127.0.0.1"),
 		"public_port":          firstNonEmpty(asString(settings["public_port"]), "19090"),
 		"allowed_user_types":   firstNonEmpty(asString(settings["allowed_user_types"]), "1,9,10"),
+		"verbose_level":        firstNonEmpty(asString(settings["verbose_level"]), "1"),
 		"cfg_wisemed_protocol": strings.TrimSpace(wise["cfg_wisemed_protocol"]),
 		"cfg_wisemed_ip":       strings.TrimSpace(wise["cfg_wisemed_ip"]),
 		"cfg_wisemed_port":     strings.TrimSpace(wise["cfg_wisemed_port"]),
@@ -1482,6 +1553,21 @@ func (m *Module) effectivePublicBaseURL() string {
 	host := firstNonEmpty(asString(settings["public_host"]), "127.0.0.1")
 	port := firstNonEmpty(asString(settings["public_port"]), "19090")
 	return fmt.Sprintf("%s://%s:%s", protocol, host, port)
+}
+
+func (m *Module) verboseLevel() int {
+	raw := strings.TrimSpace(asString(m.rt.ModuleSettings(m.ID())["verbose_level"]))
+	if raw == "" {
+		return 1
+	}
+	level, err := strconv.Atoi(raw)
+	if err != nil {
+		return 1
+	}
+	if level < 0 {
+		return 0
+	}
+	return level
 }
 
 func (m *Module) readersRepoRoot() (string, error) {
@@ -1663,7 +1749,7 @@ func (m *Module) runReleaseCtlBuild(repoRoot, sourceAppID, target, version strin
 func runReleaseCtlBuildCommand(repoRoot, sourceAppID, target, version, goCache string) (string, error) {
 	cmd := exec.Command("go", "run", "-a", "./tools/releasectl", "build", "--app", sourceAppID, "--target", target, "--version", version)
 	cmd.Dir = repoRoot
-	cmd.Env = append(cleanGoCommandEnv(), "GOCACHE="+goCache)
+	cmd.Env = append(cleanGoCommandEnv(), "GOCACHE="+goCache, "WMR_RELEASE_VERBOSE=1")
 	var output bytes.Buffer
 	cmd.Stdout = &output
 	cmd.Stderr = &output
@@ -1697,8 +1783,9 @@ func (m *Module) runReleaseCtlRelease(repoRoot, sourceAppID, target, version str
 	if err := os.MkdirAll(tmpCache, 0o755); err != nil {
 		return releaseCtlResult{}, err
 	}
-	m.rt.Logf("update-server: compilez release source_app=%s version=%s target=%s repo=%s gocache=%s", sourceAppID, version, target, repoRoot, tmpCache)
-	output, err := runReleaseCtlReleaseCommand(repoRoot, sourceAppID, target, version, tmpCache, m.effectivePublicBaseURL(), func(line string) {
+	verboseLevel := m.verboseLevel()
+	m.rt.Logf("update-server: compilez release source_app=%s version=%s target=%s repo=%s gocache=%s verbose_level=%d", sourceAppID, version, target, repoRoot, tmpCache, verboseLevel)
+	output, err := runReleaseCtlReleaseCommand(repoRoot, sourceAppID, target, version, tmpCache, m.effectivePublicBaseURL(), verboseLevel, func(line string) {
 		m.rt.Logf("update-server: %s", line)
 	})
 	if err == nil {
@@ -1711,7 +1798,7 @@ func (m *Module) runReleaseCtlRelease(repoRoot, sourceAppID, target, version str
 		if err := os.MkdirAll(tmpCache, 0o755); err != nil {
 			return releaseCtlResult{}, err
 		}
-		output, retryErr := runReleaseCtlReleaseCommand(repoRoot, sourceAppID, target, version, tmpCache, m.effectivePublicBaseURL(), func(line string) {
+		output, retryErr := runReleaseCtlReleaseCommand(repoRoot, sourceAppID, target, version, tmpCache, m.effectivePublicBaseURL(), verboseLevel, func(line string) {
 			m.rt.Logf("update-server: %s", line)
 		})
 		if retryErr == nil {
@@ -1723,14 +1810,14 @@ func (m *Module) runReleaseCtlRelease(repoRoot, sourceAppID, target, version str
 	return releaseCtlResult{}, err
 }
 
-func runReleaseCtlReleaseCommand(repoRoot, sourceAppID, target, version, goCache, appUpdatesBaseURL string, progress func(string)) (releaseCtlResult, error) {
+func runReleaseCtlReleaseCommand(repoRoot, sourceAppID, target, version, goCache, appUpdatesBaseURL string, verboseLevel int, progress func(string)) (releaseCtlResult, error) {
 	args := []string{"run", "-a", "./tools/releasectl", "release", "--json", "--app", sourceAppID, "--target", target, "--version", version}
 	if strings.TrimSpace(appUpdatesBaseURL) != "" {
 		args = append(args, "--app-updates-base-url", strings.TrimSpace(appUpdatesBaseURL))
 	}
 	cmd := exec.Command("go", args...)
 	cmd.Dir = repoRoot
-	cmd.Env = append(cleanGoCommandEnv(), "GOCACHE="+goCache)
+	cmd.Env = append(cleanGoCommandEnv(), "GOCACHE="+goCache, fmt.Sprintf("WMR_RELEASE_VERBOSE=%d", verboseLevel))
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 	cmd.Stdout = &stdout

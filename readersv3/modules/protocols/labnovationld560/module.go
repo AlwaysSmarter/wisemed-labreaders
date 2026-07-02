@@ -450,9 +450,9 @@ func (m *Module) handleSettingsPage(w http.ResponseWriter, r *http.Request) {
       <textarea id="simple_json"></textarea>
       <label for="image_mode">Image mode</label>
       <select id="image_mode">
-        <option value="no_image">No image</option>
-        <option value="bitmap">Bitmap format</option>
-        <option value="base64">Base 64 format</option>
+        <option value="no_image">1 - Fara imagine</option>
+        <option value="bitmap">2 - Format bitmap</option>
+        <option value="base64">3 - Format base64</option>
       </select>
       <button id="save">Salveaza</button>
       <div id="status" class="status"></div>
@@ -1170,9 +1170,11 @@ func normalizeTCPMode(value string) string {
 
 func normalizeImageMode(value string) string {
 	switch strings.ToLower(strings.TrimSpace(value)) {
-	case "bitmap", "bmp":
+	case "1", "no_image", "no-image", "none", "off", "":
+		return "no_image"
+	case "2", "bitmap", "bmp":
 		return "bitmap"
-	case "base64", "base_64", "b64":
+	case "3", "base64", "base_64", "b64":
 		return "base64"
 	default:
 		return "no_image"

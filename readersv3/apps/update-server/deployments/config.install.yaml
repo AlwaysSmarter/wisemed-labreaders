@@ -23,6 +23,7 @@ modules:
     db_path: ./app-update-server.db
     files_dir: ./files
     public_base_url: http://127.0.0.1:19090
+    verbose_level: "1"
   help:
     help_dir: ./help
   local-http:

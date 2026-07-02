@@ -457,19 +457,28 @@ func buildRuntime(root string, app appInfo, target string, ti targetInfo, versio
 		"SOURCE_DATE_EPOCH=" + fmt.Sprint(epoch),
 		"GOWORK=off",
 	}
+	logf("go build prepared: app=%s target=%s binary=%s", app.ID, target, binaryPath)
+	logf("go build env: GOOS=%s GOARCH=%s SOURCE_DATE_EPOCH=%d", ti.GOOS, ti.GOARCH, epoch)
+	logf("go build start: app=%s target=%s", app.ID, target)
 	if err := runGoBuild(root, env, buildArgs...); err != nil {
+		logf("go build initial attempt failed: app=%s target=%s err=%v", app.ID, target, err)
 		if !strings.Contains(err.Error(), "CGO_ENABLED=0") {
 			logf("retrying %s for %s with CGO_ENABLED=1", app.ID, target)
 		}
 		env = append(env, "CGO_ENABLED=1")
+		logf("go build retry start: app=%s target=%s", app.ID, target)
 		if err2 := runGoBuild(root, env, buildArgs...); err2 != nil {
+			logf("go build retry failed: app=%s target=%s err=%v", app.ID, target, err2)
 			return runtimeManifest{}, fmt.Errorf("go build for %s/%s failed: %w", app.ID, target, err2)
 		}
+		logf("go build retry succeeded: app=%s target=%s", app.ID, target)
 	} else {
 		env = append(env, "CGO_ENABLED=0")
+		logf("go build initial attempt succeeded: app=%s target=%s", app.ID, target)
 	}
 	version = discoverEmbeddedVersion(binaryPath, version)
 	packageVersion = normalizePackageVersion(version)
+	logf("embedded version detected: app=%s target=%s embedded_version=%s", app.ID, target, version)
 	deploymentsSrc := filepath.Join(root, "apps", app.ID, "deployments")
 	if _, err := os.Stat(deploymentsSrc); err != nil {
 		return runtimeManifest{}, fmt.Errorf("deployments missing for %s at %s", app.ID, deploymentsSrc)
@@ -478,6 +487,7 @@ func buildRuntime(root string, app appInfo, target string, ti targetInfo, versio
 	if err := copyDeployments(deploymentsSrc, deploymentsDst); err != nil {
 		return runtimeManifest{}, err
 	}
+	logf("deployments copied: app=%s target=%s src=%s dst=%s", app.ID, target, deploymentsSrc, deploymentsDst)
 	manifest := runtimeManifest{
 		App:              app,
 		Target:           target,
@@ -494,6 +504,7 @@ func buildRuntime(root string, app appInfo, target string, ti targetInfo, versio
 	if err := writeJSON(filepath.Join(runtimeDir, "manifest.json"), manifest); err != nil {
 		return runtimeManifest{}, err
 	}
+	logf("runtime manifest ready: app=%s target=%s manifest=%s", app.ID, target, filepath.Join(runtimeDir, "manifest.json"))
 	logf("build finished: app=%s target=%s binary=%s", app.ID, target, binaryPath)
 	return manifest, nil
 }

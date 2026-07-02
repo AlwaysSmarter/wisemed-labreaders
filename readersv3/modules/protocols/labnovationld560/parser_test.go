@@ -2,6 +2,23 @@ package labnovationld560
 
 import "testing"
 
+func TestNormalizeImageModeSupportsNumericAliases(t *testing.T) {
+	tests := map[string]string{
+		"":         "no_image",
+		"1":        "no_image",
+		"2":        "bitmap",
+		"3":        "base64",
+		"no_image": "no_image",
+		"bitmap":   "bitmap",
+		"base64":   "base64",
+	}
+	for input, want := range tests {
+		if got := normalizeImageMode(input); got != want {
+			t.Fatalf("normalizeImageMode(%q) = %q, want %q", input, got, want)
+		}
+	}
+}
+
 func TestParseSimpleResults(t *testing.T) {
 	raw := []byte(`<TRANSMIT><M>LD560|LD560-001</M><I>sample|2018-03-15 22:34:54|3105|10|1|10|0</I><R>HbA1a|1.04HbA1b|1.01HbF|1.5L-A1C|1.0HbA1c|7.19HbA0|92eAG|4.5</R></TRANSMIT>`)
 	items, err := parseSimpleResults(raw, simpleSettingsFromMap(defaultSimpleSettings()))
@@ -97,6 +114,34 @@ func TestParseSimpleResultsObservedCompactFormatMissingFields(t *testing.T) {
 	}
 	if got.SampleType != "0" {
 		t.Fatalf("expected sample type 0, got %q", got.SampleType)
+	}
+}
+
+func TestParseSimpleResultsObservedCompactFormatWithBase64ImageModeAlias(t *testing.T) {
+	raw := []byte(`<TRANSMIT><M>LD560|LD560-001<I>sample|20260702112614|12|354499|2|0</I><R>HbA1a|0.4HbA1b|0.2Hbf|1.7L-A1c|0.4HbA1c|5.0HbA0|93.3eAG|97.2</R><IMAGE><NAME>graph.png</NAME><DATA>iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aK1cAAAAASUVORK5CYII=</DATA></IMAGE></M></TRANSMIT>`)
+	items, err := parseSimpleResults(raw, simpleSettingsFromMap(map[string]interface{}{
+		"sample_mode_qc_values": []interface{}{"1"},
+		"analyte_mappings":      map[string]interface{}{},
+		"analyte_units":         map[string]interface{}{},
+		"image_mode":            "3",
+	}))
+	if err != nil {
+		t.Fatalf("parseSimpleResults image alias error: %v", err)
+	}
+	if len(items) != 1 {
+		t.Fatalf("expected 1 message, got %d", len(items))
+	}
+	if items[0].image == nil {
+		t.Fatal("expected parsed image for image_mode=3")
+	}
+	if items[0].image.encoding != "base64" {
+		t.Fatalf("expected base64 encoding, got %q", items[0].image.encoding)
+	}
+	if items[0].image.format != "png" {
+		t.Fatalf("expected png format, got %q", items[0].image.format)
+	}
+	if len(items[0].image.data) == 0 {
+		t.Fatal("expected decoded image bytes")
 	}
 }
 
