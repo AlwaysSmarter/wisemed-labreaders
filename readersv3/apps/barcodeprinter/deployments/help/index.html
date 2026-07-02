@@ -58,7 +58,7 @@
 
     <section class="section">
       <h2>1. Ce face aplicatia</h2>
-      <p>Barcode Printer este utilitarul WiseMED pentru tiparirea de etichete pe imprimante compatibile ZPL. Aplicatia expune un API local simplu, un endpoint legacy compatibil cu integrari mai vechi, o interfata web de administrare si suport pentru comenzi venite prin WiseMED WebSocket.</p>
+      <p>Barcode Printer este utilitarul WiseMED pentru tiparirea de etichete pe imprimante compatibile ZPL. Aplicatia expune un API local simplu, endpoint-uri dedicate pe profil de tiparire, o interfata web de administrare si suport pentru comenzi venite prin WiseMED WebSocket.</p>
       <ul>
         <li>tiparire etichete din request HTTP sau WS</li>
         <li>lista imprimantelor disponibile</li>
@@ -95,8 +95,10 @@
         </thead>
         <tbody>
           <tr><td><code>GET/POST /barcode/print</code></td><td>Endpoint legacy compatibil cu integrari vechi.</td></tr>
+          <tr><td><code>GET/POST /barcode/print/posta-romana</code></td><td>Endpoint form/query pentru etichete de expeditie Posta Romana.</td></tr>
           <tr><td><code>GET /api/barcode/printers</code></td><td>Returneaza lista imprimantelor detectate in contextul curent de rulare al aplicatiei.</td></tr>
           <tr><td><code>POST /api/barcode/print</code></td><td>Tipareste o eticheta pe baza unui payload JSON.</td></tr>
+          <tr><td><code>POST /api/barcode/print/posta-romana</code></td><td>Tipareste o eticheta termica 100x150 pentru expeditii Posta Romana.</td></tr>
           <tr><td><code>POST /api/barcode/test-print</code></td><td>Genereaza si trimite o eticheta de test.</td></tr>
           <tr><td><code>GET /api/barcode/settings</code></td><td>Citeste setarile curente ale modulului.</td></tr>
           <tr><td><code>PUT /api/barcode/settings</code></td><td>Salveaza setarile si actualizeaza runtime-ul.</td></tr>
@@ -122,6 +124,20 @@ Content-Type: application/json
       <h3>Request legacy</h3>
       <pre><code>GET /barcode/print?bc=TEST-93389&amp;pn=TEST%20PRINT&amp;tc=T&amp;no=1</code></pre>
       <p class="ok">Campul principal de cod se poate transmite si ca <code>bc</code>, <code>fileid</code> sau <code>code</code>, in functie de integrarea existenta.</p>
+      <h3>Request Posta Romana</h3>
+      <pre><code>POST /api/barcode/print/posta-romana
+Content-Type: application/json
+
+{
+  "recipient_name": "RAMPREST_PL_3",
+  "recipient_address1": "Str. Laborator_3 nr. 1 C",
+  "recipient_city": "IASI",
+  "recipient_county": "IASI",
+  "recipient_postal_code": "7005001",
+  "recipient_phone": "0723433433",
+  "recipient_client_code": "IS 16",
+  "shipment_reference": "PR-2026-0001"
+}</code></pre>
     </section>
 
     <section class="section">

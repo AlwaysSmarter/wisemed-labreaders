@@ -4,11 +4,42 @@ const loginMsg = document.getElementById("login-msg");
 const settingsMsg = document.getElementById("settings-msg");
 const form = document.getElementById("settings-form");
 const printerSelect = document.getElementById("printer-select");
+const prPrinterSelect = document.getElementById("pr-printer-select");
+const settingsProfile = document.getElementById("settings-profile");
 const statsBody = document.querySelector("#stats-table tbody");
 const jobsBody = document.querySelector("#jobs-table tbody");
 const dateFrom = document.getElementById("date-from");
 const dateTo = document.getElementById("date-to");
 let readerSettings = {};
+const defaultSettings = {
+  print_profile: "barcode",
+  shipping_prepaid_stamp: "FRANCARE ULTERIOARA",
+  pr_resolution: "203",
+  pr_orientation: "landscape",
+  pr_label_width_mm: "100",
+  pr_label_height_mm: "150",
+  pr_start_x_mm: "3",
+  pr_start_y_mm: "3",
+  pr_outer_padding_mm: "4",
+  pr_section_gap_mm: "3",
+  pr_section_header_h_mm: "8",
+  pr_section_title_font_h: "34",
+  pr_section_title_font_w: "24",
+  pr_body_font_h: "32",
+  pr_body_font_w: "24",
+  pr_body_line_gap: "8",
+  pr_small_font_h: "26",
+  pr_small_font_w: "20",
+  pr_stamp_box_w_mm: "42",
+  pr_stamp_box_h_mm: "28",
+  pr_stamp_font_h: "24",
+  pr_stamp_font_w: "18",
+  pr_sender_name: "INSTITUTUL NATIONAL DE SANATATE PUBLICA",
+  pr_sender_address1: "Str. Dr. Leonte Anastasievici, Nr. 1-3",
+  pr_sender_address2: "Cod postal 077042",
+  pr_sender_city: "Loc. Bucuresti Sector 5",
+  pr_sender_postal_code: "077042",
+};
 const views = {
   dashboard: document.getElementById("view-dashboard"),
   settings: document.getElementById("view-settings"),
@@ -22,6 +53,7 @@ document.getElementById("reload-settings").addEventListener("click", loadSetting
 document.getElementById("refresh-stats").addEventListener("click", refreshStatsAndJobs);
 document.getElementById("test-print").addEventListener("click", onTestPrint);
 document.querySelectorAll(".menu-btn[data-view]").forEach((btn) => btn.addEventListener("click", () => activateView(btn.dataset.view)));
+settingsProfile.addEventListener("change", () => applyProfileVisibility(settingsProfile.value));
 
 initDates();
 bootstrap();
@@ -90,12 +122,14 @@ async function loadAll() {
 async function loadPrinters() {
   const data = await api("/api/barcode/printers");
   const printers = data.printers || [];
-  printerSelect.innerHTML = `<option value="">(default)</option>`;
-  printers.forEach((name) => {
-    const opt = document.createElement("option");
-    opt.value = name;
-    opt.textContent = name;
-    printerSelect.appendChild(opt);
+  [printerSelect, prPrinterSelect].forEach((select) => {
+    select.innerHTML = `<option value="">(default)</option>`;
+    printers.forEach((name) => {
+      const opt = document.createElement("option");
+      opt.value = name;
+      opt.textContent = name;
+      select.appendChild(opt);
+    });
   });
 }
 
@@ -106,6 +140,7 @@ async function loadSettings() {
   ]);
   readerSettings = readerData.settings || {};
   const settings = {
+    ...defaultSettings,
     local_http_address: readerSettings.local_http_address || "",
     local_http_language: readerSettings.local_http_language || "ro",
     local_http_tls: readerSettings.local_http_tls || "false",
@@ -116,6 +151,7 @@ async function loadSettings() {
     const field = form.elements.namedItem(key);
     if (field) field.value = value || "";
   }
+  applyProfileVisibility(settings.print_profile || "barcode");
 }
 
 async function saveSettings() {
@@ -186,7 +222,11 @@ async function saveSettings() {
 
 async function onTestPrint() {
   settingsMsg.textContent = "";
-  const data = await api("/api/barcode/test-print", { method: "POST", allowFail: true });
+  const data = await api("/api/barcode/test-print", {
+    method: "POST",
+    body: JSON.stringify({ profile: settingsProfile.value || "barcode" }),
+    allowFail: true,
+  });
   if (!data || data.success === false) {
     settingsMsg.textContent = data?.error || "Test print failed";
     settingsMsg.style.color = "#8f1d1d";
@@ -195,6 +235,13 @@ async function onTestPrint() {
   settingsMsg.textContent = "Test print trimis";
   settingsMsg.style.color = "#1c7b32";
   await refreshStatsAndJobs();
+}
+
+function applyProfileVisibility(profile) {
+  const selected = profile || "barcode";
+  document.querySelectorAll(".profile-panel").forEach((panel) => {
+    panel.hidden = panel.dataset.profile !== selected;
+  });
 }
 
 async function refreshStatsAndJobs() {

@@ -52,6 +52,42 @@ type ZPLPrinter struct {
 	TubeCode    string
 }
 
+type PostaRomanaLayoutSettings struct {
+	PrinterResolution   int
+	LabelWidth          int
+	LabelHeight         int
+	Landscape           bool
+	StartX              int
+	StartY              int
+	OuterPadding        int
+	SectionGap          int
+	SectionHeaderHeight int
+	SectionTitleFontH   int
+	SectionTitleFontW   int
+	BodyFontH           int
+	BodyFontW           int
+	BodyLineGap         int
+	SmallFontH          int
+	SmallFontW          int
+	StampBoxWidth       int
+	StampBoxHeight      int
+	StampTitleFontH     int
+	StampTitleFontW     int
+}
+
+type PostaRomanaLabel struct {
+	Settings          PostaRomanaLayoutSettings
+	ServiceName       string
+	ShipmentReference string
+	PrepaidStampText  string
+	SenderName        string
+	SenderLines       []string
+	RecipientName     string
+	RecipientLines    []string
+	RecipientPhone    string
+	RecipientCode     string
+}
+
 func newZPLPrinterFromParams(params map[string]string) (*ZPLPrinter, error) {
 	barcodeValue := strings.TrimSpace(firstNonEmpty(params["bc"], params["fileid"], params["code"]))
 	if barcodeValue == "" {
@@ -116,6 +152,7 @@ func parseLayoutSettings(params map[string]string) LayoutSettings {
 func (p *ZPLPrinter) RenderZPL() string {
 	var b strings.Builder
 	b.WriteString("^XA\n")
+	b.WriteString("^CI28\n")
 	b.WriteString(fmt.Sprintf("^PW%d\n", p.Settings.LabelWidth))
 	b.WriteString(fmt.Sprintf("^FO%d,%d^BY%s,%s,%d^%s%s,%s,%d,%s,%s^FD%s^FS\n",
 		p.Settings.BarcodeCodeX,
@@ -175,6 +212,151 @@ func (p *ZPLPrinter) RenderZPL() string {
 	return b.String()
 }
 
+func newPostaRomanaLabelFromParams(params map[string]string) (*PostaRomanaLabel, error) {
+	recipientName := strings.TrimSpace(firstNonEmpty(params["recipient_name"], params["dest_name"], params["dn"], params["name"]))
+	if recipientName == "" {
+		return nil, fmt.Errorf("recipient_name is required")
+	}
+	address1 := strings.TrimSpace(firstNonEmpty(params["recipient_address1"], params["dest_address1"], params["address"], params["addr1"], params["adresa"]))
+	if address1 == "" {
+		return nil, fmt.Errorf("recipient_address1 is required")
+	}
+	recipientCity := strings.TrimSpace(firstNonEmpty(params["recipient_city"], params["dest_city"], params["city"], params["loc"]))
+	recipientCounty := strings.TrimSpace(firstNonEmpty(params["recipient_county"], params["dest_county"], params["county"], params["jud"]))
+	recipientPostal := strings.TrimSpace(firstNonEmpty(params["recipient_postal_code"], params["dest_postal_code"], params["postal_code"], params["zip"], params["cod"]))
+	recipientPhone := strings.TrimSpace(firstNonEmpty(params["recipient_phone"], params["dest_phone"], params["phone"], params["telefon"]))
+	recipientCode := strings.TrimSpace(firstNonEmpty(params["recipient_client_code"], params["dest_client_code"], params["client_code"], params["cod_client"]))
+	senderName := strings.TrimSpace(firstNonEmpty(params["sender_name"], params["pr_sender_name"], "INSTITUTUL NATIONAL DE SANATATE PUBLICA"))
+	senderAddress1 := strings.TrimSpace(firstNonEmpty(params["sender_address1"], params["pr_sender_address1"], "Str. Dr. Leonte Anastasievici, Nr. 1-3"))
+	senderAddress2 := strings.TrimSpace(firstNonEmpty(params["sender_address2"], params["pr_sender_address2"], "Cod postal 077042"))
+	senderCity := strings.TrimSpace(firstNonEmpty(params["sender_city"], params["pr_sender_city"], "Loc. Bucuresti Sector 5"))
+	senderPostal := strings.TrimSpace(firstNonEmpty(params["sender_postal_code"], params["pr_sender_postal_code"]))
+	if senderPostal != "" && !strings.Contains(strings.ToLower(senderAddress2), "postal") {
+		senderAddress2 = "Cod postal " + senderPostal
+	}
+	address2 := strings.TrimSpace(firstNonEmpty(params["recipient_address2"], params["dest_address2"], params["addr2"]))
+	serviceName := strings.TrimSpace(firstNonEmpty(params["shipping_service_name"], params["service_name"], "POSTA ROMANA"))
+	reference := strings.TrimSpace(firstNonEmpty(params["shipment_reference"], params["reference"], params["awb"], recipientCode))
+	prepaidStamp := strings.TrimSpace(firstNonEmpty(params["shipping_prepaid_stamp"], params["prepaid_stamp"], "FRANCARE ULTERIOARA"))
+	recipientLines := []string{address1}
+	if address2 != "" {
+		recipientLines = append(recipientLines, address2)
+	}
+	if recipientCity != "" || recipientCounty != "" {
+		recipientLines = append(recipientLines, strings.TrimSpace(firstNonEmpty(
+			joinParts(" ", nonEmptyParts("Loc.", recipientCity), nonEmptyParts("Jud.", recipientCounty)),
+			joinParts(" ", nonEmptyParts("Loc.", recipientCity)),
+			joinParts(" ", nonEmptyParts("Jud.", recipientCounty)),
+		)))
+	}
+	if recipientPostal != "" {
+		recipientLines = append(recipientLines, "Cod "+recipientPostal)
+	}
+	senderLines := []string{senderAddress1}
+	if senderAddress2 != "" {
+		senderLines = append(senderLines, senderAddress2)
+	}
+	if senderCity != "" {
+		senderLines = append(senderLines, senderCity)
+	}
+	return &PostaRomanaLabel{
+		Settings:          parsePostaRomanaLayoutSettings(params),
+		ServiceName:       serviceName,
+		ShipmentReference: reference,
+		PrepaidStampText:  prepaidStamp,
+		SenderName:        senderName,
+		SenderLines:       senderLines,
+		RecipientName:     recipientName,
+		RecipientLines:    recipientLines,
+		RecipientPhone:    recipientPhone,
+		RecipientCode:     recipientCode,
+	}, nil
+}
+
+func parsePostaRomanaLayoutSettings(params map[string]string) PostaRomanaLayoutSettings {
+	res := intParam(params, "pr_resolution", "pr_resolution", 203, false, 0)
+	if res <= 0 {
+		res = 203
+	}
+	width := intParam(params, "pr_label_width_mm", "pr_label_width_mm", 100, true, res)
+	height := intParam(params, "pr_label_height_mm", "pr_label_height_mm", 150, true, res)
+	landscape := strings.EqualFold(strings.TrimSpace(firstNonEmpty(params["pr_orientation"], "landscape")), "landscape")
+	if landscape {
+		width, height = height, width
+	}
+	return PostaRomanaLayoutSettings{
+		PrinterResolution:   res,
+		LabelWidth:          width,
+		LabelHeight:         height,
+		Landscape:           landscape,
+		StartX:              intParam(params, "pr_start_x_mm", "pr_start_x_mm", 3, true, res),
+		StartY:              intParam(params, "pr_start_y_mm", "pr_start_y_mm", 3, true, res),
+		OuterPadding:        intParam(params, "pr_outer_padding_mm", "pr_outer_padding_mm", 4, true, res),
+		SectionGap:          intParam(params, "pr_section_gap_mm", "pr_section_gap_mm", 3, true, res),
+		SectionHeaderHeight: intParam(params, "pr_section_header_h_mm", "pr_section_header_h_mm", 8, true, res),
+		SectionTitleFontH:   intParam(params, "pr_section_title_font_h", "pr_section_title_font_h", 34, false, 0),
+		SectionTitleFontW:   intParam(params, "pr_section_title_font_w", "pr_section_title_font_w", 24, false, 0),
+		BodyFontH:           intParam(params, "pr_body_font_h", "pr_body_font_h", 32, false, 0),
+		BodyFontW:           intParam(params, "pr_body_font_w", "pr_body_font_w", 24, false, 0),
+		BodyLineGap:         intParam(params, "pr_body_line_gap", "pr_body_line_gap", 8, false, 0),
+		SmallFontH:          intParam(params, "pr_small_font_h", "pr_small_font_h", 26, false, 0),
+		SmallFontW:          intParam(params, "pr_small_font_w", "pr_small_font_w", 20, false, 0),
+		StampBoxWidth:       intParam(params, "pr_stamp_box_w_mm", "pr_stamp_box_w_mm", 42, true, res),
+		StampBoxHeight:      intParam(params, "pr_stamp_box_h_mm", "pr_stamp_box_h_mm", 28, true, res),
+		StampTitleFontH:     intParam(params, "pr_stamp_font_h", "pr_stamp_font_h", 24, false, 0),
+		StampTitleFontW:     intParam(params, "pr_stamp_font_w", "pr_stamp_font_w", 18, false, 0),
+	}
+}
+
+func (p *PostaRomanaLabel) RenderZPL() string {
+	s := p.Settings
+	var b strings.Builder
+	b.WriteString("^XA\n")
+	b.WriteString("^CI28\n")
+	b.WriteString(fmt.Sprintf("^PW%d\n", s.LabelWidth))
+	b.WriteString(fmt.Sprintf("^LL%d\n", s.LabelHeight))
+	b.WriteString("^LH0,0\n")
+
+	x := s.StartX
+	y := s.StartY
+	contentW := s.LabelWidth - (s.StartX * 2)
+	contentH := s.LabelHeight - (s.StartY * 2)
+	bodyX := x + s.OuterPadding
+	bodyY := y + s.OuterPadding
+	bodyW := contentW - (s.OuterPadding * 2)
+
+	headerH := maxInt(s.SectionHeaderHeight*2, s.BodyFontH+s.OuterPadding*2)
+	stampW := minInt(s.StampBoxWidth, bodyW/3)
+	leftHeaderW := bodyW - stampW - s.SectionGap
+	senderBoxY := bodyY + headerH + s.SectionGap
+	senderBoxH := (contentH - headerH - (s.SectionGap * 3)) / 3
+	recipientBoxY := senderBoxY + senderBoxH + s.SectionGap
+	recipientBoxH := contentH - headerH - senderBoxH - (s.SectionGap * 3)
+
+	writeBox(&b, x, y, contentW, contentH, 3)
+	writeFilledTitleBar(&b, bodyX, bodyY, leftHeaderW, headerH, "POSTA ROMANA", s.SectionTitleFontH+8, s.SectionTitleFontW+8)
+	writeOutlineBox(&b, bodyX+leftHeaderW+s.SectionGap, bodyY, stampW, headerH, 2)
+	writeCenteredText(&b, bodyX+leftHeaderW+s.SectionGap+10, bodyY+12, stampW-20, "TIMBRU / PLATA", s.StampTitleFontH, s.StampTitleFontW)
+	writeCenteredText(&b, bodyX+leftHeaderW+s.SectionGap+10, bodyY+12+s.StampTitleFontH+10, stampW-20, p.PrepaidStampText, s.SmallFontH, s.SmallFontW)
+
+	writeSection(&b, bodyX, senderBoxY, bodyW, senderBoxH, "EXPEDITOR", s, append([]string{p.SenderName}, p.SenderLines...)...)
+	writeSection(&b, bodyX, recipientBoxY, bodyW, recipientBoxH, "DESTINATAR", s, append([]string{p.RecipientName}, p.RecipientLines...)...)
+
+	footerY := recipientBoxY + recipientBoxH - s.SectionHeaderHeight - s.SmallFontH - 18
+	if footerY > recipientBoxY+s.SectionHeaderHeight+s.BodyFontH {
+		leftFooter := "Telefon: " + fallbackText(p.RecipientPhone, "-")
+		rightFooter := "Cod client: " + fallbackText(p.RecipientCode, "-")
+		if strings.TrimSpace(p.ShipmentReference) != "" {
+			leftFooter = leftFooter + "  Ref: " + p.ShipmentReference
+		}
+		writeText(&b, bodyX+s.OuterPadding, footerY, leftFooter, "A", s.SmallFontH, s.SmallFontW)
+		writeText(&b, bodyX+bodyW/2, footerY, rightFooter, "A", s.SmallFontH, s.SmallFontW)
+	}
+
+	b.WriteString("^XZ\n")
+	return b.String()
+}
+
 func strParam(params map[string]string, requestKey, cfgKey, def string) string {
 	if v := strings.TrimSpace(params[requestKey]); v != "" {
 		return v
@@ -208,4 +390,121 @@ func mmToDPI(mm float64, dpi int) int {
 		dpi = 200
 	}
 	return int(math.Round(mm * float64(dpi) / 25.4))
+}
+
+func writeSection(b *strings.Builder, x, y, w, h int, title string, s PostaRomanaLayoutSettings, lines ...string) {
+	writeOutlineBox(b, x, y, w, h, 2)
+	writeFilledTitleBar(b, x, y, w, s.SectionHeaderHeight, title, s.SectionTitleFontH, s.SectionTitleFontW)
+	textX := x + s.OuterPadding
+	textY := y + s.SectionHeaderHeight + s.OuterPadding + s.BodyFontH
+	usableWidth := w - (s.OuterPadding * 2)
+	maxChars := maxInt(12, usableWidth/maxInt(12, s.BodyFontW))
+	for _, raw := range lines {
+		for _, line := range wrapLabelText(raw, maxChars) {
+			writeText(b, textX, textY, line, "A", s.BodyFontH, s.BodyFontW)
+			textY += s.BodyFontH + s.BodyLineGap
+		}
+	}
+}
+
+func writeBox(b *strings.Builder, x, y, w, h, thickness int) {
+	b.WriteString(fmt.Sprintf("^FO%d,%d^GB%d,%d,%d^FS\n", x, y, w, h, thickness))
+}
+
+func writeOutlineBox(b *strings.Builder, x, y, w, h, thickness int) {
+	writeBox(b, x, y, w, h, thickness)
+}
+
+func writeFilledTitleBar(b *strings.Builder, x, y, w, h int, text string, fontH, fontW int) {
+	b.WriteString(fmt.Sprintf("^FO%d,%d^GB%d,%d,%d,B,0^FS\n", x, y, w, h, 0))
+	b.WriteString(fmt.Sprintf("^FO%d,%d^FR^A0N,%d,%d^FD%s^FS\n", x+16, y+maxInt(10, (h-fontH)/2), fontH, fontW, zplText(text)))
+}
+
+func writeCenteredText(b *strings.Builder, x, y, width int, text string, fontH, fontW int) {
+	text = zplText(text)
+	maxChars := maxInt(8, width/maxInt(12, fontW))
+	for _, line := range wrapLabelText(text, maxChars) {
+		offset := maxInt(0, (width-(len([]rune(line))*fontW))/2)
+		b.WriteString(fmt.Sprintf("^FO%d,%d^A0N,%d,%d^FD%s^FS\n", x+offset, y, fontH, fontW, zplText(line)))
+		y += fontH + 6
+	}
+}
+
+func writeText(b *strings.Builder, x, y int, text, font string, fontH, fontW int) {
+	b.WriteString(fmt.Sprintf("^FO%d,%d^A%sN,%d,%d^FD%s^FS\n", x, y, font, fontH, fontW, zplText(text)))
+}
+
+func wrapLabelText(text string, maxChars int) []string {
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return nil
+	}
+	if maxChars <= 0 {
+		return []string{text}
+	}
+	words := strings.Fields(text)
+	if len(words) == 0 {
+		return []string{text}
+	}
+	lines := []string{}
+	current := words[0]
+	for _, word := range words[1:] {
+		candidate := current + " " + word
+		if len([]rune(candidate)) <= maxChars {
+			current = candidate
+			continue
+		}
+		lines = append(lines, current)
+		current = word
+	}
+	lines = append(lines, current)
+	return lines
+}
+
+func zplText(s string) string {
+	replacer := strings.NewReplacer("^", "-", "~", "-", "\r", " ", "\n", " ")
+	return replacer.Replace(strings.TrimSpace(s))
+}
+
+func fallbackText(value, fallback string) string {
+	if strings.TrimSpace(value) == "" {
+		return fallback
+	}
+	return strings.TrimSpace(value)
+}
+
+func joinParts(sep string, parts ...string) string {
+	items := []string{}
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			items = append(items, part)
+		}
+	}
+	return strings.Join(items, sep)
+}
+
+func nonEmptyParts(prefix, value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ""
+	}
+	if strings.TrimSpace(prefix) == "" {
+		return value
+	}
+	return strings.TrimSpace(prefix) + " " + value
+}
+
+func maxInt(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
+}
+
+func minInt(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }

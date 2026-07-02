@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="1000" viewBox="0 0 1500 1000">
+  <defs>
+    <linearGradient id="paper" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0%" stop-color="#fffef9"/>
+      <stop offset="100%" stop-color="#f4efe6"/>
+    </linearGradient>
+    <linearGradient id="header" x1="0" x2="1">
+      <stop offset="0%" stop-color="#103b35"/>
+      <stop offset="100%" stop-color="#28564c"/>
+    </linearGradient>
+    <style>
+      .ui { font-family: "Avenir Next", "Helvetica Neue", Arial, sans-serif; }
+      .title { font-size: 26px; font-weight: 800; letter-spacing: 2px; fill: #ffffff; }
+      .section { font-size: 24px; font-weight: 800; letter-spacing: 1.6px; fill: #ffffff; }
+      .name { font-size: 42px; font-weight: 800; fill: #111815; }
+      .body { font-size: 29px; font-weight: 600; fill: #23312c; }
+      .meta { font-size: 24px; font-weight: 700; fill: #385049; }
+      .stampMajor { font-size: 34px; font-weight: 800; fill: #161616; }
+      .stampMinor { font-size: 27px; font-weight: 700; fill: #161616; }
+      .hint { font-size: 22px; font-weight: 600; fill: #576862; }
+    </style>
+  </defs>
+
+  <rect width="1500" height="1000" fill="#d9ddd8"/>
+  <rect x="22" y="22" width="1456" height="956" rx="28" fill="url(#paper)" stroke="#111815" stroke-width="6"/>
+
+  <rect x="66" y="66" width="844" height="144" rx="20" fill="url(#header)"/>
+  <text x="102" y="121" class="ui title">EXPEDITOR</text>
+  <image href="/Users/raduichim/work/WiseMED/Clients/INSP/Design/Ghid_identitate_viz_INSP/05_LNSP/Logo INSP/Logo INSP/Vertical/Secundar vertical/Monocrom/PNG/logo principal vetical monocrom-01.png" x="92" y="92" width="92" height="92" preserveAspectRatio="xMidYMid meet"/>
+  <text x="208" y="121" class="ui body" fill="#ffffff">Institutul Național de Sănătate Publică</text>
+  <text x="208" y="154" class="ui meta" fill="#dfe8e2">Str. Dr. Leonte Anastasievici, Nr. 1-3</text>
+  <text x="208" y="182" class="ui meta" fill="#dfe8e2">Cod poștal 077042  •  București Sector 5</text>
+
+  <rect x="954" y="66" width="460" height="220" rx="16" fill="#fffdf8" stroke="#111815" stroke-width="4"/>
+  <text x="1184" y="118" text-anchor="middle" class="ui stampMajor">T.P.</text>
+  <text x="1184" y="164" text-anchor="middle" class="ui stampMajor">POȘTA ROMÂNĂ</text>
+  <text x="1184" y="210" text-anchor="middle" class="ui stampMinor">Nr. 109/P/300028/2018</text>
+  <text x="1184" y="252" text-anchor="middle" class="ui stampMinor">Valabilitate permanentă</text>
+
+  <rect x="66" y="246" width="1348" height="526" rx="22" fill="#fffcf6" stroke="#18211e" stroke-width="4"/>
+  <rect x="66" y="246" width="1348" height="70" rx="22" fill="#214f46"/>
+  <text x="104" y="292" class="ui section">DESTINATAR</text>
+
+  <text x="104" y="394" class="ui name">RAMPREST_PL_3</text>
+  <text x="104" y="450" class="ui body">Adresa: Str. Laborator_3 nr. 1 C</text>
+  <text x="104" y="502" class="ui body">Loc. IAȘI   Jud. IAȘI</text>
+  <text x="104" y="554" class="ui body">Cod 7005001</text>
+
+  <line x1="104" y1="610" x2="1372" y2="610" stroke="#d8d8d1" stroke-width="3"/>
+  <text x="104" y="676" class="ui body">Telefon: 0723433433</text>
+  <text x="818" y="676" class="ui body">Cod client: IS 16</text>
+
+  <rect x="972" y="340" width="382" height="176" rx="16" fill="#f5f1e8" stroke="#31413b" stroke-width="3"/>
+  <text x="1163" y="402" text-anchor="middle" class="ui stampMinor">Oficiu poștal</text>
+  <text x="1163" y="446" text-anchor="middle" class="ui stampMajor">Chiajna</text>
+  <text x="1163" y="486" text-anchor="middle" class="ui hint">zonă rezervată ștampilei</text>
+
+  <rect x="66" y="804" width="1348" height="108" rx="18" fill="#f1ece3" stroke="#c8c0b5" stroke-width="2"/>
+  <text x="98" y="852" class="ui meta">Ref expediție: PR-2026-0001</text>
+  <text x="98" y="886" class="ui hint">Mockup vizual pentru etichetă termică 100x150 mm, orientare landscape, cu logo de expeditor și timbru preplătit compact.</text>
+</svg>

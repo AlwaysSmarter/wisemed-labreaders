@@ -36,6 +36,13 @@ type Module struct {
 	db       *sql.DB
 }
 
+type preparedPrintJob struct {
+	PrinterName string
+	Copies      int
+	ZPL         string
+	LogParams   map[string]string
+}
+
 type localHTTPControl interface {
 	ApplyRuntimeSettings(addr, lang string, tls bool)
 }
@@ -58,8 +65,10 @@ func (m *Module) Init(rt module.Runtime) error {
 	m.rt.Handle("/barcode/app.js", m.withCORS(http.HandlerFunc(m.handleStaticAsset("ui/app.js", "application/javascript; charset=utf-8"))))
 	m.rt.Handle("/barcode/styles.css", m.withCORS(http.HandlerFunc(m.handleStaticAsset("ui/styles.css", "text/css; charset=utf-8"))))
 	m.rt.Handle("/barcode/print", m.withCORS(http.HandlerFunc(m.handleLegacyPrint)))
+	m.rt.Handle("/barcode/print/posta-romana", m.withCORS(http.HandlerFunc(m.handleLegacyPostaRomanaPrint)))
 	m.rt.Handle("/api/barcode/printers", m.withCORS(http.HandlerFunc(m.handlePrinters)))
 	m.rt.Handle("/api/barcode/print", m.withCORS(http.HandlerFunc(m.handlePrintJSON)))
+	m.rt.Handle("/api/barcode/print/posta-romana", m.withCORS(http.HandlerFunc(m.handlePostaRomanaPrintJSON)))
 	m.rt.Handle("/api/barcode/test-print", m.withCORS(http.HandlerFunc(m.handleTestPrint)))
 	m.rt.Handle("/api/barcode/settings", m.withCORS(http.HandlerFunc(m.handleSettingsAPI)))
 	m.rt.Handle("/api/barcode/jobs", m.withCORS(http.HandlerFunc(m.handleJobs)))
@@ -227,9 +236,74 @@ func (m *Module) handlePrintJSON(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]interface{}{"success": true})
 }
 
+func (m *Module) handleLegacyPostaRomanaPrint(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet && r.Method != http.MethodPost {
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]interface{}{"success": false, "error": "method not allowed"})
+		return
+	}
+	params := map[string]string{}
+	_ = r.ParseForm()
+	for k, vals := range r.Form {
+		if len(vals) > 0 {
+			params[k] = vals[len(vals)-1]
+		}
+	}
+	if err := m.printPostaRomanaWithParams(params, extractIP(r)); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]interface{}{"success": false, "error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{"success": true})
+}
+
+func (m *Module) handlePostaRomanaPrintJSON(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]interface{}{"success": false, "error": "method not allowed"})
+		return
+	}
+	payload := map[string]interface{}{}
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]interface{}{"success": false, "error": "invalid json"})
+		return
+	}
+	params := interfaceMapToStringMap(payload)
+	if err := m.printPostaRomanaWithParams(params, extractIP(r)); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]interface{}{"success": false, "error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{"success": true})
+}
+
 func (m *Module) handleTestPrint(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		writeJSON(w, http.StatusMethodNotAllowed, map[string]interface{}{"success": false, "error": "method not allowed"})
+		return
+	}
+	payload := map[string]interface{}{}
+	_ = json.NewDecoder(r.Body).Decode(&payload)
+	profile := strings.ToLower(strings.TrimSpace(valueAsString(payload["profile"])))
+	if profile == "" {
+		profile = strings.ToLower(strings.TrimSpace(r.URL.Query().Get("profile")))
+	}
+	if profile == "posta-romana" || profile == "posta_romana" || profile == "posta" {
+		m.mu.RLock()
+		params := mergeMaps(m.settings, map[string]string{
+			"recipient_name":         "RAMPREST_PL_3",
+			"recipient_address1":     "Str. Laborator_3 nr. 1 C",
+			"recipient_city":         "IASI",
+			"recipient_county":       "IASI",
+			"recipient_postal_code":  "7005001",
+			"recipient_phone":        "0723433433",
+			"recipient_client_code":  "IS 16",
+			"shipping_service_name":  "POSTA ROMANA",
+			"shipment_reference":     fmt.Sprintf("PR-TEST-%d", time.Now().Unix()%100000),
+			"shipping_prepaid_stamp": "EXPEDITOR CU FRANCATURA ULTERIOARA",
+		})
+		m.mu.RUnlock()
+		if err := m.printPostaRomanaWithParams(params, extractIP(r)); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]interface{}{"success": false, "error": err.Error()})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]interface{}{"success": true})
 		return
 	}
 	m.mu.RLock()
@@ -334,27 +408,86 @@ func (m *Module) printWithParams(params map[string]string, clientIP string) erro
 	m.mu.RLock()
 	resolved := mergeMaps(m.settings, params)
 	m.mu.RUnlock()
-	bcp, err := newZPLPrinterFromParams(resolved)
+	job, err := buildBarcodePrintJob(resolved)
 	if err != nil {
 		_ = m.insertPrintLog(clientIP, resolved, 0, "fail", err.Error())
 		return err
 	}
+	return m.runPreparedPrintJob(job, clientIP)
+}
+
+func (m *Module) printPostaRomanaWithParams(params map[string]string, clientIP string) error {
+	m.mu.RLock()
+	resolved := mergeMaps(m.settings, params)
+	m.mu.RUnlock()
+	job, err := buildPostaRomanaPrintJob(resolved)
+	if err != nil {
+		_ = m.insertPrintLog(clientIP, resolved, 0, "fail", err.Error())
+		return err
+	}
+	return m.runPreparedPrintJob(job, clientIP)
+}
+
+func (m *Module) runPreparedPrintJob(job preparedPrintJob, clientIP string) error {
 	count := 1
-	if raw := strings.TrimSpace(firstNonEmpty(resolved["no"], resolved["copies"])); raw != "" {
+	if job.Copies > 0 {
+		count = job.Copies
+	}
+	m.logPrintPayload(job.PrinterName, count, job.ZPL)
+	for i := 0; i < count; i++ {
+		if err := sendToPrinter(job.PrinterName, []byte(job.ZPL)); err != nil {
+			_ = m.insertPrintLog(clientIP, job.LogParams, count, "fail", err.Error())
+			return err
+		}
+	}
+	_ = m.insertPrintLog(clientIP, job.LogParams, count, "ok", "")
+	return nil
+}
+
+func buildBarcodePrintJob(params map[string]string) (preparedPrintJob, error) {
+	bcp, err := newZPLPrinterFromParams(params)
+	if err != nil {
+		return preparedPrintJob{}, err
+	}
+	count := 1
+	if raw := strings.TrimSpace(firstNonEmpty(params["no"], params["copies"])); raw != "" {
 		if n, err := strconv.Atoi(raw); err == nil && n > 0 {
 			count = n
 		}
 	}
-	zpl := bcp.RenderZPL()
-	m.logPrintPayload(resolved["othercfg_sel_printer"], count, zpl)
-	for i := 0; i < count; i++ {
-		if err := sendToPrinter(resolved["othercfg_sel_printer"], []byte(zpl)); err != nil {
-			_ = m.insertPrintLog(clientIP, resolved, count, "fail", err.Error())
-			return err
+	printerName := strings.TrimSpace(firstNonEmpty(params["othercfg_sel_printer"], params["bc_selprinter"]))
+	return preparedPrintJob{
+		PrinterName: printerName,
+		Copies:      count,
+		ZPL:         bcp.RenderZPL(),
+		LogParams:   mergeMaps(params, map[string]string{"print_profile": "barcode"}),
+	}, nil
+}
+
+func buildPostaRomanaPrintJob(params map[string]string) (preparedPrintJob, error) {
+	label, err := newPostaRomanaLabelFromParams(params)
+	if err != nil {
+		return preparedPrintJob{}, err
+	}
+	count := 1
+	if raw := strings.TrimSpace(firstNonEmpty(params["no"], params["copies"])); raw != "" {
+		if n, err := strconv.Atoi(raw); err == nil && n > 0 {
+			count = n
 		}
 	}
-	_ = m.insertPrintLog(clientIP, resolved, count, "ok", "")
-	return nil
+	printerName := strings.TrimSpace(firstNonEmpty(params["pr_sel_printer"], params["othercfg_sel_printer"]))
+	return preparedPrintJob{
+		PrinterName: printerName,
+		Copies:      count,
+		ZPL:         label.RenderZPL(),
+		LogParams: mergeMaps(params, map[string]string{
+			"print_profile":        "posta-romana",
+			"fileid":               firstNonEmpty(params["shipment_reference"], params["recipient_client_code"], params["recipient_postal_code"]),
+			"name":                 firstNonEmpty(params["recipient_name"], params["dest_name"]),
+			"bc_bctype":            "POSTA_ROMANA",
+			"othercfg_sel_printer": printerName,
+		}),
+	}, nil
 }
 
 func (m *Module) logPrintPayload(printerName string, count int, zpl string) {
