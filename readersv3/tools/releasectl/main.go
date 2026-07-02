@@ -440,7 +440,7 @@ func buildRuntime(root string, app appInfo, target string, ti targetInfo, versio
 		"build",
 		"-a",
 		"-trimpath",
-		"-buildvcs=true",
+		"-buildvcs=false",
 		"-mod=readonly",
 		"-ldflags",
 		buildLDFlags(version, commit, epoch),

@@ -8,12 +8,13 @@
 /output/sysmex-ca600/certs/
 /output/sysmex-xn550/certs/
 /old-src/
-/old-src/
 /common/output/certs/
 *.log
 readersv3/dist/
 readersv3/release/
 /readersv3/build/apps.json
+/readersv3/output/*
+!/readersv3/output/.gitkeep
 /readersv3/output/*/bin/**
 /readersv3/output/*/deployments/*.log
 /readersv3/output/*/deployments/*.zip
