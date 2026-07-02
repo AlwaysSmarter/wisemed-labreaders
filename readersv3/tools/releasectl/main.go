@@ -72,6 +72,8 @@ type releaseOverrides struct {
 	AppUpdatesBaseURL string
 }
 
+var errMissingMakensis = errors.New("makensis was not found in PATH")
+
 type targetInfo struct {
 	GOOS   string
 	GOARCH string
@@ -544,9 +546,14 @@ func buildReleaseBundle(root string, manifest runtimeManifest) (releaseBundle, e
 	if manifest.GOOS == "windows" {
 		installerArtifact, err := packageWindows(root, manifest)
 		if err != nil {
-			return releaseBundle{}, err
+			if errors.Is(err, errMissingMakensis) {
+				logf("makensis not found; continuing without Windows installer for %s %s", manifest.App.ID, manifest.Target)
+			} else {
+				return releaseBundle{}, err
+			}
+		} else {
+			bundle.Installer = &installerArtifact
 		}
-		bundle.Installer = &installerArtifact
 	}
 	metadataPath := filepath.Join(root, "dist", "releases", manifest.App.ID, manifest.Target, manifest.PackageVersion+".json")
 	if err := writeJSON(metadataPath, bundle); err != nil {
@@ -601,7 +608,7 @@ func packageWindows(root string, manifest runtimeManifest) (artifactInfo, error)
 		return artifactInfo{}, err
 	}
 	if lookPath("makensis") == "" {
-		return artifactInfo{}, errors.New("makensis was not found in PATH")
+		return artifactInfo{}, errMissingMakensis
 	}
 	setupName := windowsInstallerFileName(manifest)
 	outputPath := filepath.Join(root, "dist", "installers", setupName)
