@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <service>
   <id>wisemed-cfx96-reader</id>
-  <name>WiseMED CFX-96 Reader</name>
-  <description>WiseMED readersv3 Seegene Reader background service</description>
+  <name>WiseMED Cfx96 Reader</name>
+  <description>WiseMED readersv3 Cfx96 Reader background service</description>
   <executable>cfx96-reader.exe</executable>
   <arguments>-config deployments\config.yaml -headless</arguments>
   <stoptimeout>15sec</stoptimeout>

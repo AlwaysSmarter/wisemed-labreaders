@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <service>
   <id>wisemed-cary60-uvvis-reader</id>
-  <name>WiseMED Cary60 UVVIS Reader</name>
-  <description>WiseMED readersv3 Cary60 UVVIS Reader background service</description>
-  <executable>Cary60-UVVIS-Reader.exe</executable>
+  <name>WiseMED Cary60 Uvvis Reader</name>
+  <description>WiseMED readersv3 Cary60 Uvvis Reader background service</description>
+  <executable>cary60-uvvis-reader.exe</executable>
   <arguments>-config deployments\config.yaml -headless</arguments>
   <stoptimeout>15sec</stoptimeout>
   <startmode>Automatic</startmode>

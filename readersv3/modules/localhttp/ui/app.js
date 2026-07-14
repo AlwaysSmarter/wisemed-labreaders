@@ -619,6 +619,12 @@ const BARCODE_RATIO = [["2.0", "2.0"], ["2.1", "2.1"], ["2.2", "2.2"], ["2.3", "
 const BARCODE_FONT_OPTIONS = [["A", "A"], ["B", "B"], ["C", "C"], ["D", "D"], ["E", "E"], ["F", "F"], ["G", "G"], ["H", "H"], ["0", "0"]];
 const BARCODE_BOX_COLOR = [["B", "Black"], ["W", "White"]];
 const BARCODE_QR_EC = [["Q", "High reliability"], ["H", "Ultra-high reliability"], ["M", "Standard"], ["L", "High density"]];
+const BARCODE_ENDPOINT_OPTIONS = [
+  ["barcode-legacy", "/barcode/print"],
+  ["barcode-api", "/api/barcode/print"],
+  ["posta-romana-legacy", "/barcode/print/posta-romana"],
+  ["posta-romana-api", "/api/barcode/print/posta-romana"],
+];
 
 const BARCODE_FIELD_SECTIONS = [
   {
@@ -717,6 +723,67 @@ const BARCODE_FIELD_SECTIONS = [
       { key: "local_http_language", label: "Limba interfata", type: "select", options: [["ro", "Romana"], ["en", "English"]], default: "ro" },
       { key: "local_http_tls", label: "HTTPS local", type: "select", options: [["false", "Nu"], ["true", "Da"]], default: "false" },
       { key: "local_http_cors_allowed_origins", label: "Origin-uri CORS permise", type: "text", default: "https://ldse.wisemed.eu", span: 2 },
+    ],
+  },
+];
+
+const POSTA_ROMANA_FIELD_SECTIONS = [
+  {
+    title: "Endpoint settings",
+    fields: [
+      { key: "pr_sel_printer", label: "Selected printer", type: "printer-select", default: "" },
+      { key: "pr_resolution", label: "Printer resolution", type: "select", options: [["203", "203 dpi"], ["300", "300 dpi"]], default: "203" },
+      { key: "pr_orientation", label: "Orientation", type: "select", options: [["landscape", "Landscape"], ["portrait", "Portrait"]], default: "landscape" },
+      { key: "__group_logo", label: "Logo", type: "group-title", span: 3 },
+      { key: "pr_logo_data_url", label: "Logo upload", type: "image-upload", default: "", span: 3 },
+      { key: "pr_logo_x_mm", label: "Logo X (mm)", type: "number", default: "0" },
+      { key: "pr_logo_y_mm", label: "Logo Y (mm)", type: "number", default: "0" },
+      { key: "pr_logo_width_mm", label: "Logo width (mm)", type: "number", default: "0" },
+      { key: "pr_logo_height_mm", label: "Logo height (mm)", type: "number", default: "20" },
+      { key: "__group_header", label: "Header", type: "group-title", span: 3 },
+      { key: "pr_header_font_family", label: "Header font family", type: "select", options: BARCODE_FONT_OPTIONS, default: "0" },
+      { key: "pr_header_font_h", label: "Header font H", type: "number", default: "34" },
+      { key: "pr_header_font_w", label: "Header font W", type: "number", default: "24" },
+      { key: "__group_address", label: "Address", type: "group-title", span: 3 },
+      { key: "pr_address_font_family", label: "Address font family", type: "select", options: BARCODE_FONT_OPTIONS, default: "B" },
+      { key: "pr_address_font_h", label: "Address font H", type: "number", default: "38" },
+      { key: "pr_address_font_w", label: "Address font W", type: "number", default: "28" },
+      { key: "__group_address_title", label: "Address Title", type: "group-title", span: 3 },
+      { key: "pr_address_title_font_family", label: "Address title font family", type: "select", options: BARCODE_FONT_OPTIONS, default: "0" },
+      { key: "pr_address_title_font_h", label: "Address title font H", type: "number", default: "38" },
+      { key: "pr_address_title_font_w", label: "Address title font W", type: "number", default: "28" },
+      { key: "__group_footer", label: "Footer", type: "group-title", span: 3 },
+      { key: "pr_footer_font_family", label: "Footer font family", type: "select", options: BARCODE_FONT_OPTIONS, default: "0" },
+      { key: "pr_footer_font_h", label: "Footer font H", type: "number", default: "39" },
+      { key: "pr_footer_font_w", label: "Footer font W", type: "number", default: "30" },
+      { key: "__group_stamp", label: "Stamp", type: "group-title", span: 3 },
+      { key: "pr_stamp_font_family", label: "Stamp font family", type: "select", options: BARCODE_FONT_OPTIONS, default: "A" },
+      { key: "pr_stamp_font_h", label: "Stamp font H", type: "number", default: "24" },
+      { key: "pr_stamp_font_w", label: "Stamp font W", type: "number", default: "18" },
+      { key: "pr_stamp_box_w_mm", label: "Stamp box width (mm)", type: "number", default: "42" },
+      { key: "pr_stamp_box_h_mm", label: "Stamp box height (mm)", type: "number", default: "28" },
+      { key: "__group_layout", label: "Layout", type: "group-title", span: 3 },
+      { key: "pr_label_width_mm", label: "Label width (mm)", type: "number", default: "100" },
+      { key: "pr_label_height_mm", label: "Label height (mm)", type: "number", default: "150" },
+      { key: "pr_start_x_mm", label: "Start X (mm)", type: "number", default: "3" },
+      { key: "pr_start_y_mm", label: "Start Y (mm)", type: "number", default: "3" },
+      { key: "pr_outer_padding_mm", label: "Outer padding (mm)", type: "number", default: "4" },
+      { key: "pr_section_gap_mm", label: "Section gap (mm)", type: "number", default: "3" },
+      { key: "pr_section_header_h_mm", label: "Section header height (mm)", type: "number", default: "8" },
+      { key: "pr_body_line_gap", label: "Body line gap", type: "number", default: "8" },
+      { key: "pr_small_font_h", label: "Small font H", type: "number", default: "26" },
+      { key: "pr_small_font_w", label: "Small font W", type: "number", default: "20" },
+    ],
+  },
+  {
+    title: "Sender defaults",
+    fields: [
+      { key: "pr_sender_name", label: "Sender name", type: "text", default: "INSTITUTUL NATIONAL DE SANATATE PUBLICA", span: 2 },
+      { key: "pr_sender_address1", label: "Sender address 1", type: "text", default: "Str. Dr. Leonte Anastasievici, Nr. 1-3", span: 2 },
+      { key: "pr_sender_address2", label: "Sender address 2", type: "text", default: "Cod postal 077042", span: 2 },
+      { key: "pr_sender_city", label: "Sender city", type: "text", default: "Loc. Bucuresti Sector 5", span: 2 },
+      { key: "pr_sender_postal_code", label: "Sender postal code", type: "text", default: "077042" },
+      { key: "shipping_prepaid_stamp", label: "Prepaid stamp text", type: "text", default: "FRANCARE ULTERIOARA", span: 2 },
     ],
   },
 ];
@@ -1075,6 +1142,7 @@ function bindEvents() {
   if (els.readerSettingsForm) bindAsyncSubmit(els.readerSettingsForm, onSaveReaderSettings);
   if (els.deleteOrdersPreference) els.deleteOrdersPreference.addEventListener("change", onDeleteOrdersPreferenceChange);
   if (els.readerSettingsForm?.elements?.analyzer_comm_type) els.readerSettingsForm.elements.analyzer_comm_type.addEventListener("change", syncReaderSettingsTransportFields);
+  if (els.readerSettingsForm?.elements?.analyzer_protocol) els.readerSettingsForm.elements.analyzer_protocol.addEventListener("change", syncReaderSettingsTransportFields);
   if (els.readerSettingsForm?.elements?.tcpip_mode) els.readerSettingsForm.elements.tcpip_mode.addEventListener("change", syncReaderSettingsTransportFields);
   if (els.runResultSyncBtn) bindAsyncClick(els.runResultSyncBtn, onRunResultSync);
   if (els.resetResultSyncBtn) bindAsyncClick(els.resetResultSyncBtn, onResetResultSync);
@@ -1975,6 +2043,7 @@ async function loadReaderSettings() {
     result_sync_separators: String(resp.settings?.result_sync_separators || "-"),
     result_sync_qc_prefixes: String(resp.settings?.result_sync_qc_prefixes || ""),
     protocol_subtype: String(resp.settings?.protocol_subtype || "auto"),
+    labnovation_image_mode: String(resp.settings?.labnovation_image_mode || "no_image"),
     labnovation_enabled: Boolean(resp.settings?.labnovation_enabled),
   };
   state.resultsDelivery = {
@@ -2025,6 +2094,7 @@ async function loadReaderSettings() {
     form.elements.result_sync_separators.value = state.readerSettings.result_sync_separators;
     form.elements.result_sync_qc_prefixes.value = state.readerSettings.result_sync_qc_prefixes;
     form.elements.protocol_subtype.value = state.readerSettings.protocol_subtype || "auto";
+    form.elements.labnovation_image_mode.value = state.readerSettings.labnovation_image_mode || "no_image";
     syncReaderSettingsTransportFields();
   }
   els.repeatModeSelect.value = state.readerSettings.repeat_mode;
@@ -2078,6 +2148,7 @@ async function onSaveReaderSettings(event) {
     result_sync_separators: String(form.elements.result_sync_separators.value || "-").trim(),
     result_sync_qc_prefixes: String(form.elements.result_sync_qc_prefixes.value || "").trim(),
     protocol_subtype: String(form.elements.protocol_subtype.value || "").trim(),
+    labnovation_image_mode: String(form.elements.labnovation_image_mode.value || "no_image").trim(),
     repeat_mode: String(els.repeatModeSelect.value || "individual"),
   };
   const resp = await api("/api/reader-settings", {
@@ -2129,6 +2200,7 @@ async function onSaveReaderSettings(event) {
     result_sync_separators: String(resp.settings?.result_sync_separators || payload.result_sync_separators),
     result_sync_qc_prefixes: String(resp.settings?.result_sync_qc_prefixes || payload.result_sync_qc_prefixes),
     protocol_subtype: String(resp.settings?.protocol_subtype || payload.protocol_subtype),
+    labnovation_image_mode: String(resp.settings?.labnovation_image_mode || payload.labnovation_image_mode),
     labnovation_enabled: Boolean(resp.settings?.labnovation_enabled),
   };
   els.repeatModeSelect.value = state.readerSettings.repeat_mode;
@@ -2187,16 +2259,20 @@ function syncReaderSettingsTransportFields() {
   if (!form) return;
   const commType = String(form.elements.analyzer_comm_type.value || state.readerSettings.analyzer_comm_type || "").toLowerCase();
   const tcpMode = String(form.elements.tcpip_mode.value || state.readerSettings.tcpip_mode || "server").toLowerCase();
+  const analyzerProtocol = String(form.elements.analyzer_protocol.value || state.readerSettings.analyzer_protocol || "").toLowerCase();
   const tcpModeRow = document.getElementById("reader-settings-tcp-mode-row");
   const tcpServerRow = document.getElementById("reader-settings-tcp-server-row");
   const tcpClientRow = document.getElementById("reader-settings-tcp-client-row");
   const fileRow = document.getElementById("reader-settings-file-row");
+  const labnovationImageRow = document.getElementById("reader-settings-labnovation-image-row");
   const showTCP = commType === "tcpip";
   const showFile = commType === "file";
+  const showLabnovationImage = analyzerProtocol === "labnovation-ld560";
   if (tcpModeRow) tcpModeRow.hidden = !showTCP;
   if (tcpServerRow) tcpServerRow.hidden = !showTCP || tcpMode === "client";
   if (tcpClientRow) tcpClientRow.hidden = !showTCP || tcpMode !== "client";
   if (fileRow) fileRow.hidden = !showFile;
+  if (labnovationImageRow) labnovationImageRow.hidden = !showLabnovationImage;
 }
 
 async function loadResultSyncStatus() {
@@ -2252,10 +2328,16 @@ async function loadBarcodeSettingsView() {
   state.barcodeSettings = settingsResp.settings || {};
   state.barcodePrinters = printersResp.printers || [];
   state.appUpdateSettings = updateResp.settings || state.appUpdateSettings || {};
-  const values = buildBarcodeSettingsState(state.barcodeSettings);
+  const selectedProfile = normalizeBarcodeEndpointProfile(state.barcodeSettingsViewProfile || state.barcodeSettings.print_profile || "barcode-legacy");
+  state.barcodeSettingsViewProfile = selectedProfile;
+  const sections = activeBarcodeSections(selectedProfile);
+  const values = buildBarcodeSettingsState(state.barcodeSettings, selectedProfile);
   els.settingsPanelAnalytes.innerHTML = `
     <div class="orders-toolbar">
       <div class="orders-buttons">
+        <select id="barcode-settings-profile" class="ghost">
+          ${BARCODE_ENDPOINT_OPTIONS.map(([value, label]) => `<option value="${escapeHtml(value)}" ${value === selectedProfile ? "selected" : ""}>${escapeHtml(label)}</option>`).join("")}
+        </select>
         <button id="barcode-settings-save" class="ghost">Salveaza</button>
         <button id="barcode-settings-test" class="ghost">Test print</button>
         <button id="barcode-settings-refresh" class="ghost">Refresh</button>
@@ -2263,7 +2345,7 @@ async function loadBarcodeSettingsView() {
     </div>
     <div class="barcode-settings-layout">
       <div class="table-wrap barcode-settings-form">
-        ${BARCODE_FIELD_SECTIONS.map((section) => `
+        ${sections.map((section) => `
           <section class="barcode-settings-section">
             <h3>${escapeHtml(section.title)}</h3>
             <div class="barcode-settings-grid">
@@ -2293,15 +2375,20 @@ async function loadBarcodeSettingsView() {
   `;
 
   const collect = () => {
-    const out = buildBarcodeSettingsState(state.barcodeSettings);
+    const out = { ...state.barcodeSettings };
+    const preview = {};
     els.settingsPanelAnalytes.querySelectorAll("[data-setting-key]").forEach((node) => {
       const key = node.getAttribute("data-setting-key");
+      const baseKey = node.getAttribute("data-base-key");
       if (!key) return;
       out[key] = node.value ?? "";
+      if (baseKey) preview[baseKey] = node.value ?? "";
     });
-    out.othercfg_printer_type = out.bcp_type || "zebrazpl";
-    out.othercfg_bc_width = out.othercfg_print_bcodeopt_w || out.othercfg_bc_width || "2";
-    return out;
+    if (!isPostaRomanaBarcodeProfile(selectedProfile)) {
+      preview.othercfg_printer_type = preview.bcp_type || "zebrazpl";
+      preview.othercfg_bc_width = preview.othercfg_print_bcodeopt_w || preview.othercfg_bc_width || "2";
+    }
+    return { payload: out, preview };
   };
   const collectUpdate = () => {
     const out = {};
@@ -2313,24 +2400,65 @@ async function loadBarcodeSettingsView() {
     return out;
   };
 
+  const profileSelect = document.getElementById("barcode-settings-profile");
   const saveBtn = document.getElementById("barcode-settings-save");
   const testBtn = document.getElementById("barcode-settings-test");
   const refreshBtn = document.getElementById("barcode-settings-refresh");
   const bindRerender = () => {
-    applyBarcodeFieldVisibility();
-    renderBarcodeSettingsPreview(collect());
+    applyBarcodeFieldVisibility(selectedProfile);
+    renderBarcodeSettingsPreview(collect().preview, selectedProfile);
   };
 
   els.settingsPanelAnalytes.querySelectorAll("[data-setting-key]").forEach((node) => {
     node.addEventListener("input", bindRerender);
     node.addEventListener("change", bindRerender);
   });
+  els.settingsPanelAnalytes.querySelectorAll("[data-setting-upload]").forEach((node) => {
+    node.addEventListener("change", async () => {
+      const storageKey = node.getAttribute("data-setting-upload");
+      const hidden = storageKey ? els.settingsPanelAnalytes.querySelector(`[data-setting-key="${storageKey}"]`) : null;
+      const field = node.closest(".barcode-field");
+      const file = node.files && node.files[0];
+      if (!hidden || !file) return;
+      try {
+        hidden.value = await readFileAsDataURL(file);
+        let previewHost = field?.querySelector(".barcode-logo-preview");
+        if (!previewHost && field) {
+          field.insertAdjacentHTML("beforeend", `<div class="barcode-logo-preview"><img src="${escapeHtml(hidden.value)}" alt="Logo preview"></div>`);
+          previewHost = field.querySelector(".barcode-logo-preview");
+        }
+        const img = previewHost?.querySelector("img");
+        if (img) img.src = hidden.value;
+        bindRerender();
+      } catch (error) {
+        showToast(error?.message || "Nu se poate citi logo-ul", "error");
+      }
+    });
+  });
+  els.settingsPanelAnalytes.querySelectorAll("[data-setting-clear]").forEach((node) => {
+    node.addEventListener("click", () => {
+      const storageKey = node.getAttribute("data-setting-clear");
+      const hidden = storageKey ? els.settingsPanelAnalytes.querySelector(`[data-setting-key="${storageKey}"]`) : null;
+      const fileInput = storageKey ? els.settingsPanelAnalytes.querySelector(`[data-setting-upload="${storageKey}"]`) : null;
+      const previewHost = node.closest(".barcode-field")?.querySelector(".barcode-logo-preview");
+      if (hidden) hidden.value = "";
+      if (fileInput) fileInput.value = "";
+      if (previewHost) previewHost.remove();
+      bindRerender();
+    });
+  });
+  if (profileSelect) {
+    profileSelect.addEventListener("change", async () => {
+      state.barcodeSettingsViewProfile = normalizeBarcodeEndpointProfile(profileSelect.value);
+      await loadBarcodeSettingsView();
+    });
+  }
 
   if (saveBtn) {
     saveBtn.addEventListener("click", async () => {
       try {
         setButtonLoading(saveBtn, true);
-        const payload = collect();
+        const payload = collect().payload;
         const updatePayload = collectUpdate();
         const settingsResp = await api("/api/barcode/settings", {
           method: "PUT",
@@ -2356,7 +2484,7 @@ async function loadBarcodeSettingsView() {
     testBtn.addEventListener("click", async () => {
       try {
         setButtonLoading(testBtn, true);
-        await api("/api/barcode/test-print", { method: "POST", body: "{}" });
+        await api("/api/barcode/test-print", { method: "POST", body: JSON.stringify({ profile: selectedProfile }) });
         showToast("Test print trimis", "success");
       } finally {
         setButtonLoading(testBtn, false);
@@ -2378,11 +2506,12 @@ async function loadBarcodeSettingsView() {
   bindRerender();
 }
 
-function buildBarcodeSettingsState(current = {}) {
+function buildBarcodeSettingsState(current = {}, profile = "barcode-legacy") {
   const values = {};
-  BARCODE_FIELD_SECTIONS.forEach((section) => {
+  activeBarcodeSections(profile).forEach((section) => {
     section.fields.forEach((field) => {
-      values[field.key] = current[field.key] ?? field.default ?? "";
+      const storageKey = barcodeProfileStorageKey(profile, field.key);
+      values[storageKey] = current[storageKey] ?? current[field.key] ?? field.default ?? "";
     });
   });
   Object.entries(current || {}).forEach(([key, value]) => {
@@ -2392,26 +2521,91 @@ function buildBarcodeSettingsState(current = {}) {
   return values;
 }
 
+function normalizeBarcodeEndpointProfile(profile) {
+  switch (String(profile || "").trim()) {
+    case "barcode-api":
+    case "posta-romana-legacy":
+    case "posta-romana-api":
+      return String(profile).trim();
+    case "barcode":
+    case "barcode-legacy":
+    default:
+      return "barcode-legacy";
+  }
+}
+
+function isPostaRomanaBarcodeProfile(profile) {
+  return profile === "posta-romana-legacy" || profile === "posta-romana-api";
+}
+
+function barcodeProfileStoragePrefix(profile) {
+  switch (profile) {
+    case "barcode-legacy":
+    case "barcode-api":
+      return "ep_barcode__";
+    case "posta-romana-legacy":
+    case "posta-romana-api":
+      return "ep_posta__";
+    default:
+      return "ep_barcode__";
+  }
+}
+
+function barcodeProfileStorageKey(profile, baseKey) {
+  if (baseKey.startsWith("local_http_")) return baseKey;
+  return `${barcodeProfileStoragePrefix(profile)}${baseKey}`;
+}
+
+function activeBarcodeSections(profile) {
+  const endpointSections = isPostaRomanaBarcodeProfile(profile) ? POSTA_ROMANA_FIELD_SECTIONS : BARCODE_FIELD_SECTIONS.slice(0, 3);
+  const localHTTPSections = BARCODE_FIELD_SECTIONS.slice(3);
+  return endpointSections
+    .concat(localHTTPSections)
+    .map((section) => ({
+      ...section,
+      fields: section.fields.map((field) => ({
+        ...field,
+        baseKey: field.key,
+        storageKey: barcodeProfileStorageKey(profile, field.key),
+      })),
+    }));
+}
+
 function renderBarcodeField(field, values, printers) {
-  const current = String(values[field.key] ?? field.default ?? "");
+  const storageKey = field.storageKey || field.key;
+  const baseKey = field.baseKey || field.key;
+  const current = String(values[storageKey] ?? field.default ?? "");
   const showFor = field.showFor ? field.showFor.join(",") : "";
   const style = field.span === 2 ? "grid-column:span 2;" : field.span === 3 ? "grid-column:span 3;" : "";
+  if (field.type === "group-title") {
+    return `<div class="barcode-field-group-title" data-key="${escapeHtml(storageKey)}" data-base-key="${escapeHtml(baseKey)}" style="${style}"><span>${escapeHtml(field.label)}</span></div>`;
+  }
   let control = "";
   if (field.type === "printer-select") {
-    const listID = `printer-options-${escapeHtml(field.key)}`;
+    const listID = `printer-options-${escapeHtml(storageKey)}`;
     const options = printers.map((name) => `<option value="${escapeHtml(name)}"></option>`).join("");
     control = [
-      `<input data-setting-key="${escapeHtml(field.key)}" value="${escapeHtml(current)}" list="${listID}" placeholder="\\\\server\\printer sau nume local">`,
+      `<input data-setting-key="${escapeHtml(storageKey)}" data-base-key="${escapeHtml(baseKey)}" value="${escapeHtml(current)}" list="${listID}" placeholder="\\\\server\\printer sau nume local">`,
       `<datalist id="${listID}">${options}</datalist>`,
       `<small>Puteti selecta din lista sau introduce manual numele exact al imprimantei shared.</small>`,
     ].join("");
+  } else if (field.type === "image-upload") {
+    const preview = current
+      ? `<div class="barcode-logo-preview"><img src="${escapeHtml(current)}" alt="Logo preview"></div><small>Logo incarcat. Selectati alt fisier pentru inlocuire sau Clear pentru stergere.</small>`
+      : `<small>Accepta PNG, JPG sau GIF. Imaginea se salveaza in setari.</small>`;
+    control = [
+      `<input type="file" accept="image/png,image/jpeg,image/gif" data-setting-upload="${escapeHtml(storageKey)}" data-base-key="${escapeHtml(baseKey)}">`,
+      `<input type="hidden" data-setting-key="${escapeHtml(storageKey)}" data-base-key="${escapeHtml(baseKey)}" value="${escapeHtml(current)}">`,
+      `<div class="inline-actions"><button type="button" class="ghost" data-setting-clear="${escapeHtml(storageKey)}">Clear</button></div>`,
+      preview,
+    ].join("");
   } else if (field.type === "select") {
-    control = `<select data-setting-key="${escapeHtml(field.key)}">${(field.options || []).map(([value, label]) => `<option value="${escapeHtml(value)}" ${value === current ? "selected" : ""}>${escapeHtml(label)}</option>`).join("")}</select>`;
+    control = `<select data-setting-key="${escapeHtml(storageKey)}" data-base-key="${escapeHtml(baseKey)}">${(field.options || []).map(([value, label]) => `<option value="${escapeHtml(value)}" ${value === current ? "selected" : ""}>${escapeHtml(label)}</option>`).join("")}</select>`;
   } else {
     const inputMode = field.type === "number" ? `inputmode="decimal"` : "";
-    control = `<input ${inputMode} data-setting-key="${escapeHtml(field.key)}" value="${escapeHtml(current)}">`;
+    control = `<input ${inputMode} data-setting-key="${escapeHtml(storageKey)}" data-base-key="${escapeHtml(baseKey)}" value="${escapeHtml(current)}">`;
   }
-  return `<label class="barcode-field" data-key="${escapeHtml(field.key)}" data-show-for="${escapeHtml(showFor)}" style="${style}"><span>${escapeHtml(field.label)}</span>${control}</label>`;
+  return `<label class="barcode-field" data-key="${escapeHtml(storageKey)}" data-base-key="${escapeHtml(baseKey)}" data-show-for="${escapeHtml(showFor)}" style="${style}"><span>${escapeHtml(field.label)}</span>${control}</label>`;
 }
 
 function renderBarcodeUpdateField(label, key, current, type = "text", options = null, span = 1) {
@@ -2425,17 +2619,34 @@ function renderBarcodeUpdateField(label, key, current, type = "text", options = 
   return `<label class="barcode-field" style="${style}"><span>${escapeHtml(label)}</span>${control}</label>`;
 }
 
-function applyBarcodeFieldVisibility() {
-  const type = String(els.settingsPanelAnalytes.querySelector('[data-setting-key="othercfg_printer_barcode"]')?.value || "B3");
+function applyBarcodeFieldVisibility(profile = "barcode-legacy") {
+  if (isPostaRomanaBarcodeProfile(profile)) {
+    els.settingsPanelAnalytes.querySelectorAll(".barcode-field").forEach((node) => {
+      const showFor = String(node.dataset.showFor || "").trim();
+      if (showFor) node.hidden = false;
+    });
+    return;
+  }
+  const type = String(els.settingsPanelAnalytes.querySelector('[data-base-key="othercfg_printer_barcode"]')?.value || "B3");
   els.settingsPanelAnalytes.querySelectorAll(".barcode-field").forEach((node) => {
     const showFor = String(node.dataset.showFor || "").trim();
     node.hidden = !!showFor && !showFor.split(",").includes(type);
   });
 }
 
-function renderBarcodeSettingsPreview(settings) {
+function renderBarcodeSettingsPreview(settings, profile = "barcode-legacy") {
   const host = document.getElementById("barcode-preview");
   if (!host) return;
+  if (isPostaRomanaBarcodeProfile(profile)) {
+    host.innerHTML = `
+      <div class="barcode-preview-meta">
+        <span>Posta Romana</span>
+        <span>${escapeHtml(`${settings.pr_label_width_mm || "100"}mm x ${settings.pr_label_height_mm || "150"}mm`)}</span>
+      </div>
+      <div class="empty-state">Preview-ul vizual pentru acest endpoint nu este generat aici. Foloseste "Test print" pentru verificare rapida.</div>
+    `;
+    return;
+  }
   const dpi = Math.max(200, parseInt(settings.othercfg_printer_resolution || "200", 10) || 200);
   const labelWidthMM = Math.max(20, parseFloat(settings.othercfg_label_width || 35) || 35);
   const labelHeightMM = Math.max(15, parseFloat(settings.othercfg_label_height || 25) || 25);
@@ -5309,6 +5520,15 @@ async function api(url, options = {}) {
     throw new Error(payload.error || `Request failed with ${response.status}`);
   }
   return payload;
+}
+
+function readFileAsDataURL(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("Nu se poate citi fisierul selectat"));
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.readAsDataURL(file);
+  });
 }
 
 function formatDate(value) {

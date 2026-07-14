@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <service>
   <id>wisemed-tricarb-5110-tr-reader</id>
-  <name>WiseMED TriCARB 5110 TR Reader</name>
-  <description>WiseMED readersv3 TriCARB 5110 TR Reader background service</description>
+  <name>WiseMED Tricarb 5110 Tr Reader</name>
+  <description>WiseMED readersv3 Tricarb 5110 Tr Reader background service</description>
   <executable>tricarb-5110-tr-reader.exe</executable>
   <arguments>-config deployments\config.yaml -headless</arguments>
   <stoptimeout>15sec</stoptimeout>

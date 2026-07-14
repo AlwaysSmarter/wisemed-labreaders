@@ -1,7 +1,7 @@
 Unicode true
-Name "WiseMED GammaVision Reader"
+Name "WiseMED Gammavision Reader"
 OutFile "$%OUTPUT_EXE%"
-InstallDir "$PROGRAMFILES64\WiseMED GammaVision Reader"
+InstallDir "$PROGRAMFILES64\WiseMED Gammavision Reader"
 RequestExecutionLevel admin
 ShowInstDetails show
 ShowUninstDetails show
@@ -14,13 +14,13 @@ UninstPage instfiles
 Section "Install"
   SetOutPath "$INSTDIR"
   File /r "$%APP_PAYLOAD%\*.*"
-  CreateShortcut "$SMPROGRAMS\WiseMED\WiseMED GammaVision Reader.lnk" "$INSTDIR\gammavision-reader.exe"
+  CreateShortcut "$SMPROGRAMS\WiseMED\WiseMED Gammavision Reader.lnk" "$INSTDIR\gammavision-reader.exe"
   nsExec::ExecToLog 'powershell -ExecutionPolicy Bypass -File "$INSTDIR\install-service.ps1"'
   WriteUninstaller "$INSTDIR\Uninstall.exe"
 SectionEnd
 
 Section "Uninstall"
   nsExec::ExecToLog 'powershell -ExecutionPolicy Bypass -File "$INSTDIR\uninstall-service.ps1"'
-  Delete "$SMPROGRAMS\WiseMED\WiseMED GammaVision Reader.lnk"
+  Delete "$SMPROGRAMS\WiseMED\WiseMED Gammavision Reader.lnk"
   RMDir /r "$INSTDIR"
 SectionEnd

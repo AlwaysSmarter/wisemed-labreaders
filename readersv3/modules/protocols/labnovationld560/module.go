@@ -350,14 +350,15 @@ func (m *Module) handleSettingsAPI(w http.ResponseWriter, r *http.Request) {
 		simple := normalizeMap(req.Simple)
 		simple["image_mode"] = normalizeImageMode(req.ImageMode)
 		if err := config.Update(m.rt.ConfigPath(), map[string]interface{}{
-			"analyzer.protocol":                         mode,
-			"modules.transport-tcpip.mode":              tcpMode,
-			"modules.transport-tcpip.host":              host,
-			"modules.transport-tcpip.port":              port,
-			"modules.transport-tcpip.remote_host":       remoteHost,
-			"modules.transport-tcpip.remote_port":       remotePort,
-			"modules.protocol-labnovation-ld560.hl7":    hl7,
-			"modules.protocol-labnovation-ld560.simple": simple,
+			"analyzer.protocol":                             mode,
+			"modules.transport-tcpip.mode":                  tcpMode,
+			"modules.transport-tcpip.host":                  host,
+			"modules.transport-tcpip.port":                  port,
+			"modules.transport-tcpip.remote_host":           remoteHost,
+			"modules.transport-tcpip.remote_port":           remotePort,
+			"modules.protocol-labnovation-ld560.image_mode": normalizeImageMode(req.ImageMode),
+			"modules.protocol-labnovation-ld560.hl7":        hl7,
+			"modules.protocol-labnovation-ld560.simple":     simple,
 		}); err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]interface{}{"ok": false, "error": err.Error()})
 			return

@@ -1,5 +1,5 @@
 [Unit]
-Description=WiseMED readersv3 Barcode Printer background service
+Description=WiseMED readersv3 Barcodeprinter background service
 After=network-online.target
 Wants=network-online.target
 
@@ -7,7 +7,7 @@ Wants=network-online.target
 Type=simple
 User=root
 WorkingDirectory=/opt/barcodeprinter
-ExecStart=/opt/barcodeprinter/BarcodePrinter -config deployments/config.yaml -headless
+ExecStart=/opt/barcodeprinter/barcodeprinter -config deployments/config.yaml -headless
 Restart=on-failure
 RestartSec=5
 StandardOutput=journal

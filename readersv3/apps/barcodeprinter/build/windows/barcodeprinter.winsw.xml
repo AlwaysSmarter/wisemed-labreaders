@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <service>
   <id>wisemed-barcodeprinter</id>
-  <name>WiseMED Barcode Printer</name>
-  <description>WiseMED readersv3 Barcode Printer background service</description>
-  <executable>BarcodePrinter.exe</executable>
+  <name>WiseMED Barcodeprinter</name>
+  <description>WiseMED readersv3 Barcodeprinter background service</description>
+  <executable>barcodeprinter.exe</executable>
   <arguments>-config deployments\config.yaml -headless</arguments>
   <stoptimeout>15sec</stoptimeout>
   <startmode>Automatic</startmode>

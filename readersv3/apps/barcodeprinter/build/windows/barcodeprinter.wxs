@@ -26,7 +26,7 @@
       <Component Directory="ProgramMenuWiseMED" Guid="*">
         <Shortcut Id="StartMenuShortcut"
                   Name="WiseMED barcodeprinter"
-                  Target="[INSTALLFOLDER]\BarcodePrinter.exe"
+                  Target="[INSTALLFOLDER]\barcodeprinter.exe"
                   WorkingDirectory="INSTALLFOLDER" />
         <RemoveFolder Id="RemoveWiseMEDProgramMenu" Directory="ProgramMenuWiseMED" On="uninstall" />
         <RegistryValue Root="HKLM" Key="Software\WiseMED\barcodeprinter" Name="installed" Type="integer" Value="1" KeyPath="yes" />

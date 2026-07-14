@@ -6,7 +6,7 @@
   <string>eu.wisemed.readersv3.update.server</string>
   <key>ProgramArguments</key>
   <array>
-    <string>/usr/local/update-server/Update_Server</string>
+    <string>/usr/local/update-server/update-server</string>
     <string>-config</string>
     <string>deployments/config.yaml</string>
   </array>

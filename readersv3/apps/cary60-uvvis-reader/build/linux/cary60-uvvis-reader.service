@@ -1,5 +1,5 @@
 [Unit]
-Description=WiseMED readersv3 Cary60 UVVIS Reader background service
+Description=WiseMED readersv3 Cary60 Uvvis Reader background service
 After=network-online.target
 Wants=network-online.target
 
@@ -7,7 +7,7 @@ Wants=network-online.target
 Type=simple
 User=root
 WorkingDirectory=/opt/cary60-uvvis-reader
-ExecStart=/opt/cary60-uvvis-reader/Cary60-UVVIS-Reader -config deployments/config.yaml -headless
+ExecStart=/opt/cary60-uvvis-reader/cary60-uvvis-reader -config deployments/config.yaml -headless
 Restart=on-failure
 RestartSec=5
 StandardOutput=journal

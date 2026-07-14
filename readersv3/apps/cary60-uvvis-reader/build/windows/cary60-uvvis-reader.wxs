@@ -26,7 +26,7 @@
       <Component Directory="ProgramMenuWiseMED" Guid="*">
         <Shortcut Id="StartMenuShortcut"
                   Name="WiseMED cary60-uvvis-reader"
-                  Target="[INSTALLFOLDER]\Cary60-UVVIS-Reader.exe"
+                  Target="[INSTALLFOLDER]\cary60-uvvis-reader.exe"
                   WorkingDirectory="INSTALLFOLDER" />
         <RemoveFolder Id="RemoveWiseMEDProgramMenu" Directory="ProgramMenuWiseMED" On="uninstall" />
         <RegistryValue Root="HKLM" Key="Software\WiseMED\cary60-uvvis-reader" Name="installed" Type="integer" Value="1" KeyPath="yes" />

@@ -1,7 +1,7 @@
 Unicode true
-Name "WiseMED Barcode Printer"
+Name "WiseMED Barcodeprinter"
 OutFile "$%OUTPUT_EXE%"
-InstallDir "$PROGRAMFILES64\WiseMED Barcode Printer"
+InstallDir "$PROGRAMFILES64\WiseMED Barcodeprinter"
 RequestExecutionLevel admin
 ShowInstDetails show
 ShowUninstDetails show
@@ -14,13 +14,13 @@ UninstPage instfiles
 Section "Install"
   SetOutPath "$INSTDIR"
   File /r "$%APP_PAYLOAD%\*.*"
-  CreateShortcut "$SMPROGRAMS\WiseMED\WiseMED Barcode Printer.lnk" "$INSTDIR\BarcodePrinter.exe"
+  CreateShortcut "$SMPROGRAMS\WiseMED\WiseMED Barcodeprinter.lnk" "$INSTDIR\barcodeprinter.exe"
   nsExec::ExecToLog 'powershell -ExecutionPolicy Bypass -File "$INSTDIR\install-service.ps1"'
   WriteUninstaller "$INSTDIR\Uninstall.exe"
 SectionEnd
 
 Section "Uninstall"
   nsExec::ExecToLog 'powershell -ExecutionPolicy Bypass -File "$INSTDIR\uninstall-service.ps1"'
-  Delete "$SMPROGRAMS\WiseMED\WiseMED Barcode Printer.lnk"
+  Delete "$SMPROGRAMS\WiseMED\WiseMED Barcodeprinter.lnk"
   RMDir /r "$INSTDIR"
 SectionEnd

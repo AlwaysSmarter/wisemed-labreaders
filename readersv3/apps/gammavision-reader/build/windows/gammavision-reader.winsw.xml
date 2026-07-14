@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <service>
   <id>wisemed-gammavision-reader</id>
-  <name>WiseMED GammaVision Reader</name>
-  <description>WiseMED readersv3 GammaVision Reader background service</description>
+  <name>WiseMED Gammavision Reader</name>
+  <description>WiseMED readersv3 Gammavision Reader background service</description>
   <executable>gammavision-reader.exe</executable>
   <arguments>-config deployments\config.yaml -headless</arguments>
   <stoptimeout>15sec</stoptimeout>

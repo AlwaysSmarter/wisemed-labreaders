@@ -3,7 +3,7 @@
   <id>wisemed-update-server</id>
   <name>WiseMED Update Server</name>
   <description>WiseMED readersv3 Update Server background service</description>
-  <executable>Update_Server.exe</executable>
+  <executable>update-server.exe</executable>
   <arguments>-config deployments\config.yaml</arguments>
   <stoptimeout>15sec</stoptimeout>
   <startmode>Automatic</startmode>

@@ -6,7 +6,7 @@
   <string>eu.wisemed.readersv3.cary60.uvvis.reader</string>
   <key>ProgramArguments</key>
   <array>
-    <string>/usr/local/cary60-uvvis-reader/Cary60-UVVIS-Reader</string>
+    <string>/usr/local/cary60-uvvis-reader/cary60-uvvis-reader</string>
     <string>-config</string>
     <string>deployments/config.yaml</string>
     <string>-headless</string>

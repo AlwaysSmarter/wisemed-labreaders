@@ -26,7 +26,7 @@
       <Component Directory="ProgramMenuWiseMED" Guid="*">
         <Shortcut Id="StartMenuShortcut"
                   Name="WiseMED update-server"
-                  Target="[INSTALLFOLDER]\Update_Server.exe"
+                  Target="[INSTALLFOLDER]\update-server.exe"
                   WorkingDirectory="INSTALLFOLDER" />
         <RemoveFolder Id="RemoveWiseMEDProgramMenu" Directory="ProgramMenuWiseMED" On="uninstall" />
         <RegistryValue Root="HKLM" Key="Software\WiseMED\update-server" Name="installed" Type="integer" Value="1" KeyPath="yes" />

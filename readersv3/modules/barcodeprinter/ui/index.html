@@ -47,12 +47,14 @@
           <div class="settings-layout">
             <section class="settings-card settings-card-wide">
               <p class="settings-kicker">Control</p>
-              <h4>Profil endpoint</h4>
+              <h4>Setari generale</h4>
               <div class="grid compact-grid">
-                <label>Tip print
-                  <select id="settings-profile" name="print_profile">
-                    <option value="barcode">Cod bare / legacy</option>
-                    <option value="posta-romana">Eticheta expeditie Posta Romana</option>
+                <label>Endpoint selectat
+                  <select id="settings-endpoint-selector">
+                    <option value="barcode-legacy">/barcode/print</option>
+                    <option value="barcode-api">/api/barcode/print</option>
+                    <option value="posta-romana-legacy">/barcode/print/posta-romana</option>
+                    <option value="posta-romana-api">/api/barcode/print/posta-romana</option>
                   </select>
                 </label>
                 <label>HTTP local address<input name="local_http_address" value="127.0.0.1:18080"></label>
@@ -63,69 +65,192 @@
                 <label>Auth user<input name="auth_username" value="admin"></label>
                 <label>Auth pass<input name="auth_password" value="admin"></label>
               </div>
+              <div class="actions section-actions">
+                <button id="selected-test-print" type="button">Test print endpoint selectat</button>
+              </div>
             </section>
 
-            <section class="settings-card profile-panel" data-profile="barcode">
+            <section id="endpoint-card-barcode-legacy" class="settings-card" data-endpoint-profile="barcode-legacy">
               <p class="settings-kicker">Endpoint</p>
               <h4>/barcode/print</h4>
+              <p class="endpoint-note">Etichete barcode legacy, cu imprimanta si layout separat.</p>
               <div class="grid compact-grid">
-                <label>Printer type<input name="bcp_type" value="zebrazpl"></label>
-                <label>Selected printer<select id="printer-select" name="othercfg_sel_printer"></select></label>
-                <label>Printer resolution (dpi)<input name="othercfg_printer_resolution" type="number" value="200"></label>
-                <label>Barcode type<input name="othercfg_printer_barcode" value="B3"></label>
-                <label>Label width (mm)<input name="othercfg_label_width" value="50"></label>
-                <label>Label height (mm)<input name="othercfg_label_height" value="25"></label>
-                <label>Barcode X (mm)<input name="othercfg_print_bcodex" value="5"></label>
-                <label>Barcode Y (mm)<input name="othercfg_print_bcodey" value="5"></label>
-                <label>Barcode text X (mm)<input name="othercfg_print_bcodetxtx" value="20"></label>
-                <label>Barcode text Y (mm)<input name="othercfg_print_bcodetxty" value="40"></label>
-                <label>Patient name X (mm)<input name="othercfg_print_namex" value="5"></label>
-                <label>Patient name Y (mm)<input name="othercfg_print_namey" value="12"></label>
-                <label>Tube code X (mm)<input name="othercfg_print_tubecodex" value="40"></label>
-                <label>Tube code Y (mm)<input name="othercfg_print_tubecodey" value="22"></label>
+                <label>Printer type<input name="ep_barcode_legacy__bcp_type" value="zebrazpl"></label>
+                <label>Selected printer<select data-printer-select name="ep_barcode_legacy__othercfg_sel_printer"></select></label>
+                <label>Printer resolution (dpi)<input name="ep_barcode_legacy__othercfg_printer_resolution" type="number" value="200"></label>
+                <label>Barcode type<input name="ep_barcode_legacy__othercfg_printer_barcode" value="B3"></label>
+                <label>Label width (mm)<input name="ep_barcode_legacy__othercfg_label_width" value="50"></label>
+                <label>Label height (mm)<input name="ep_barcode_legacy__othercfg_label_height" value="25"></label>
+                <label>Barcode X (mm)<input name="ep_barcode_legacy__othercfg_print_bcodex" value="5"></label>
+                <label>Barcode Y (mm)<input name="ep_barcode_legacy__othercfg_print_bcodey" value="5"></label>
+                <label>Barcode width<input name="ep_barcode_legacy__othercfg_print_bcodeopt_w" value="2"></label>
+                <label>Wide/narrow ratio<input name="ep_barcode_legacy__othercfg_bc_widenarowr" value="3.0"></label>
+                <label>Barcode height<input name="ep_barcode_legacy__othercfg_print_bcodeopt_h" value="50"></label>
+                <label>Barcode orientation<input name="ep_barcode_legacy__othercfg_print_bcodeopt_o" value="N"></label>
+                <label>Check digit<input name="ep_barcode_legacy__othercfg_print_bcodeopt_e" value="N"></label>
+                <label>Interpret line<input name="ep_barcode_legacy__othercfg_print_bcodeopt_f" value="N"></label>
+                <label>Interpret above<input name="ep_barcode_legacy__othercfg_print_bcodeopt_g" value="N"></label>
+                <label>Barcode text X (mm)<input name="ep_barcode_legacy__othercfg_print_bcodetxtx" value="20"></label>
+                <label>Barcode text Y (mm)<input name="ep_barcode_legacy__othercfg_print_bcodetxty" value="40"></label>
+                <label>Barcode text font<input name="ep_barcode_legacy__othercfg_print_bcodetxtf" value="D"></label>
+                <label>Barcode text orientation<input name="ep_barcode_legacy__othercfg_print_bcodetxto" value="N"></label>
+                <label>Barcode text H<input name="ep_barcode_legacy__othercfg_print_bcodetxth" value="6"></label>
+                <label>Barcode text W<input name="ep_barcode_legacy__othercfg_print_bcodetxtw" value="6"></label>
+                <label>Patient name X (mm)<input name="ep_barcode_legacy__othercfg_print_namex" value="5"></label>
+                <label>Patient name Y (mm)<input name="ep_barcode_legacy__othercfg_print_namey" value="12"></label>
+                <label>Patient name font<input name="ep_barcode_legacy__othercfg_print_namef" value="B"></label>
+                <label>Patient name orientation<input name="ep_barcode_legacy__othercfg_print_nameo" value="N"></label>
+                <label>Patient name H<input name="ep_barcode_legacy__othercfg_print_nameh" value="6"></label>
+                <label>Patient name W<input name="ep_barcode_legacy__othercfg_print_namew" value="6"></label>
+                <label>Tube code X (mm)<input name="ep_barcode_legacy__othercfg_print_tubecodex" value="40"></label>
+                <label>Tube code Y (mm)<input name="ep_barcode_legacy__othercfg_print_tubecodey" value="22"></label>
+                <label>Tube code font<input name="ep_barcode_legacy__othercfg_print_tubecodef" value="B"></label>
+                <label>Tube code orientation<input name="ep_barcode_legacy__othercfg_print_tubecodeo" value="N"></label>
+                <label>Tube code H<input name="ep_barcode_legacy__othercfg_print_tubecodeh" value="6"></label>
+                <label>Tube code W<input name="ep_barcode_legacy__othercfg_print_tubecodew" value="6"></label>
+                <label>Tube box width (mm)<input name="ep_barcode_legacy__othercfg_print_tubecode_boxw" value="3.81"></label>
+                <label>Tube box height (mm)<input name="ep_barcode_legacy__othercfg_print_tubecode_boxh" value="3.81"></label>
+                <label>Tube box thickness<input name="ep_barcode_legacy__othercfg_print_tubecode_boxt" value="1"></label>
+                <label>Tube box color<input name="ep_barcode_legacy__othercfg_print_tubecode_boxc" value="B"></label>
+                <label>Tube box radius<input name="ep_barcode_legacy__othercfg_print_tubecode_boxr" value="4"></label>
+              </div>
+              <div class="actions section-actions">
+                <button type="button" data-test-profile="barcode-legacy">Test /barcode/print</button>
               </div>
             </section>
 
-            <section class="settings-card profile-panel" data-profile="posta-romana" hidden>
+            <section id="endpoint-card-barcode-api" class="settings-card" data-endpoint-profile="barcode-api">
               <p class="settings-kicker">Endpoint</p>
-              <h4>/api/barcode/print/posta-romana</h4>
+              <h4>/api/barcode/print</h4>
+              <p class="endpoint-note">Etichete barcode JSON/API, cu setari independente de legacy.</p>
               <div class="grid compact-grid">
-                <label>Selected printer<select id="pr-printer-select" name="pr_sel_printer"></select></label>
-                <label>Rezolutie (dpi)<input name="pr_resolution" type="number" value="203"></label>
-                <label>Orientare<select name="pr_orientation"><option value="landscape">Landscape</option><option value="portrait">Portrait</option></select></label>
-                <label>Latime eticheta (mm)<input name="pr_label_width_mm" value="100"></label>
-                <label>Inaltime eticheta (mm)<input name="pr_label_height_mm" value="150"></label>
-                <label>Start X (mm)<input name="pr_start_x_mm" value="3"></label>
-                <label>Start Y (mm)<input name="pr_start_y_mm" value="3"></label>
-                <label>Padding exterior (mm)<input name="pr_outer_padding_mm" value="4"></label>
-                <label>Spatiu intre sectiuni (mm)<input name="pr_section_gap_mm" value="3"></label>
-                <label>Inaltime bara sectiune (mm)<input name="pr_section_header_h_mm" value="8"></label>
-                <label>Font titlu sectiune H<input name="pr_section_title_font_h" value="34"></label>
-                <label>Font titlu sectiune W<input name="pr_section_title_font_w" value="24"></label>
-                <label>Font corp H<input name="pr_body_font_h" value="32"></label>
-                <label>Font corp W<input name="pr_body_font_w" value="24"></label>
-                <label>Spatiere linii<input name="pr_body_line_gap" value="8"></label>
-                <label>Font mic H<input name="pr_small_font_h" value="26"></label>
-                <label>Font mic W<input name="pr_small_font_w" value="20"></label>
-                <label>Latime caseta timbru (mm)<input name="pr_stamp_box_w_mm" value="42"></label>
-                <label>Inaltime caseta timbru (mm)<input name="pr_stamp_box_h_mm" value="28"></label>
-                <label>Font timbru H<input name="pr_stamp_font_h" value="24"></label>
-                <label>Font timbru W<input name="pr_stamp_font_w" value="18"></label>
+                <label>Printer type<input name="ep_barcode_api__bcp_type" value="zebrazpl"></label>
+                <label>Selected printer<select data-printer-select name="ep_barcode_api__othercfg_sel_printer"></select></label>
+                <label>Printer resolution (dpi)<input name="ep_barcode_api__othercfg_printer_resolution" type="number" value="200"></label>
+                <label>Barcode type<input name="ep_barcode_api__othercfg_printer_barcode" value="B3"></label>
+                <label>Label width (mm)<input name="ep_barcode_api__othercfg_label_width" value="50"></label>
+                <label>Label height (mm)<input name="ep_barcode_api__othercfg_label_height" value="25"></label>
+                <label>Barcode X (mm)<input name="ep_barcode_api__othercfg_print_bcodex" value="5"></label>
+                <label>Barcode Y (mm)<input name="ep_barcode_api__othercfg_print_bcodey" value="5"></label>
+                <label>Barcode width<input name="ep_barcode_api__othercfg_print_bcodeopt_w" value="2"></label>
+                <label>Wide/narrow ratio<input name="ep_barcode_api__othercfg_bc_widenarowr" value="3.0"></label>
+                <label>Barcode height<input name="ep_barcode_api__othercfg_print_bcodeopt_h" value="50"></label>
+                <label>Barcode orientation<input name="ep_barcode_api__othercfg_print_bcodeopt_o" value="N"></label>
+                <label>Check digit<input name="ep_barcode_api__othercfg_print_bcodeopt_e" value="N"></label>
+                <label>Interpret line<input name="ep_barcode_api__othercfg_print_bcodeopt_f" value="N"></label>
+                <label>Interpret above<input name="ep_barcode_api__othercfg_print_bcodeopt_g" value="N"></label>
+                <label>Barcode text X (mm)<input name="ep_barcode_api__othercfg_print_bcodetxtx" value="20"></label>
+                <label>Barcode text Y (mm)<input name="ep_barcode_api__othercfg_print_bcodetxty" value="40"></label>
+                <label>Barcode text font<input name="ep_barcode_api__othercfg_print_bcodetxtf" value="D"></label>
+                <label>Barcode text orientation<input name="ep_barcode_api__othercfg_print_bcodetxto" value="N"></label>
+                <label>Barcode text H<input name="ep_barcode_api__othercfg_print_bcodetxth" value="6"></label>
+                <label>Barcode text W<input name="ep_barcode_api__othercfg_print_bcodetxtw" value="6"></label>
+                <label>Patient name X (mm)<input name="ep_barcode_api__othercfg_print_namex" value="5"></label>
+                <label>Patient name Y (mm)<input name="ep_barcode_api__othercfg_print_namey" value="12"></label>
+                <label>Patient name font<input name="ep_barcode_api__othercfg_print_namef" value="B"></label>
+                <label>Patient name orientation<input name="ep_barcode_api__othercfg_print_nameo" value="N"></label>
+                <label>Patient name H<input name="ep_barcode_api__othercfg_print_nameh" value="6"></label>
+                <label>Patient name W<input name="ep_barcode_api__othercfg_print_namew" value="6"></label>
+                <label>Tube code X (mm)<input name="ep_barcode_api__othercfg_print_tubecodex" value="40"></label>
+                <label>Tube code Y (mm)<input name="ep_barcode_api__othercfg_print_tubecodey" value="22"></label>
+                <label>Tube code font<input name="ep_barcode_api__othercfg_print_tubecodef" value="B"></label>
+                <label>Tube code orientation<input name="ep_barcode_api__othercfg_print_tubecodeo" value="N"></label>
+                <label>Tube code H<input name="ep_barcode_api__othercfg_print_tubecodeh" value="6"></label>
+                <label>Tube code W<input name="ep_barcode_api__othercfg_print_tubecodew" value="6"></label>
+                <label>Tube box width (mm)<input name="ep_barcode_api__othercfg_print_tubecode_boxw" value="3.81"></label>
+                <label>Tube box height (mm)<input name="ep_barcode_api__othercfg_print_tubecode_boxh" value="3.81"></label>
+                <label>Tube box thickness<input name="ep_barcode_api__othercfg_print_tubecode_boxt" value="1"></label>
+                <label>Tube box color<input name="ep_barcode_api__othercfg_print_tubecode_boxc" value="B"></label>
+                <label>Tube box radius<input name="ep_barcode_api__othercfg_print_tubecode_boxr" value="4"></label>
+              </div>
+              <div class="actions section-actions">
+                <button type="button" data-test-profile="barcode-api">Test /api/barcode/print</button>
+              </div>
+            </section>
+
+            <section id="endpoint-card-posta-romana-legacy" class="settings-card" data-endpoint-profile="posta-romana-legacy">
+              <p class="settings-kicker">Endpoint</p>
+              <h4>/barcode/print/posta-romana</h4>
+              <p class="endpoint-note">Eticheta Posta Romana pentru ruta legacy/form.</p>
+              <div class="grid compact-grid">
+                <label>Selected printer<select data-printer-select name="ep_posta_legacy__pr_sel_printer"></select></label>
+                <label>Rezolutie (dpi)<input name="ep_posta_legacy__pr_resolution" type="number" value="203"></label>
+                <label>Orientare<select name="ep_posta_legacy__pr_orientation"><option value="landscape">Landscape</option><option value="portrait">Portrait</option></select></label>
+                <label>Latime eticheta (mm)<input name="ep_posta_legacy__pr_label_width_mm" value="100"></label>
+                <label>Inaltime eticheta (mm)<input name="ep_posta_legacy__pr_label_height_mm" value="150"></label>
+                <label>Start X (mm)<input name="ep_posta_legacy__pr_start_x_mm" value="3"></label>
+                <label>Start Y (mm)<input name="ep_posta_legacy__pr_start_y_mm" value="3"></label>
+                <label>Padding exterior (mm)<input name="ep_posta_legacy__pr_outer_padding_mm" value="4"></label>
+                <label>Spatiu intre sectiuni (mm)<input name="ep_posta_legacy__pr_section_gap_mm" value="3"></label>
+                <label>Inaltime bara sectiune (mm)<input name="ep_posta_legacy__pr_section_header_h_mm" value="8"></label>
+                <label>Font titlu sectiune H<input name="ep_posta_legacy__pr_section_title_font_h" value="34"></label>
+                <label>Font titlu sectiune W<input name="ep_posta_legacy__pr_section_title_font_w" value="24"></label>
+                <label>Font corp H<input name="ep_posta_legacy__pr_body_font_h" value="32"></label>
+                <label>Font corp W<input name="ep_posta_legacy__pr_body_font_w" value="24"></label>
+                <label>Spatiere linii<input name="ep_posta_legacy__pr_body_line_gap" value="8"></label>
+                <label>Font mic H<input name="ep_posta_legacy__pr_small_font_h" value="26"></label>
+                <label>Font mic W<input name="ep_posta_legacy__pr_small_font_w" value="20"></label>
+                <label>Latime caseta timbru (mm)<input name="ep_posta_legacy__pr_stamp_box_w_mm" value="42"></label>
+                <label>Inaltime caseta timbru (mm)<input name="ep_posta_legacy__pr_stamp_box_h_mm" value="28"></label>
+                <label>Font timbru H<input name="ep_posta_legacy__pr_stamp_font_h" value="24"></label>
+                <label>Font timbru W<input name="ep_posta_legacy__pr_stamp_font_w" value="18"></label>
               </div>
               <div class="grid compact-grid">
-                <label>Expeditor - nume<input name="pr_sender_name" value="INSTITUTUL NATIONAL DE SANATATE PUBLICA"></label>
-                <label>Expeditor - adresa 1<input name="pr_sender_address1" value="Str. Dr. Leonte Anastasievici, Nr. 1-3"></label>
-                <label>Expeditor - adresa 2<input name="pr_sender_address2" value="Cod postal 077042"></label>
-                <label>Expeditor - localitate<input name="pr_sender_city" value="Loc. Bucuresti Sector 5"></label>
-                <label>Expeditor - cod postal<input name="pr_sender_postal_code" value="077042"></label>
-                <label>Text timbru preplatit<input name="shipping_prepaid_stamp" value="FRANCARE ULTERIOARA"></label>
+                <label>Expeditor - nume<input name="ep_posta_legacy__pr_sender_name" value="INSTITUTUL NATIONAL DE SANATATE PUBLICA"></label>
+                <label>Expeditor - adresa 1<input name="ep_posta_legacy__pr_sender_address1" value="Str. Dr. Leonte Anastasievici, Nr. 1-3"></label>
+                <label>Expeditor - adresa 2<input name="ep_posta_legacy__pr_sender_address2" value="Cod postal 077042"></label>
+                <label>Expeditor - localitate<input name="ep_posta_legacy__pr_sender_city" value="Loc. Bucuresti Sector 5"></label>
+                <label>Expeditor - cod postal<input name="ep_posta_legacy__pr_sender_postal_code" value="077042"></label>
+                <label>Text timbru preplatit<input name="ep_posta_legacy__shipping_prepaid_stamp" value="FRANCARE ULTERIOARA"></label>
+              </div>
+              <div class="actions section-actions">
+                <button type="button" data-test-profile="posta-romana-legacy">Test /barcode/print/posta-romana</button>
+              </div>
+            </section>
+
+            <section id="endpoint-card-posta-romana-api" class="settings-card" data-endpoint-profile="posta-romana-api">
+              <p class="settings-kicker">Endpoint</p>
+              <h4>/api/barcode/print/posta-romana</h4>
+              <p class="endpoint-note">Eticheta Posta Romana pentru ruta JSON/API.</p>
+              <div class="grid compact-grid">
+                <label>Selected printer<select data-printer-select name="ep_posta_api__pr_sel_printer"></select></label>
+                <label>Rezolutie (dpi)<input name="ep_posta_api__pr_resolution" type="number" value="203"></label>
+                <label>Orientare<select name="ep_posta_api__pr_orientation"><option value="landscape">Landscape</option><option value="portrait">Portrait</option></select></label>
+                <label>Latime eticheta (mm)<input name="ep_posta_api__pr_label_width_mm" value="100"></label>
+                <label>Inaltime eticheta (mm)<input name="ep_posta_api__pr_label_height_mm" value="150"></label>
+                <label>Start X (mm)<input name="ep_posta_api__pr_start_x_mm" value="3"></label>
+                <label>Start Y (mm)<input name="ep_posta_api__pr_start_y_mm" value="3"></label>
+                <label>Padding exterior (mm)<input name="ep_posta_api__pr_outer_padding_mm" value="4"></label>
+                <label>Spatiu intre sectiuni (mm)<input name="ep_posta_api__pr_section_gap_mm" value="3"></label>
+                <label>Inaltime bara sectiune (mm)<input name="ep_posta_api__pr_section_header_h_mm" value="8"></label>
+                <label>Font titlu sectiune H<input name="ep_posta_api__pr_section_title_font_h" value="34"></label>
+                <label>Font titlu sectiune W<input name="ep_posta_api__pr_section_title_font_w" value="24"></label>
+                <label>Font corp H<input name="ep_posta_api__pr_body_font_h" value="32"></label>
+                <label>Font corp W<input name="ep_posta_api__pr_body_font_w" value="24"></label>
+                <label>Spatiere linii<input name="ep_posta_api__pr_body_line_gap" value="8"></label>
+                <label>Font mic H<input name="ep_posta_api__pr_small_font_h" value="26"></label>
+                <label>Font mic W<input name="ep_posta_api__pr_small_font_w" value="20"></label>
+                <label>Latime caseta timbru (mm)<input name="ep_posta_api__pr_stamp_box_w_mm" value="42"></label>
+                <label>Inaltime caseta timbru (mm)<input name="ep_posta_api__pr_stamp_box_h_mm" value="28"></label>
+                <label>Font timbru H<input name="ep_posta_api__pr_stamp_font_h" value="24"></label>
+                <label>Font timbru W<input name="ep_posta_api__pr_stamp_font_w" value="18"></label>
+              </div>
+              <div class="grid compact-grid">
+                <label>Expeditor - nume<input name="ep_posta_api__pr_sender_name" value="INSTITUTUL NATIONAL DE SANATATE PUBLICA"></label>
+                <label>Expeditor - adresa 1<input name="ep_posta_api__pr_sender_address1" value="Str. Dr. Leonte Anastasievici, Nr. 1-3"></label>
+                <label>Expeditor - adresa 2<input name="ep_posta_api__pr_sender_address2" value="Cod postal 077042"></label>
+                <label>Expeditor - localitate<input name="ep_posta_api__pr_sender_city" value="Loc. Bucuresti Sector 5"></label>
+                <label>Expeditor - cod postal<input name="ep_posta_api__pr_sender_postal_code" value="077042"></label>
+                <label>Text timbru preplatit<input name="ep_posta_api__shipping_prepaid_stamp" value="FRANCARE ULTERIOARA"></label>
+              </div>
+              <div class="actions section-actions">
+                <button type="button" data-test-profile="posta-romana-api">Test /api/barcode/print/posta-romana</button>
               </div>
             </section>
           </div>
         </form>
         <div class="actions">
           <button id="save-settings" type="button">Salveaza setarile</button>
-          <button id="test-print" type="button">Test print</button>
           <button id="reload-settings" type="button">Reload</button>
         </div>
         <p id="settings-msg" class="msg"></p>

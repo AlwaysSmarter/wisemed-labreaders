@@ -1,5 +1,5 @@
 [Unit]
-Description=WiseMED readersv3 Shimatzu Tocl Reader background service
+Description=WiseMED readersv3 Analytikjena Plasmaquantms Elite Reader background service
 After=network-online.target
 Wants=network-online.target
 

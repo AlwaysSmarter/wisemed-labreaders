@@ -3,16 +3,129 @@ const appView = document.getElementById("app");
 const loginMsg = document.getElementById("login-msg");
 const settingsMsg = document.getElementById("settings-msg");
 const form = document.getElementById("settings-form");
-const printerSelect = document.getElementById("printer-select");
-const prPrinterSelect = document.getElementById("pr-printer-select");
-const settingsProfile = document.getElementById("settings-profile");
+const printerSelects = Array.from(document.querySelectorAll("[data-printer-select]"));
+const endpointSelector = document.getElementById("settings-endpoint-selector");
 const statsBody = document.querySelector("#stats-table tbody");
 const jobsBody = document.querySelector("#jobs-table tbody");
 const dateFrom = document.getElementById("date-from");
 const dateTo = document.getElementById("date-to");
-let readerSettings = {};
+
+const barcodeFieldNames = [
+  "bcp_type",
+  "othercfg_sel_printer",
+  "othercfg_printer_resolution",
+  "othercfg_printer_barcode",
+  "othercfg_label_width",
+  "othercfg_label_height",
+  "othercfg_print_bcodex",
+  "othercfg_print_bcodey",
+  "othercfg_print_bcodeopt_w",
+  "othercfg_bc_widenarowr",
+  "othercfg_print_bcodeopt_h",
+  "othercfg_print_bcodeopt_o",
+  "othercfg_print_bcodeopt_e",
+  "othercfg_print_bcodeopt_f",
+  "othercfg_print_bcodeopt_g",
+  "othercfg_print_bcodetxtx",
+  "othercfg_print_bcodetxty",
+  "othercfg_print_bcodetxtf",
+  "othercfg_print_bcodetxto",
+  "othercfg_print_bcodetxth",
+  "othercfg_print_bcodetxtw",
+  "othercfg_print_namex",
+  "othercfg_print_namey",
+  "othercfg_print_namef",
+  "othercfg_print_nameo",
+  "othercfg_print_nameh",
+  "othercfg_print_namew",
+  "othercfg_print_tubecodex",
+  "othercfg_print_tubecodey",
+  "othercfg_print_tubecodef",
+  "othercfg_print_tubecodeo",
+  "othercfg_print_tubecodeh",
+  "othercfg_print_tubecodew",
+  "othercfg_print_tubecode_boxw",
+  "othercfg_print_tubecode_boxh",
+  "othercfg_print_tubecode_boxt",
+  "othercfg_print_tubecode_boxc",
+  "othercfg_print_tubecode_boxr",
+];
+
+const postaFieldNames = [
+  "pr_sel_printer",
+  "pr_resolution",
+  "pr_orientation",
+  "pr_label_width_mm",
+  "pr_label_height_mm",
+  "pr_start_x_mm",
+  "pr_start_y_mm",
+  "pr_outer_padding_mm",
+  "pr_section_gap_mm",
+  "pr_section_header_h_mm",
+  "pr_section_title_font_h",
+  "pr_section_title_font_w",
+  "pr_body_font_h",
+  "pr_body_font_w",
+  "pr_body_line_gap",
+  "pr_small_font_h",
+  "pr_small_font_w",
+  "pr_stamp_box_w_mm",
+  "pr_stamp_box_h_mm",
+  "pr_stamp_font_h",
+  "pr_stamp_font_w",
+  "pr_sender_name",
+  "pr_sender_address1",
+  "pr_sender_address2",
+  "pr_sender_city",
+  "pr_sender_postal_code",
+  "shipping_prepaid_stamp",
+];
+
+const endpointProfiles = [
+  { profile: "barcode-legacy", prefix: "ep_barcode__", fields: barcodeFieldNames },
+  { profile: "barcode-api", prefix: "ep_barcode__", fields: barcodeFieldNames },
+  { profile: "posta-romana-legacy", prefix: "ep_posta__", fields: postaFieldNames },
+  { profile: "posta-romana-api", prefix: "ep_posta__", fields: postaFieldNames },
+];
+
 const defaultSettings = {
-  print_profile: "barcode",
+  bcp_type: "zebrazpl",
+  othercfg_printer_resolution: "200",
+  othercfg_printer_barcode: "B3",
+  othercfg_label_width: "50",
+  othercfg_label_height: "25",
+  othercfg_print_bcodex: "5",
+  othercfg_print_bcodey: "5",
+  othercfg_print_bcodeopt_w: "2",
+  othercfg_bc_widenarowr: "3.0",
+  othercfg_print_bcodeopt_h: "50",
+  othercfg_print_bcodeopt_o: "N",
+  othercfg_print_bcodeopt_e: "N",
+  othercfg_print_bcodeopt_f: "N",
+  othercfg_print_bcodeopt_g: "N",
+  othercfg_print_bcodetxtx: "20",
+  othercfg_print_bcodetxty: "40",
+  othercfg_print_bcodetxtf: "D",
+  othercfg_print_bcodetxto: "N",
+  othercfg_print_bcodetxth: "6",
+  othercfg_print_bcodetxtw: "6",
+  othercfg_print_namex: "5",
+  othercfg_print_namey: "12",
+  othercfg_print_namef: "B",
+  othercfg_print_nameo: "N",
+  othercfg_print_nameh: "6",
+  othercfg_print_namew: "6",
+  othercfg_print_tubecodex: "40",
+  othercfg_print_tubecodey: "22",
+  othercfg_print_tubecodef: "B",
+  othercfg_print_tubecodeo: "N",
+  othercfg_print_tubecodeh: "6",
+  othercfg_print_tubecodew: "6",
+  othercfg_print_tubecode_boxw: "3.81",
+  othercfg_print_tubecode_boxh: "3.81",
+  othercfg_print_tubecode_boxt: "1",
+  othercfg_print_tubecode_boxc: "B",
+  othercfg_print_tubecode_boxr: "4",
   shipping_prepaid_stamp: "FRANCARE ULTERIOARA",
   pr_resolution: "203",
   pr_orientation: "landscape",
@@ -40,20 +153,26 @@ const defaultSettings = {
   pr_sender_city: "Loc. Bucuresti Sector 5",
   pr_sender_postal_code: "077042",
 };
+
 const views = {
   dashboard: document.getElementById("view-dashboard"),
   settings: document.getElementById("view-settings"),
   history: document.getElementById("view-history"),
 };
 
+let readerSettings = {};
+
 document.getElementById("login-btn").addEventListener("click", onLogin);
 document.getElementById("logout-btn").addEventListener("click", onLogout);
 document.getElementById("save-settings").addEventListener("click", saveSettings);
 document.getElementById("reload-settings").addEventListener("click", loadSettings);
 document.getElementById("refresh-stats").addEventListener("click", refreshStatsAndJobs);
-document.getElementById("test-print").addEventListener("click", onTestPrint);
+document.getElementById("selected-test-print").addEventListener("click", () => onTestPrint(endpointSelector.value));
 document.querySelectorAll(".menu-btn[data-view]").forEach((btn) => btn.addEventListener("click", () => activateView(btn.dataset.view)));
-settingsProfile.addEventListener("change", () => applyProfileVisibility(settingsProfile.value));
+document.querySelectorAll("[data-test-profile]").forEach((btn) => {
+  btn.addEventListener("click", () => onTestPrint(btn.dataset.testProfile));
+});
+endpointSelector.addEventListener("change", onEndpointSelectionChange);
 
 initDates();
 bootstrap();
@@ -86,8 +205,12 @@ function showApp() {
 }
 
 function activateView(name) {
-  Object.entries(views).forEach(([key, node]) => { node.hidden = key !== name; });
-  document.querySelectorAll(".menu-btn[data-view]").forEach((btn) => btn.classList.toggle("active", btn.dataset.view === name));
+  Object.entries(views).forEach(([key, node]) => {
+    node.hidden = key !== name;
+  });
+  document.querySelectorAll(".menu-btn[data-view]").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.view === name);
+  });
 }
 
 async function onLogin() {
@@ -122,7 +245,7 @@ async function loadAll() {
 async function loadPrinters() {
   const data = await api("/api/barcode/printers");
   const printers = data.printers || [];
-  [printerSelect, prPrinterSelect].forEach((select) => {
+  printerSelects.forEach((select) => {
     select.innerHTML = `<option value="">(default)</option>`;
     printers.forEach((name) => {
       const opt = document.createElement("option");
@@ -139,26 +262,31 @@ async function loadSettings() {
     api("/api/reader-settings"),
   ]);
   readerSettings = readerData.settings || {};
-  const settings = {
+  const settings = materializeEndpointSettings({
     ...defaultSettings,
     local_http_address: readerSettings.local_http_address || "",
     local_http_language: readerSettings.local_http_language || "ro",
     local_http_tls: readerSettings.local_http_tls || "false",
     local_http_cors_allowed_origins: readerSettings.local_http_cors_allowed_origins || "https://ldse.wisemed.eu",
     ...(barcodeData.settings || {}),
-  };
+  });
   for (const [key, value] of Object.entries(settings)) {
     const field = form.elements.namedItem(key);
-    if (field) field.value = value || "";
+    if (field) {
+      field.value = value || "";
+    }
   }
-  applyProfileVisibility(settings.print_profile || "barcode");
 }
 
 async function saveSettings() {
   settingsMsg.textContent = "";
   settingsMsg.style.color = "#8f1d1d";
   const all = {};
-  Array.from(form.elements).forEach((el) => { if (el.name) all[el.name] = el.value; });
+  Array.from(form.elements).forEach((el) => {
+    if (el.name) {
+      all[el.name] = el.value;
+    }
+  });
   const readerPayload = {
     repeat_mode: readerSettings.repeat_mode || "individual",
     reader_id: readerSettings.reader_id || "",
@@ -220,11 +348,11 @@ async function saveSettings() {
   settingsMsg.style.color = "#1c7b32";
 }
 
-async function onTestPrint() {
+async function onTestPrint(profile) {
   settingsMsg.textContent = "";
   const data = await api("/api/barcode/test-print", {
     method: "POST",
-    body: JSON.stringify({ profile: settingsProfile.value || "barcode" }),
+    body: JSON.stringify({ profile: profile || "barcode-legacy" }),
     allowFail: true,
   });
   if (!data || data.success === false) {
@@ -237,11 +365,12 @@ async function onTestPrint() {
   await refreshStatsAndJobs();
 }
 
-function applyProfileVisibility(profile) {
-  const selected = profile || "barcode";
-  document.querySelectorAll(".profile-panel").forEach((panel) => {
-    panel.hidden = panel.dataset.profile !== selected;
-  });
+function onEndpointSelectionChange() {
+  const profile = endpointSelector.value || "barcode-legacy";
+  const card = document.querySelector(`[data-endpoint-profile="${profile}"]`);
+  if (card) {
+    card.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 }
 
 async function refreshStatsAndJobs() {
@@ -290,6 +419,19 @@ async function api(url, opts = {}) {
     throw new Error(data.error || `HTTP ${res.status}`);
   }
   return data;
+}
+
+function materializeEndpointSettings(settings) {
+  const next = { ...settings };
+  endpointProfiles.forEach(({ prefix, fields }) => {
+    fields.forEach((field) => {
+      const key = prefix + field;
+      if (!next[key]) {
+        next[key] = next[field] || defaultSettings[field] || "";
+      }
+    });
+  });
+  return next;
 }
 
 function esc(v) {

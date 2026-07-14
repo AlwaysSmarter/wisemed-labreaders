@@ -1,5 +1,5 @@
 [Unit]
-Description=WiseMED readersv3 Biosan HIPO MPP-96 Reader background service
+Description=WiseMED readersv3 Biosan Hipo Mpp 96 Reader background service
 After=network-online.target
 Wants=network-online.target
 

@@ -1,5 +1,5 @@
 [Unit]
-Description=WiseMED readersv3 GammaVision Reader background service
+Description=WiseMED readersv3 Gammavision Reader background service
 After=network-online.target
 Wants=network-online.target
 

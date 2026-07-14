@@ -1,5 +1,5 @@
 [Unit]
-Description=WiseMED readersv3 TriCARB 5110 TR Reader background service
+Description=WiseMED readersv3 Tricarb 5110 Tr Reader background service
 After=network-online.target
 Wants=network-online.target
 

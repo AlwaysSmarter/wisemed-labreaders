@@ -14,7 +14,7 @@ UninstPage instfiles
 Section "Install"
   SetOutPath "$INSTDIR"
   File /r "$%APP_PAYLOAD%\*.*"
-  CreateShortcut "$SMPROGRAMS\WiseMED\WiseMED Update Server.lnk" "$INSTDIR\Update_Server.exe"
+  CreateShortcut "$SMPROGRAMS\WiseMED\WiseMED Update Server.lnk" "$INSTDIR\update-server.exe"
   nsExec::ExecToLog 'powershell -ExecutionPolicy Bypass -File "$INSTDIR\install-service.ps1"'
   WriteUninstaller "$INSTDIR\Uninstall.exe"
 SectionEnd

@@ -6,7 +6,7 @@
   <string>eu.wisemed.readersv3.barcodeprinter</string>
   <key>ProgramArguments</key>
   <array>
-    <string>/usr/local/barcodeprinter/BarcodePrinter</string>
+    <string>/usr/local/barcodeprinter/barcodeprinter</string>
     <string>-config</string>
     <string>deployments/config.yaml</string>
     <string>-headless</string>

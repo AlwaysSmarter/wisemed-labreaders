@@ -24,6 +24,8 @@ th { background: #edf5ed; }
 .settings-card h4 { margin: 0 0 12px; font-size: 22px; }
 .settings-kicker { margin: 0 0 6px; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: #356f59; font-weight: 700; }
 .compact-grid { grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
+.endpoint-note { margin: -4px 0 14px; color: #4f6256; font-size: 14px; }
+.section-actions { margin-top: 16px; }
 
 @media (max-width: 900px) {
   .app { grid-template-columns: 1fr; }

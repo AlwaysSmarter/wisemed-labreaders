@@ -140,6 +140,16 @@
     "supportsHeadless": true
   },
   {
+    "id": "snibe-maglumi-x3",
+    "title": "Snibe Maglumi X3",
+    "binaryName": "snibe-maglumi-x3",
+    "serviceName": "wisemed-snibe-maglumi-x3",
+    "displayName": "WiseMED Snibe Maglumi X3",
+    "description": "WiseMED readersv3 Snibe Maglumi X3 background service",
+    "bundleId": "eu.wisemed.readersv3.snibe.maglumi.x3",
+    "supportsHeadless": true
+  },
+  {
     "id": "tricarb-5110-tr-reader",
     "title": "TriCARB 5110 TR Reader",
     "binaryName": "tricarb-5110-tr-reader",

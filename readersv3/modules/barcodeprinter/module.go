@@ -43,6 +43,13 @@ type preparedPrintJob struct {
 	LogParams   map[string]string
 }
 
+const (
+	endpointBarcodeLegacy = "barcode-legacy"
+	endpointBarcodeAPI    = "barcode-api"
+	endpointPostaLegacy   = "posta-romana-legacy"
+	endpointPostaAPI      = "posta-romana-api"
+)
+
 type localHTTPControl interface {
 	ApplyRuntimeSettings(addr, lang string, tls bool)
 }
@@ -98,7 +105,11 @@ func (m *Module) HandleWSAction(action string, payload map[string]interface{}) (
 		if clientIP == "" {
 			clientIP = "ws"
 		}
-		err := m.printWithParams(params, clientIP)
+		profile := normalizeRequestedProfile(params["print_profile"])
+		if profile == "" {
+			profile = endpointBarcodeAPI
+		}
+		err := m.printWithParams(profile, params, clientIP)
 		if err != nil {
 			return nil, true, err
 		}
@@ -211,7 +222,7 @@ func (m *Module) handleLegacyPrint(w http.ResponseWriter, r *http.Request) {
 			params[k] = vals[len(vals)-1]
 		}
 	}
-	if err := m.printWithParams(params, extractIP(r)); err != nil {
+	if err := m.printWithParams(endpointBarcodeLegacy, params, extractIP(r)); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]interface{}{"success": false, "error": err.Error()})
 		return
 	}
@@ -229,7 +240,7 @@ func (m *Module) handlePrintJSON(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	params := interfaceMapToStringMap(payload)
-	if err := m.printWithParams(params, extractIP(r)); err != nil {
+	if err := m.printWithParams(endpointBarcodeAPI, params, extractIP(r)); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]interface{}{"success": false, "error": err.Error()})
 		return
 	}
@@ -248,7 +259,7 @@ func (m *Module) handleLegacyPostaRomanaPrint(w http.ResponseWriter, r *http.Req
 			params[k] = vals[len(vals)-1]
 		}
 	}
-	if err := m.printPostaRomanaWithParams(params, extractIP(r)); err != nil {
+	if err := m.printPostaRomanaWithParams(endpointPostaLegacy, params, extractIP(r)); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]interface{}{"success": false, "error": err.Error()})
 		return
 	}
@@ -266,7 +277,7 @@ func (m *Module) handlePostaRomanaPrintJSON(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	params := interfaceMapToStringMap(payload)
-	if err := m.printPostaRomanaWithParams(params, extractIP(r)); err != nil {
+	if err := m.printPostaRomanaWithParams(endpointPostaAPI, params, extractIP(r)); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]interface{}{"success": false, "error": err.Error()})
 		return
 	}
@@ -280,13 +291,16 @@ func (m *Module) handleTestPrint(w http.ResponseWriter, r *http.Request) {
 	}
 	payload := map[string]interface{}{}
 	_ = json.NewDecoder(r.Body).Decode(&payload)
-	profile := strings.ToLower(strings.TrimSpace(valueAsString(payload["profile"])))
+	profile := normalizeRequestedProfile(valueAsString(payload["profile"]))
 	if profile == "" {
-		profile = strings.ToLower(strings.TrimSpace(r.URL.Query().Get("profile")))
+		profile = normalizeRequestedProfile(r.URL.Query().Get("profile"))
 	}
-	if profile == "posta-romana" || profile == "posta_romana" || profile == "posta" {
+	if profile == "" {
+		profile = endpointBarcodeLegacy
+	}
+	if isPostaEndpointProfile(profile) {
 		m.mu.RLock()
-		params := mergeMaps(m.settings, map[string]string{
+		params := mergeMaps(resolveEndpointSettings(m.settings, profile), map[string]string{
 			"recipient_name":         "RAMPREST_PL_3",
 			"recipient_address1":     "Str. Laborator_3 nr. 1 C",
 			"recipient_city":         "IASI",
@@ -299,7 +313,7 @@ func (m *Module) handleTestPrint(w http.ResponseWriter, r *http.Request) {
 			"shipping_prepaid_stamp": "EXPEDITOR CU FRANCATURA ULTERIOARA",
 		})
 		m.mu.RUnlock()
-		if err := m.printPostaRomanaWithParams(params, extractIP(r)); err != nil {
+		if err := m.printPostaRomanaWithParams(profile, params, extractIP(r)); err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]interface{}{"success": false, "error": err.Error()})
 			return
 		}
@@ -307,7 +321,7 @@ func (m *Module) handleTestPrint(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	m.mu.RLock()
-	params := mergeMaps(m.settings, map[string]string{
+	params := mergeMaps(resolveEndpointSettings(m.settings, profile), map[string]string{
 		"bc":   fmt.Sprintf("TEST-%d", time.Now().Unix()%100000),
 		"pn":   "TEST PRINT",
 		"tc":   "T",
@@ -315,7 +329,7 @@ func (m *Module) handleTestPrint(w http.ResponseWriter, r *http.Request) {
 		"code": "",
 	})
 	m.mu.RUnlock()
-	if err := m.printWithParams(params, extractIP(r)); err != nil {
+	if err := m.printWithParams(profile, params, extractIP(r)); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]interface{}{"success": false, "error": err.Error()})
 		return
 	}
@@ -404,11 +418,11 @@ func (m *Module) handleDailyStats(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]interface{}{"success": true, "daily": items})
 }
 
-func (m *Module) printWithParams(params map[string]string, clientIP string) error {
+func (m *Module) printWithParams(profile string, params map[string]string, clientIP string) error {
 	m.mu.RLock()
-	resolved := mergeMaps(m.settings, params)
+	resolved := mergeMaps(resolveEndpointSettings(m.settings, profile), params)
 	m.mu.RUnlock()
-	job, err := buildBarcodePrintJob(resolved)
+	job, err := buildBarcodePrintJob(profile, resolved)
 	if err != nil {
 		_ = m.insertPrintLog(clientIP, resolved, 0, "fail", err.Error())
 		return err
@@ -416,11 +430,11 @@ func (m *Module) printWithParams(params map[string]string, clientIP string) erro
 	return m.runPreparedPrintJob(job, clientIP)
 }
 
-func (m *Module) printPostaRomanaWithParams(params map[string]string, clientIP string) error {
+func (m *Module) printPostaRomanaWithParams(profile string, params map[string]string, clientIP string) error {
 	m.mu.RLock()
-	resolved := mergeMaps(m.settings, params)
+	resolved := mergeMaps(resolveEndpointSettings(m.settings, profile), params)
 	m.mu.RUnlock()
-	job, err := buildPostaRomanaPrintJob(resolved)
+	job, err := buildPostaRomanaPrintJob(profile, resolved)
 	if err != nil {
 		_ = m.insertPrintLog(clientIP, resolved, 0, "fail", err.Error())
 		return err
@@ -444,7 +458,7 @@ func (m *Module) runPreparedPrintJob(job preparedPrintJob, clientIP string) erro
 	return nil
 }
 
-func buildBarcodePrintJob(params map[string]string) (preparedPrintJob, error) {
+func buildBarcodePrintJob(profile string, params map[string]string) (preparedPrintJob, error) {
 	bcp, err := newZPLPrinterFromParams(params)
 	if err != nil {
 		return preparedPrintJob{}, err
@@ -460,11 +474,13 @@ func buildBarcodePrintJob(params map[string]string) (preparedPrintJob, error) {
 		PrinterName: printerName,
 		Copies:      count,
 		ZPL:         bcp.RenderZPL(),
-		LogParams:   mergeMaps(params, map[string]string{"print_profile": "barcode"}),
+		LogParams: mergeMaps(params, map[string]string{
+			"print_profile": profile,
+		}),
 	}, nil
 }
 
-func buildPostaRomanaPrintJob(params map[string]string) (preparedPrintJob, error) {
+func buildPostaRomanaPrintJob(profile string, params map[string]string) (preparedPrintJob, error) {
 	label, err := newPostaRomanaLabelFromParams(params)
 	if err != nil {
 		return preparedPrintJob{}, err
@@ -481,7 +497,7 @@ func buildPostaRomanaPrintJob(params map[string]string) (preparedPrintJob, error
 		Copies:      count,
 		ZPL:         label.RenderZPL(),
 		LogParams: mergeMaps(params, map[string]string{
-			"print_profile":        "posta-romana",
+			"print_profile":        profile,
 			"fileid":               firstNonEmpty(params["shipment_reference"], params["recipient_client_code"], params["recipient_postal_code"]),
 			"name":                 firstNonEmpty(params["recipient_name"], params["dest_name"]),
 			"bc_bctype":            "POSTA_ROMANA",
@@ -777,6 +793,50 @@ func mergeMaps(base, over map[string]string) map[string]string {
 		out[k] = v
 	}
 	return out
+}
+
+func normalizeRequestedProfile(raw string) string {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "", "barcode", "legacy", "legacy-barcode", "barcode-legacy":
+		return endpointBarcodeLegacy
+	case "api", "api-barcode", "barcode-api":
+		return endpointBarcodeAPI
+	case "posta", "posta-romana", "posta_romana", "legacy-posta", "legacy-posta-romana", "posta-romana-legacy":
+		return endpointPostaLegacy
+	case "api-posta", "api-posta-romana", "posta-romana-api":
+		return endpointPostaAPI
+	default:
+		return ""
+	}
+}
+
+func isPostaEndpointProfile(profile string) bool {
+	return profile == endpointPostaLegacy || profile == endpointPostaAPI
+}
+
+func endpointSettingsPrefix(profile string) string {
+	switch profile {
+	case endpointBarcodeLegacy, endpointBarcodeAPI:
+		return "ep_barcode__"
+	case endpointPostaLegacy, endpointPostaAPI:
+		return "ep_posta__"
+	default:
+		return ""
+	}
+}
+
+func resolveEndpointSettings(all map[string]string, profile string) map[string]string {
+	resolved := mergeMaps(all, nil)
+	prefix := endpointSettingsPrefix(profile)
+	if prefix == "" {
+		return resolved
+	}
+	for key, value := range all {
+		if strings.HasPrefix(key, prefix) {
+			resolved[strings.TrimPrefix(key, prefix)] = value
+		}
+	}
+	return resolved
 }
 
 func firstNonEmpty(items ...string) string {

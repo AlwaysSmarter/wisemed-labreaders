@@ -2,7 +2,7 @@
 set -euo pipefail
 
 APP_ID="biosan-hipo-mpp-96-reader"
-BUNDLE_ID="eu.wisemed.readersv3.biosan.hipo.mpp96.reader"
+BUNDLE_ID="eu.wisemed.readersv3.biosan.hipo.mpp.96.reader"
 SOURCE_DIR="$(cd "$(dirname "$0")" && pwd)"
 INSTALL_DIR="/usr/local/${APP_ID}"
 

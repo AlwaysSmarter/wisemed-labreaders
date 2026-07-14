@@ -670,6 +670,7 @@ func (m *Module) handleReaderSettings(w http.ResponseWriter, r *http.Request) {
 			ResultSyncSeparators      string `json:"result_sync_separators"`
 			ResultSyncQCPrefixes      string `json:"result_sync_qc_prefixes"`
 			ProtocolSubtype           string `json:"protocol_subtype"`
+			LabnovationImageMode      string `json:"labnovation_image_mode"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]interface{}{"ok": false, "error": "invalid json body"})
@@ -769,50 +770,51 @@ func (m *Module) handleReaderSettings(w http.ResponseWriter, r *http.Request) {
 			currentResultSyncSeparators != joinStringList(splitCSV(req.ResultSyncSeparators)) ||
 			currentResultSyncQCPrefixes != formatQCPrefixSettings(parseQCPrefixSettings(req.ResultSyncQCPrefixes))
 		if err := m.persistReaderSettings(map[string]interface{}{
-			"reader.id":                                 strings.TrimSpace(req.ReaderID),
-			"reader.label":                              strings.TrimSpace(req.ReaderLabel),
-			"reader.analyzer_name":                      strings.TrimSpace(req.AnalyzerName),
-			"reader.analyzer_code":                      strings.TrimSpace(req.AnalyzerCode),
-			"reader.db_name":                            nextDBName,
-			"local_http.address":                        strings.TrimSpace(req.LocalHTTPAddress),
-			"local_http.language":                       strings.TrimSpace(req.LocalHTTPLang),
-			"local_http.tls":                            boolString(req.LocalHTTPTLS),
-			"local_http.cors_allowed_origins":           strings.TrimSpace(req.LocalHTTPCORSAllowed),
-			"modules.local-http.address":                strings.TrimSpace(req.LocalHTTPAddress),
-			"modules.local-http.language":               strings.TrimSpace(req.LocalHTTPLang),
-			"modules.local-http.tls":                    boolString(req.LocalHTTPTLS),
-			"modules.local-http.cors_allowed_origins":   strings.TrimSpace(req.LocalHTTPCORSAllowed),
-			"analyzer.comm_type":                        commType,
-			"analyzer.protocol":                         protocol,
-			"modules.local-http.repeat_mode":            mode,
-			"modules.transport-tcpip.mode":              tcpMode,
-			"modules.transport-tcpip.host":              strings.TrimSpace(req.TCPIPHost),
-			"modules.transport-tcpip.port":              strings.TrimSpace(req.TCPIPPort),
-			"modules.transport-tcpip.remote_host":       strings.TrimSpace(req.TCPIPRemoteHost),
-			"modules.transport-tcpip.remote_port":       strings.TrimSpace(req.TCPIPRemotePort),
-			"modules.transport-file.import_dir":         strings.TrimSpace(req.FileImportDir),
-			"modules.transport-file.processed_dir":      strings.TrimSpace(req.FileProcessedDir),
-			"modules.transport-file.failed_dir":         strings.TrimSpace(req.FileFailedDir),
-			"modules.transport-file.pattern":            strings.TrimSpace(req.FilePattern),
-			"logging.verbose_level":                     verboseLevelInt,
-			"modules.logging.verbose_level":             verboseLevelInt,
-			"results.auto_confirm_wisemed":              requestedAutoConfirm,
-			"modules.results.auto_confirm_wisemed":      requestedAutoConfirm,
-			"modules.wisemed-api.reagent_set_name":      strings.TrimSpace(req.WiseMEDReagentSetName),
-			"modules.storage-sqlite.path":               nextSQLitePath,
-			"modules.app-updates.enabled":               boolString(req.AppUpdatesEnabled),
-			"modules.app-updates.app_id":                strings.TrimSpace(req.AppUpdatesAppID),
-			"modules.app-updates.channel":               strings.TrimSpace(req.AppUpdatesChannel),
-			"modules.app-updates.base_url":              strings.TrimSpace(req.AppUpdatesBaseURL),
-			"modules.app-updates.auto_download":         boolString(req.AppUpdatesAutoDownload),
-			"modules.app-updates.download_dir":          strings.TrimSpace(req.AppUpdatesDownloadDir),
-			"modules.result-sync.enabled":               boolString(req.ResultSyncEnabled),
-			"modules.result-sync.interval_minutes":      parseIntString(req.ResultSyncIntervalMinutes, "5"),
-			"modules.result-sync.sample_prefixes":       splitCSV(req.ResultSyncSamplePrefixes),
-			"modules.result-sync.sample_suffixes":       splitCSV(req.ResultSyncSampleSuffixes),
-			"modules.result-sync.separators":            splitCSV(req.ResultSyncSeparators),
-			"modules.result-sync.qc_prefixes":           parseQCPrefixSettings(req.ResultSyncQCPrefixes),
-			"modules.protocol-shimatzu-generic.subtype": requestedSubtype,
+			"reader.id":                                     strings.TrimSpace(req.ReaderID),
+			"reader.label":                                  strings.TrimSpace(req.ReaderLabel),
+			"reader.analyzer_name":                          strings.TrimSpace(req.AnalyzerName),
+			"reader.analyzer_code":                          strings.TrimSpace(req.AnalyzerCode),
+			"reader.db_name":                                nextDBName,
+			"local_http.address":                            strings.TrimSpace(req.LocalHTTPAddress),
+			"local_http.language":                           strings.TrimSpace(req.LocalHTTPLang),
+			"local_http.tls":                                boolString(req.LocalHTTPTLS),
+			"local_http.cors_allowed_origins":               strings.TrimSpace(req.LocalHTTPCORSAllowed),
+			"modules.local-http.address":                    strings.TrimSpace(req.LocalHTTPAddress),
+			"modules.local-http.language":                   strings.TrimSpace(req.LocalHTTPLang),
+			"modules.local-http.tls":                        boolString(req.LocalHTTPTLS),
+			"modules.local-http.cors_allowed_origins":       strings.TrimSpace(req.LocalHTTPCORSAllowed),
+			"analyzer.comm_type":                            commType,
+			"analyzer.protocol":                             protocol,
+			"modules.local-http.repeat_mode":                mode,
+			"modules.transport-tcpip.mode":                  tcpMode,
+			"modules.transport-tcpip.host":                  strings.TrimSpace(req.TCPIPHost),
+			"modules.transport-tcpip.port":                  strings.TrimSpace(req.TCPIPPort),
+			"modules.transport-tcpip.remote_host":           strings.TrimSpace(req.TCPIPRemoteHost),
+			"modules.transport-tcpip.remote_port":           strings.TrimSpace(req.TCPIPRemotePort),
+			"modules.transport-file.import_dir":             strings.TrimSpace(req.FileImportDir),
+			"modules.transport-file.processed_dir":          strings.TrimSpace(req.FileProcessedDir),
+			"modules.transport-file.failed_dir":             strings.TrimSpace(req.FileFailedDir),
+			"modules.transport-file.pattern":                strings.TrimSpace(req.FilePattern),
+			"logging.verbose_level":                         verboseLevelInt,
+			"modules.logging.verbose_level":                 verboseLevelInt,
+			"results.auto_confirm_wisemed":                  requestedAutoConfirm,
+			"modules.results.auto_confirm_wisemed":          requestedAutoConfirm,
+			"modules.wisemed-api.reagent_set_name":          strings.TrimSpace(req.WiseMEDReagentSetName),
+			"modules.storage-sqlite.path":                   nextSQLitePath,
+			"modules.app-updates.enabled":                   boolString(req.AppUpdatesEnabled),
+			"modules.app-updates.app_id":                    strings.TrimSpace(req.AppUpdatesAppID),
+			"modules.app-updates.channel":                   strings.TrimSpace(req.AppUpdatesChannel),
+			"modules.app-updates.base_url":                  strings.TrimSpace(req.AppUpdatesBaseURL),
+			"modules.app-updates.auto_download":             boolString(req.AppUpdatesAutoDownload),
+			"modules.app-updates.download_dir":              strings.TrimSpace(req.AppUpdatesDownloadDir),
+			"modules.result-sync.enabled":                   boolString(req.ResultSyncEnabled),
+			"modules.result-sync.interval_minutes":          parseIntString(req.ResultSyncIntervalMinutes, "5"),
+			"modules.result-sync.sample_prefixes":           splitCSV(req.ResultSyncSamplePrefixes),
+			"modules.result-sync.sample_suffixes":           splitCSV(req.ResultSyncSampleSuffixes),
+			"modules.result-sync.separators":                splitCSV(req.ResultSyncSeparators),
+			"modules.result-sync.qc_prefixes":               parseQCPrefixSettings(req.ResultSyncQCPrefixes),
+			"modules.protocol-shimatzu-generic.subtype":     requestedSubtype,
+			"modules.protocol-labnovation-ld560.image_mode": strings.TrimSpace(req.LabnovationImageMode),
 		}); err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]interface{}{"ok": false, "error": err.Error()})
 			return
@@ -2715,6 +2717,7 @@ func (m *Module) readerSettingsPayload() map[string]interface{} {
 		"result_sync_separators":          joinStringList(m.rt.ModuleSettings("result-sync")["separators"]),
 		"result_sync_qc_prefixes":         formatQCPrefixSettings(m.rt.ModuleSettings("result-sync")["qc_prefixes"]),
 		"protocol_subtype":                asString(m.rt.ModuleSettings("protocol-shimatzu-generic")["subtype"]),
+		"labnovation_image_mode":          asString(m.rt.ModuleSettings("protocol-labnovation-ld560")["image_mode"]),
 		"labnovation_enabled":             containsStringFold(m.enabledModules(), "protocol-labnovation-ld560"),
 	}
 
@@ -2727,6 +2730,7 @@ func (m *Module) readerSettingsPayload() map[string]interface{} {
 	appUpdates := cfg.ModuleSettings("app-updates")
 	resultSync := cfg.ModuleSettings("result-sync")
 	shimadzuGeneric := cfg.ModuleSettings("protocol-shimatzu-generic")
+	labnovation := cfg.ModuleSettings("protocol-labnovation-ld560")
 	storageSQLite := cfg.ModuleSettings("storage-sqlite")
 	transportTCPIP := cfg.ModuleSettings("transport-tcpip")
 	transportFile := cfg.ModuleSettings("transport-file")
@@ -2772,6 +2776,16 @@ func (m *Module) readerSettingsPayload() map[string]interface{} {
 	settings["result_sync_separators"] = firstNonEmpty(joinStringList(resultSync["separators"]), asString(settings["result_sync_separators"]))
 	settings["result_sync_qc_prefixes"] = firstNonEmpty(formatQCPrefixSettings(resultSync["qc_prefixes"]), asString(settings["result_sync_qc_prefixes"]))
 	settings["protocol_subtype"] = firstNonEmpty(asString(shimadzuGeneric["subtype"]), asString(settings["protocol_subtype"]))
+	labnovationImageMode := ""
+	if simple, ok := labnovation["simple"].(map[string]interface{}); ok {
+		labnovationImageMode = strings.TrimSpace(asString(simple["image_mode"]))
+	}
+	settings["labnovation_image_mode"] = firstNonEmpty(
+		strings.TrimSpace(asString(labnovation["image_mode"])),
+		labnovationImageMode,
+		strings.TrimSpace(asString(settings["labnovation_image_mode"])),
+		"no_image",
+	)
 	return settings
 }
 

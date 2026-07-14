@@ -1,0 +1,17 @@
+[Unit]
+Description=WiseMED readersv3 Snibe Maglumi X3 background service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/snibe-maglumi-x3
+ExecStart=/opt/snibe-maglumi-x3/snibe-maglumi-x3 -config deployments/config.yaml -headless
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

@@ -66,13 +66,14 @@ modules:
         cfg_wisemed_protocol: https
         cod_echipament: reader-v3
         echipament_id: "25"
-        login_token: 4f55770f50837356ade618c4197f1fde
+        login_token: fb3139033345273a119f12289e90e2b9
         login_user_id: "1"
         nr_rackuri: "0"
         numar_serial_echipament: reader-v3-001
         nume_pe_raport_final: Reader v3
         pozitii_pe_rack: "0"
         producator_echipament: Reader
+        reagent_set_name: ""
         tip_de_echipament_id: "25"
         unitate_medicala_id: "19"
     wisemed-ws:

@@ -114,6 +114,7 @@ Exemplu de diferențiere:
 - `seegene-reader`: file transport + seegene excel protocol + QC avansat
 - `beosl-reader`: file transport + beosl csv protocol
 - `gemini-reader`: tcp/ip transport + astm protocol
+- `snibe-maglumi-x3`: tcp/ip transport + astm protocol
 - `barcodeprinter`: utilitar de tipărire etichete, compatibil `GET/POST /barcode/print`, plus control prin WS (`barcode.print`)
 
 ## Stadiu

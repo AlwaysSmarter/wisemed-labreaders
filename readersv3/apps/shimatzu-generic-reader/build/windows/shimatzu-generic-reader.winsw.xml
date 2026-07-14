@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <service>
   <id>wisemed-shimatzu-generic-reader</id>
-  <name>WiseMED SHIMATZU Generic Reader</name>
-  <description>WiseMED readersv3 SHIMATZU Generic Reader background service</description>
+  <name>WiseMED Shimatzu Generic Reader</name>
+  <description>WiseMED readersv3 Shimatzu Generic Reader background service</description>
   <executable>shimatzu-generic-reader.exe</executable>
   <arguments>-config deployments\config.yaml -headless</arguments>
   <stoptimeout>15sec</stoptimeout>
