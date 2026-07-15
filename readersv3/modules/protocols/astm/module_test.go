@@ -2,6 +2,15 @@ package astm
 
 import "testing"
 
+func TestASTMExpectedTrailerBytes(t *testing.T) {
+	if got := astmExpectedTrailerBytes(tcpConfig{ChecksumMode: "astm", TrailerMode: "crlf"}); got != 4 {
+		t.Fatalf("standard trailer bytes = %d, want 4", got)
+	}
+	if got := astmExpectedTrailerBytes(tcpConfig{ChecksumMode: "none", TrailerMode: "none"}); got != 0 {
+		t.Fatalf("raw trailer bytes = %d, want 0", got)
+	}
+}
+
 func TestParseBatchExtractsSampleResult(t *testing.T) {
 	cfg := tcpConfig{
 		SampleIDPaths: []string{"O.3.1", "O.2.1"},

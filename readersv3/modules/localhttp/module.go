@@ -648,6 +648,8 @@ func (m *Module) handleReaderSettings(w http.ResponseWriter, r *http.Request) {
 			TCPIPPort                 string `json:"tcpip_port"`
 			TCPIPRemoteHost           string `json:"tcpip_remote_host"`
 			TCPIPRemotePort           string `json:"tcpip_remote_port"`
+			ASTMChecksumMode          string `json:"astm_checksum_mode"`
+			ASTMTrailerMode           string `json:"astm_trailer_mode"`
 			FileImportDir             string `json:"file_import_dir"`
 			FileProcessedDir          string `json:"file_processed_dir"`
 			FileFailedDir             string `json:"file_failed_dir"`
@@ -729,6 +731,8 @@ func (m *Module) handleReaderSettings(w http.ResponseWriter, r *http.Request) {
 		currentTCPPort := strings.TrimSpace(asString(m.rt.ModuleSettings("transport-tcpip")["port"]))
 		currentTCPRemoteHost := strings.TrimSpace(asString(m.rt.ModuleSettings("transport-tcpip")["remote_host"]))
 		currentTCPRemotePort := strings.TrimSpace(asString(m.rt.ModuleSettings("transport-tcpip")["remote_port"]))
+		currentASTMChecksumMode := strings.TrimSpace(asString(m.rt.ModuleSettings("protocol-astm")["checksum_mode"]))
+		currentASTMTrailerMode := strings.TrimSpace(asString(m.rt.ModuleSettings("protocol-astm")["trailer_mode"]))
 		currentFileImportDir := strings.TrimSpace(asString(m.rt.ModuleSettings("transport-file")["import_dir"]))
 		currentFileProcessedDir := strings.TrimSpace(asString(m.rt.ModuleSettings("transport-file")["processed_dir"]))
 		currentFileFailedDir := strings.TrimSpace(asString(m.rt.ModuleSettings("transport-file")["failed_dir"]))
@@ -753,6 +757,8 @@ func (m *Module) handleReaderSettings(w http.ResponseWriter, r *http.Request) {
 			currentTCPPort != strings.TrimSpace(req.TCPIPPort) ||
 			currentTCPRemoteHost != strings.TrimSpace(req.TCPIPRemoteHost) ||
 			currentTCPRemotePort != strings.TrimSpace(req.TCPIPRemotePort) ||
+			currentASTMChecksumMode != strings.TrimSpace(req.ASTMChecksumMode) ||
+			currentASTMTrailerMode != strings.TrimSpace(req.ASTMTrailerMode) ||
 			currentFileImportDir != strings.TrimSpace(req.FileImportDir) ||
 			currentFileProcessedDir != strings.TrimSpace(req.FileProcessedDir) ||
 			currentFileFailedDir != strings.TrimSpace(req.FileFailedDir) ||
@@ -791,6 +797,8 @@ func (m *Module) handleReaderSettings(w http.ResponseWriter, r *http.Request) {
 			"modules.transport-tcpip.port":                  strings.TrimSpace(req.TCPIPPort),
 			"modules.transport-tcpip.remote_host":           strings.TrimSpace(req.TCPIPRemoteHost),
 			"modules.transport-tcpip.remote_port":           strings.TrimSpace(req.TCPIPRemotePort),
+			"modules.protocol-astm.checksum_mode":           strings.TrimSpace(req.ASTMChecksumMode),
+			"modules.protocol-astm.trailer_mode":            strings.TrimSpace(req.ASTMTrailerMode),
 			"modules.transport-file.import_dir":             strings.TrimSpace(req.FileImportDir),
 			"modules.transport-file.processed_dir":          strings.TrimSpace(req.FileProcessedDir),
 			"modules.transport-file.failed_dir":             strings.TrimSpace(req.FileFailedDir),
@@ -837,6 +845,8 @@ func (m *Module) handleReaderSettings(w http.ResponseWriter, r *http.Request) {
 			"comm_type":                    commType,
 			"repeatMode":                   mode,
 			"protocol_subtype":             requestedSubtype,
+			"astm_checksum_mode":           strings.TrimSpace(req.ASTMChecksumMode),
+			"astm_trailer_mode":            strings.TrimSpace(req.ASTMTrailerMode),
 			"logging_verbose_level":        verboseLevel,
 			"results_auto_confirm_wisemed": requestedAutoConfirm,
 			"sqlite_path":                  nextSQLitePath,
@@ -2694,6 +2704,10 @@ func (m *Module) readerSettingsPayload() map[string]interface{} {
 		"tcpip_port":                      asString(m.rt.ModuleSettings("transport-tcpip")["port"]),
 		"tcpip_remote_host":               asString(m.rt.ModuleSettings("transport-tcpip")["remote_host"]),
 		"tcpip_remote_port":               asString(m.rt.ModuleSettings("transport-tcpip")["remote_port"]),
+		"available_astm_checksum_modes":   []string{"astm", "none"},
+		"available_astm_trailer_modes":    []string{"crlf", "none"},
+		"astm_checksum_mode":              firstNonEmpty(asString(m.rt.ModuleSettings("protocol-astm")["checksum_mode"]), "astm"),
+		"astm_trailer_mode":               firstNonEmpty(asString(m.rt.ModuleSettings("protocol-astm")["trailer_mode"]), "crlf"),
 		"file_import_dir":                 asString(m.rt.ModuleSettings("transport-file")["import_dir"]),
 		"file_processed_dir":              asString(m.rt.ModuleSettings("transport-file")["processed_dir"]),
 		"file_failed_dir":                 asString(m.rt.ModuleSettings("transport-file")["failed_dir"]),
@@ -2733,6 +2747,7 @@ func (m *Module) readerSettingsPayload() map[string]interface{} {
 	labnovation := cfg.ModuleSettings("protocol-labnovation-ld560")
 	storageSQLite := cfg.ModuleSettings("storage-sqlite")
 	transportTCPIP := cfg.ModuleSettings("transport-tcpip")
+	protocolASTM := cfg.ModuleSettings("protocol-astm")
 	transportFile := cfg.ModuleSettings("transport-file")
 	logged := cfg.ModuleSettings("logging")
 	results := cfg.ModuleSettings("results")
@@ -2755,6 +2770,8 @@ func (m *Module) readerSettingsPayload() map[string]interface{} {
 	settings["tcpip_port"] = firstNonEmpty(asString(transportTCPIP["port"]), asString(settings["tcpip_port"]))
 	settings["tcpip_remote_host"] = firstNonEmpty(asString(transportTCPIP["remote_host"]), asString(settings["tcpip_remote_host"]))
 	settings["tcpip_remote_port"] = firstNonEmpty(asString(transportTCPIP["remote_port"]), asString(settings["tcpip_remote_port"]))
+	settings["astm_checksum_mode"] = firstNonEmpty(asString(protocolASTM["checksum_mode"]), asString(settings["astm_checksum_mode"]), "astm")
+	settings["astm_trailer_mode"] = firstNonEmpty(asString(protocolASTM["trailer_mode"]), asString(settings["astm_trailer_mode"]), "crlf")
 	settings["file_import_dir"] = firstNonEmpty(asString(transportFile["import_dir"]), asString(settings["file_import_dir"]))
 	settings["file_processed_dir"] = firstNonEmpty(asString(transportFile["processed_dir"]), asString(settings["file_processed_dir"]))
 	settings["file_failed_dir"] = firstNonEmpty(asString(transportFile["failed_dir"]), asString(settings["file_failed_dir"]))

@@ -68,6 +68,8 @@ type tcpConfig struct {
 	RemotePort    string
 	SendACK       bool
 	FrameTimeout  time.Duration
+	ChecksumMode  string
+	TrailerMode   string
 	SampleIDPaths []string
 	PatientIDPath []string
 	PatientName   []string
@@ -243,6 +245,10 @@ func (m *Module) handleSettingsPage(w http.ResponseWriter, _ *http.Request) {
 			"result_flag":  cfg.ResultFlag,
 		},
 		"qc_prefixes": cfg.QCPrefixes,
+		"framing": map[string]string{
+			"checksum_mode": cfg.ChecksumMode,
+			"trailer_mode":  cfg.TrailerMode,
+		},
 	}, "", "  ")
 	html := fmt.Sprintf(`<!doctype html><html lang="ro"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Protocol ASTM</title><style>body{font:15px/1.5 Arial,sans-serif;margin:24px;color:#1f2937}pre{background:#111827;color:#e5e7eb;padding:16px;border-radius:12px;overflow:auto}code{background:#f3f4f6;padding:2px 6px;border-radius:6px}</style></head><body><h1>Protocol ASTM</h1><p>Stack activ pentru Gemini `+"`TCP/IP + ASTM`"+`. Status live: <code>/api/protocol/astm/status</code>.</p><pre>%s</pre></body></html>`, string(payload))
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -464,6 +470,7 @@ func (m *Module) handleConn(ctx context.Context, conn net.Conn, cfg tcpConfig, m
 	frameEnded := false
 	framePayload := make([]byte, 0, 256)
 	frameTrailer := make([]byte, 0, 4)
+	expectedTrailerBytes := astmExpectedTrailerBytes(cfg)
 	resetFrame := func() {
 		frameActive = false
 		frameEnded = false
@@ -500,6 +507,17 @@ func (m *Module) handleConn(ctx context.Context, conn net.Conn, cfg tcpConfig, m
 		if frameActive {
 			if !frameEnded {
 				if b == ctrlETX || b == ctrlETB {
+					if expectedTrailerBytes == 0 {
+						frame := normalizeFrameText(string(framePayload))
+						frames = append(frames, frame)
+						m.trace("in", "tcpip", remote+" FRAME", []byte(frame))
+						if cfg.SendACK {
+							_, _ = conn.Write([]byte{ctrlACK})
+							m.trace("out", "tcpip", remote+" ACK", []byte{ctrlACK})
+						}
+						resetFrame()
+						continue
+					}
 					frameEnded = true
 					frameTrailer = frameTrailer[:0]
 					continue
@@ -508,7 +526,7 @@ func (m *Module) handleConn(ctx context.Context, conn net.Conn, cfg tcpConfig, m
 				continue
 			}
 			frameTrailer = append(frameTrailer, b)
-			if len(frameTrailer) < 4 {
+			if len(frameTrailer) < expectedTrailerBytes {
 				continue
 			}
 			frame := normalizeFrameText(string(framePayload))
@@ -857,6 +875,8 @@ func (m *Module) readConfig() tcpConfig {
 		RemotePort:    firstNonEmpty(asString(transport["remote_port"]), firstNonEmpty(asString(transport["port"]), "9000")),
 		SendACK:       boolSetting(settings, "send_ack", true),
 		FrameTimeout:  time.Duration(intSetting(settings, "frame_timeout_ms", 2000)) * time.Millisecond,
+		ChecksumMode:  astmFrameChecksumMode(settings),
+		TrailerMode:   astmFrameTrailerMode(settings),
 		SampleIDPaths: listSetting(settings, "sample_id_paths", []string{"O.3.1", "O.2.1"}),
 		PatientIDPath: listSetting(settings, "patient_id_paths", []string{"P.3.1", "P.2.1"}),
 		PatientName:   listSetting(settings, "patient_name_paths", []string{"P.5.1", "P.4.1"}),
@@ -868,6 +888,35 @@ func (m *Module) readConfig() tcpConfig {
 		ResultFlag:    listSetting(settings, "result_flag_paths", []string{"R.6.1", "R.8.1"}),
 		QCPrefixes:    listSetting(settings, "qc_prefixes", []string{"QC", "CTRL", "CONTROL"}),
 		AnalyteMap:    stringMapSetting(settings, "analyte_mappings"),
+	}
+}
+
+func astmExpectedTrailerBytes(cfg tcpConfig) int {
+	count := 0
+	if cfg.ChecksumMode != "none" {
+		count += 2
+	}
+	if cfg.TrailerMode == "crlf" {
+		count += 2
+	}
+	return count
+}
+
+func astmFrameChecksumMode(settings map[string]interface{}) string {
+	switch strings.ToLower(strings.TrimSpace(asString(settings["checksum_mode"]))) {
+	case "none":
+		return "none"
+	default:
+		return "astm"
+	}
+}
+
+func astmFrameTrailerMode(settings map[string]interface{}) string {
+	switch strings.ToLower(strings.TrimSpace(asString(settings["trailer_mode"]))) {
+	case "none":
+		return "none"
+	default:
+		return "crlf"
 	}
 }
 

@@ -2016,11 +2016,15 @@ async function loadReaderSettings() {
     available_comm_types: Array.isArray(resp.settings?.available_comm_types) ? resp.settings.available_comm_types : [],
     available_protocols: Array.isArray(resp.settings?.available_protocols) ? resp.settings.available_protocols : [],
     available_tcpip_modes: Array.isArray(resp.settings?.available_tcpip_modes) ? resp.settings.available_tcpip_modes : [],
+    available_astm_checksum_modes: Array.isArray(resp.settings?.available_astm_checksum_modes) ? resp.settings.available_astm_checksum_modes : ["astm", "none"],
+    available_astm_trailer_modes: Array.isArray(resp.settings?.available_astm_trailer_modes) ? resp.settings.available_astm_trailer_modes : ["crlf", "none"],
     tcpip_mode: String(resp.settings?.tcpip_mode || "server"),
     tcpip_host: String(resp.settings?.tcpip_host || ""),
     tcpip_port: String(resp.settings?.tcpip_port || ""),
     tcpip_remote_host: String(resp.settings?.tcpip_remote_host || ""),
     tcpip_remote_port: String(resp.settings?.tcpip_remote_port || ""),
+    astm_checksum_mode: String(resp.settings?.astm_checksum_mode || "astm"),
+    astm_trailer_mode: String(resp.settings?.astm_trailer_mode || "crlf"),
     file_import_dir: String(resp.settings?.file_import_dir || "./inbox"),
     file_processed_dir: String(resp.settings?.file_processed_dir || "./processed"),
     file_failed_dir: String(resp.settings?.file_failed_dir || "./failed"),
@@ -2056,6 +2060,8 @@ async function loadReaderSettings() {
     fillSelect(form.elements.analyzer_comm_type, state.readerSettings.available_comm_types, state.readerSettings.analyzer_comm_type);
     fillSelect(form.elements.analyzer_protocol, state.readerSettings.available_protocols, state.readerSettings.analyzer_protocol);
     fillSelect(form.elements.tcpip_mode, state.readerSettings.available_tcpip_modes, state.readerSettings.tcpip_mode);
+    fillSelect(form.elements.astm_checksum_mode, state.readerSettings.available_astm_checksum_modes, state.readerSettings.astm_checksum_mode);
+    fillSelect(form.elements.astm_trailer_mode, state.readerSettings.available_astm_trailer_modes, state.readerSettings.astm_trailer_mode);
     form.elements.reader_id.value = state.readerSettings.reader_id;
     form.elements.reader_label.value = state.readerSettings.reader_label;
     form.elements.analyzer_name.value = state.readerSettings.analyzer_name;
@@ -2073,6 +2079,8 @@ async function loadReaderSettings() {
     form.elements.tcpip_port.value = state.readerSettings.tcpip_port;
     form.elements.tcpip_remote_host.value = state.readerSettings.tcpip_remote_host;
     form.elements.tcpip_remote_port.value = state.readerSettings.tcpip_remote_port;
+    form.elements.astm_checksum_mode.value = state.readerSettings.astm_checksum_mode || "astm";
+    form.elements.astm_trailer_mode.value = state.readerSettings.astm_trailer_mode || "crlf";
     form.elements.file_import_dir.value = state.readerSettings.file_import_dir;
     form.elements.file_processed_dir.value = state.readerSettings.file_processed_dir;
     form.elements.file_failed_dir.value = state.readerSettings.file_failed_dir;
@@ -2127,6 +2135,8 @@ async function onSaveReaderSettings(event) {
     tcpip_port: String(form.elements.tcpip_port.value || "").trim(),
     tcpip_remote_host: String(form.elements.tcpip_remote_host.value || "").trim(),
     tcpip_remote_port: String(form.elements.tcpip_remote_port.value || "").trim(),
+    astm_checksum_mode: String(form.elements.astm_checksum_mode.value || "astm").trim(),
+    astm_trailer_mode: String(form.elements.astm_trailer_mode.value || "crlf").trim(),
     file_import_dir: String(form.elements.file_import_dir.value || "./inbox").trim(),
     file_processed_dir: String(form.elements.file_processed_dir.value || "./processed").trim(),
     file_failed_dir: String(form.elements.file_failed_dir.value || "./failed").trim(),
@@ -2173,11 +2183,15 @@ async function onSaveReaderSettings(event) {
     available_comm_types: Array.isArray(resp.settings?.available_comm_types) ? resp.settings.available_comm_types : state.readerSettings.available_comm_types,
     available_protocols: Array.isArray(resp.settings?.available_protocols) ? resp.settings.available_protocols : state.readerSettings.available_protocols,
     available_tcpip_modes: Array.isArray(resp.settings?.available_tcpip_modes) ? resp.settings.available_tcpip_modes : state.readerSettings.available_tcpip_modes,
+    available_astm_checksum_modes: Array.isArray(resp.settings?.available_astm_checksum_modes) ? resp.settings.available_astm_checksum_modes : state.readerSettings.available_astm_checksum_modes,
+    available_astm_trailer_modes: Array.isArray(resp.settings?.available_astm_trailer_modes) ? resp.settings.available_astm_trailer_modes : state.readerSettings.available_astm_trailer_modes,
     tcpip_mode: String(resp.settings?.tcpip_mode || payload.tcpip_mode),
     tcpip_host: String(resp.settings?.tcpip_host || payload.tcpip_host),
     tcpip_port: String(resp.settings?.tcpip_port || payload.tcpip_port),
     tcpip_remote_host: String(resp.settings?.tcpip_remote_host || payload.tcpip_remote_host),
     tcpip_remote_port: String(resp.settings?.tcpip_remote_port || payload.tcpip_remote_port),
+    astm_checksum_mode: String(resp.settings?.astm_checksum_mode || payload.astm_checksum_mode),
+    astm_trailer_mode: String(resp.settings?.astm_trailer_mode || payload.astm_trailer_mode),
     file_import_dir: String(resp.settings?.file_import_dir || payload.file_import_dir),
     file_processed_dir: String(resp.settings?.file_processed_dir || payload.file_processed_dir),
     file_failed_dir: String(resp.settings?.file_failed_dir || payload.file_failed_dir),
@@ -2263,14 +2277,17 @@ function syncReaderSettingsTransportFields() {
   const tcpModeRow = document.getElementById("reader-settings-tcp-mode-row");
   const tcpServerRow = document.getElementById("reader-settings-tcp-server-row");
   const tcpClientRow = document.getElementById("reader-settings-tcp-client-row");
+  const astmFramingRow = document.getElementById("reader-settings-astm-framing-row");
   const fileRow = document.getElementById("reader-settings-file-row");
   const labnovationImageRow = document.getElementById("reader-settings-labnovation-image-row");
   const showTCP = commType === "tcpip";
   const showFile = commType === "file";
+  const showASTMFraming = showTCP && analyzerProtocol === "astm";
   const showLabnovationImage = analyzerProtocol === "labnovation-ld560";
   if (tcpModeRow) tcpModeRow.hidden = !showTCP;
   if (tcpServerRow) tcpServerRow.hidden = !showTCP || tcpMode === "client";
   if (tcpClientRow) tcpClientRow.hidden = !showTCP || tcpMode !== "client";
+  if (astmFramingRow) astmFramingRow.hidden = !showASTMFraming;
   if (fileRow) fileRow.hidden = !showFile;
   if (labnovationImageRow) labnovationImageRow.hidden = !showLabnovationImage;
 }
