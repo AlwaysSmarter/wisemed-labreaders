@@ -460,6 +460,16 @@ func (m *Module) handleConn(ctx context.Context, conn net.Conn, cfg tcpConfig, m
 	var frames []string
 	var rawLines []string
 	var lineBuf strings.Builder
+	frameActive := false
+	frameEnded := false
+	framePayload := make([]byte, 0, 256)
+	frameTrailer := make([]byte, 0, 4)
+	resetFrame := func() {
+		frameActive = false
+		frameEnded = false
+		framePayload = framePayload[:0]
+		frameTrailer = frameTrailer[:0]
+	}
 	for {
 		if cfg.FrameTimeout > 0 {
 			_ = conn.SetReadDeadline(time.Now().Add(cfg.FrameTimeout))
@@ -467,6 +477,9 @@ func (m *Module) handleConn(ctx context.Context, conn net.Conn, cfg tcpConfig, m
 		b, err := reader.ReadByte()
 		if err != nil {
 			if ne, ok := err.(net.Error); ok && ne.Timeout() {
+				if frameActive {
+					continue
+				}
 				if len(frames) > 0 {
 					_ = m.processBatch(strings.Join(frames, ""), remote, cfg)
 					frames = nil
@@ -484,6 +497,30 @@ func (m *Module) handleConn(ctx context.Context, conn net.Conn, cfg tcpConfig, m
 		if tracker := m.activityTracker(); tracker != nil {
 			tracker.Packet("in", "tcpip")
 		}
+		if frameActive {
+			if !frameEnded {
+				if b == ctrlETX || b == ctrlETB {
+					frameEnded = true
+					frameTrailer = frameTrailer[:0]
+					continue
+				}
+				framePayload = append(framePayload, b)
+				continue
+			}
+			frameTrailer = append(frameTrailer, b)
+			if len(frameTrailer) < 4 {
+				continue
+			}
+			frame := normalizeFrameText(string(framePayload))
+			frames = append(frames, frame)
+			m.trace("in", "tcpip", remote+" FRAME", []byte(frame))
+			if cfg.SendACK {
+				_, _ = conn.Write([]byte{ctrlACK})
+				m.trace("out", "tcpip", remote+" ACK", []byte{ctrlACK})
+			}
+			resetFrame()
+			continue
+		}
 		switch b {
 		case ctrlENQ:
 			if cfg.SendACK {
@@ -494,21 +531,10 @@ func (m *Module) handleConn(ctx context.Context, conn net.Conn, cfg tcpConfig, m
 			rawLines = nil
 			lineBuf.Reset()
 		case ctrlSTX:
-			frame, ferr := readFrame(reader)
-			if ferr != nil {
-				m.setError(ferr)
-				if cfg.SendACK {
-					_, _ = conn.Write([]byte{ctrlNAK})
-					m.trace("out", "tcpip", remote+" NAK", []byte{ctrlNAK})
-				}
-				continue
-			}
-			frames = append(frames, frame)
-			m.trace("in", "tcpip", remote+" FRAME", []byte(frame))
-			if cfg.SendACK {
-				_, _ = conn.Write([]byte{ctrlACK})
-				m.trace("out", "tcpip", remote+" ACK", []byte{ctrlACK})
-			}
+			frameActive = true
+			frameEnded = false
+			framePayload = framePayload[:0]
+			frameTrailer = frameTrailer[:0]
 		case ctrlEOT:
 			if len(frames) > 0 {
 				if err := m.processBatch(strings.Join(frames, ""), remote, cfg); err != nil {
@@ -516,6 +542,7 @@ func (m *Module) handleConn(ctx context.Context, conn net.Conn, cfg tcpConfig, m
 				}
 				frames = nil
 			}
+			resetFrame()
 		case '\r', '\n':
 			line := strings.TrimSpace(lineBuf.String())
 			lineBuf.Reset()
@@ -546,6 +573,13 @@ func (m *Module) handleConn(ctx context.Context, conn net.Conn, cfg tcpConfig, m
 	if len(rawLines) > 0 {
 		_ = m.processBatch(strings.Join(rawLines, "\r"), remote, cfg)
 	}
+}
+
+func normalizeFrameText(text string) string {
+	if text != "" && unicode.IsDigit(rune(text[0])) {
+		text = text[1:]
+	}
+	return text
 }
 
 func (m *Module) processBatch(payload, remote string, cfg tcpConfig) error {
