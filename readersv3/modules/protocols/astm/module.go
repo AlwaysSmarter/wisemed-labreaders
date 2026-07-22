@@ -3,6 +3,7 @@ package astm
 import (
 	"bufio"
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -21,7 +22,6 @@ import (
 	coremodel "wisemed-labreaders/readersv3/modules/core/model"
 	"wisemed-labreaders/readersv3/shared/analyzeractivity"
 	"wisemed-labreaders/readersv3/shared/bindguard"
-	"wisemed-labreaders/readersv3/shared/commtrace"
 	"wisemed-labreaders/readersv3/shared/debugreplay"
 )
 
@@ -114,6 +114,17 @@ type astmResult struct {
 	RawValue    string
 	Unit        string
 	Flag        string
+}
+
+type astmFrameInfo struct {
+	Text             string
+	RawPayload       []byte
+	Terminator       byte
+	ChecksumRaw      string
+	ChecksumExpected string
+	ChecksumPresent  bool
+	ChecksumValid    bool
+	TrailerRaw       []byte
 }
 
 type Module struct {
@@ -468,12 +479,14 @@ func (m *Module) handleConn(ctx context.Context, conn net.Conn, cfg tcpConfig, m
 	var lineBuf strings.Builder
 	frameActive := false
 	frameEnded := false
+	frameTerminator := byte(0)
 	framePayload := make([]byte, 0, 256)
 	frameTrailer := make([]byte, 0, 4)
 	expectedTrailerBytes := astmExpectedTrailerBytes(cfg)
 	resetFrame := func() {
 		frameActive = false
 		frameEnded = false
+		frameTerminator = 0
 		framePayload = framePayload[:0]
 		frameTrailer = frameTrailer[:0]
 	}
@@ -500,20 +513,21 @@ func (m *Module) handleConn(ctx context.Context, conn net.Conn, cfg tcpConfig, m
 			m.rt.Logf("astm read error remote=%s: %v", remote, err)
 			break
 		}
-		m.trace("in", "tcpip", remote, []byte{b})
+		m.tracePacket("in", "tcpip", remote, []byte{b})
 		if tracker := m.activityTracker(); tracker != nil {
 			tracker.Packet("in", "tcpip")
 		}
 		if frameActive {
 			if !frameEnded {
 				if b == ctrlETX || b == ctrlETB {
+					frameTerminator = b
 					if expectedTrailerBytes == 0 {
-						frame := normalizeFrameText(string(framePayload))
-						frames = append(frames, frame)
-						m.trace("in", "tcpip", remote+" FRAME", []byte(frame))
+						frame := m.buildFrameInfo(framePayload, frameTerminator, nil, cfg)
+						frames = append(frames, frame.Text)
+						m.traceFrame("in", "tcpip", remote+" FRAME", frame)
 						if cfg.SendACK {
 							_, _ = conn.Write([]byte{ctrlACK})
-							m.trace("out", "tcpip", remote+" ACK", []byte{ctrlACK})
+							m.tracePacket("out", "tcpip", remote+" ACK", []byte{ctrlACK})
 						}
 						resetFrame()
 						continue
@@ -529,12 +543,12 @@ func (m *Module) handleConn(ctx context.Context, conn net.Conn, cfg tcpConfig, m
 			if len(frameTrailer) < expectedTrailerBytes {
 				continue
 			}
-			frame := normalizeFrameText(string(framePayload))
-			frames = append(frames, frame)
-			m.trace("in", "tcpip", remote+" FRAME", []byte(frame))
+			frame := m.buildFrameInfo(framePayload, frameTerminator, frameTrailer, cfg)
+			frames = append(frames, frame.Text)
+			m.traceFrame("in", "tcpip", remote+" FRAME", frame)
 			if cfg.SendACK {
 				_, _ = conn.Write([]byte{ctrlACK})
-				m.trace("out", "tcpip", remote+" ACK", []byte{ctrlACK})
+				m.tracePacket("out", "tcpip", remote+" ACK", []byte{ctrlACK})
 			}
 			resetFrame()
 			continue
@@ -543,7 +557,7 @@ func (m *Module) handleConn(ctx context.Context, conn net.Conn, cfg tcpConfig, m
 		case ctrlENQ:
 			if cfg.SendACK {
 				_, _ = conn.Write([]byte{ctrlACK})
-				m.trace("out", "tcpip", remote+" ACK", []byte{ctrlACK})
+				m.tracePacket("out", "tcpip", remote+" ACK", []byte{ctrlACK})
 			}
 			frames = nil
 			rawLines = nil
@@ -603,10 +617,13 @@ func normalizeFrameText(text string) string {
 func (m *Module) processBatch(payload, remote string, cfg tcpConfig) error {
 	records := parseRecords(payload)
 	if len(records) == 0 {
+		m.logProcessing("astm parse source=%s records=0", remote)
 		return nil
 	}
+	m.logProcessing("astm parse source=%s records=%d types=%s", remote, len(records), summarizeRecordTypes(records))
 	results := parseBatch(records, cfg)
 	if len(results) == 0 {
+		m.logProcessing("astm parse source=%s produced no results", remote)
 		return errors.New("astm payload parsed but produced no results")
 	}
 	store := m.importStore()
@@ -621,8 +638,20 @@ func (m *Module) processBatch(payload, remote string, cfg tcpConfig) error {
 	qcRecordIDs := []int64{}
 	sourceName := sanitizeSourceName(remote)
 	for _, item := range results {
+		m.logLevel1("astm rezultat primit sample_id=%s patient_id=%s analyte=%s value=%s",
+			firstNonEmpty(item.Order.SampleID, "-"),
+			firstNonEmpty(item.Order.PatientID, "-"),
+			firstNonEmpty(item.AnalyteTag, item.AnalyteName, "-"),
+			firstNonEmpty(strings.TrimSpace(item.Value), "-"))
 		tag := normalizeTag(firstNonEmpty(mappedAnalyte(cfg.AnalyteMap, item.AnalyteTag), item.AnalyteName))
 		if tag == "" || strings.TrimSpace(item.Value) == "" {
+			m.logProcessing("astm skip source=%s sample_id=%s patient_id=%s analyte_tag=%s analyte_name=%s reason=%s",
+				remote,
+				firstNonEmpty(item.Order.SampleID, "-"),
+				firstNonEmpty(item.Order.PatientID, "-"),
+				firstNonEmpty(item.AnalyteTag, "-"),
+				firstNonEmpty(item.AnalyteName, "-"),
+				missingResultReason(tag, item.Value))
 			continue
 		}
 		name := firstNonEmpty(mappedAnalyte(cfg.AnalyteMap, item.AnalyteName), item.AnalyteTag, tag)
@@ -920,6 +949,97 @@ func astmFrameTrailerMode(settings map[string]interface{}) string {
 	}
 }
 
+func (m *Module) buildFrameInfo(payload []byte, terminator byte, trailer []byte, cfg tcpConfig) astmFrameInfo {
+	info := astmFrameInfo{
+		Text:       normalizeFrameText(string(payload)),
+		RawPayload: append([]byte(nil), payload...),
+		Terminator: terminator,
+		TrailerRaw: append([]byte(nil), trailer...),
+	}
+	if cfg.ChecksumMode != "none" && len(trailer) >= 2 {
+		info.ChecksumPresent = true
+		info.ChecksumRaw = strings.ToUpper(string(trailer[:2]))
+		info.ChecksumExpected = computeASTMChecksum(payload, terminator)
+		info.ChecksumValid = strings.EqualFold(info.ChecksumRaw, info.ChecksumExpected)
+	}
+	return info
+}
+
+func computeASTMChecksum(payload []byte, terminator byte) string {
+	sum := 0
+	for _, b := range payload {
+		sum += int(b)
+	}
+	sum += int(terminator)
+	return strings.ToUpper(fmt.Sprintf("%02X", sum%256))
+}
+
+func summarizeRecordTypes(records []astmRecord) string {
+	if len(records) == 0 {
+		return "-"
+	}
+	parts := make([]string, 0, len(records))
+	for _, rec := range records {
+		parts = append(parts, firstNonEmpty(rec.Type, "?"))
+	}
+	return strings.Join(parts, ",")
+}
+
+func missingResultReason(tag, value string) string {
+	switch {
+	case strings.TrimSpace(tag) == "" && strings.TrimSpace(value) == "":
+		return "missing analyte tag and result value"
+	case strings.TrimSpace(tag) == "":
+		return "missing analyte tag"
+	case strings.TrimSpace(value) == "":
+		return "missing result value"
+	default:
+		return "unknown"
+	}
+}
+
+func describeControlByte(value byte) string {
+	switch value {
+	case ctrlENQ:
+		return "ENQ"
+	case ctrlACK:
+		return "ACK"
+	case ctrlNAK:
+		return "NAK"
+	case ctrlEOT:
+		return "EOT"
+	case ctrlSTX:
+		return "STX"
+	case ctrlETX:
+		return "ETX"
+	case ctrlETB:
+		return "ETB"
+	case '\r':
+		return "CR"
+	case '\n':
+		return "LF"
+	default:
+		if value == 0 {
+			return "NONE"
+		}
+		if unicode.IsPrint(rune(value)) {
+			return fmt.Sprintf("%q", value)
+		}
+		return fmt.Sprintf("0x%02X", value)
+	}
+}
+
+func formatTraceText(payload []byte) string {
+	text := strings.TrimSpace(string(payload))
+	if text == "" {
+		return "(empty)"
+	}
+	if strings.HasSuffix(text, "\n") {
+		return text
+	}
+	return text + "\n"
+}
+
 func (m *Module) importStore() importStore {
 	service, ok := m.rt.Service("storage")
 	if !ok {
@@ -1003,12 +1123,60 @@ func (m *Module) appendAudit(level, actor, eventType, message string, meta map[s
 	_ = logger.AppendAuditLog(level, actor, eventType, message, meta)
 }
 
-func (m *Module) trace(direction, transport, details string, payload []byte) {
+func (m *Module) tracePacket(direction, transport, details string, payload []byte) {
+	level := m.verboseLevel()
+	arrow := "==>"
+	label := "IN"
+	if strings.EqualFold(strings.TrimSpace(direction), "out") {
+		arrow = "<=="
+		label = "OUT"
+	}
+	transport = strings.ToUpper(strings.TrimSpace(transport))
+	details = strings.TrimSpace(details)
+	if details != "" {
+		details = " " + details
+	}
+	headline := fmt.Sprintf("%s %s %s%s len=%d", arrow, label, transport, details, len(payload))
+	switch {
+	case level <= 1:
+		m.rt.Logf("%s", headline)
+	case level == 2:
+		m.rt.Logf("%s\nTEXT:\n%s", headline, formatTraceText(payload))
+	default:
+		m.rt.Logf("%s\nTEXT:\n%s\nHEX:\n%s", headline, formatTraceText(payload), strings.TrimRight(hex.Dump(payload), "\n"))
+	}
+}
+
+func (m *Module) traceFrame(direction, transport, details string, frame astmFrameInfo) {
+	m.tracePacket(direction, transport, details, frame.RawPayload)
+	if m.verboseLevel() >= 3 {
+		checksumStatus := "disabled"
+		if frame.ChecksumPresent {
+			checksumStatus = fmt.Sprintf("present raw=%s expected=%s valid=%t", frame.ChecksumRaw, frame.ChecksumExpected, frame.ChecksumValid)
+		}
+		m.rt.Logf("astm frame processing terminator=%s checksum=%s trailer_len=%d payload_len=%d",
+			describeControlByte(frame.Terminator), checksumStatus, len(frame.TrailerRaw), len(frame.RawPayload))
+	}
+}
+
+func (m *Module) verboseLevel() int {
 	level := intSetting(m.rt.ModuleSettings("logging"), "verbose_level", 1)
 	if level <= 0 {
-		level = 1
+		return 1
 	}
-	m.rt.Logf("%s", commtrace.Format(direction, transport, details, payload, level))
+	return level
+}
+
+func (m *Module) logLevel1(format string, args ...interface{}) {
+	if m.verboseLevel() >= 1 {
+		m.rt.Logf(format, args...)
+	}
+}
+
+func (m *Module) logProcessing(format string, args ...interface{}) {
+	if m.verboseLevel() >= 3 {
+		m.rt.Logf(format, args...)
+	}
 }
 
 func (m *Module) connected(delta int) {
