@@ -547,6 +547,9 @@ func SaveOrderBundlesToWiseMEDWithSettings(settings map[string]string, bundles [
 		return SaveOrderBundlesToWiseMED(rt, bundles)
 	}
 	api := wisemedapi.NewOverrideClient(settings, "ReaderV3")
+	if runtimeVerboseLevel(rt) >= 5 {
+		api.Tracef = rt.Logf
+	}
 	if api == nil || !api.SetupComplete() {
 		return nil, errors.New("wisemed-api settings override unavailable or setup incomplete")
 	}
@@ -1366,4 +1369,22 @@ func firstNonEmpty(values ...string) string {
 		}
 	}
 	return ""
+}
+
+func runtimeVerboseLevel(rt module.Runtime) int {
+	if rt == nil {
+		return 1
+	}
+	raw := strings.TrimSpace(fmt.Sprintf("%v", rt.ModuleSettings("logging")["verbose_level"]))
+	value, err := strconv.Atoi(raw)
+	if err != nil {
+		return 1
+	}
+	if value < 1 {
+		return 1
+	}
+	if value > 5 {
+		return 5
+	}
+	return value
 }

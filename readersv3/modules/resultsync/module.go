@@ -166,7 +166,28 @@ func (m *Module) RunOrders(orderIDs []int64, roundNo int, orderDate string) (map
 
 func (m *Module) RunOrdersWithSettings(orderIDs []int64, roundNo int, orderDate string, settings map[string]string) (map[string]interface{}, error) {
 	client := wisemedapi.NewOverrideClient(settings, "ReaderV3")
+	if runtimeVerboseLevel(m.rt) >= 5 {
+		client.Tracef = m.rt.Logf
+	}
 	return m.runOrdersWithWiseMED(context.Background(), orderIDs, roundNo, orderDate, client)
+}
+
+func runtimeVerboseLevel(rt module.Runtime) int {
+	if rt == nil {
+		return 1
+	}
+	raw := strings.TrimSpace(fmt.Sprintf("%v", rt.ModuleSettings("logging")["verbose_level"]))
+	value, err := strconv.Atoi(raw)
+	if err != nil {
+		return 1
+	}
+	if value < 1 {
+		return 1
+	}
+	if value > 5 {
+		return 5
+	}
+	return value
 }
 
 func (m *Module) Reset() {

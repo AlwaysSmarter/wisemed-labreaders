@@ -105,6 +105,7 @@ type OverrideClient struct {
 	settings   map[string]string
 	callerType string
 	client     *http.Client
+	Tracef     traceFunc
 }
 
 func New() module.Module     { return &Module{} }
@@ -394,7 +395,7 @@ func (c *OverrideClient) FetchFileForAnalyzer(fileID, equipmentID string) (map[s
 	}
 	endpoint := "/fileforanalyzer/" + url.PathEscape(fileID) + "/" + url.PathEscape(equipmentID) + "/?XDEBUG_TRIGGER=debug"
 	var raw interface{}
-	if err := doJSONWithClient(c.client, c.settings, c.callerType, http.MethodGet, endpoint, nil, &raw); err != nil {
+	if err := doJSONWithClientTrace(c.client, c.settings, c.callerType, http.MethodGet, endpoint, nil, &raw, c.Tracef); err != nil {
 		return nil, err
 	}
 	if resp, ok := raw.(map[string]interface{}); ok {
@@ -430,7 +431,7 @@ func (c *OverrideClient) SaveFileServiceResults(fileID string, entries []Service
 	}
 	endpoint := "/file/services/results/" + url.PathEscape(fileID) + "?XDEBUG_TRIGGER=debug"
 	var raw interface{}
-	if err := doFormWithClient(c.client, c.settings, c.callerType, http.MethodPatch, endpoint, form, &raw); err != nil {
+	if err := doFormWithClientTrace(c.client, c.settings, c.callerType, http.MethodPatch, endpoint, form, &raw, c.Tracef); err != nil {
 		return nil, err
 	}
 	if resp, ok := raw.(map[string]interface{}); ok {
