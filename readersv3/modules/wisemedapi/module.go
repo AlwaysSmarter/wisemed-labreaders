@@ -271,7 +271,7 @@ func (m *Module) Login(req LoginRequest) (LoginResponse, error) {
 		req.DeviceName = firstNonEmpty(readerString(m.rt, "analyzer_name"), readerString(m.rt, "label"), m.rt.ReaderID())
 	}
 	var raw interface{}
-	if err := m.putJSON("/administrative/login", req, &raw); err != nil {
+	if err := m.doJSON(http.MethodPut, "/administrative/login", req, &raw); err != nil {
 		return LoginResponse{}, err
 	}
 	resp, err := parseLoginResponse(raw)
