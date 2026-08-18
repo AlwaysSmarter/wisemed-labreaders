@@ -122,7 +122,7 @@ func NewBootstrapClient(settings map[string]string, callerType string) *Bootstra
 	return &BootstrapClient{
 		Settings:   items,
 		CallerType: callerType,
-		Client:     &http.Client{Timeout: 20 * time.Second},
+		Client:     newWiseMEDHTTPClient(items),
 	}
 }
 
@@ -138,7 +138,7 @@ func NewOverrideClient(settings map[string]string, callerType string) *OverrideC
 	return &OverrideClient{
 		settings:   items,
 		callerType: callerType,
-		client:     &http.Client{Timeout: 20 * time.Second},
+		client:     newWiseMEDHTTPClient(items),
 	}
 }
 
@@ -146,7 +146,7 @@ func (m *Module) Init(rt module.Runtime) error {
 	m.rt = rt
 	m.settings = readStringSettings(rt.ModuleSettings(m.ID()))
 	m.applyBaseURLFallback()
-	m.client = &http.Client{Timeout: 20 * time.Second}
+	m.client = newWiseMEDHTTPClient(m.settings)
 	rt.RegisterService("wisemed-api", m)
 	rt.Handle("/api/wisemed/meta", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]interface{}{
@@ -1066,7 +1066,29 @@ func (c *BootstrapClient) httpClient() *http.Client {
 	if c.Client != nil {
 		return c.Client
 	}
-	return &http.Client{Timeout: 20 * time.Second}
+	return newWiseMEDHTTPClient(c.Settings)
+}
+
+func newWiseMEDHTTPClient(settings map[string]string) *http.Client {
+	timeout := 20 * time.Second
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	if isLegacyMedicalPagesAPI(settings) {
+		transport.DisableCompression = true
+		transport.DisableKeepAlives = true
+	}
+	return &http.Client{
+		Timeout:   timeout,
+		Transport: transport,
+	}
+}
+
+func isLegacyMedicalPagesAPI(settings map[string]string) bool {
+	if len(settings) == 0 {
+		return false
+	}
+	protocol := strings.ToLower(strings.TrimSpace(settings["cfg_wisemed_protocol"]))
+	path := strings.ToLower(strings.TrimSpace(settings["cfg_wisemed_path"]))
+	return protocol == "http" || strings.Contains(path, "mp-api")
 }
 
 func applyBaseURLFallbackToSettings(settings map[string]string) {
@@ -1151,20 +1173,25 @@ func doJSONWithClientTrace(client *http.Client, settings map[string]string, call
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
+	req.Header.Set("Accept", "application/json")
+	if isLegacyMedicalPagesAPI(settings) {
+		req.Close = true
+	}
 	token, err := createJWTForSettings(settings, callerType)
 	if err != nil {
 		return err
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
 	traceHTTPRequest(tracef, client, method, path, target, payload, token)
+	start := time.Now()
 	resp, err := client.Do(req)
 	if err != nil {
-		traceHTTPTransportError(tracef, method, path, target, err)
+		traceHTTPTransportError(tracef, method, path, target, time.Since(start), err)
 		return err
 	}
 	defer resp.Body.Close()
 	raw, _ := io.ReadAll(resp.Body)
-	traceHTTPResponse(tracef, method, path, target, resp.StatusCode, resp.Status, resp.Header, raw)
+	traceHTTPResponse(tracef, method, path, target, time.Since(start), resp.StatusCode, resp.Status, resp.Header, raw)
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		apiErr := apiError{}
 		if err := json.Unmarshal(raw, &apiErr); err == nil && strings.TrimSpace(apiErr.Message) != "" {
@@ -1199,20 +1226,25 @@ func doFormWithClientTrace(client *http.Client, settings map[string]string, call
 		return err
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Accept", "application/json")
+	if isLegacyMedicalPagesAPI(settings) {
+		req.Close = true
+	}
 	token, err := createJWTForSettings(settings, callerType)
 	if err != nil {
 		return err
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
 	traceHTTPRequest(tracef, client, method, path, target, sanitizeFormValues(payload), token)
+	start := time.Now()
 	resp, err := client.Do(req)
 	if err != nil {
-		traceHTTPTransportError(tracef, method, path, target, err)
+		traceHTTPTransportError(tracef, method, path, target, time.Since(start), err)
 		return err
 	}
 	defer resp.Body.Close()
 	raw, _ := io.ReadAll(resp.Body)
-	traceHTTPResponse(tracef, method, path, target, resp.StatusCode, resp.Status, resp.Header, raw)
+	traceHTTPResponse(tracef, method, path, target, time.Since(start), resp.StatusCode, resp.Status, resp.Header, raw)
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		apiErr := apiError{}
 		if err := json.Unmarshal(raw, &apiErr); err == nil && strings.TrimSpace(apiErr.Message) != "" {
@@ -1246,18 +1278,19 @@ func traceHTTPRequest(tracef traceFunc, client *http.Client, method, path, targe
 	if client != nil && client.Timeout > 0 {
 		timeout = client.Timeout.String()
 	}
-	tracef("wisemed-api trace request method=%s path=%s url=%s timeout=%s body=%s", method, path, target, timeout, mustJSON(maskSecrets(payload)))
+	legacy := isLegacyMedicalPagesAPI(map[string]string{"cfg_wisemed_protocol": mustProtocolFromURL(target), "cfg_wisemed_path": mustPathFromURL(target)})
+	tracef("wisemed-api trace request method=%s path=%s url=%s timeout=%s legacy_mode=%t body=%s", method, path, target, timeout, legacy, mustJSON(maskSecrets(payload)))
 	tracef("wisemed-api trace auth method=%s path=%s bearer_present=%t bearer_preview=%s jwt_claims=%s", method, path, strings.TrimSpace(token) != "", previewJWT(token), jwtClaimsSummary(token))
 }
 
-func traceHTTPTransportError(tracef traceFunc, method, path, target string, err error) {
+func traceHTTPTransportError(tracef traceFunc, method, path, target string, elapsed time.Duration, err error) {
 	if tracef == nil {
 		return
 	}
-	tracef("wisemed-api trace transport-error method=%s path=%s url=%s error=%v", method, path, target, err)
+	tracef("wisemed-api trace transport-error method=%s path=%s url=%s elapsed=%s error=%v", method, path, target, elapsed.Round(time.Millisecond), err)
 }
 
-func traceHTTPResponse(tracef traceFunc, method, path, target string, statusCode int, status string, headers http.Header, raw []byte) {
+func traceHTTPResponse(tracef traceFunc, method, path, target string, elapsed time.Duration, statusCode int, status string, headers http.Header, raw []byte) {
 	if tracef == nil {
 		return
 	}
@@ -1265,7 +1298,7 @@ func traceHTTPResponse(tracef traceFunc, method, path, target string, statusCode
 	if len(bodyText) > 1200 {
 		bodyText = bodyText[:1200] + "...(truncated)"
 	}
-	tracef("wisemed-api trace response method=%s path=%s url=%s status_code=%d status=%q content_type=%q body=%s", method, path, target, statusCode, status, strings.TrimSpace(headers.Get("Content-Type")), bodyText)
+	tracef("wisemed-api trace response method=%s path=%s url=%s elapsed=%s status_code=%d status=%q content_type=%q body=%s", method, path, target, elapsed.Round(time.Millisecond), statusCode, status, strings.TrimSpace(headers.Get("Content-Type")), bodyText)
 }
 
 func previewJWT(token string) string {
@@ -1293,6 +1326,22 @@ func jwtClaimsSummary(token string) string {
 		return "json-error:" + err.Error()
 	}
 	return mustJSON(maskSecrets(claims))
+}
+
+func mustProtocolFromURL(value string) string {
+	parsed, err := url.Parse(strings.TrimSpace(value))
+	if err != nil {
+		return ""
+	}
+	return parsed.Scheme
+}
+
+func mustPathFromURL(value string) string {
+	parsed, err := url.Parse(strings.TrimSpace(value))
+	if err != nil {
+		return ""
+	}
+	return parsed.Path
 }
 
 func makeURLFromSettings(settings map[string]string, path string) (string, error) {
