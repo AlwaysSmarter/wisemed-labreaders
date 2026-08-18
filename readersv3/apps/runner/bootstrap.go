@@ -50,6 +50,7 @@ func ensureBootstrap(cfg *config.Config, reconfigure bool) (bool, error) {
 		changed = true
 	}
 	apiClient := wisemedapi.NewBootstrapClient(stringSettings(settings), callerTypeForProtocol(cfg.Analyzer.Protocol))
+	apiClient.Tracef = startupConsolef
 
 	if reconfigure || cfg.Reader.ID == "" {
 		promptTopLevelString(reader, "Reader ID", &cfg.Reader.ID, defaultReaderID(cfg))

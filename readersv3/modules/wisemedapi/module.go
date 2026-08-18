@@ -92,10 +92,13 @@ type apiError struct {
 	ErrorContext string `json:"error_context"`
 }
 
+type traceFunc func(format string, args ...interface{})
+
 type BootstrapClient struct {
 	Settings   map[string]string
 	CallerType string
 	Client     *http.Client
+	Tracef     traceFunc
 }
 
 type OverrideClient struct {
@@ -608,7 +611,7 @@ func (m *Module) doJSON(method, path string, payload interface{}, out interface{
 	if m.verboseLevel() >= 4 {
 		m.rt.Logf("wisemed-api request method=%s path=%s url=%s body=%s", method, path, targetURL, mustJSON(maskSecrets(payload)))
 	}
-	err := doJSONWithClient(m.client, m.Settings(), m.callerType(), method, path, payload, out)
+	err := doJSONWithClientTrace(m.client, m.Settings(), m.callerType(), method, path, payload, out, m.wiseMEDTracef())
 	if m.verboseLevel() >= 4 {
 		if err != nil {
 			m.rt.Logf("wisemed-api response method=%s path=%s url=%s error=%v", method, path, targetURL, err)
@@ -626,7 +629,7 @@ func (m *Module) doForm(method, path string, payload url.Values, out interface{}
 	if m.verboseLevel() >= 4 {
 		m.rt.Logf("wisemed-api form request method=%s path=%s url=%s body=%s", method, path, targetURL, sanitizeFormValues(payload).Encode())
 	}
-	err := doFormWithClient(m.client, m.Settings(), m.callerType(), method, path, payload, out)
+	err := doFormWithClientTrace(m.client, m.Settings(), m.callerType(), method, path, payload, out, m.wiseMEDTracef())
 	if m.verboseLevel() >= 4 {
 		if err != nil {
 			m.rt.Logf("wisemed-api form response method=%s path=%s url=%s error=%v", method, path, targetURL, err)
@@ -869,6 +872,15 @@ func (m *Module) verboseLevel() int {
 	return value
 }
 
+func (m *Module) wiseMEDTracef() traceFunc {
+	if m == nil || m.rt == nil || m.verboseLevel() < 4 {
+		return nil
+	}
+	return func(format string, args ...interface{}) {
+		m.rt.Logf(format, args...)
+	}
+}
+
 func mustJSON(value interface{}) string {
 	blob, err := json.Marshal(value)
 	if err != nil {
@@ -1028,7 +1040,7 @@ func localHTTPString(rt module.Runtime, key string) string {
 
 func (c *BootstrapClient) ListMedicalUnits() ([]map[string]interface{}, error) {
 	var raw interface{}
-	if err := doJSONWithClient(c.httpClient(), c.Settings, c.CallerType, http.MethodGet, "/administrative/medicalunits", nil, &raw); err != nil {
+	if err := doJSONWithClientTrace(c.httpClient(), c.Settings, c.CallerType, http.MethodGet, "/administrative/medicalunits", nil, &raw, c.Tracef); err != nil {
 		return nil, err
 	}
 	return normalizeJSONArray(raw), nil
@@ -1036,7 +1048,7 @@ func (c *BootstrapClient) ListMedicalUnits() ([]map[string]interface{}, error) {
 
 func (c *BootstrapClient) ListEquipmentTypes() ([]map[string]interface{}, error) {
 	var raw interface{}
-	if err := doJSONWithClient(c.httpClient(), c.Settings, c.CallerType, http.MethodGet, "/administrative/wmanalyzertypes", nil, &raw); err != nil {
+	if err := doJSONWithClientTrace(c.httpClient(), c.Settings, c.CallerType, http.MethodGet, "/administrative/wmanalyzertypes", nil, &raw, c.Tracef); err != nil {
 		return nil, err
 	}
 	return normalizeJSONArray(raw), nil
@@ -1044,7 +1056,7 @@ func (c *BootstrapClient) ListEquipmentTypes() ([]map[string]interface{}, error)
 
 func (c *BootstrapClient) RegisterEquipment(payload map[string]interface{}) (map[string]interface{}, error) {
 	resp := map[string]interface{}{}
-	if err := doJSONWithClient(c.httpClient(), c.Settings, c.CallerType, http.MethodPut, "/administrative/analyzer", payload, &resp); err != nil {
+	if err := doJSONWithClientTrace(c.httpClient(), c.Settings, c.CallerType, http.MethodPut, "/administrative/analyzer", payload, &resp, c.Tracef); err != nil {
 		return nil, err
 	}
 	return resp, nil
@@ -1118,6 +1130,10 @@ func applyBaseURLFallbackToSettings(settings map[string]string) {
 }
 
 func doJSONWithClient(client *http.Client, settings map[string]string, callerType, method, path string, payload interface{}, out interface{}) error {
+	return doJSONWithClientTrace(client, settings, callerType, method, path, payload, out, nil)
+}
+
+func doJSONWithClientTrace(client *http.Client, settings map[string]string, callerType, method, path string, payload interface{}, out interface{}, tracef traceFunc) error {
 	target, err := makeURLFromSettings(settings, path)
 	if err != nil {
 		return err
@@ -1140,12 +1156,15 @@ func doJSONWithClient(client *http.Client, settings map[string]string, callerTyp
 		return err
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
+	traceHTTPRequest(tracef, client, method, path, target, payload, token)
 	resp, err := client.Do(req)
 	if err != nil {
+		traceHTTPTransportError(tracef, method, path, target, err)
 		return err
 	}
 	defer resp.Body.Close()
 	raw, _ := io.ReadAll(resp.Body)
+	traceHTTPResponse(tracef, method, path, target, resp.StatusCode, resp.Status, resp.Header, raw)
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		apiErr := apiError{}
 		if err := json.Unmarshal(raw, &apiErr); err == nil && strings.TrimSpace(apiErr.Message) != "" {
@@ -1163,6 +1182,10 @@ func doJSONWithClient(client *http.Client, settings map[string]string, callerTyp
 }
 
 func doFormWithClient(client *http.Client, settings map[string]string, callerType, method, path string, payload url.Values, out interface{}) error {
+	return doFormWithClientTrace(client, settings, callerType, method, path, payload, out, nil)
+}
+
+func doFormWithClientTrace(client *http.Client, settings map[string]string, callerType, method, path string, payload url.Values, out interface{}, tracef traceFunc) error {
 	target, err := makeURLFromSettings(settings, path)
 	if err != nil {
 		return err
@@ -1181,12 +1204,15 @@ func doFormWithClient(client *http.Client, settings map[string]string, callerTyp
 		return err
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
+	traceHTTPRequest(tracef, client, method, path, target, sanitizeFormValues(payload), token)
 	resp, err := client.Do(req)
 	if err != nil {
+		traceHTTPTransportError(tracef, method, path, target, err)
 		return err
 	}
 	defer resp.Body.Close()
 	raw, _ := io.ReadAll(resp.Body)
+	traceHTTPResponse(tracef, method, path, target, resp.StatusCode, resp.Status, resp.Header, raw)
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		apiErr := apiError{}
 		if err := json.Unmarshal(raw, &apiErr); err == nil && strings.TrimSpace(apiErr.Message) != "" {
@@ -1210,6 +1236,63 @@ func doFormWithClient(client *http.Client, settings map[string]string, callerTyp
 		}
 	}
 	return json.Unmarshal(raw, out)
+}
+
+func traceHTTPRequest(tracef traceFunc, client *http.Client, method, path, target string, payload interface{}, token string) {
+	if tracef == nil {
+		return
+	}
+	timeout := "none"
+	if client != nil && client.Timeout > 0 {
+		timeout = client.Timeout.String()
+	}
+	tracef("wisemed-api trace request method=%s path=%s url=%s timeout=%s body=%s", method, path, target, timeout, mustJSON(maskSecrets(payload)))
+	tracef("wisemed-api trace auth method=%s path=%s bearer_present=%t bearer_preview=%s jwt_claims=%s", method, path, strings.TrimSpace(token) != "", previewJWT(token), jwtClaimsSummary(token))
+}
+
+func traceHTTPTransportError(tracef traceFunc, method, path, target string, err error) {
+	if tracef == nil {
+		return
+	}
+	tracef("wisemed-api trace transport-error method=%s path=%s url=%s error=%v", method, path, target, err)
+}
+
+func traceHTTPResponse(tracef traceFunc, method, path, target string, statusCode int, status string, headers http.Header, raw []byte) {
+	if tracef == nil {
+		return
+	}
+	bodyText := strings.TrimSpace(string(raw))
+	if len(bodyText) > 1200 {
+		bodyText = bodyText[:1200] + "...(truncated)"
+	}
+	tracef("wisemed-api trace response method=%s path=%s url=%s status_code=%d status=%q content_type=%q body=%s", method, path, target, statusCode, status, strings.TrimSpace(headers.Get("Content-Type")), bodyText)
+}
+
+func previewJWT(token string) string {
+	token = strings.TrimSpace(token)
+	if token == "" {
+		return "-"
+	}
+	if len(token) <= 24 {
+		return token
+	}
+	return token[:12] + "..." + token[len(token)-12:]
+}
+
+func jwtClaimsSummary(token string) string {
+	parts := strings.Split(strings.TrimSpace(token), ".")
+	if len(parts) < 2 {
+		return "-"
+	}
+	blob, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		return "decode-error:" + err.Error()
+	}
+	var claims map[string]interface{}
+	if err := json.Unmarshal(blob, &claims); err != nil {
+		return "json-error:" + err.Error()
+	}
+	return mustJSON(maskSecrets(claims))
 }
 
 func makeURLFromSettings(settings map[string]string, path string) (string, error) {
