@@ -1075,6 +1075,7 @@ func newWiseMEDHTTPClient(settings map[string]string) *http.Client {
 	if isLegacyMedicalPagesAPI(settings) {
 		transport.DisableCompression = true
 		transport.DisableKeepAlives = true
+		transport.Proxy = nil
 	}
 	return &http.Client{
 		Timeout:   timeout,
@@ -1356,7 +1357,25 @@ func makeURLFromSettings(settings map[string]string, path string) (string, error
 	if !strings.HasPrefix(basePath, "/") {
 		basePath = "/" + basePath
 	}
-	return fmt.Sprintf("%s://%s:%s%s%s", protocol, host, port, strings.TrimRight(basePath, "/"), path), nil
+	return fmt.Sprintf("%s://%s%s%s", protocol, normalizedHostPort(protocol, host, port), strings.TrimRight(basePath, "/"), path), nil
+}
+
+func normalizedHostPort(protocol, host, port string) string {
+	protocol = strings.ToLower(strings.TrimSpace(protocol))
+	host = strings.TrimSpace(host)
+	port = strings.TrimSpace(port)
+	switch {
+	case host == "":
+		return ""
+	case port == "":
+		return host
+	case protocol == "http" && port == "80":
+		return host
+	case protocol == "https" && port == "443":
+		return host
+	default:
+		return host + ":" + port
+	}
 }
 
 func joinAPIPaths(parts ...string) string {
