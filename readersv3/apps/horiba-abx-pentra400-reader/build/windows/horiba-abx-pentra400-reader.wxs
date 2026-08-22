@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package Name="WiseMED HORIBA ABX Pentra 400 Reader"
+           Manufacturer="WiseMED"
+           Version="1.0.0"
+           UpgradeCode="34504C9A-117C-46AD-A7CD-E5E9A05176D5">
+    <MediaTemplate EmbedCab="yes" />
+    <MajorUpgrade DowngradeErrorMessage="A newer version is already installed." />
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLROOT" Name="WiseMED">
+        <Directory Id="INSTALLFOLDER" Name="horiba-abx-pentra400-reader" />
+      </Directory>
+    </StandardDirectory>
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="ProgramMenuWiseMED" Name="WiseMED" />
+    </StandardDirectory>
+    <StandardDirectory Id="TempFolder" />
+
+    <?include $(var.FilesWxi)?>
+
+    <Feature Id="MainFeature" Title="WiseMED HORIBA ABX Pentra 400 Reader" Level="1">
+      <ComponentGroupRef Id="ShortcutComponents" />
+    </Feature>
+
+    <ComponentGroup Id="ShortcutComponents">
+      <Component Directory="ProgramMenuWiseMED" Guid="*">
+        <Shortcut Id="StartMenuShortcut"
+                  Name="WiseMED HORIBA ABX Pentra 400 Reader"
+                  Target="[INSTALLFOLDER]\horiba-abx-pentra400-reader.exe"
+                  WorkingDirectory="INSTALLFOLDER" />
+        <RemoveFolder Id="RemoveWiseMEDProgramMenu" Directory="ProgramMenuWiseMED" On="uninstall" />
+        <RegistryValue Root="HKLM" Key="Software\WiseMED\horiba-abx-pentra400-reader" Name="installed" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </ComponentGroup>
+
+    <Binary Id="InstallServiceScript" SourceFile="$(var.InstallScript)" />
+    <Binary Id="UninstallServiceScript" SourceFile="$(var.UninstallScript)" />
+
+    <CustomAction Id="InstallService"
+                  BinaryRef="InstallServiceScript"
+                  ExeCommand="-ExecutionPolicy Bypass -File &quot;[#InstallServiceScript]&quot;"
+                  Execute="deferred"
+                  Impersonate="no"
+                  Return="check" />
+    <CustomAction Id="UninstallService"
+                  BinaryRef="UninstallServiceScript"
+                  ExeCommand="-ExecutionPolicy Bypass -File &quot;[#UninstallServiceScript]&quot;"
+                  Execute="deferred"
+                  Impersonate="no"
+                  Return="ignore" />
+
+    <InstallExecuteSequence>
+      <Custom Action="InstallService" After="InstallFiles">NOT Installed OR REINSTALL</Custom>
+      <Custom Action="UninstallService" Before="RemoveFiles">REMOVE="ALL"</Custom>
+    </InstallExecuteSequence>
+  </Package>
+</Wix>

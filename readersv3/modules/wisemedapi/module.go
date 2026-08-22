@@ -163,7 +163,7 @@ func (m *Module) Init(rt module.Runtime) error {
 }
 
 func (m *Module) Start(ctx context.Context) error {
-	if m.SetupComplete() {
+	if m.SetupComplete() && !m.skipSetupCompletion() {
 		if _, err := m.EnsureEquipmentOnline(nil); err != nil {
 			m.rt.Logf("wisemed-api startup sync failed: %v", err)
 		}
@@ -202,6 +202,9 @@ func (m *Module) SetupComplete() bool {
 	if !m.IsConfigured() {
 		return false
 	}
+	if m.skipSetupCompletion() {
+		return true
+	}
 	required := []string{"unitate_medicala_id", "tip_de_echipament_id", "cod_echipament", "numar_serial_echipament"}
 	for _, key := range required {
 		if strings.TrimSpace(settings[key]) == "" {
@@ -212,6 +215,9 @@ func (m *Module) SetupComplete() bool {
 }
 
 func (m *Module) HasEquipmentID() bool {
+	if m.skipSetupCompletion() {
+		return true
+	}
 	value := strings.TrimSpace(m.Settings()["echipament_id"])
 	if value == "" {
 		return false
@@ -292,6 +298,9 @@ func (m *Module) Login(req LoginRequest) (LoginResponse, error) {
 }
 
 func (m *Module) EnsureEquipmentOnline(reader map[string]interface{}) (map[string]interface{}, error) {
+	if m.skipSetupCompletion() {
+		return map[string]interface{}{"success": true, "skipped": true}, nil
+	}
 	if !m.SetupComplete() {
 		return nil, errors.New("WiseMED setup is incomplete")
 	}
@@ -359,6 +368,10 @@ func (m *Module) FetchFileForAnalyzer(fileID, equipmentID string) (map[string]in
 		return resp, nil
 	}
 	return map[string]interface{}{"data": raw}, nil
+}
+
+func (m *Module) skipSetupCompletion() bool {
+	return strings.EqualFold(strings.TrimSpace(m.Settings()["skip_setup_completion"]), "true")
 }
 
 func (c *OverrideClient) Settings() map[string]string {

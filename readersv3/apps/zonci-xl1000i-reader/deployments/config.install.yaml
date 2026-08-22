@@ -1,0 +1,71 @@
+reader:
+  id: zonci-xl1000i-reader-v3
+  label: Zonci XL1000i Reader V3
+  analyzer_name: Zonci XL1000i
+  analyzer_code: zonci-xl1000i-reader-v3
+  db_name: zonci-xl1000i-reader-v3.db
+logging:
+  verbose_level: 1
+results:
+  auto_confirm_wisemed: false
+local_http:
+  enabled: true
+  address: 127.0.0.1:18080
+  language: ro
+  tls: false
+analyzer:
+  comm_type: tcpip
+  protocol: zonci-xl1000i
+modules:
+  app-updates:
+    enabled: true
+    app_id: zonci-xl1000i-reader-v3
+    channel: stable
+    base_url: http://127.0.0.1:19090
+    auto_download: true
+    download_dir: ./updates
+  logging:
+    verbose_level: 1
+  local-http:
+    enabled: true
+    address: 127.0.0.1:18080
+    language: ro
+    repeat_mode: individual
+    tls: false
+  storage-sqlite:
+    path: ./zonci-xl1000i-reader-v3.db
+  wisemed-api:
+    base_url: https://api.wisemed.example
+    cfg_wisemed_protocol: https
+    cfg_wisemed_ip: hitmed.wisemed.eu
+    cfg_wisemed_port: "443"
+    cfg_wisemed_path: /wisemed-api/apiv2
+    cfg_wisemed_key: ""
+    echipament_id: ""
+  wisemed-ws:
+    enabled: true
+    url: wss://wslocal.wisemed.eu/ws
+    heartbeat_ms: 15000
+    reconnect_delay_ms: 5000
+  help:
+    help_dir: ./help
+  result-sync:
+    enabled: true
+    interval_minutes: 5
+    sample_prefixes: []
+    sample_suffixes: []
+    separators: ["-"]
+    qc_prefixes: []
+  transport-tcpip:
+    host: 0.0.0.0
+    port: "3125"
+    mode: server
+  transport-serial:
+    port: ""
+    baud: 115200
+    data_bits: 8
+    parity: none
+    stop_bits: 1
+  protocol-zonci-xl1000i:
+    order_lookup_days: 7
+    result_separator: VIRGULA

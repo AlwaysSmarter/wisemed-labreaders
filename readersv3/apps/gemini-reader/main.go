@@ -22,7 +22,7 @@ func main() {
 		fmt.Println(appmeta.CurrentVersion())
 		return
 	}
-	modules := []string{"local-http", "storage-sqlite", "events", "wisemed-api", "wisemed-ws", "login", "help", "dashboard", "analytes", "analyte-management", "qc", "result-sync", "stats", "daily-orders", "transport-tcpip", "protocol-astm", "protocol-ir-biotyper"}
+	modules := []string{"local-http", "storage-sqlite", "events", "wisemed-api", "wisemed-ws", "login", "help", "dashboard", "analytes", "analyte-management", "qc", "result-sync", "stats", "daily-orders", "astm-specimen-settings", "transport-tcpip", "protocol-astm", "protocol-ir-biotyper"}
 	if err := runner.Run(*cfgPath, modules, runner.RunOptions{Headless: *modulesHeadless, HeadlessChild: *headlessChild, InstallService: *installService, Reconfigure: *reconfigure, ShowLog: *showLog}); err != nil {
 		log.Fatal(err)
 	}

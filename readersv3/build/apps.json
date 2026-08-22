@@ -1,11 +1,21 @@
 [
   {
+    "id": "anaf-docsmart",
+    "title": "Anaf Docsmart",
+    "binaryName": "anaf-docsmart",
+    "serviceName": "wisemed-anaf-docsmart",
+    "displayName": "WiseMED Anaf Docsmart",
+    "description": "WiseMED readersv3 Anaf Docsmart background service",
+    "bundleId": "eu.wisemed.readersv3.anaf.docsmart",
+    "supportsHeadless": true
+  },
+  {
     "id": "analytikjena-plasmaquantms-elite-reader",
-    "title": "AnalytikJena PlasmaQuantMS Elite Reader",
+    "title": "Analytikjena Plasmaquantms Elite Reader",
     "binaryName": "analytikjena-plasmaquantms-elite-reader",
     "serviceName": "wisemed-analytikjena-plasmaquantms-elite-reader",
-    "displayName": "WiseMED AnalytikJena PlasmaQuantMS Elite Reader",
-    "description": "WiseMED readersv3 AnalytikJena PlasmaQuantMS Elite Reader background service",
+    "displayName": "WiseMED Analytikjena Plasmaquantms Elite Reader",
+    "description": "WiseMED readersv3 Analytikjena Plasmaquantms Elite Reader background service",
     "bundleId": "eu.wisemed.readersv3.analytikjena.plasmaquantms.elite.reader",
     "supportsHeadless": true
   },
@@ -17,6 +27,16 @@
     "displayName": "WiseMED Anatolia Geneworks Reader",
     "description": "WiseMED readersv3 Anatolia Geneworks Reader background service",
     "bundleId": "eu.wisemed.readersv3.anatolia.geneworks.reader",
+    "supportsHeadless": true
+  },
+  {
+    "id": "autobio-autolumo-s900-reader",
+    "title": "Autobio AutoLumo S900 Reader",
+    "binaryName": "autobio-autolumo-s900-reader",
+    "serviceName": "wisemed-autobio-autolumo-s900-reader",
+    "displayName": "WiseMED Autobio AutoLumo S900 Reader",
+    "description": "WiseMED readersv3 Autobio AutoLumo S900 Reader background service",
+    "bundleId": "eu.wisemed.readersv3.autobio.autolumo.s900.reader",
     "supportsHeadless": true
   },
   {
@@ -44,9 +64,19 @@
     "title": "Biosan Hipo Mpp 96 Reader",
     "binaryName": "biosan-hipo-mpp-96-reader",
     "serviceName": "wisemed-biosan-hipo-mpp-96-reader",
-    "displayName": "WiseMED Biosan HIPO MPP-96 Reader",
-    "description": "WiseMED readersv3 Biosan HIPO MPP-96 Reader background service",
-    "bundleId": "eu.wisemed.readersv3.biosan.hipo.mpp96.reader",
+    "displayName": "WiseMED Biosan Hipo Mpp 96 Reader",
+    "description": "WiseMED readersv3 Biosan Hipo Mpp 96 Reader background service",
+    "bundleId": "eu.wisemed.readersv3.biosan.hipo.mpp.96.reader",
+    "supportsHeadless": true
+  },
+  {
+    "id": "biomerieux-minividas-reader",
+    "title": "BioMerieux miniVIDAS Reader",
+    "binaryName": "biomerieux-minividas-reader",
+    "serviceName": "wisemed-biomerieux-minividas-reader",
+    "displayName": "WiseMED BioMerieux miniVIDAS Reader",
+    "description": "WiseMED readersv3 BioMerieux miniVIDAS Reader background service",
+    "bundleId": "eu.wisemed.readersv3.biomerieux.minividas.reader",
     "supportsHeadless": true
   },
   {
@@ -61,12 +91,22 @@
   },
   {
     "id": "cfx96-reader",
-    "title": "CFX96 Reader",
+    "title": "Cfx96 Reader",
     "binaryName": "cfx96-reader",
     "serviceName": "wisemed-cfx96-reader",
-    "displayName": "WiseMED CFX-96 Reader",
-    "description": "WiseMED readersv3 CFX-96 Reader background service",
+    "displayName": "WiseMED Cfx96 Reader",
+    "description": "WiseMED readersv3 Cfx96 Reader background service",
     "bundleId": "eu.wisemed.readersv3.cfx96.reader",
+    "supportsHeadless": true
+  },
+  {
+    "id": "gammavision-reader",
+    "title": "Gammavision Reader",
+    "binaryName": "gammavision-reader",
+    "serviceName": "wisemed-gammavision-reader",
+    "displayName": "WiseMED Gammavision Reader",
+    "description": "WiseMED readersv3 Gammavision Reader background service",
+    "bundleId": "eu.wisemed.readersv3.gammavision.reader",
     "supportsHeadless": true
   },
   {
@@ -80,16 +120,6 @@
     "supportsHeadless": true
   },
   {
-    "id": "gammavision-reader",
-    "title": "GammaVision Reader",
-    "binaryName": "gammavision-reader",
-    "serviceName": "wisemed-gammavision-reader",
-    "displayName": "WiseMED GammaVision Reader",
-    "description": "WiseMED readersv3 GammaVision Reader background service",
-    "bundleId": "eu.wisemed.readersv3.gammavision.reader",
-    "supportsHeadless": true
-  },
-  {
     "id": "generic-test-reader",
     "title": "Generic Test Reader",
     "binaryName": "generic-test-reader",
@@ -97,6 +127,26 @@
     "displayName": "WiseMED Generic Test Reader",
     "description": "WiseMED readersv3 Generic Test Reader background service",
     "bundleId": "eu.wisemed.readersv3.generic.test.reader",
+    "supportsHeadless": true
+  },
+  {
+    "id": "horiba-abx-pentra400-reader",
+    "title": "Horiba Abx Pentra400 Reader",
+    "binaryName": "horiba-abx-pentra400-reader",
+    "serviceName": "wisemed-horiba-abx-pentra400-reader",
+    "displayName": "WiseMED Horiba Abx Pentra400 Reader",
+    "description": "WiseMED readersv3 Horiba Abx Pentra400 Reader background service",
+    "bundleId": "eu.wisemed.readersv3.horiba.abx.pentra400.reader",
+    "supportsHeadless": true
+  },
+  {
+    "id": "horiba-yumizen-h500-reader",
+    "title": "Horiba Yumizen H500 Reader",
+    "binaryName": "horiba-yumizen-h500-reader",
+    "serviceName": "wisemed-horiba-yumizen-h500-reader",
+    "displayName": "WiseMED Horiba Yumizen H500 Reader",
+    "description": "WiseMED readersv3 Horiba Yumizen H500 Reader background service",
+    "bundleId": "eu.wisemed.readersv3.horiba.yumizen.h500.reader",
     "supportsHeadless": true
   },
   {
@@ -110,6 +160,16 @@
     "supportsHeadless": true
   },
   {
+    "id": "lifotronic-h8-reader",
+    "title": "Lifotronic H8 Reader",
+    "binaryName": "lifotronic-h8-reader",
+    "serviceName": "wisemed-lifotronic-h8-reader",
+    "displayName": "WiseMED Lifotronic H8 Reader",
+    "description": "WiseMED readersv3 Lifotronic H8 Reader background service",
+    "bundleId": "eu.wisemed.readersv3.lifotronic.h8.reader",
+    "supportsHeadless": true
+  },
+  {
     "id": "seegene-reader",
     "title": "Seegene Reader",
     "binaryName": "seegene-reader",
@@ -117,6 +177,16 @@
     "displayName": "WiseMED Seegene Reader",
     "description": "WiseMED readersv3 Seegene Reader background service",
     "bundleId": "eu.wisemed.readersv3.seegene.reader",
+    "supportsHeadless": true
+  },
+  {
+    "id": "shimatzu-generic-reader",
+    "title": "Shimatzu Generic Reader",
+    "binaryName": "shimatzu-generic-reader",
+    "serviceName": "wisemed-shimatzu-generic-reader",
+    "displayName": "WiseMED Shimatzu Generic Reader",
+    "description": "WiseMED readersv3 Shimatzu Generic Reader background service",
+    "bundleId": "eu.wisemed.readersv3.shimatzu.generic.reader",
     "supportsHeadless": true
   },
   {
@@ -130,13 +200,13 @@
     "supportsHeadless": true
   },
   {
-    "id": "shimatzu-generic-reader",
-    "title": "Shimatzu Generic Reader",
-    "binaryName": "shimatzu-generic-reader",
-    "serviceName": "wisemed-shimatzu-generic-reader",
-    "displayName": "WiseMED SHIMATZU Generic Reader",
-    "description": "WiseMED readersv3 SHIMATZU Generic Reader background service",
-    "bundleId": "eu.wisemed.readersv3.shimatzu.generic.reader",
+    "id": "signing-pad-utility",
+    "title": "Signing Pad Utility",
+    "binaryName": "signing-pad-utility",
+    "serviceName": "wisemed-signing-pad-utility",
+    "displayName": "WiseMED Signing Pad Utility",
+    "description": "WiseMED readersv3 Signing Pad Utility background service",
+    "bundleId": "eu.wisemed.readersv3.signing.pad.utility",
     "supportsHeadless": true
   },
   {
@@ -151,22 +221,32 @@
   },
   {
     "id": "tricarb-5110-tr-reader",
-    "title": "TriCARB 5110 TR Reader",
+    "title": "Tricarb 5110 Tr Reader",
     "binaryName": "tricarb-5110-tr-reader",
     "serviceName": "wisemed-tricarb-5110-tr-reader",
-    "displayName": "WiseMED TriCARB 5110 TR Reader",
-    "description": "WiseMED readersv3 TriCARB 5110 TR Reader background service",
+    "displayName": "WiseMED Tricarb 5110 Tr Reader",
+    "description": "WiseMED readersv3 Tricarb 5110 Tr Reader background service",
     "bundleId": "eu.wisemed.readersv3.tricarb.5110.tr.reader",
     "supportsHeadless": true
   },
   {
     "id": "update-server",
     "title": "Update Server",
-    "binaryName": "Update_Server",
+    "binaryName": "update-server",
     "serviceName": "wisemed-update-server",
     "displayName": "WiseMED Update Server",
     "description": "WiseMED readersv3 Update Server background service",
     "bundleId": "eu.wisemed.readersv3.update.server",
     "supportsHeadless": false
+  },
+  {
+    "id": "zonci-xl1000i-reader",
+    "title": "Zonci XL1000i Reader",
+    "binaryName": "zonci-xl1000i-reader",
+    "serviceName": "wisemed-zonci-xl1000i-reader",
+    "displayName": "WiseMED Zonci XL1000i Reader",
+    "description": "WiseMED readersv3 Zonci XL1000i native LIS reader background service",
+    "bundleId": "eu.wisemed.readersv3.zonci.xl1000i.reader",
+    "supportsHeadless": true
   }
 ]

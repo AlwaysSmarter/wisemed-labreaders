@@ -802,6 +802,7 @@ const state = {
   layoutKind: "simple_list",
   commType: "file",
   orders: [],
+  docsmartFiles: [],
   qcRecords: [],
   rounds: [1],
   qcRounds: [1],
@@ -826,6 +827,7 @@ const state = {
   selectedQCAnalysisId: null,
   selectedQCAnalysisTag: null,
   selectedOrderAnalysisID: null,
+  selectedDocsmartFileID: null,
   selectedOrderIDs: [],
   selectedOrderReceiveFilter: "",
   selectedOrderSendFilter: "",
@@ -841,6 +843,9 @@ const state = {
   dailyDetailsScopeTab: "day",
   dailyDetailsRoundNo: 1,
   dailyDetailsAnalyteTag: "",
+  dailyAnalysisFilterDate: localISODate(),
+  dailyAnalysisFilters: [],
+  dailyAnalysisFilterSpecimenCodes: [],
   logPollSeconds: 1,
   logPollTimer: null,
   statusPollSeconds: 2,
@@ -914,11 +919,28 @@ const els = {
   resetResultSyncBtn: document.getElementById("reset-result-sync"),
   resultSyncStatus: document.getElementById("result-sync-status"),
   readerSettingsMessage: document.getElementById("reader-settings-message"),
+  settingsPanelASTMSpecimens: document.getElementById("settings-panel-astm-specimens"),
+  astmSpecimenList: document.getElementById("astm-specimen-list"),
+  astmSpecimenDefault: document.getElementById("astm-specimen-default"),
+  astmSpecimenMessage: document.getElementById("astm-specimen-message"),
+  newASTMSpecimenBtn: document.getElementById("new-astm-specimen"),
+  saveASTMSpecimensBtn: document.getElementById("save-astm-specimens"),
   analyteList: document.getElementById("analyte-list"),
   settingsSubmenu: document.getElementById("settings-submenu"),
   settingsPanelAnalytes: document.getElementById("settings-panel-analytes"),
   settingsPanelQCEditor: document.getElementById("settings-panel-qc-editor"),
   settingsPanelDailyDetails: document.getElementById("settings-panel-daily-details"),
+  settingsPanelDailyAnalysisFilters: document.getElementById("settings-panel-daily-analysis-filters"),
+  dailyAnalysisFilterPill: document.getElementById("daily-analysis-filter-pill"),
+  dailyAnalysisFilterDate: document.getElementById("daily-analysis-filter-date"),
+  dailyAnalysisFilterAnalyte: document.getElementById("daily-analysis-filter-analyte"),
+  dailyAnalysisFilterMode: document.getElementById("daily-analysis-filter-mode"),
+  dailyAnalysisFilterSpecimensBox: document.getElementById("daily-analysis-filter-specimens-box"),
+  dailyAnalysisFilterSpecimens: document.getElementById("daily-analysis-filter-specimens"),
+  dailyAnalysisFilterList: document.getElementById("daily-analysis-filter-list"),
+  dailyAnalysisFilterMessage: document.getElementById("daily-analysis-filter-message"),
+  addDailyAnalysisFilterBtn: document.getElementById("add-daily-analysis-filter"),
+  refreshDailyAnalysisFiltersBtn: document.getElementById("refresh-daily-analysis-filters"),
   analyteForm: document.getElementById("analyte-form"),
   analyteMessage: document.getElementById("analyte-message"),
   deleteAnalyteBtn: document.getElementById("delete-analyte"),
@@ -1138,6 +1160,8 @@ function bindEvents() {
   els.ordersImportFile.addEventListener("change", onOrdersImportFileChange);
   els.appToastClose.addEventListener("click", hideToast);
   els.newAnalyteBtn.addEventListener("click", () => openAnalyteModal());
+  if (els.newASTMSpecimenBtn) els.newASTMSpecimenBtn.addEventListener("click", () => addASTMSpecimenRow());
+  if (els.saveASTMSpecimensBtn) bindAsyncClick(els.saveASTMSpecimensBtn, saveASTMSpecimens);
   bindAsyncClick(els.refreshAnalytesBtn, onRefreshAnalytesClick);
   if (els.readerSettingsForm) bindAsyncSubmit(els.readerSettingsForm, onSaveReaderSettings);
   if (els.deleteOrdersPreference) els.deleteOrdersPreference.addEventListener("change", onDeleteOrdersPreferenceChange);
@@ -1160,6 +1184,11 @@ function bindEvents() {
   if (els.newDailyDetailDefinitionBtn) els.newDailyDetailDefinitionBtn.addEventListener("click", () => openDailyDetailDefinitionModal());
   if (els.refreshDailyDetailDefinitionsBtn) bindAsyncClick(els.refreshDailyDetailDefinitionsBtn, onRefreshDailyDetailDefinitionsClick);
   if (els.dailyDetailsDate) els.dailyDetailsDate.addEventListener("change", onDailyDetailsDateChange);
+  if (els.dailyAnalysisFilterDate) els.dailyAnalysisFilterDate.addEventListener("change", onDailyAnalysisFilterDateChange);
+  if (els.dailyAnalysisFilterMode) els.dailyAnalysisFilterMode.addEventListener("change", syncDailyAnalysisFilterMode);
+  if (els.addDailyAnalysisFilterBtn) bindAsyncClick(els.addDailyAnalysisFilterBtn, onAddDailyAnalysisFilter);
+  if (els.refreshDailyAnalysisFiltersBtn) bindAsyncClick(els.refreshDailyAnalysisFiltersBtn, loadDailyAnalysisFilters);
+  if (els.dailyAnalysisFilterPill) els.dailyAnalysisFilterPill.addEventListener("click", () => { state.settingsSubView = "daily-analysis-filters"; activateView("analytes"); });
   if (els.dailyDetailsRound) els.dailyDetailsRound.addEventListener("change", onDailyDetailsRoundChange);
   if (els.dailyDetailsAnalyte) els.dailyDetailsAnalyte.addEventListener("change", onDailyDetailsAnalyteChange);
   if (els.dailyDetailsPrintBtn) bindAsyncClick(els.dailyDetailsPrintBtn, onPrintDailyWorksheetClick);
@@ -1314,6 +1343,11 @@ function isUtilityMode() {
   return commType === "utility";
 }
 
+function isDocsmartMode() {
+  const protocol = String(state.readerInfo?.protocol || state.readerSettings?.analyzer_protocol || "").toLowerCase();
+  return state.utilityMode && protocol === "anaf-docsmart";
+}
+
 function barcodeNavButton(viewName) {
   return document.querySelector(`.nav-link[data-view="${viewName}"]`);
 }
@@ -1326,8 +1360,17 @@ function applyBarcodeModeUI() {
   const navOrders = barcodeNavButton("orders");
   const navQC = barcodeNavButton("qc");
   const navDailyDetails = barcodeNavButton("daily-details");
+  if (navOrders && isDocsmartMode()) navOrders.textContent = state.language === "en" ? "Parsed files" : "Fisiere parse";
   if (navOrders && state.barcodeMode) navOrders.textContent = state.language === "en" ? "History" : "Istoric";
   if (navQC) navQC.style.display = "none";
+  if (isDocsmartMode()) {
+    if (navDailyDetails) navDailyDetails.style.display = "none";
+    if (els.settingsSubmenu) els.settingsSubmenu.hidden = true;
+    if (els.settingsPanelReader) els.settingsPanelReader.hidden = false;
+    if (els.settingsPanelAnalytes) els.settingsPanelAnalytes.hidden = true;
+    if (els.settingsPanelQCEditor) els.settingsPanelQCEditor.hidden = true;
+    if (els.settingsPanelDailyDetails) els.settingsPanelDailyDetails.hidden = true;
+  }
   if (state.barcodeMode) {
     if (navDailyDetails) navDailyDetails.style.display = "none";
     if (els.settingsSubmenu) els.settingsSubmenu.hidden = true;
@@ -1360,7 +1403,11 @@ async function onLanguageChange(event) {
     if (state.barcodeMode) {
       await Promise.all([loadStatus(), loadLogs(), loadDashboard(), loadBarcodeSettingsView(), loadBarcodeHistory()]);
     } else if (state.utilityMode) {
-      await Promise.all([loadStatus(), loadLogs(), loadReaderSettings(), loadAnalytes(), loadDailyDetailDefinitions(), loadOrders(), loadDashboard()]);
+      if (isDocsmartMode()) {
+        await Promise.all([loadStatus(), loadLogs(), loadReaderSettings(), loadOrders(), loadDashboard()]);
+      } else {
+        await Promise.all([loadStatus(), loadLogs(), loadReaderSettings(), loadAnalytes(), loadDailyDetailDefinitions(), loadOrders(), loadDashboard()]);
+      }
     } else {
       await Promise.all([loadStatus(), loadLogs(), loadAnalytes(), loadQCTargets(), loadDailyDetailDefinitions(), loadOrders(), loadQCRecords(), loadDashboard()]);
       if (state.currentView === "daily-details" || state.settingsSubView === "daily-details") {
@@ -1559,9 +1606,13 @@ async function mountDashboard(sessionResp) {
   if (state.barcodeMode) {
     await Promise.all([loadStatus(), loadLogs(), loadDashboard(), loadBarcodeSettingsView(), loadBarcodeHistory()]);
   } else if (state.utilityMode) {
-    await Promise.all([loadStatus(), loadLogs(), loadReaderSettings(), loadAnalytes(), loadDailyDetailDefinitions(), loadOrders(), loadDashboard()]);
-    if (state.currentView === "daily-details" || state.settingsSubView === "daily-details") {
-      await loadDailyDetailsWorkspace();
+    if (isDocsmartMode()) {
+      await Promise.all([loadStatus(), loadLogs(), loadReaderSettings(), loadOrders(), loadDashboard()]);
+    } else {
+      await Promise.all([loadStatus(), loadLogs(), loadReaderSettings(), loadAnalytes(), loadDailyDetailDefinitions(), loadOrders(), loadDashboard()]);
+      if (state.currentView === "daily-details" || state.settingsSubView === "daily-details") {
+        await loadDailyDetailsWorkspace();
+      }
     }
   } else {
     await Promise.all([loadStatus(), loadLogs(), loadQCMeta(), loadReaderSettings(), loadAnalytes(), loadQCTargets(), loadDailyDetailDefinitions(), loadOrders(), loadQCRecords(), loadDashboard()]);
@@ -1751,7 +1802,8 @@ function onAppUpdateIndicatorClick(event) {
 
 function activateView(name, pushHistory = true) {
   if (name === "help") {
-    window.location.href = "/help/";
+    const helpTab = window.open("/help/", "_blank", "noopener");
+    if (helpTab) helpTab.opener = null;
     return;
   }
   if (name === "debug" && (!state.debugEnabled || (Number(state.session?.user_type) || 0) > 0)) {
@@ -1831,11 +1883,11 @@ function renderTopbarTitle() {
   if (state.currentView === "analytes") {
     title.textContent = state.settingsSubView === "reader"
       ? t("settingsReader")
-      : (state.settingsSubView === "qc" ? t("settingsQc") : (state.settingsSubView === "daily-details" ? t("settingsDailyDetails") : t("settingsAnalytes")));
+      : (state.settingsSubView === "qc" ? t("settingsQc") : (state.settingsSubView === "daily-details" ? t("settingsDailyDetails") : (state.settingsSubView === "daily-analysis-filters" ? "Filtre blocare analize" : (state.settingsSubView === "astm-specimens" ? "ASTM - Tipuri probe" : t("settingsAnalytes")))));
     return;
   }
   if (state.currentView === "orders") {
-    title.textContent = t("navOrders");
+    title.textContent = isDocsmartMode() ? (state.language === "en" ? "Parsed files" : "Fisiere parse") : t("navOrders");
     return;
   }
   if (state.currentView === "qc") {
@@ -1863,7 +1915,7 @@ function viewFromLocation() {
     if (path === "/help") return "help";
     return "overview";
   }
-  if (path === "/settings" || path === "/settings/reader" || path === "/settings/analytes" || path === "/settings/qc" || path === "/settings/daily-details") return "analytes";
+  if (path === "/settings" || path === "/settings/reader" || path === "/settings/analytes" || path === "/settings/qc" || path === "/settings/daily-details" || path === "/settings/daily-analysis-filters" || path === "/settings/astm-specimens") return "analytes";
   if (path === "/daily-details") return "daily-details";
   if (path === "/orders") return "orders";
   if (path === "/qc") return "qc";
@@ -1877,6 +1929,8 @@ function settingsSubViewFromLocation() {
   if (path === "/settings/reader" || path === "/settings") return "reader";
   if (path === "/settings/qc") return "qc";
   if (path === "/settings/daily-details") return "daily-details";
+  if (path === "/settings/daily-analysis-filters") return "daily-analysis-filters";
+  if (path === "/settings/astm-specimens") return "astm-specimens";
   return "analytes";
 }
 
@@ -1893,6 +1947,8 @@ function pathForView(name) {
     if (state.settingsSubView === "reader") return "/settings/reader";
     if (state.settingsSubView === "qc") return "/settings/qc";
     if (state.settingsSubView === "daily-details") return "/settings/daily-details";
+    if (state.settingsSubView === "daily-analysis-filters") return "/settings/daily-analysis-filters";
+    if (state.settingsSubView === "astm-specimens") return "/settings/astm-specimens";
     return "/settings/analytes";
   }
   if (name === "daily-details") return "/daily-details";
@@ -1914,14 +1970,29 @@ function activateSettingsSubView(name) {
     }
     return;
   }
-  state.settingsSubView = ["reader", "qc", "daily-details", "analytes"].includes(name) ? name : "reader";
+  if (isDocsmartMode()) {
+    state.settingsSubView = "reader";
+    if (els.settingsPanelReader) els.settingsPanelReader.hidden = false;
+    if (els.settingsPanelAnalytes) els.settingsPanelAnalytes.hidden = true;
+    if (els.settingsPanelQCEditor) els.settingsPanelQCEditor.hidden = true;
+    if (els.settingsPanelDailyDetails) els.settingsPanelDailyDetails.hidden = true;
+    if (!els.views.analytes.hidden) {
+      renderTopbarTitle();
+    }
+    return;
+  }
+  state.settingsSubView = ["reader", "qc", "daily-details", "daily-analysis-filters", "analytes", "astm-specimens"].includes(name) ? name : "reader";
   const readerActive = state.settingsSubView === "reader";
   const qcActive = state.settingsSubView === "qc";
   const dailyDetailsActive = state.settingsSubView === "daily-details";
+  const dailyAnalysisFiltersActive = state.settingsSubView === "daily-analysis-filters";
+  const astmSpecimensActive = state.settingsSubView === "astm-specimens";
   if (els.settingsPanelReader) els.settingsPanelReader.hidden = !readerActive;
-  els.settingsPanelAnalytes.hidden = readerActive || qcActive || dailyDetailsActive;
+  els.settingsPanelAnalytes.hidden = readerActive || qcActive || dailyDetailsActive || dailyAnalysisFiltersActive || astmSpecimensActive;
   els.settingsPanelQCEditor.hidden = !qcActive;
   if (els.settingsPanelDailyDetails) els.settingsPanelDailyDetails.hidden = !dailyDetailsActive;
+  if (els.settingsPanelDailyAnalysisFilters) els.settingsPanelDailyAnalysisFilters.hidden = !dailyAnalysisFiltersActive;
+  if (els.settingsPanelASTMSpecimens) els.settingsPanelASTMSpecimens.hidden = !astmSpecimensActive;
   els.navSublinks.forEach((link) => {
     link.classList.toggle("active", (link.dataset.settingsSubview || "analytes") === state.settingsSubView);
   });
@@ -1938,6 +2009,119 @@ function activateSettingsSubView(name) {
   if (dailyDetailsActive) {
     renderDailyDetailDefinitionList();
   }
+  if (dailyAnalysisFiltersActive) {
+    loadDailyAnalysisFilters().catch((error) => showToast(error?.message || "Nu se pot încărca filtrele", "error"));
+  }
+  if (astmSpecimensActive) {
+    loadASTMSpecimens().catch((error) => showToast(error?.message || "Nu se pot incarca mapa ASTM", "error"));
+  }
+}
+
+async function loadASTMSpecimens() {
+  if (!els.astmSpecimenList) return;
+  const response = await api("/api/settings/astm-specimens");
+  const settings = response.settings || {};
+  els.astmSpecimenDefault.value = settings.default || "1";
+  renderASTMSpecimenRows(settings.rows || []);
+}
+
+async function loadDailyAnalysisFilters() {
+  if (!els.dailyAnalysisFilterDate) return;
+  const date = state.dailyAnalysisFilterDate || localISODate();
+  els.dailyAnalysisFilterDate.value = date;
+  const response = await api(`/api/daily-analysis-filters?scope_date=${encodeURIComponent(date)}`);
+  state.dailyAnalysisFilters = response.filters || [];
+  state.dailyAnalysisFilterSpecimenCodes = response.specimen_codes || state.dailyAnalysisFilterSpecimenCodes || [];
+  syncDailyAnalysisFilterOptions();
+  renderDailyAnalysisFilterList();
+  if (els.dailyAnalysisFilterPill) {
+    const count = state.dailyAnalysisFilters.length;
+    els.dailyAnalysisFilterPill.hidden = count === 0;
+    els.dailyAnalysisFilterPill.textContent = `Filtre: ${count}`;
+  }
+}
+
+function syncDailyAnalysisFilterOptions() {
+  if (els.dailyAnalysisFilterAnalyte) {
+    els.dailyAnalysisFilterAnalyte.innerHTML = state.analytes.map((item) => `<option value="${escapeHtml(item.tag)}">${escapeHtml(item.tag)} · ${escapeHtml(item.name || "-")}</option>`).join("");
+  }
+  if (els.dailyAnalysisFilterSpecimens) {
+    els.dailyAnalysisFilterSpecimens.innerHTML = state.dailyAnalysisFilterSpecimenCodes.map((code) => `<option value="${escapeHtml(code)}">${escapeHtml(code)}</option>`).join("");
+  }
+  syncDailyAnalysisFilterMode();
+}
+
+function syncDailyAnalysisFilterMode() {
+  if (els.dailyAnalysisFilterSpecimensBox) els.dailyAnalysisFilterSpecimensBox.hidden = els.dailyAnalysisFilterMode?.value !== "specimen_codes";
+}
+
+function renderDailyAnalysisFilterList() {
+  if (!els.dailyAnalysisFilterList) return;
+  if (!state.dailyAnalysisFilters.length) { els.dailyAnalysisFilterList.innerHTML = '<div class="log-item">Nu există filtre. Toate analizele sunt trimise către analizor.</div>'; return; }
+  const names = Object.fromEntries(state.analytes.map((item) => [item.tag, item.name]));
+  els.dailyAnalysisFilterList.innerHTML = `<div class="analyte-table-wrap"><table class="analyte-table"><thead><tr><th>Analiză</th><th>Mod</th><th>Coduri probă</th><th>Acțiune</th></tr></thead><tbody>${state.dailyAnalysisFilters.map((item) => `<tr><td><strong>${escapeHtml(item.analyte_tag)}</strong><div class="small muted">${escapeHtml(names[item.analyte_tag] || "")}</div></td><td>${item.mode === "global" ? "Global" : "Pe cod de probă"}</td><td>${escapeHtml((item.specimen_codes || []).join(", ") || "Toate")}</td><td><button class="danger daily-analysis-filter-delete" data-filter-id="${item.id}" type="button">Șterge</button></td></tr>`).join("")}</tbody></table></div>`;
+  els.dailyAnalysisFilterList.querySelectorAll(".daily-analysis-filter-delete").forEach((button) => button.addEventListener("click", () => deleteDailyAnalysisFilter(button.dataset.filterId)));
+}
+
+async function onAddDailyAnalysisFilter() {
+  const specimenCodes = [...(els.dailyAnalysisFilterSpecimens?.selectedOptions || [])].map((option) => option.value);
+  const payload = { scope_date: state.dailyAnalysisFilterDate || localISODate(), analyte_tag: els.dailyAnalysisFilterAnalyte?.value || "", mode: els.dailyAnalysisFilterMode?.value || "global", specimen_codes: specimenCodes };
+  await api("/api/daily-analysis-filters", { method: "POST", body: JSON.stringify(payload) });
+  if (els.dailyAnalysisFilterMessage) els.dailyAnalysisFilterMessage.textContent = "Filtru salvat. Cererile LIS următoare vor respecta blocarea.";
+  await loadDailyAnalysisFilters();
+}
+
+async function deleteDailyAnalysisFilter(id) {
+  await api(`/api/daily-analysis-filters/${encodeURIComponent(id)}`, { method: "DELETE" });
+  await loadDailyAnalysisFilters();
+}
+
+function onDailyAnalysisFilterDateChange() {
+  state.dailyAnalysisFilterDate = els.dailyAnalysisFilterDate?.value || localISODate();
+  loadDailyAnalysisFilters().catch((error) => showToast(error?.message || "Nu se pot încărca filtrele", "error"));
+}
+
+function renderASTMSpecimenRows(rows) {
+  if (!els.astmSpecimenList) return;
+  const normalized = Array.isArray(rows) ? rows : [];
+  els.astmSpecimenList.innerHTML = `
+    <div class="analyte-table-wrap"><table class="analyte-table">
+      <thead><tr><th>Cod tip proba WiseMED</th><th>Cod tip proba analizor</th><th class="col-state">Actiune</th></tr></thead>
+      <tbody>${normalized.map((row) => astmSpecimenRowHTML(row.source || "", row.target || "")).join("")}</tbody>
+    </table></div>`;
+  bindASTMSpecimenRowActions();
+}
+
+function astmSpecimenRowHTML(source, target) {
+  return `<tr><td><input class="astm-specimen-source" value="${escapeHtml(source)}" placeholder="ex. SER"></td><td><input class="astm-specimen-target" value="${escapeHtml(target)}" placeholder="ex. 1"></td><td class="col-state"><button class="danger astm-specimen-delete" type="button">Sterge</button></td></tr>`;
+}
+
+function bindASTMSpecimenRowActions() {
+  if (!els.astmSpecimenList) return;
+  els.astmSpecimenList.querySelectorAll(".astm-specimen-delete").forEach((button) => button.addEventListener("click", () => button.closest("tr")?.remove()));
+}
+
+function addASTMSpecimenRow() {
+  const body = els.astmSpecimenList?.querySelector("tbody");
+  if (!body) {
+    renderASTMSpecimenRows([{ source: "", target: "" }]);
+    return;
+  }
+  body.insertAdjacentHTML("beforeend", astmSpecimenRowHTML("", ""));
+  bindASTMSpecimenRowActions();
+}
+
+async function saveASTMSpecimens() {
+  const rows = [...(els.astmSpecimenList?.querySelectorAll("tbody tr") || [])].map((row) => ({
+    source: row.querySelector(".astm-specimen-source")?.value || "",
+    target: row.querySelector(".astm-specimen-target")?.value || "",
+  }));
+  const response = await api("/api/settings/astm-specimens", {
+    method: "PUT",
+    body: JSON.stringify({ default: els.astmSpecimenDefault?.value || "1", rows }),
+  });
+  if (els.astmSpecimenMessage) els.astmSpecimenMessage.textContent = response.restart_required ? "Salvat. Reporniti readerul pentru aplicare." : "Salvat.";
+  showToast("Mapa tipurilor de proba ASTM a fost salvata.", "success");
 }
 
 async function loadStatus() {
@@ -2016,6 +2200,11 @@ async function loadReaderSettings() {
     available_comm_types: Array.isArray(resp.settings?.available_comm_types) ? resp.settings.available_comm_types : [],
     available_protocols: Array.isArray(resp.settings?.available_protocols) ? resp.settings.available_protocols : [],
     available_tcpip_modes: Array.isArray(resp.settings?.available_tcpip_modes) ? resp.settings.available_tcpip_modes : [],
+    available_serial_bauds: Array.isArray(resp.settings?.available_serial_bauds) ? resp.settings.available_serial_bauds : ["9600"],
+    available_serial_data_bits: Array.isArray(resp.settings?.available_serial_data_bits) ? resp.settings.available_serial_data_bits : ["8"],
+    available_serial_parities: Array.isArray(resp.settings?.available_serial_parities) ? resp.settings.available_serial_parities : ["none"],
+    available_serial_stop_bits: Array.isArray(resp.settings?.available_serial_stop_bits) ? resp.settings.available_serial_stop_bits : ["1"],
+    available_serial_flow_controls: Array.isArray(resp.settings?.available_serial_flow_controls) ? resp.settings.available_serial_flow_controls : ["none"],
     available_astm_checksum_modes: Array.isArray(resp.settings?.available_astm_checksum_modes) ? resp.settings.available_astm_checksum_modes : ["astm", "none"],
     available_astm_trailer_modes: Array.isArray(resp.settings?.available_astm_trailer_modes) ? resp.settings.available_astm_trailer_modes : ["crlf", "none"],
     tcpip_mode: String(resp.settings?.tcpip_mode || "server"),
@@ -2023,6 +2212,12 @@ async function loadReaderSettings() {
     tcpip_port: String(resp.settings?.tcpip_port || ""),
     tcpip_remote_host: String(resp.settings?.tcpip_remote_host || ""),
     tcpip_remote_port: String(resp.settings?.tcpip_remote_port || ""),
+    serial_port: String(resp.settings?.serial_port || ""),
+    serial_baud: String(resp.settings?.serial_baud || "9600"),
+    serial_data_bits: String(resp.settings?.serial_data_bits || "8"),
+    serial_parity: String(resp.settings?.serial_parity || "none"),
+    serial_stop_bits: String(resp.settings?.serial_stop_bits || "1"),
+    serial_flow_control: String(resp.settings?.serial_flow_control || "none"),
     astm_checksum_mode: String(resp.settings?.astm_checksum_mode || "astm"),
     astm_trailer_mode: String(resp.settings?.astm_trailer_mode || "crlf"),
     file_import_dir: String(resp.settings?.file_import_dir || "./inbox"),
@@ -2048,6 +2243,7 @@ async function loadReaderSettings() {
     result_sync_qc_prefixes: String(resp.settings?.result_sync_qc_prefixes || ""),
     protocol_subtype: String(resp.settings?.protocol_subtype || "auto"),
     labnovation_image_mode: String(resp.settings?.labnovation_image_mode || "no_image"),
+	zonci_result_separator: String(resp.settings?.zonci_result_separator || "VIRGULA"),
     labnovation_enabled: Boolean(resp.settings?.labnovation_enabled),
   };
   state.resultsDelivery = {
@@ -2060,6 +2256,14 @@ async function loadReaderSettings() {
     fillSelect(form.elements.analyzer_comm_type, state.readerSettings.available_comm_types, state.readerSettings.analyzer_comm_type);
     fillSelect(form.elements.analyzer_protocol, state.readerSettings.available_protocols, state.readerSettings.analyzer_protocol);
     fillSelect(form.elements.tcpip_mode, state.readerSettings.available_tcpip_modes, state.readerSettings.tcpip_mode);
+    fillSelect(form.elements.serial_baud, state.readerSettings.available_serial_bauds, state.readerSettings.serial_baud);
+    fillSelect(form.elements.serial_data_bits, state.readerSettings.available_serial_data_bits, state.readerSettings.serial_data_bits);
+    fillSelect(form.elements.serial_parity, state.readerSettings.available_serial_parities, state.readerSettings.serial_parity);
+    fillSelect(form.elements.serial_stop_bits, state.readerSettings.available_serial_stop_bits, state.readerSettings.serial_stop_bits);
+    fillSelect(form.elements.serial_flow_control, state.readerSettings.available_serial_flow_controls, state.readerSettings.serial_flow_control);
+    for (const option of form.elements.serial_flow_control.options) {
+      option.textContent = ({ none: "None", rtscts: "RtsCts", dtrdsr: "DtrDsr", software: "Software", custom: "Custom" })[option.value] || option.value;
+    }
     fillSelect(form.elements.astm_checksum_mode, state.readerSettings.available_astm_checksum_modes, state.readerSettings.astm_checksum_mode);
     fillSelect(form.elements.astm_trailer_mode, state.readerSettings.available_astm_trailer_modes, state.readerSettings.astm_trailer_mode);
     form.elements.reader_id.value = state.readerSettings.reader_id;
@@ -2079,6 +2283,12 @@ async function loadReaderSettings() {
     form.elements.tcpip_port.value = state.readerSettings.tcpip_port;
     form.elements.tcpip_remote_host.value = state.readerSettings.tcpip_remote_host;
     form.elements.tcpip_remote_port.value = state.readerSettings.tcpip_remote_port;
+    form.elements.serial_port.value = state.readerSettings.serial_port;
+    form.elements.serial_baud.value = state.readerSettings.serial_baud;
+    form.elements.serial_data_bits.value = state.readerSettings.serial_data_bits;
+    form.elements.serial_parity.value = state.readerSettings.serial_parity;
+    form.elements.serial_stop_bits.value = state.readerSettings.serial_stop_bits;
+    form.elements.serial_flow_control.value = state.readerSettings.serial_flow_control;
     form.elements.astm_checksum_mode.value = state.readerSettings.astm_checksum_mode || "astm";
     form.elements.astm_trailer_mode.value = state.readerSettings.astm_trailer_mode || "crlf";
     form.elements.file_import_dir.value = state.readerSettings.file_import_dir;
@@ -2103,6 +2313,7 @@ async function loadReaderSettings() {
     form.elements.result_sync_qc_prefixes.value = state.readerSettings.result_sync_qc_prefixes;
     form.elements.protocol_subtype.value = state.readerSettings.protocol_subtype || "auto";
     form.elements.labnovation_image_mode.value = state.readerSettings.labnovation_image_mode || "no_image";
+	form.elements.zonci_result_separator.value = state.readerSettings.zonci_result_separator || "VIRGULA";
     syncReaderSettingsTransportFields();
   }
   els.repeatModeSelect.value = state.readerSettings.repeat_mode;
@@ -2135,6 +2346,12 @@ async function onSaveReaderSettings(event) {
     tcpip_port: String(form.elements.tcpip_port.value || "").trim(),
     tcpip_remote_host: String(form.elements.tcpip_remote_host.value || "").trim(),
     tcpip_remote_port: String(form.elements.tcpip_remote_port.value || "").trim(),
+    serial_port: String(form.elements.serial_port.value || "").trim(),
+    serial_baud: String(form.elements.serial_baud.value || "9600").trim(),
+    serial_data_bits: String(form.elements.serial_data_bits.value || "8").trim(),
+    serial_parity: String(form.elements.serial_parity.value || "none").trim(),
+    serial_stop_bits: String(form.elements.serial_stop_bits.value || "1").trim(),
+    serial_flow_control: String(form.elements.serial_flow_control.value || "none").trim(),
     astm_checksum_mode: String(form.elements.astm_checksum_mode.value || "astm").trim(),
     astm_trailer_mode: String(form.elements.astm_trailer_mode.value || "crlf").trim(),
     file_import_dir: String(form.elements.file_import_dir.value || "./inbox").trim(),
@@ -2159,6 +2376,7 @@ async function onSaveReaderSettings(event) {
     result_sync_qc_prefixes: String(form.elements.result_sync_qc_prefixes.value || "").trim(),
     protocol_subtype: String(form.elements.protocol_subtype.value || "").trim(),
     labnovation_image_mode: String(form.elements.labnovation_image_mode.value || "no_image").trim(),
+	zonci_result_separator: String(form.elements.zonci_result_separator.value || "VIRGULA").trim(),
     repeat_mode: String(els.repeatModeSelect.value || "individual"),
   };
   const resp = await api("/api/reader-settings", {
@@ -2183,6 +2401,11 @@ async function onSaveReaderSettings(event) {
     available_comm_types: Array.isArray(resp.settings?.available_comm_types) ? resp.settings.available_comm_types : state.readerSettings.available_comm_types,
     available_protocols: Array.isArray(resp.settings?.available_protocols) ? resp.settings.available_protocols : state.readerSettings.available_protocols,
     available_tcpip_modes: Array.isArray(resp.settings?.available_tcpip_modes) ? resp.settings.available_tcpip_modes : state.readerSettings.available_tcpip_modes,
+    available_serial_bauds: Array.isArray(resp.settings?.available_serial_bauds) ? resp.settings.available_serial_bauds : state.readerSettings.available_serial_bauds,
+    available_serial_data_bits: Array.isArray(resp.settings?.available_serial_data_bits) ? resp.settings.available_serial_data_bits : state.readerSettings.available_serial_data_bits,
+    available_serial_parities: Array.isArray(resp.settings?.available_serial_parities) ? resp.settings.available_serial_parities : state.readerSettings.available_serial_parities,
+    available_serial_stop_bits: Array.isArray(resp.settings?.available_serial_stop_bits) ? resp.settings.available_serial_stop_bits : state.readerSettings.available_serial_stop_bits,
+    available_serial_flow_controls: Array.isArray(resp.settings?.available_serial_flow_controls) ? resp.settings.available_serial_flow_controls : state.readerSettings.available_serial_flow_controls,
     available_astm_checksum_modes: Array.isArray(resp.settings?.available_astm_checksum_modes) ? resp.settings.available_astm_checksum_modes : state.readerSettings.available_astm_checksum_modes,
     available_astm_trailer_modes: Array.isArray(resp.settings?.available_astm_trailer_modes) ? resp.settings.available_astm_trailer_modes : state.readerSettings.available_astm_trailer_modes,
     tcpip_mode: String(resp.settings?.tcpip_mode || payload.tcpip_mode),
@@ -2190,6 +2413,12 @@ async function onSaveReaderSettings(event) {
     tcpip_port: String(resp.settings?.tcpip_port || payload.tcpip_port),
     tcpip_remote_host: String(resp.settings?.tcpip_remote_host || payload.tcpip_remote_host),
     tcpip_remote_port: String(resp.settings?.tcpip_remote_port || payload.tcpip_remote_port),
+    serial_port: String(resp.settings?.serial_port || payload.serial_port),
+    serial_baud: String(resp.settings?.serial_baud || payload.serial_baud),
+    serial_data_bits: String(resp.settings?.serial_data_bits || payload.serial_data_bits),
+    serial_parity: String(resp.settings?.serial_parity || payload.serial_parity),
+    serial_stop_bits: String(resp.settings?.serial_stop_bits || payload.serial_stop_bits),
+    serial_flow_control: String(resp.settings?.serial_flow_control || payload.serial_flow_control),
     astm_checksum_mode: String(resp.settings?.astm_checksum_mode || payload.astm_checksum_mode),
     astm_trailer_mode: String(resp.settings?.astm_trailer_mode || payload.astm_trailer_mode),
     file_import_dir: String(resp.settings?.file_import_dir || payload.file_import_dir),
@@ -2277,19 +2506,30 @@ function syncReaderSettingsTransportFields() {
   const tcpModeRow = document.getElementById("reader-settings-tcp-mode-row");
   const tcpServerRow = document.getElementById("reader-settings-tcp-server-row");
   const tcpClientRow = document.getElementById("reader-settings-tcp-client-row");
+  const serialRow = document.getElementById("reader-settings-serial-row");
   const astmFramingRow = document.getElementById("reader-settings-astm-framing-row");
+  const astmSpecimenRow = document.getElementById("reader-settings-astm-specimen-row");
+  const astmSpecimenSettingsLink = document.getElementById("astm-specimen-settings-link");
+	const zonciSeparatorRow = document.getElementById("reader-settings-zonci-separator-row");
   const fileRow = document.getElementById("reader-settings-file-row");
   const labnovationImageRow = document.getElementById("reader-settings-labnovation-image-row");
   const showTCP = commType === "tcpip";
   const showFile = commType === "file";
+	const showSerial = commType === "serial";
+  const usesASTM = analyzerProtocol === "astm" || analyzerProtocol === "horiba-abx-pentra400";
   const showASTMFraming = showTCP && analyzerProtocol === "astm";
   const showLabnovationImage = analyzerProtocol === "labnovation-ld560";
+	const showZonciSeparator = analyzerProtocol === "zonci-xl1000i";
   if (tcpModeRow) tcpModeRow.hidden = !showTCP;
   if (tcpServerRow) tcpServerRow.hidden = !showTCP || tcpMode === "client";
   if (tcpClientRow) tcpClientRow.hidden = !showTCP || tcpMode !== "client";
+	if (serialRow) serialRow.hidden = !showSerial;
   if (astmFramingRow) astmFramingRow.hidden = !showASTMFraming;
+  if (astmSpecimenRow) astmSpecimenRow.hidden = !usesASTM;
+  if (astmSpecimenSettingsLink) astmSpecimenSettingsLink.hidden = !usesASTM;
   if (fileRow) fileRow.hidden = !showFile;
   if (labnovationImageRow) labnovationImageRow.hidden = !showLabnovationImage;
+	if (zonciSeparatorRow) zonciSeparatorRow.hidden = !showZonciSeparator;
 }
 
 async function loadResultSyncStatus() {
@@ -3025,6 +3265,7 @@ async function loadAnalytes() {
     state.selectedQCTargetAnalyteTag = null;
   }
   renderAnalyteList();
+  loadDailyAnalysisFilters().catch(() => {});
   syncQCTargetAnalyteOptions();
   syncQCTargetFormAnalyteOptions();
   syncDailyDetailAnalyteOptions();
@@ -3114,6 +3355,21 @@ async function onRefreshAnalytesClick() {
 }
 
 async function loadOrders() {
+  if (isDocsmartMode()) {
+    const resp = await api("/api/docsmart/parsed-files");
+    state.docsmartFiles = resp.files || [];
+    state.orders = [];
+    if (!state.selectedDocsmartFileID && state.docsmartFiles.length > 0) {
+      state.selectedDocsmartFileID = state.docsmartFiles[0].id;
+    }
+    if (state.selectedDocsmartFileID && !state.docsmartFiles.some((item) => item.id === state.selectedDocsmartFileID)) {
+      state.selectedDocsmartFileID = state.docsmartFiles[0]?.id || null;
+    }
+    if (els.ordersSearch) els.ordersSearch.value = state.selectedOrderSearch || "";
+    renderOrdersLayout();
+    renderOrderDetails();
+    return;
+  }
   const requestedRoundNo = state.selectedRoundNo;
   const params = new URLSearchParams();
   params.set("include_analysis", "1");
@@ -3163,6 +3419,23 @@ function syncOrderControls() {
     els.ordersSelectAllBox.hidden = true;
     if (els.orderDate?.parentElement) els.orderDate.parentElement.hidden = true;
     if (els.roundSelect?.parentElement) els.roundSelect.parentElement.hidden = true;
+    return;
+  }
+  if (isDocsmartMode()) {
+    els.importOrdersBtn.hidden = true;
+    els.exportOrdersBtn.hidden = true;
+    if (els.syncOrdersWiseMEDBtn) els.syncOrdersWiseMEDBtn.hidden = true;
+    if (els.reapplyOrderTransformationsBtn) els.reapplyOrderTransformationsBtn.hidden = true;
+    if (els.sendOrdersWiseMEDBtn) els.sendOrdersWiseMEDBtn.hidden = true;
+    els.worklistOrdersBtn.hidden = true;
+    if (els.deleteOrdersBtn) els.deleteOrdersBtn.hidden = true;
+    els.newRoundBtn.hidden = true;
+    els.ordersSelectAllBox.hidden = true;
+    if (els.orderDate?.parentElement) els.orderDate.parentElement.hidden = true;
+    if (els.roundSelect?.parentElement) els.roundSelect.parentElement.hidden = true;
+    if (els.ordersReceivedFilter?.parentElement) els.ordersReceivedFilter.parentElement.hidden = true;
+    if (els.ordersSentFilter?.parentElement) els.ordersSentFilter.parentElement.hidden = true;
+    if (els.ordersFilterActive) els.ordersFilterActive.hidden = true;
     return;
   }
   if (els.orderDate) {
@@ -4926,6 +5199,57 @@ function formatMetricNumber(value) {
 }
 
 function renderOrdersLayout() {
+  if (isDocsmartMode()) {
+    const items = state.docsmartFiles.filter((item) => {
+      const search = String(state.selectedOrderSearch || "").trim().toLowerCase();
+      if (!search) return true;
+      return [item.file_name, item.institution_name, item.document_date, item.year, item.month, item.status, item.location]
+        .some((value) => String(value || "").toLowerCase().includes(search));
+    });
+    if (items.length === 0) {
+      els.ordersLayout.innerHTML = `<div class="log-item">${escapeHtml(state.selectedOrderSearch ? "Nu exista fisiere pentru filtrul selectat." : "Nu exista fisiere XML parse-ate.")}</div>`;
+      return;
+    }
+    els.ordersLayout.innerHTML = `
+      <div class="orders-table-wrap">
+        <table class="orders-table">
+          <thead>
+            <tr>
+              <th>Fisier</th>
+              <th>Stare</th>
+              <th>Locatie</th>
+              <th>Institutie</th>
+              <th>Data</th>
+              <th>An/Luna</th>
+              <th>Conturi</th>
+              <th>Total debit</th>
+              <th>Total credit</th>
+            </tr>
+          </thead>
+          <tbody>${items.map((item) => `
+            <tr class="${item.id === state.selectedDocsmartFileID ? "active" : ""}" data-docsmart-file-id="${escapeHtml(item.id)}">
+              <td><strong>${escapeHtml(item.file_name || "-")}</strong></td>
+              <td><span class="status-pill-soft">${escapeHtml(item.status || "-")}</span></td>
+              <td>${escapeHtml(item.location || "-")}</td>
+              <td>${escapeHtml(item.institution_name || "-")}</td>
+              <td>${escapeHtml(item.document_date || "-")}</td>
+              <td>${escapeHtml(`${item.year || "-"} / ${item.month || "-"}`)}</td>
+              <td>${escapeHtml(String(item.accounts_count || 0))}</td>
+              <td>${escapeHtml(item.debit_total || "0.00")}</td>
+              <td>${escapeHtml(item.credit_total || "0.00")}</td>
+            </tr>`).join("")}
+          </tbody>
+        </table>
+      </div>`;
+    [...els.ordersLayout.querySelectorAll("[data-docsmart-file-id]")].forEach((row) => {
+      row.addEventListener("click", () => {
+        state.selectedDocsmartFileID = row.dataset.docsmartFileId || null;
+        renderOrdersLayout();
+        renderOrderDetails();
+      });
+    });
+    return;
+  }
   const visibleOrders = filteredOrders();
   if (visibleOrders.length === 0) {
     els.ordersSelectAll.checked = false;
@@ -5139,6 +5463,7 @@ function renderSimpleRow(bundle) {
   const receiveStatus = orderReceiveStatus(bundle);
   const sendStatus = orderSendStatus(bundle);
   const analyzerSendCount = orderAnalyzerSendCount(order);
+  const fileIDClass = missingFileID(order) ? "required-label required-label-danger" : "";
   return `<tr class="${order.id === state.selectedOrderId ? "active" : ""}" data-order-id="${order.id}">
     <td class="col-check">
       ${!state.barcodeMode ? `<span class="order-select"><input type="checkbox" data-order-check="${order.id}" ${state.selectedOrderIDs.includes(order.id) ? "checked" : ""}></span>` : ""}
@@ -5151,7 +5476,7 @@ function renderSimpleRow(bundle) {
         <div class="sample-sub">
           <span>${escapeHtml(`${t("sampleNo")}: ${String(order.sample_no || 0)}`)}</span>
           <span>${escapeHtml(`${t("sentSampleCode")}: ${sentSampleCode || "-"}`)}</span>
-          <span>${escapeHtml(`${t("fileId")}: ${fileID || "-"}`)}</span>
+          <span class="${fileIDClass}">${escapeHtml(`${t("fileId")}: ${fileID || "-"}`)}</span>
           <span>${escapeHtml(`${t("sampleCode")}: ${sampleCode || "-"}`)}</span>
           <span>${escapeHtml(`${t("specimenCode")}: ${specimenCode || "-"}`)}</span>
           <span>${escapeHtml(`${t("patientId")}: ${patientID || "-"}`)}</span>
@@ -5203,6 +5528,14 @@ function orderAnalyzerSendCount(order) {
   return Number.isFinite(value) && value > 0 ? value : 0;
 }
 
+function missingFileID(order) {
+  return !String(order?.file_id || "").trim();
+}
+
+function missingWiseMEDFSMID(analysis) {
+  return !String(analysis?.wisemed_fsm_id || "").trim();
+}
+
 function analysisCommunicationDetails(analysis) {
   return String(analysis?.flags?.communication_details || analysis?.interpreted_value || "").trim();
 }
@@ -5237,6 +5570,46 @@ function slotLabel(order) {
 }
 
 function renderOrderDetails() {
+  if (isDocsmartMode()) {
+    const item = state.docsmartFiles.find((entry) => entry.id === state.selectedDocsmartFileID);
+    if (!item) {
+      els.orderDetails.innerHTML = `<div class="log-item">Selecteaza un fisier XML pentru a vedea detaliile parse-ate.</div>`;
+      return;
+    }
+    const topAccounts = Array.isArray(item.top_accounts) ? item.top_accounts : [];
+    els.orderDetails.innerHTML = `
+      <div class="order-card">
+        <div class="order-headline">
+          <div class="order-title">
+            <strong>${escapeHtml(item.file_name || "-")}</strong>
+            <div class="small muted">${escapeHtml(item.path || "-")}</div>
+          </div>
+          <div class="analysis-send-pill"><span class="slot-pill">${escapeHtml(item.status || "-")}</span></div>
+        </div>
+        <div class="order-meta-grid">
+          <div class="meta-kpi"><span class="label">Institutie</span><span class="value">${escapeHtml(item.institution_name || "-")}</span></div>
+          <div class="meta-kpi"><span class="label">Data document</span><span class="value">${escapeHtml(item.document_date || "-")}</span></div>
+          <div class="meta-kpi"><span class="label">An</span><span class="value">${escapeHtml(item.year || "-")}</span></div>
+          <div class="meta-kpi"><span class="label">Luna</span><span class="value">${escapeHtml(item.month || "-")}</span></div>
+          <div class="meta-kpi"><span class="label">Suma control</span><span class="value">${escapeHtml(item.control_sum || "-")}</span></div>
+          <div class="meta-kpi"><span class="label">Conturi</span><span class="value">${escapeHtml(String(item.accounts_count || 0))}</span></div>
+          <div class="meta-kpi"><span class="label">Total debit</span><span class="value">${escapeHtml(item.debit_total || "0.00")}</span></div>
+          <div class="meta-kpi"><span class="label">Total credit</span><span class="value">${escapeHtml(item.credit_total || "0.00")}</span></div>
+        </div>
+        ${item.error ? `<div class="log-item">${escapeHtml(item.error)}</div>` : ""}
+      </div>
+      <div class="analysis-card">
+        <strong>Primele conturi parse-ate</strong>
+        ${topAccounts.length ? `
+          <div class="analysis-table-wrap">
+            <table class="analysis-table">
+              <thead><tr><th>Cont</th><th>Sursa</th><th>Debit</th><th>Credit</th></tr></thead>
+              <tbody>${topAccounts.map((acc) => `<tr><td>${escapeHtml(acc.symbol || "-")}</td><td>${escapeHtml(acc.source_code || "-")}</td><td>${escapeHtml(acc.debit || "-")}</td><td>${escapeHtml(acc.credit || "-")}</td></tr>`).join("")}</tbody>
+            </table>
+          </div>` : `<div class="log-item">Fisierul nu contine conturi parse-abile.</div>`}
+      </div>`;
+    return;
+  }
   const bundle = state.orders.find((item) => item.order.id === state.selectedOrderId);
   if (!bundle) {
     els.orderDetails.innerHTML = `<div class="log-item">${escapeHtml(t("orderDetails"))}</div>`;
@@ -5256,6 +5629,7 @@ function renderOrderDetails() {
   const imagePath = String(bundle.order?.meta?.labnovation_image_path || "").trim();
   const receiveStatus = orderReceiveStatus(bundle);
   const sendStatus = orderSendStatus(bundle);
+  const fileIDValueClass = missingFileID(bundle.order) ? "value required-label required-label-danger" : "value";
   els.orderDetails.innerHTML = `
     <div class="order-card">
       <div class="order-headline">
@@ -5280,7 +5654,7 @@ function renderOrderDetails() {
         </div>
         <div class="meta-kpi">
           <span class="label">${escapeHtml(t("fileId"))}</span>
-          <span class="value">${escapeHtml(fileID || "-")}</span>
+          <span class="${fileIDValueClass}">${escapeHtml(fileID || "-")}</span>
         </div>
         <div class="meta-kpi">
           <span class="label">${escapeHtml(t("sampleCode"))}</span>
@@ -5328,7 +5702,7 @@ function renderOrderDetails() {
                       <strong>${escapeHtml(item.analysis.analyte_name || item.analysis.analyte_tag || "-")}</strong>
                       <div class="small muted">${escapeHtml(item.analysis.analyte_description || "")}</div>
                       <div class="small muted">${escapeHtml(`${t("wisemedSMID")}: ${item.analysis.wisemed_sm_id || "-"}`)}</div>
-                      <div class="small muted">${escapeHtml(`${t("wisemedFSMID")}: ${item.analysis.wisemed_fsm_id || "-"}`)}</div>
+                      <div class="small ${missingWiseMEDFSMID(item.analysis) ? "required-label required-label-warn" : "muted"}">${escapeHtml(`${t("wisemedFSMID")}: ${item.analysis.wisemed_fsm_id || "-"}`)}</div>
                     </td>
                     <td>${escapeHtml(item.analysis.analyte_tag || "-")}</td>
                     <td>${item.analysis.flags?.transformation_error ? `<span title="${escapeHtml(String(item.analysis.flags?.transformation_error_message || "Eroare transformare"))}">!</span>` : ""}</td>
@@ -5348,7 +5722,7 @@ function renderOrderDetails() {
               <div class="small muted">${escapeHtml(selectedAnalysisBundle.analysis.analyte_name || "")}</div>
               <div class="small muted">${escapeHtml(selectedAnalysisBundle.analysis.analyte_description || "")}</div>
               <div class="small muted">${escapeHtml(`${t("wisemedSMID")}: ${selectedAnalysisBundle.analysis.wisemed_sm_id || "-"}`)}</div>
-              <div class="small muted">${escapeHtml(`${t("wisemedFSMID")}: ${selectedAnalysisBundle.analysis.wisemed_fsm_id || "-"}`)}</div>
+              <div class="small ${missingWiseMEDFSMID(selectedAnalysisBundle.analysis) ? "required-label required-label-warn" : "muted"}">${escapeHtml(`${t("wisemedFSMID")}: ${selectedAnalysisBundle.analysis.wisemed_fsm_id || "-"}`)}</div>
               <div class="small muted">${escapeHtml(`${t("analysisSendStatus")}: ${localizeSendStatus(analysisSendStatus(selectedAnalysisBundle.analysis))}`)}</div>
               ${selectedAnalysisBundle.analysis.flags?.transformation_error ? `<div class="small muted">Eroare transformare: ${escapeHtml(String(selectedAnalysisBundle.analysis.flags?.transformation_error_message || "-"))}</div>` : ""}
             </div>

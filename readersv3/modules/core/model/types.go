@@ -80,6 +80,18 @@ type DailyDetailValue struct {
 	UpdatedAt     time.Time              `json:"updated_at"`
 }
 
+// DailyAnalysisSendFilter temporarily blocks an analyte from an analyzer's
+// LIS worklist for one calendar day. Empty specimen codes means global block.
+type DailyAnalysisSendFilter struct {
+	ID            int64     `json:"id"`
+	ScopeDate     string    `json:"scope_date"`
+	AnalyteTag    string    `json:"analyte_tag"`
+	Mode          string    `json:"mode"`
+	SpecimenCodes []string  `json:"specimen_codes,omitempty"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
+}
+
 type Order struct {
 	ID           int64                  `json:"id"`
 	RoundNo      int                    `json:"round_no"`

@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="ro">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ajutor WiseMED BioMerieux miniVIDAS Reader</title>
+  <style>
+    :root{--ink:#15343a;--muted:#597176;--paper:#fffdf7;--wash:#e7f0ed;--line:#c9ddd6;--accent:#006b5f;--warning:#fff2cf}*{box-sizing:border-box}body{margin:0;background:linear-gradient(135deg,#e3f0ea,#fdf7e9);color:var(--ink);font:16px/1.55 Georgia,serif}.wrap{max-width:960px;margin:auto;padding:36px 20px 72px}.hero,.card{background:var(--paper);border:1px solid var(--line);box-shadow:0 14px 32px #17372d1a}.hero{border-top:8px solid var(--accent);padding:32px;margin-bottom:22px}.card{padding:28px;margin:22px 0}.eyebrow{color:var(--accent);font:700 12px/1.2 Arial,sans-serif;letter-spacing:.14em;text-transform:uppercase}h1,h2{font-family:Arial,sans-serif;line-height:1.15}h1{font-size:36px;margin:8px 0 12px}h2{font-size:22px;margin:0 0 14px;color:var(--accent)}.muted{color:var(--muted)}.chips span{display:inline-block;margin:8px 8px 0 0;padding:5px 10px;border-radius:999px;background:var(--wash);font:700 12px Arial,sans-serif;color:var(--accent)}table{border-collapse:collapse;width:100%;margin:14px 0}th,td{border-bottom:1px solid var(--line);padding:9px;text-align:left;vertical-align:top}th{font:700 12px Arial,sans-serif;color:var(--muted);text-transform:uppercase}code{font:14px ui-monospace,monospace;background:#edf5f2;padding:2px 5px}.note{background:var(--warning);border-left:4px solid #be861b;padding:12px 15px;margin-top:16px}ol,ul{padding-left:22px}li{margin:7px 0}.gallery{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:16px;margin-top:18px}.shot{margin:0;padding:10px;background:#f4f8f5;border:1px solid var(--line)}.shot a{display:block}.shot img{display:block;width:100%;height:auto;border:1px solid #aebfba}.shot figcaption{font:700 12px/1.35 Arial,sans-serif;color:var(--muted);margin-top:8px}@media(max-width:600px){.wrap{padding:20px 12px 48px}.hero,.card{padding:20px}h1{font-size:30px}}
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <section class="hero">
+      <div class="eyebrow">Ghid de configurare</div>
+      <h1>BioMerieux miniVIDAS Reader</h1>
+      <p class="muted">Instrucțiuni transformate din documentul local <em>Configure communication And Use.doc</em>. Readerul primește rezultate exclusiv prin conexiune serială; miniVIDAS nu acceptă comunicare bidirecțională pentru lista de lucru.</p>
+      <div class="chips"><span>Serial</span><span>9600 8N1</span><span>Flow control: Custom</span><span>Unidirecțional</span><span>LIS Upload</span></div>
+    </section>
+    <section class="card">
+      <h2>1. Conexiune fizică</h2>
+      <p>Folosește cablu serial mamă-mamă, cu firele <code>2-3</code>, <code>3-2</code> și <code>5-5</code>. În reader selectează portul serial al adaptorului sau calculatorului.</p>
+      <table><thead><tr><th>Setare reader</th><th>Valoare</th></tr></thead><tbody>
+        <tr><td><code>analyzer.comm_type</code></td><td><code>serial</code></td></tr><tr><td><code>transport-serial.port</code></td><td>Port local, de exemplu <code>COM3</code> sau <code>/dev/tty.usbserial-...</code>.</td></tr><tr><td><code>transport-serial.baud</code></td><td><code>9600</code></td></tr><tr><td><code>transport-serial.data_bits</code></td><td><code>8</code></td></tr><tr><td><code>transport-serial.parity</code></td><td><code>none</code></td></tr><tr><td><code>transport-serial.stop_bits</code></td><td><code>1</code></td></tr><tr><td><code>transport-serial.flow_control</code></td><td><code>custom</code></td></tr>
+      </tbody></table>
+    </section>
+    <section class="card">
+      <h2>2. Activare comunicație în miniVIDAS</h2>
+      <ol><li>Din <strong>Main Menu</strong> deschide <strong>Utility Menu</strong>.</li><li>Intră în <strong>Configuration Menu</strong>.</li><li>Navighează la <strong>LIS User Options</strong> și bifează <strong>LIS Upload Enabled</strong>.</li><li>Opțional, bifează <strong>LIS auto validation</strong> pentru transmitere automată la prima tipărire.</li><li>Intră în <strong>LIS Interface Options</strong> pentru setările de mai jos.</li></ol>
+    </section>
+    <section class="card">
+      <h2>3. LIS Interface Options</h2>
+      <table><thead><tr><th>Secțiune</th><th>Setare</th><th>Valoare</th></tr></thead><tbody>
+        <tr><td>Communication Settings</td><td>Baud Rate</td><td><code>9600</code></td></tr><tr><td>Communication Settings</td><td>Parity</td><td><code>None</code></td></tr><tr><td>Communication Settings</td><td>Character Size</td><td><code>8</code></td></tr><tr><td>Timeouts and Limits</td><td>Timeout / Checksum Retry Limit / ENQ Retry Limit</td><td><code>3 / 3 / 3</code></td></tr><tr><td>Timeouts and Limits</td><td>Checksum Error Retry Interval / ENQ Retry Interval</td><td><code>10 / 10</code></td></tr><tr><td>Timeouts and Limits</td><td>InterRecord Delay / InterMessage Delay</td><td><code>0 / 2</code></td></tr><tr><td>Data Format</td><td>Misc Format</td><td>Nicio opțiune bifată, inclusiv <em>Alternate Protocol</em> și <em>Send Dilution</em>.</td></tr><tr><td>Data Format</td><td>Time Separator / Date Separator / Field Terminator</td><td><code>:</code> / <code>/</code> / <code>|</code></td></tr>
+      </tbody></table>
+      <div class="note"><strong>Atenție:</strong> pentru miniVIDAS comunicația este numai unidirecțională. Lista de lucru și ID-urile probelor se introduc manual pe analizor.</div>
+    </section>
+    <section class="card">
+      <h2>4. Capturi din configurarea miniVIDAS</h2>
+      <p class="muted">Capturile au fost preluate din pachetul local de configurare. Apasă pe o imagine pentru vizualizare la dimensiunea originală.</p>
+      <div class="gallery">
+        <figure class="shot"><a href="assets/lis_status.jpg"><img src="assets/lis_status.jpg" alt="LIS User Options"></a><figcaption>LIS User Options</figcaption></figure>
+        <figure class="shot"><a href="assets/lis_interf_options.jpg"><img src="assets/lis_interf_options.jpg" alt="LIS Interface Options"></a><figcaption>LIS Interface Options</figcaption></figure>
+        <figure class="shot"><a href="assets/speed.jpg"><img src="assets/speed.jpg" alt="Baud rate"></a><figcaption>Baud rate</figcaption></figure>
+        <figure class="shot"><a href="assets/partity-sett.jpg"><img src="assets/partity-sett.jpg" alt="Parity"></a><figcaption>Parity</figcaption></figure>
+        <figure class="shot"><a href="assets/char_size.jpg"><img src="assets/char_size.jpg" alt="Character size"></a><figcaption>Character size</figcaption></figure>
+        <figure class="shot"><a href="assets/timeout.jpg"><img src="assets/timeout.jpg" alt="Timeout"></a><figcaption>Timeout</figcaption></figure>
+        <figure class="shot"><a href="assets/limit_checksumretry.jpg"><img src="assets/limit_checksumretry.jpg" alt="Checksum retry limit"></a><figcaption>Checksum retry limit</figcaption></figure>
+        <figure class="shot"><a href="assets/limit_enq_retry.jpg"><img src="assets/limit_enq_retry.jpg" alt="ENQ retry limit"></a><figcaption>ENQ retry limit</figcaption></figure>
+        <figure class="shot"><a href="assets/limit_checsum-err-retry.jpg"><img src="assets/limit_checsum-err-retry.jpg" alt="Checksum retry interval"></a><figcaption>Checksum retry interval</figcaption></figure>
+        <figure class="shot"><a href="assets/limit_enq_retry_interval.jpg"><img src="assets/limit_enq_retry_interval.jpg" alt="ENQ retry interval"></a><figcaption>ENQ retry interval</figcaption></figure>
+        <figure class="shot"><a href="assets/inter-record-delay.jpg"><img src="assets/inter-record-delay.jpg" alt="Inter-record delay"></a><figcaption>Inter-record delay</figcaption></figure>
+        <figure class="shot"><a href="assets/limitintermessagedelay.jpg"><img src="assets/limitintermessagedelay.jpg" alt="Inter-message delay"></a><figcaption>Inter-message delay</figcaption></figure>
+        <figure class="shot"><a href="assets/data_format_misc_format1.jpg"><img src="assets/data_format_misc_format1.jpg" alt="Misc format"></a><figcaption>Misc format, pagina 1</figcaption></figure>
+        <figure class="shot"><a href="assets/data_format_misc_format2.jpg"><img src="assets/data_format_misc_format2.jpg" alt="Misc format"></a><figcaption>Misc format, pagina 2</figcaption></figure>
+        <figure class="shot"><a href="assets/time_sep.jpg"><img src="assets/time_sep.jpg" alt="Time separator"></a><figcaption>Time separator</figcaption></figure>
+        <figure class="shot"><a href="assets/date_sep.jpg"><img src="assets/date_sep.jpg" alt="Date separator"></a><figcaption>Date separator</figcaption></figure>
+        <figure class="shot"><a href="assets/field-terminator.jpg"><img src="assets/field-terminator.jpg" alt="Field terminator"></a><figcaption>Field terminator</figcaption></figure>
+        <figure class="shot"><a href="assets/VALIDATE-RES.jpg"><img src="assets/VALIDATE-RES.jpg" alt="Validate LIS results"></a><figcaption>Validate LIS results</figcaption></figure>
+        <figure class="shot"><a href="assets/vaidate-results.jpg"><img src="assets/vaidate-results.jpg" alt="Transmitere rezultate"></a><figcaption>Transmitere rezultate</figcaption></figure>
+      </div>
+    </section>
+    <section class="card"><h2>5. Trimitere și retrimitere rezultate</h2><p>Pentru transmitere intră în <strong>Main Menu → Results Menu → Validate LIS Results</strong>, selectează rezultatele nevalidate și apasă <strong>Send</strong>. Dacă rezultatele au fost deja validate, retipărește-le din <strong>Results Menu</strong> pentru a reveni în lista de validare.</p><p>Dacă apar rezultate neselectate, răspunde în mod normal <strong>Nu</strong> la întrebarea de ștergere, pentru a putea face retransmiterea ulterior.</p></section>
+    <section class="card"><h2>6. Ce preia readerul</h2><p>Protocolul recunoaște ID-ul probei din <code>ci</code>, codul și numele testului din <code>rt</code>/<code>rn</code>, rezultatul numeric sau calitativ din <code>qn</code>/<code>ql</code> și data/ora din <code>td</code>/<code>tt</code>. La nivel de log <code>5</code>, Logs afișează pachetul reconstruit ca <code>PARSED SERIAL PACKAGE: TEXT: ...</code>.</p></section>
+  </main>
+</body>
+</html>

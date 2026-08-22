@@ -266,6 +266,10 @@ button.is-loading:hover{transform:none}
 .orders-table .sample-main{display:grid;gap:4px;min-width:0}
 .orders-table .sample-id{font-weight:700;font-size:1rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .orders-table .sample-sub{display:flex;gap:8px;flex-wrap:wrap;color:var(--muted);font-size:.86rem}
+.required-label{display:inline-flex;align-items:center;gap:6px;font-weight:700}
+.required-label::before{content:"";width:8px;height:8px;border-radius:999px;background:currentColor;opacity:.9;flex:0 0 auto}
+.required-label-warn{color:var(--amber-deep)}
+.required-label-danger{color:var(--danger)}
 .orders-table .slot-pill,.status-pill-soft,.count-pill{display:inline-flex;align-items:center;justify-content:center;padding:6px 10px;border-radius:999px;font-size:.8rem;font-weight:700}
 .orders-table .slot-pill{background:#eff6f0;color:#2f6a40;border:1px solid #d3e4d6}
 .status-pill-soft{background:#f5f8f6;border:1px solid #dde9e0;color:#607166}

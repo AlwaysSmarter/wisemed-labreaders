@@ -51,6 +51,7 @@ func ensureBootstrap(cfg *config.Config, reconfigure bool) (bool, error) {
 	}
 	apiClient := wisemedapi.NewBootstrapClient(stringSettings(settings), callerTypeForProtocol(cfg.Analyzer.Protocol))
 	apiClient.Tracef = startupConsolef
+	skipSetupCompletion := strings.EqualFold(strSetting(settings, "skip_setup_completion"), "true")
 
 	if reconfigure || cfg.Reader.ID == "" {
 		promptTopLevelString(reader, "Reader ID", &cfg.Reader.ID, defaultReaderID(cfg))
@@ -73,39 +74,39 @@ func ensureBootstrap(cfg *config.Config, reconfigure bool) (bool, error) {
 		changed = true
 	}
 
-	if reconfigure || strSetting(settings, "unitate_medicala_id") == "" {
+	if !skipSetupCompletion && (reconfigure || strSetting(settings, "unitate_medicala_id") == "") {
 		if err := promptMedicalUnitSelection(reader, apiClient, settings); err != nil {
 			return changed, err
 		}
 		changed = true
 	}
-	if reconfigure || strSetting(settings, "tip_de_echipament_id") == "" {
+	if !skipSetupCompletion && (reconfigure || strSetting(settings, "tip_de_echipament_id") == "") {
 		if err := promptEquipmentTypeSelection(reader, apiClient, settings); err != nil {
 			return changed, err
 		}
 		changed = true
 	}
-	if reconfigure || strSetting(settings, "cod_echipament") == "" {
+	if !skipSetupCompletion && (reconfigure || strSetting(settings, "cod_echipament") == "") {
 		promptString(reader, "Equipment code", settings, "cod_echipament", cfg.Reader.AnalyzerCode)
 		changed = true
 	}
-	if reconfigure || strSetting(settings, "producator_echipament") == "" {
+	if !skipSetupCompletion && (reconfigure || strSetting(settings, "producator_echipament") == "") {
 		promptString(reader, "Equipment manufacturer", settings, "producator_echipament", firstToken(cfg.Reader.AnalyzerName))
 		changed = true
 	}
-	if reconfigure || strSetting(settings, "numar_serial_echipament") == "" {
+	if !skipSetupCompletion && (reconfigure || strSetting(settings, "numar_serial_echipament") == "") {
 		promptString(reader, "Equipment serial number", settings, "numar_serial_echipament", cfg.Reader.AnalyzerCode+"-001")
 		changed = true
 	}
-	if reconfigure || strSetting(settings, "nume_pe_raport_final") == "" {
+	if !skipSetupCompletion && (reconfigure || strSetting(settings, "nume_pe_raport_final") == "") {
 		promptString(reader, "Final report equipment name", settings, "nume_pe_raport_final", cfg.Reader.AnalyzerName)
 		changed = true
 	}
-	if reconfigure || strSetting(settings, "nr_rackuri") == "" {
+	if !skipSetupCompletion && (reconfigure || strSetting(settings, "nr_rackuri") == "") {
 		promptString(reader, "Number of racks", settings, "nr_rackuri", "0")
 		changed = true
 	}
-	if reconfigure || strSetting(settings, "pozitii_pe_rack") == "" {
+	if !skipSetupCompletion && (reconfigure || strSetting(settings, "pozitii_pe_rack") == "") {
 		promptString(reader, "Positions per rack", settings, "pozitii_pe_rack", "0")
 		changed = true
 	}
@@ -134,7 +135,7 @@ func ensureBootstrap(cfg *config.Config, reconfigure bool) (bool, error) {
 	cfg.Modules["wisemed-api"] = settings
 	syncModuleMirrors(cfg)
 	cfg.ApplyDefaults()
-	if changed {
+	if changed && !skipSetupCompletion {
 		if err := registerEquipment(cfg, apiClient); err != nil {
 			return changed, err
 		}
@@ -264,14 +265,18 @@ func needsBootstrap(cfg *config.Config) bool {
 		"cfg_wisemed_port",
 		"cfg_wisemed_path",
 		"cfg_wisemed_key",
-		"unitate_medicala_id",
-		"tip_de_echipament_id",
-		"cod_echipament",
-		"producator_echipament",
-		"numar_serial_echipament",
-		"nume_pe_raport_final",
-		"nr_rackuri",
-		"pozitii_pe_rack",
+	}
+	if !strings.EqualFold(strSetting(ws, "skip_setup_completion"), "true") {
+		requiredSettings = append(requiredSettings,
+			"unitate_medicala_id",
+			"tip_de_echipament_id",
+			"cod_echipament",
+			"producator_echipament",
+			"numar_serial_echipament",
+			"nume_pe_raport_final",
+			"nr_rackuri",
+			"pozitii_pe_rack",
+		)
 	}
 	for _, key := range requiredSettings {
 		if strSetting(ws, key) == "" {
@@ -696,6 +701,8 @@ func supportedProtocols(cfg *config.Config) []string {
 			add("cfx96-quantitation")
 		case "protocol-analytikjena-plasmaquantms-elite":
 			add("analytikjena-plasmaquantms-elite")
+		case "protocol-anaf-docsmart":
+			add("anaf-docsmart")
 		case "protocol-biosan-hipo-mpp96":
 			add("biosan-hipo-mpp96")
 		case "protocol-gammavision":
@@ -738,7 +745,7 @@ func supportedCommTypes(cfg *config.Config) []string {
 			add("tcpip")
 		case "seegene-excel", "beosl-csv", "beoslcsv", "cfx96-quantitation", "cary60-uvvis", "analytikjena-plasmaquantms-elite", "shimatzu-tocl", "shimatzu-generic", "biosan-hipo-mpp96", "gammavision", "tricarb-5110-tr", "anatolia-geneworks", "generic-file":
 			add("file")
-		case "barcodeprinter":
+		case "barcodeprinter", "anaf-docsmart":
 			add("utility")
 		}
 	}

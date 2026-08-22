@@ -1,0 +1,65 @@
+reader:
+  id: anaf-docsmart
+  label: ANAF DocSmart
+  analyzer_name: ANAF DocSmart Utility
+  analyzer_code: anaf-docsmart
+  db_name: anaf-docsmart.db
+local_http:
+  enabled: true
+  address: 127.0.0.1:18120
+  language: ro
+  tls: false
+wisemed_ws:
+  enabled: true
+  url: wss://wslocal.wisemed.eu/ws
+  heartbeat_ms: 15000
+  reconnect_delay_ms: 5000
+analyzer:
+  comm_type: utility
+  protocol: anaf-docsmart
+modules:
+  app-updates:
+    enabled: true
+    app_id: anaf-docsmart
+    channel: stable
+    base_url: http://127.0.0.1:19090
+    auto_download: true
+    download_dir: ./updates
+  help:
+    help_dir: ./help
+  local-http:
+    enabled: true
+    address: 127.0.0.1:18120
+    language: ro
+    tls: false
+  protocol-anaf-docsmart:
+    poll_seconds: "5"
+    templates_dir: ./templates
+    template_pattern: "*.pdf"
+    work_dir: ./work
+    keep_work: "false"
+    acrobat_app: Adobe Acrobat
+  transport-file:
+    import_dir: ./inbox
+    processed_dir: ./processed
+    failed_dir: ./failed
+    export_dir: ./outbox
+    pattern: "*.xml"
+  wisemed-api:
+    cfg_wisemed_protocol: https
+    cfg_wisemed_ip: ldse.wisemed.eu
+    cfg_wisemed_port: "443"
+    cfg_wisemed_path: /wisemed-api/apiv2
+    cfg_wisemed_key: 27c490bb-c9e4-47aa-bf6d-ebd2a1add35e
+    skip_setup_completion: "true"
+    cod_echipament: ""
+    numar_serial_echipament: ""
+    echipament_id: ""
+    unitate_medicala_id: ""
+    tip_de_echipament_id: ""
+    api_key_echipament: ""
+  wisemed-ws:
+    enabled: true
+    url: wss://wslocal.wisemed.eu/ws
+    heartbeat_ms: 15000
+    reconnect_delay_ms: 5000

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Bundle Name="WiseMED HORIBA ABX Pentra 400 Reader Setup"
+          Manufacturer="WiseMED"
+          Version="1.0.0"
+          UpgradeCode="C32B8E35-1C27-444F-83AF-36EFC0D6F9B5">
+    <BootstrapperApplication>
+      <bal:WixStandardBootstrapperApplication xmlns:bal="http://wixtoolset.org/schemas/v4/wxs/bal" Theme="standard" />
+    </BootstrapperApplication>
+    <Chain>
+      <MsiPackage SourceFile="$(var.MsiPath)" DisplayInternalUI="no" />
+    </Chain>
+  </Bundle>
+</Wix>

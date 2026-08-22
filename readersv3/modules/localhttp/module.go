@@ -149,6 +149,12 @@ type dailyDetailStore interface {
 	SaveDailyDetailValue(item coremodel.DailyDetailValue) (coremodel.DailyDetailValue, error)
 }
 
+type dailyAnalysisSendFilterStore interface {
+	ListDailyAnalysisSendFilters(scopeDate string) ([]coremodel.DailyAnalysisSendFilter, error)
+	SaveDailyAnalysisSendFilter(item coremodel.DailyAnalysisSendFilter) (coremodel.DailyAnalysisSendFilter, error)
+	DeleteDailyAnalysisSendFilter(id int64) error
+}
+
 type fileImporter interface {
 	ImportFileNow(path, orderDate string) (map[string]interface{}, error)
 }
@@ -202,6 +208,7 @@ func (m *Module) Init(rt module.Runtime) error {
 	m.cors = firstNonEmpty(asString(rt.ModuleSettings(m.ID())["cors_allowed_origins"]), "https://ldse.wisemed.eu")
 	m.repeatMode = normalizeRepeatMode(asString(rt.ModuleSettings(m.ID())["repeat_mode"]))
 	m.rt.RegisterService("local-http-control", m)
+	m.rt.RegisterService("daily-analysis-send-filters", m)
 	m.rt.AddMenu(module.MenuEntry{ID: "overview", Group: "core", Label: "Acasa", Path: "/", Order: 10})
 	m.rt.Handle("/", m.withNoCache(http.HandlerFunc(m.handleIndex)))
 	m.rt.Handle("/settings", m.withNoCache(http.HandlerFunc(m.handleIndex)))
@@ -239,6 +246,8 @@ func (m *Module) Init(rt module.Runtime) error {
 	m.rt.Handle("/api/daily-details/definitions/", m.withNoCache(m.requireSession(http.HandlerFunc(m.handleDailyDetailDefinitionByID))))
 	m.rt.Handle("/api/daily-details", m.withNoCache(m.requireSession(http.HandlerFunc(m.handleDailyDetails))))
 	m.rt.Handle("/api/daily-details/worksheet", m.withNoCache(m.requireSession(http.HandlerFunc(m.handleDailyDetailsWorksheet))))
+	m.rt.Handle("/api/daily-analysis-filters", m.withNoCache(m.requireSession(http.HandlerFunc(m.handleDailyAnalysisFilters))))
+	m.rt.Handle("/api/daily-analysis-filters/", m.withNoCache(m.requireSession(http.HandlerFunc(m.handleDailyAnalysisFilterByID))))
 	m.rt.Handle("/api/qc-records", m.withNoCache(m.requireSession(http.HandlerFunc(m.handleQCRecords))))
 	m.rt.Handle("/api/qc-records/delete", m.withNoCache(m.requireSession(http.HandlerFunc(m.handleQCRecordsDelete))))
 	m.rt.Handle("/api/qc-targets", m.withNoCache(m.requireSession(http.HandlerFunc(m.handleQCTargets))))
@@ -532,7 +541,7 @@ func (m *Module) handleIndex(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	switch r.URL.Path {
-	case "/", "/daily-details", "/settings", "/settings/analytes", "/settings/qc", "/settings/daily-details", "/orders", "/qc", "/debug":
+	case "/", "/daily-details", "/settings", "/settings/analytes", "/settings/qc", "/settings/daily-details", "/settings/daily-analysis-filters", "/orders", "/qc", "/debug":
 	default:
 		http.NotFound(w, r)
 		return
@@ -648,8 +657,16 @@ func (m *Module) handleReaderSettings(w http.ResponseWriter, r *http.Request) {
 			TCPIPPort                 string `json:"tcpip_port"`
 			TCPIPRemoteHost           string `json:"tcpip_remote_host"`
 			TCPIPRemotePort           string `json:"tcpip_remote_port"`
+			SerialPort                string `json:"serial_port"`
+			SerialBaud                string `json:"serial_baud"`
+			SerialDataBits            string `json:"serial_data_bits"`
+			SerialParity              string `json:"serial_parity"`
+			SerialStopBits            string `json:"serial_stop_bits"`
+			SerialFlowControl         string `json:"serial_flow_control"`
 			ASTMChecksumMode          string `json:"astm_checksum_mode"`
 			ASTMTrailerMode           string `json:"astm_trailer_mode"`
+			ASTMSpecimenCodeDefault   string `json:"astm_specimen_code_default"`
+			ASTMSpecimenCodeMap       string `json:"astm_specimen_code_map"`
 			FileImportDir             string `json:"file_import_dir"`
 			FileProcessedDir          string `json:"file_processed_dir"`
 			FileFailedDir             string `json:"file_failed_dir"`
@@ -673,6 +690,7 @@ func (m *Module) handleReaderSettings(w http.ResponseWriter, r *http.Request) {
 			ResultSyncQCPrefixes      string `json:"result_sync_qc_prefixes"`
 			ProtocolSubtype           string `json:"protocol_subtype"`
 			LabnovationImageMode      string `json:"labnovation_image_mode"`
+			ZonciResultSeparator      string `json:"zonci_result_separator"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]interface{}{"ok": false, "error": "invalid json body"})
@@ -731,8 +749,17 @@ func (m *Module) handleReaderSettings(w http.ResponseWriter, r *http.Request) {
 		currentTCPPort := strings.TrimSpace(asString(m.rt.ModuleSettings("transport-tcpip")["port"]))
 		currentTCPRemoteHost := strings.TrimSpace(asString(m.rt.ModuleSettings("transport-tcpip")["remote_host"]))
 		currentTCPRemotePort := strings.TrimSpace(asString(m.rt.ModuleSettings("transport-tcpip")["remote_port"]))
+		currentSerialPort := strings.TrimSpace(asString(m.rt.ModuleSettings("transport-serial")["port"]))
+		currentSerialBaud := firstNonEmpty(asString(m.rt.ModuleSettings("transport-serial")["baud"]), "9600")
+		currentSerialDataBits := firstNonEmpty(asString(m.rt.ModuleSettings("transport-serial")["data_bits"]), "8")
+		currentSerialParity := firstNonEmpty(asString(m.rt.ModuleSettings("transport-serial")["parity"]), "none")
+		currentSerialStopBits := firstNonEmpty(asString(m.rt.ModuleSettings("transport-serial")["stop_bits"]), "1")
+		currentSerialFlowControl := firstNonEmpty(asString(m.rt.ModuleSettings("transport-serial")["flow_control"]), "none")
 		currentASTMChecksumMode := strings.TrimSpace(asString(m.rt.ModuleSettings("protocol-astm")["checksum_mode"]))
 		currentASTMTrailerMode := strings.TrimSpace(asString(m.rt.ModuleSettings("protocol-astm")["trailer_mode"]))
+		currentASTMSpecimenDefault := firstNonEmpty(asString(m.rt.ModuleSettings("protocol-astm")["specimen_code_default"]), "1")
+		currentASTMSpecimenMap := formatSpecimenCodeMap(m.rt.ModuleSettings("protocol-astm")["specimen_code_map"])
+		currentZonciResultSeparator := firstNonEmpty(asString(m.rt.ModuleSettings("protocol-zonci-xl1000i")["result_separator"]), ",")
 		currentFileImportDir := strings.TrimSpace(asString(m.rt.ModuleSettings("transport-file")["import_dir"]))
 		currentFileProcessedDir := strings.TrimSpace(asString(m.rt.ModuleSettings("transport-file")["processed_dir"]))
 		currentFileFailedDir := strings.TrimSpace(asString(m.rt.ModuleSettings("transport-file")["failed_dir"]))
@@ -757,8 +784,17 @@ func (m *Module) handleReaderSettings(w http.ResponseWriter, r *http.Request) {
 			currentTCPPort != strings.TrimSpace(req.TCPIPPort) ||
 			currentTCPRemoteHost != strings.TrimSpace(req.TCPIPRemoteHost) ||
 			currentTCPRemotePort != strings.TrimSpace(req.TCPIPRemotePort) ||
+			currentSerialPort != strings.TrimSpace(req.SerialPort) ||
+			currentSerialBaud != firstNonEmpty(strings.TrimSpace(req.SerialBaud), "9600") ||
+			currentSerialDataBits != firstNonEmpty(strings.TrimSpace(req.SerialDataBits), "8") ||
+			currentSerialParity != firstNonEmpty(strings.ToLower(strings.TrimSpace(req.SerialParity)), "none") ||
+			currentSerialStopBits != firstNonEmpty(strings.TrimSpace(req.SerialStopBits), "1") ||
+			currentSerialFlowControl != firstNonEmpty(strings.ToLower(strings.TrimSpace(req.SerialFlowControl)), "none") ||
 			currentASTMChecksumMode != strings.TrimSpace(req.ASTMChecksumMode) ||
 			currentASTMTrailerMode != strings.TrimSpace(req.ASTMTrailerMode) ||
+			currentASTMSpecimenDefault != firstNonEmpty(strings.TrimSpace(req.ASTMSpecimenCodeDefault), "1") ||
+			currentASTMSpecimenMap != formatSpecimenCodeMap(parseSpecimenCodeMap(req.ASTMSpecimenCodeMap)) ||
+			currentZonciResultSeparator != firstNonEmpty(strings.TrimSpace(req.ZonciResultSeparator), ",") ||
 			currentFileImportDir != strings.TrimSpace(req.FileImportDir) ||
 			currentFileProcessedDir != strings.TrimSpace(req.FileProcessedDir) ||
 			currentFileFailedDir != strings.TrimSpace(req.FileFailedDir) ||
@@ -776,53 +812,62 @@ func (m *Module) handleReaderSettings(w http.ResponseWriter, r *http.Request) {
 			currentResultSyncSeparators != joinStringList(splitCSV(req.ResultSyncSeparators)) ||
 			currentResultSyncQCPrefixes != formatQCPrefixSettings(parseQCPrefixSettings(req.ResultSyncQCPrefixes))
 		if err := m.persistReaderSettings(map[string]interface{}{
-			"reader.id":                                     strings.TrimSpace(req.ReaderID),
-			"reader.label":                                  strings.TrimSpace(req.ReaderLabel),
-			"reader.analyzer_name":                          strings.TrimSpace(req.AnalyzerName),
-			"reader.analyzer_code":                          strings.TrimSpace(req.AnalyzerCode),
-			"reader.db_name":                                nextDBName,
-			"local_http.address":                            strings.TrimSpace(req.LocalHTTPAddress),
-			"local_http.language":                           strings.TrimSpace(req.LocalHTTPLang),
-			"local_http.tls":                                boolString(req.LocalHTTPTLS),
-			"local_http.cors_allowed_origins":               strings.TrimSpace(req.LocalHTTPCORSAllowed),
-			"modules.local-http.address":                    strings.TrimSpace(req.LocalHTTPAddress),
-			"modules.local-http.language":                   strings.TrimSpace(req.LocalHTTPLang),
-			"modules.local-http.tls":                        boolString(req.LocalHTTPTLS),
-			"modules.local-http.cors_allowed_origins":       strings.TrimSpace(req.LocalHTTPCORSAllowed),
-			"analyzer.comm_type":                            commType,
-			"analyzer.protocol":                             protocol,
-			"modules.local-http.repeat_mode":                mode,
-			"modules.transport-tcpip.mode":                  tcpMode,
-			"modules.transport-tcpip.host":                  strings.TrimSpace(req.TCPIPHost),
-			"modules.transport-tcpip.port":                  strings.TrimSpace(req.TCPIPPort),
-			"modules.transport-tcpip.remote_host":           strings.TrimSpace(req.TCPIPRemoteHost),
-			"modules.transport-tcpip.remote_port":           strings.TrimSpace(req.TCPIPRemotePort),
-			"modules.protocol-astm.checksum_mode":           strings.TrimSpace(req.ASTMChecksumMode),
-			"modules.protocol-astm.trailer_mode":            strings.TrimSpace(req.ASTMTrailerMode),
-			"modules.transport-file.import_dir":             strings.TrimSpace(req.FileImportDir),
-			"modules.transport-file.processed_dir":          strings.TrimSpace(req.FileProcessedDir),
-			"modules.transport-file.failed_dir":             strings.TrimSpace(req.FileFailedDir),
-			"modules.transport-file.pattern":                strings.TrimSpace(req.FilePattern),
-			"logging.verbose_level":                         verboseLevelInt,
-			"modules.logging.verbose_level":                 verboseLevelInt,
-			"results.auto_confirm_wisemed":                  requestedAutoConfirm,
-			"modules.results.auto_confirm_wisemed":          requestedAutoConfirm,
-			"modules.wisemed-api.reagent_set_name":          strings.TrimSpace(req.WiseMEDReagentSetName),
-			"modules.storage-sqlite.path":                   nextSQLitePath,
-			"modules.app-updates.enabled":                   boolString(req.AppUpdatesEnabled),
-			"modules.app-updates.app_id":                    strings.TrimSpace(req.AppUpdatesAppID),
-			"modules.app-updates.channel":                   strings.TrimSpace(req.AppUpdatesChannel),
-			"modules.app-updates.base_url":                  strings.TrimSpace(req.AppUpdatesBaseURL),
-			"modules.app-updates.auto_download":             boolString(req.AppUpdatesAutoDownload),
-			"modules.app-updates.download_dir":              strings.TrimSpace(req.AppUpdatesDownloadDir),
-			"modules.result-sync.enabled":                   boolString(req.ResultSyncEnabled),
-			"modules.result-sync.interval_minutes":          parseIntString(req.ResultSyncIntervalMinutes, "5"),
-			"modules.result-sync.sample_prefixes":           splitCSV(req.ResultSyncSamplePrefixes),
-			"modules.result-sync.sample_suffixes":           splitCSV(req.ResultSyncSampleSuffixes),
-			"modules.result-sync.separators":                splitCSV(req.ResultSyncSeparators),
-			"modules.result-sync.qc_prefixes":               parseQCPrefixSettings(req.ResultSyncQCPrefixes),
-			"modules.protocol-shimatzu-generic.subtype":     requestedSubtype,
-			"modules.protocol-labnovation-ld560.image_mode": strings.TrimSpace(req.LabnovationImageMode),
+			"reader.id":                                       strings.TrimSpace(req.ReaderID),
+			"reader.label":                                    strings.TrimSpace(req.ReaderLabel),
+			"reader.analyzer_name":                            strings.TrimSpace(req.AnalyzerName),
+			"reader.analyzer_code":                            strings.TrimSpace(req.AnalyzerCode),
+			"reader.db_name":                                  nextDBName,
+			"local_http.address":                              strings.TrimSpace(req.LocalHTTPAddress),
+			"local_http.language":                             strings.TrimSpace(req.LocalHTTPLang),
+			"local_http.tls":                                  boolString(req.LocalHTTPTLS),
+			"local_http.cors_allowed_origins":                 strings.TrimSpace(req.LocalHTTPCORSAllowed),
+			"modules.local-http.address":                      strings.TrimSpace(req.LocalHTTPAddress),
+			"modules.local-http.language":                     strings.TrimSpace(req.LocalHTTPLang),
+			"modules.local-http.tls":                          boolString(req.LocalHTTPTLS),
+			"modules.local-http.cors_allowed_origins":         strings.TrimSpace(req.LocalHTTPCORSAllowed),
+			"analyzer.comm_type":                              commType,
+			"analyzer.protocol":                               protocol,
+			"modules.local-http.repeat_mode":                  mode,
+			"modules.transport-tcpip.mode":                    tcpMode,
+			"modules.transport-tcpip.host":                    strings.TrimSpace(req.TCPIPHost),
+			"modules.transport-tcpip.port":                    strings.TrimSpace(req.TCPIPPort),
+			"modules.transport-tcpip.remote_host":             strings.TrimSpace(req.TCPIPRemoteHost),
+			"modules.transport-tcpip.remote_port":             strings.TrimSpace(req.TCPIPRemotePort),
+			"modules.transport-serial.port":                   strings.TrimSpace(req.SerialPort),
+			"modules.transport-serial.baud":                   parseIntString(req.SerialBaud, "9600"),
+			"modules.transport-serial.data_bits":              parseIntString(req.SerialDataBits, "8"),
+			"modules.transport-serial.parity":                 firstNonEmpty(strings.ToLower(strings.TrimSpace(req.SerialParity)), "none"),
+			"modules.transport-serial.stop_bits":              firstNonEmpty(strings.TrimSpace(req.SerialStopBits), "1"),
+			"modules.transport-serial.flow_control":           firstNonEmpty(strings.ToLower(strings.TrimSpace(req.SerialFlowControl)), "none"),
+			"modules.protocol-astm.checksum_mode":             strings.TrimSpace(req.ASTMChecksumMode),
+			"modules.protocol-astm.trailer_mode":              strings.TrimSpace(req.ASTMTrailerMode),
+			"modules.protocol-astm.specimen_code_default":     firstNonEmpty(strings.TrimSpace(req.ASTMSpecimenCodeDefault), "1"),
+			"modules.protocol-astm.specimen_code_map":         parseSpecimenCodeMap(req.ASTMSpecimenCodeMap),
+			"modules.transport-file.import_dir":               strings.TrimSpace(req.FileImportDir),
+			"modules.transport-file.processed_dir":            strings.TrimSpace(req.FileProcessedDir),
+			"modules.transport-file.failed_dir":               strings.TrimSpace(req.FileFailedDir),
+			"modules.transport-file.pattern":                  strings.TrimSpace(req.FilePattern),
+			"logging.verbose_level":                           verboseLevelInt,
+			"modules.logging.verbose_level":                   verboseLevelInt,
+			"results.auto_confirm_wisemed":                    requestedAutoConfirm,
+			"modules.results.auto_confirm_wisemed":            requestedAutoConfirm,
+			"modules.wisemed-api.reagent_set_name":            strings.TrimSpace(req.WiseMEDReagentSetName),
+			"modules.storage-sqlite.path":                     nextSQLitePath,
+			"modules.app-updates.enabled":                     boolString(req.AppUpdatesEnabled),
+			"modules.app-updates.app_id":                      strings.TrimSpace(req.AppUpdatesAppID),
+			"modules.app-updates.channel":                     strings.TrimSpace(req.AppUpdatesChannel),
+			"modules.app-updates.base_url":                    strings.TrimSpace(req.AppUpdatesBaseURL),
+			"modules.app-updates.auto_download":               boolString(req.AppUpdatesAutoDownload),
+			"modules.app-updates.download_dir":                strings.TrimSpace(req.AppUpdatesDownloadDir),
+			"modules.result-sync.enabled":                     boolString(req.ResultSyncEnabled),
+			"modules.result-sync.interval_minutes":            parseIntString(req.ResultSyncIntervalMinutes, "5"),
+			"modules.result-sync.sample_prefixes":             splitCSV(req.ResultSyncSamplePrefixes),
+			"modules.result-sync.sample_suffixes":             splitCSV(req.ResultSyncSampleSuffixes),
+			"modules.result-sync.separators":                  splitCSV(req.ResultSyncSeparators),
+			"modules.result-sync.qc_prefixes":                 parseQCPrefixSettings(req.ResultSyncQCPrefixes),
+			"modules.protocol-shimatzu-generic.subtype":       requestedSubtype,
+			"modules.protocol-labnovation-ld560.image_mode":   strings.TrimSpace(req.LabnovationImageMode),
+			"modules.protocol-zonci-xl1000i.result_separator": firstNonEmpty(strings.TrimSpace(req.ZonciResultSeparator), ","),
 		}); err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]interface{}{"ok": false, "error": err.Error()})
 			return
@@ -847,6 +892,12 @@ func (m *Module) handleReaderSettings(w http.ResponseWriter, r *http.Request) {
 			"protocol_subtype":             requestedSubtype,
 			"astm_checksum_mode":           strings.TrimSpace(req.ASTMChecksumMode),
 			"astm_trailer_mode":            strings.TrimSpace(req.ASTMTrailerMode),
+			"serial_port":                  strings.TrimSpace(req.SerialPort),
+			"serial_baud":                  firstNonEmpty(strings.TrimSpace(req.SerialBaud), "9600"),
+			"serial_data_bits":             firstNonEmpty(strings.TrimSpace(req.SerialDataBits), "8"),
+			"serial_parity":                firstNonEmpty(strings.ToLower(strings.TrimSpace(req.SerialParity)), "none"),
+			"serial_stop_bits":             firstNonEmpty(strings.TrimSpace(req.SerialStopBits), "1"),
+			"serial_flow_control":          firstNonEmpty(strings.ToLower(strings.TrimSpace(req.SerialFlowControl)), "none"),
 			"logging_verbose_level":        verboseLevel,
 			"results_auto_confirm_wisemed": requestedAutoConfirm,
 			"sqlite_path":                  nextSQLitePath,
@@ -1910,6 +1961,108 @@ func (m *Module) handleDailyDetails(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (m *Module) handleDailyAnalysisFilters(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		date := strings.TrimSpace(r.URL.Query().Get("scope_date"))
+		if date == "" {
+			date = time.Now().Format("2006-01-02")
+		}
+		items, err := m.dailyAnalysisSendFilterStore().ListDailyAnalysisSendFilters(date)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]interface{}{"ok": false, "error": err.Error()})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]interface{}{"ok": true, "scope_date": date, "filters": items, "count": len(items), "specimen_codes": m.configuredSpecimenCodes()})
+	case http.MethodPost:
+		var item coremodel.DailyAnalysisSendFilter
+		if err := json.NewDecoder(r.Body).Decode(&item); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]interface{}{"ok": false, "error": "invalid json body"})
+			return
+		}
+		if item.ScopeDate == "" {
+			item.ScopeDate = time.Now().Format("2006-01-02")
+		}
+		saved, err := m.dailyAnalysisSendFilterStore().SaveDailyAnalysisSendFilter(item)
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]interface{}{"ok": false, "error": err.Error()})
+			return
+		}
+		m.appendAuditLog(r, "daily-analysis-filter-create", fmt.Sprintf("Utilizatorul %s a blocat analiza %s pentru %s.", m.auditActor(r), saved.AnalyteTag, saved.ScopeDate), map[string]interface{}{"filter": saved})
+		writeJSON(w, http.StatusCreated, map[string]interface{}{"ok": true, "filter": saved})
+	default:
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]interface{}{"ok": false, "error": "method not allowed"})
+	}
+}
+
+func (m *Module) handleDailyAnalysisFilterByID(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete {
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]interface{}{"ok": false, "error": "method not allowed"})
+		return
+	}
+	id, err := parsePathInt64(r.URL.Path, "/api/daily-analysis-filters/")
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]interface{}{"ok": false, "error": "invalid filter id"})
+		return
+	}
+	if err := m.dailyAnalysisSendFilterStore().DeleteDailyAnalysisSendFilter(id); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]interface{}{"ok": false, "error": err.Error()})
+		return
+	}
+	m.appendAuditLog(r, "daily-analysis-filter-delete", fmt.Sprintf("Utilizatorul %s a sters un filtru zilnic de analize.", m.auditActor(r)), map[string]interface{}{"filter_id": id})
+	writeJSON(w, http.StatusOK, map[string]interface{}{"ok": true})
+}
+
+// IsAnalysisSendBlocked is consumed by LIS protocol modules immediately before
+// sending an order. No rule means the analyte remains enabled by default.
+func (m *Module) IsAnalysisSendBlocked(scopeDate, analyteTag, specimenCode string) bool {
+	store := m.dailyAnalysisSendFilterStore()
+	if store == nil {
+		return false
+	}
+	items, err := store.ListDailyAnalysisSendFilters(scopeDate)
+	if err != nil {
+		m.rt.Logf("daily analysis filters lookup failed: %v", err)
+		return false
+	}
+	analyteTag = strings.TrimSpace(analyteTag)
+	specimenCode = strings.ToUpper(strings.TrimSpace(specimenCode))
+	for _, item := range items {
+		if !strings.EqualFold(strings.TrimSpace(item.AnalyteTag), strings.TrimSpace(analyteTag)) {
+			continue
+		}
+		if item.Mode == "global" {
+			return true
+		}
+		for _, code := range item.SpecimenCodes {
+			if strings.EqualFold(strings.TrimSpace(code), specimenCode) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func (m *Module) configuredSpecimenCodes() []string {
+	settings := m.rt.ModuleSettings("protocol-astm")
+	values, _ := settings["specimen_code_map"].(map[string]interface{})
+	seen := map[string]bool{}
+	for code := range values {
+		if code = strings.ToUpper(strings.TrimSpace(code)); code != "" {
+			seen[code] = true
+		}
+	}
+	for _, code := range []string{"SG", "SR", "UR", "PL", "CSF"} {
+		seen[code] = true
+	}
+	out := make([]string, 0, len(seen))
+	for code := range seen {
+		out = append(out, code)
+	}
+	sort.Strings(out)
+	return out
+}
+
 func (m *Module) handleDailyDetailsWorksheet(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeJSON(w, http.StatusMethodNotAllowed, map[string]interface{}{"ok": false, "error": "method not allowed"})
@@ -2704,10 +2857,23 @@ func (m *Module) readerSettingsPayload() map[string]interface{} {
 		"tcpip_port":                      asString(m.rt.ModuleSettings("transport-tcpip")["port"]),
 		"tcpip_remote_host":               asString(m.rt.ModuleSettings("transport-tcpip")["remote_host"]),
 		"tcpip_remote_port":               asString(m.rt.ModuleSettings("transport-tcpip")["remote_port"]),
+		"serial_port":                     asString(m.rt.ModuleSettings("transport-serial")["port"]),
+		"serial_baud":                     firstNonEmpty(asString(m.rt.ModuleSettings("transport-serial")["baud"]), "9600"),
+		"serial_data_bits":                firstNonEmpty(asString(m.rt.ModuleSettings("transport-serial")["data_bits"]), "8"),
+		"serial_parity":                   firstNonEmpty(asString(m.rt.ModuleSettings("transport-serial")["parity"]), "none"),
+		"serial_stop_bits":                firstNonEmpty(asString(m.rt.ModuleSettings("transport-serial")["stop_bits"]), "1"),
+		"serial_flow_control":             firstNonEmpty(asString(m.rt.ModuleSettings("transport-serial")["flow_control"]), "none"),
+		"available_serial_bauds":          []string{"1200", "2400", "4800", "9600", "19200", "38400", "57600", "115200"},
+		"available_serial_data_bits":      []string{"5", "6", "7", "8"},
+		"available_serial_parities":       []string{"none", "odd", "even", "mark", "space"},
+		"available_serial_stop_bits":      []string{"1", "1.5", "2"},
+		"available_serial_flow_controls":  []string{"none", "rtscts", "dtrdsr", "software", "custom"},
 		"available_astm_checksum_modes":   []string{"astm", "none"},
 		"available_astm_trailer_modes":    []string{"crlf", "none"},
 		"astm_checksum_mode":              firstNonEmpty(asString(m.rt.ModuleSettings("protocol-astm")["checksum_mode"]), "astm"),
 		"astm_trailer_mode":               firstNonEmpty(asString(m.rt.ModuleSettings("protocol-astm")["trailer_mode"]), "crlf"),
+		"astm_specimen_code_default":      firstNonEmpty(asString(m.rt.ModuleSettings("protocol-astm")["specimen_code_default"]), "1"),
+		"astm_specimen_code_map":          formatSpecimenCodeMap(m.rt.ModuleSettings("protocol-astm")["specimen_code_map"]),
 		"file_import_dir":                 asString(m.rt.ModuleSettings("transport-file")["import_dir"]),
 		"file_processed_dir":              asString(m.rt.ModuleSettings("transport-file")["processed_dir"]),
 		"file_failed_dir":                 asString(m.rt.ModuleSettings("transport-file")["failed_dir"]),
@@ -2732,6 +2898,7 @@ func (m *Module) readerSettingsPayload() map[string]interface{} {
 		"result_sync_qc_prefixes":         formatQCPrefixSettings(m.rt.ModuleSettings("result-sync")["qc_prefixes"]),
 		"protocol_subtype":                asString(m.rt.ModuleSettings("protocol-shimatzu-generic")["subtype"]),
 		"labnovation_image_mode":          asString(m.rt.ModuleSettings("protocol-labnovation-ld560")["image_mode"]),
+		"zonci_result_separator":          firstNonEmpty(asString(m.rt.ModuleSettings("protocol-zonci-xl1000i")["result_separator"]), ","),
 		"labnovation_enabled":             containsStringFold(m.enabledModules(), "protocol-labnovation-ld560"),
 	}
 
@@ -2745,8 +2912,10 @@ func (m *Module) readerSettingsPayload() map[string]interface{} {
 	resultSync := cfg.ModuleSettings("result-sync")
 	shimadzuGeneric := cfg.ModuleSettings("protocol-shimatzu-generic")
 	labnovation := cfg.ModuleSettings("protocol-labnovation-ld560")
+	zonci := cfg.ModuleSettings("protocol-zonci-xl1000i")
 	storageSQLite := cfg.ModuleSettings("storage-sqlite")
 	transportTCPIP := cfg.ModuleSettings("transport-tcpip")
+	transportSerial := cfg.ModuleSettings("transport-serial")
 	protocolASTM := cfg.ModuleSettings("protocol-astm")
 	transportFile := cfg.ModuleSettings("transport-file")
 	logged := cfg.ModuleSettings("logging")
@@ -2770,8 +2939,16 @@ func (m *Module) readerSettingsPayload() map[string]interface{} {
 	settings["tcpip_port"] = firstNonEmpty(asString(transportTCPIP["port"]), asString(settings["tcpip_port"]))
 	settings["tcpip_remote_host"] = firstNonEmpty(asString(transportTCPIP["remote_host"]), asString(settings["tcpip_remote_host"]))
 	settings["tcpip_remote_port"] = firstNonEmpty(asString(transportTCPIP["remote_port"]), asString(settings["tcpip_remote_port"]))
+	settings["serial_port"] = firstNonEmpty(asString(transportSerial["port"]), asString(settings["serial_port"]))
+	settings["serial_baud"] = firstNonEmpty(asString(transportSerial["baud"]), asString(settings["serial_baud"]), "9600")
+	settings["serial_data_bits"] = firstNonEmpty(asString(transportSerial["data_bits"]), asString(settings["serial_data_bits"]), "8")
+	settings["serial_parity"] = firstNonEmpty(asString(transportSerial["parity"]), asString(settings["serial_parity"]), "none")
+	settings["serial_stop_bits"] = firstNonEmpty(asString(transportSerial["stop_bits"]), asString(settings["serial_stop_bits"]), "1")
+	settings["serial_flow_control"] = firstNonEmpty(asString(transportSerial["flow_control"]), asString(settings["serial_flow_control"]), "none")
 	settings["astm_checksum_mode"] = firstNonEmpty(asString(protocolASTM["checksum_mode"]), asString(settings["astm_checksum_mode"]), "astm")
 	settings["astm_trailer_mode"] = firstNonEmpty(asString(protocolASTM["trailer_mode"]), asString(settings["astm_trailer_mode"]), "crlf")
+	settings["astm_specimen_code_default"] = firstNonEmpty(asString(protocolASTM["specimen_code_default"]), asString(settings["astm_specimen_code_default"]), "1")
+	settings["astm_specimen_code_map"] = firstNonEmpty(formatSpecimenCodeMap(protocolASTM["specimen_code_map"]), asString(settings["astm_specimen_code_map"]))
 	settings["file_import_dir"] = firstNonEmpty(asString(transportFile["import_dir"]), asString(settings["file_import_dir"]))
 	settings["file_processed_dir"] = firstNonEmpty(asString(transportFile["processed_dir"]), asString(settings["file_processed_dir"]))
 	settings["file_failed_dir"] = firstNonEmpty(asString(transportFile["failed_dir"]), asString(settings["file_failed_dir"]))
@@ -2793,6 +2970,7 @@ func (m *Module) readerSettingsPayload() map[string]interface{} {
 	settings["result_sync_separators"] = firstNonEmpty(joinStringList(resultSync["separators"]), asString(settings["result_sync_separators"]))
 	settings["result_sync_qc_prefixes"] = firstNonEmpty(formatQCPrefixSettings(resultSync["qc_prefixes"]), asString(settings["result_sync_qc_prefixes"]))
 	settings["protocol_subtype"] = firstNonEmpty(asString(shimadzuGeneric["subtype"]), asString(settings["protocol_subtype"]))
+	settings["zonci_result_separator"] = firstNonEmpty(asString(zonci["result_separator"]), asString(settings["zonci_result_separator"]), ",")
 	labnovationImageMode := ""
 	if simple, ok := labnovation["simple"].(map[string]interface{}); ok {
 		labnovationImageMode = strings.TrimSpace(asString(simple["image_mode"]))
@@ -3119,6 +3297,51 @@ func formatQCPrefixSettings(raw interface{}) string {
 	}
 }
 
+func parseSpecimenCodeMap(raw string) map[string]string {
+	out := map[string]string{}
+	for _, line := range strings.FieldsFunc(raw, func(r rune) bool { return r == '\n' || r == '\r' || r == ',' || r == ';' }) {
+		parts := strings.SplitN(line, "=", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		source, target := strings.ToUpper(strings.TrimSpace(parts[0])), strings.TrimSpace(parts[1])
+		if source != "" && target != "" {
+			out[source] = target
+		}
+	}
+	return out
+}
+
+func formatSpecimenCodeMap(raw interface{}) string {
+	values := map[string]string{}
+	switch typed := raw.(type) {
+	case map[string]interface{}:
+		for source, target := range typed {
+			cleanSource, cleanTarget := strings.ToUpper(strings.TrimSpace(source)), strings.TrimSpace(asString(target))
+			if cleanSource != "" && cleanTarget != "" {
+				values[cleanSource] = cleanTarget
+			}
+		}
+	case map[string]string:
+		for source, target := range typed {
+			cleanSource, cleanTarget := strings.ToUpper(strings.TrimSpace(source)), strings.TrimSpace(target)
+			if cleanSource != "" && cleanTarget != "" {
+				values[cleanSource] = cleanTarget
+			}
+		}
+	}
+	keys := make([]string, 0, len(values))
+	for source := range values {
+		keys = append(keys, source)
+	}
+	sort.Strings(keys)
+	lines := make([]string, 0, len(keys))
+	for _, source := range keys {
+		lines = append(lines, source+"="+values[source])
+	}
+	return strings.Join(lines, "\n")
+}
+
 func strSettingMap(raw map[string]interface{}, key string) string {
 	if raw == nil {
 		return ""
@@ -3218,6 +3441,15 @@ func (m *Module) dailyDetailStore() dailyDetailStore {
 		return nil
 	}
 	store, _ := service.(dailyDetailStore)
+	return store
+}
+
+func (m *Module) dailyAnalysisSendFilterStore() dailyAnalysisSendFilterStore {
+	service, ok := m.rt.Service("storage")
+	if !ok {
+		return nil
+	}
+	store, _ := service.(dailyAnalysisSendFilterStore)
 	return store
 }
 
@@ -3419,6 +3651,8 @@ func (m *Module) supportedProtocols() []string {
 			add("simple")
 		case "protocol-astm":
 			add("astm")
+		case "protocol-biomerieux-minividas":
+			add("biomerieux-minividas")
 		case "protocol-ir-biotyper":
 			add("ir-biotyper")
 		case "protocol-cary60-uvvis":
@@ -3427,6 +3661,8 @@ func (m *Module) supportedProtocols() []string {
 			add("cfx96-quantitation")
 		case "protocol-analytikjena-plasmaquantms-elite":
 			add("analytikjena-plasmaquantms-elite")
+		case "protocol-anaf-docsmart":
+			add("anaf-docsmart")
 		case "protocol-biosan-hipo-mpp96":
 			add("biosan-hipo-mpp96")
 		case "protocol-gammavision":
@@ -3468,9 +3704,11 @@ func (m *Module) supportedCommTypes() []string {
 		switch strings.ToLower(strings.TrimSpace(protocol)) {
 		case "hl7", "simple", "astm", "ir-biotyper":
 			add("tcpip")
+		case "biomerieux-minividas":
+			add("serial")
 		case "seegene-excel", "beosl-csv", "cfx96-quantitation", "cary60-uvvis", "analytikjena-plasmaquantms-elite", "shimatzu-tocl", "shimatzu-generic", "biosan-hipo-mpp96", "gammavision", "tricarb-5110-tr", "anatolia-geneworks", "generic-file":
 			add("file")
-		case "barcodeprinter":
+		case "barcodeprinter", "anaf-docsmart":
 			add("utility")
 		}
 	}

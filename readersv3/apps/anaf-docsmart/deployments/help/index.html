@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="ro">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>ANAF DocSmart Help</title>
+    <style>
+      body{font-family:Arial,sans-serif;max-width:960px;margin:40px auto;padding:0 20px;line-height:1.5;color:#1e293b}
+      h1,h2{color:#0f172a}
+      code,pre{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px}
+      code{padding:2px 6px}
+      pre{padding:14px;overflow:auto}
+      table{border-collapse:collapse;width:100%}
+      th,td{border:1px solid #e2e8f0;padding:10px;text-align:left}
+      th{background:#f8fafc}
+    </style>
+  </head>
+  <body>
+    <h1>ANAF DocSmart</h1>
+    <p>Utilitar local pentru vizualizarea fișierelor XML DocSmart parse din sistemul de fișiere.</p>
+
+    <h2>Flux</h2>
+    <ol>
+      <li>Pune XML-urile în directorul configurat la <code>transport-file.import_dir</code>.</li>
+      <li>Autentifică-te în interfața locală cu contul WiseMED.</li>
+      <li>Deschide pagina <code>Fisiere parse</code>.</li>
+      <li>Aplicația citește XML-urile și afișează metadatele parse din directoarele <code>inbox</code>, <code>processed</code> și <code>failed</code>.</li>
+    </ol>
+
+    <h2>Câmpuri afișate</h2>
+    <table>
+      <tr><th>Câmp</th><th>Descriere</th></tr>
+      <tr><td>Nume fișier</td><td>Numele fișierului XML găsit pe disc.</td></tr>
+      <tr><td>Stare</td><td><code>pending</code>, <code>processed</code> sau <code>failed</code>, în funcție de director.</td></tr>
+      <tr><td>Instituție</td><td>Valoarea atributului <code>nume_ip</code> din rădăcina XML.</td></tr>
+      <tr><td>Data document</td><td>Valoarea atributului <code>data_document</code>.</td></tr>
+      <tr><td>Total debit / credit</td><td>Totaluri calculate din nodurile <code>cont</code>.</td></tr>
+    </table>
+
+    <h2>Config principal</h2>
+    <pre><code>modules:
+  transport-file:
+    import_dir: ./inbox
+    processed_dir: ./processed
+    failed_dir: ./failed
+    export_dir: ./outbox
+    pattern: "*.xml"</code></pre>
+  </body>
+</html>

@@ -91,7 +91,8 @@ function showApp() {
 
 function activateView(name) {
   if (name === "help") {
-    window.location.href = "/help/";
+    const helpTab = window.open("/help/", "_blank", "noopener");
+    if (helpTab) helpTab.opener = null;
     return;
   }
   Object.entries(views).forEach(([key, node]) => { node.hidden = key !== name; });

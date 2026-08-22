@@ -310,6 +310,15 @@ func (s *Store) init() error {
 			updated_at text not null,
 			unique(definition_key, scope_date, round_no, analyte_tag)
 		)`,
+		`create table if not exists daily_analysis_send_filters (
+			id integer primary key autoincrement,
+			scope_date text not null,
+			analyte_tag text not null,
+			mode text not null default 'global',
+			specimen_codes_json text not null default '[]',
+			created_at text not null,
+			updated_at text not null
+		)`,
 		`create index if not exists idx_rounds_date_round on rounds(order_date, round_no)`,
 		`create index if not exists idx_orders_date_round on orders(order_date, round_no)`,
 		`create index if not exists idx_order_analyses_order on order_analyses(order_id)`,
@@ -319,6 +328,7 @@ func (s *Store) init() error {
 		`create index if not exists idx_audit_logs_created_at on audit_logs(created_at)`,
 		`create index if not exists idx_qc_targets_lookup on qc_targets(analyte_tag, control_level, lot_no)`,
 		`create index if not exists idx_daily_detail_values_lookup on daily_detail_values(scope_date, round_no, analyte_tag)`,
+		`create index if not exists idx_daily_analysis_send_filters_lookup on daily_analysis_send_filters(scope_date, analyte_tag)`,
 	}
 	for _, stmt := range stmts {
 		if _, err := s.db.Exec(stmt); err != nil {
@@ -2038,6 +2048,69 @@ func (s *Store) GetDailyDetailValue(id int64) (coremodel.DailyDetailValue, error
 	item.CreatedAt, _ = time.Parse(time.RFC3339, created)
 	item.UpdatedAt, _ = time.Parse(time.RFC3339, updated)
 	return item, nil
+}
+
+func (s *Store) ListDailyAnalysisSendFilters(scopeDate string) ([]coremodel.DailyAnalysisSendFilter, error) {
+	rows, err := s.db.Query(`select id,scope_date,analyte_tag,mode,specimen_codes_json,created_at,updated_at from daily_analysis_send_filters where scope_date=? order by analyte_tag asc,id asc`, normalizeDate(scopeDate))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []coremodel.DailyAnalysisSendFilter{}
+	for rows.Next() {
+		var item coremodel.DailyAnalysisSendFilter
+		var codesJSON, created, updated string
+		if err := rows.Scan(&item.ID, &item.ScopeDate, &item.AnalyteTag, &item.Mode, &codesJSON, &created, &updated); err != nil {
+			return nil, err
+		}
+		_ = json.Unmarshal([]byte(codesJSON), &item.SpecimenCodes)
+		item.CreatedAt, _ = time.Parse(time.RFC3339, created)
+		item.UpdatedAt, _ = time.Parse(time.RFC3339, updated)
+		out = append(out, item)
+	}
+	return out, rows.Err()
+}
+
+func (s *Store) SaveDailyAnalysisSendFilter(item coremodel.DailyAnalysisSendFilter) (coremodel.DailyAnalysisSendFilter, error) {
+	item.ScopeDate, item.AnalyteTag = normalizeDate(item.ScopeDate), strings.TrimSpace(item.AnalyteTag)
+	item.Mode = strings.ToLower(strings.TrimSpace(item.Mode))
+	if item.Mode != "specimen_codes" {
+		item.Mode, item.SpecimenCodes = "global", nil
+	}
+	if item.ScopeDate == "" || item.AnalyteTag == "" {
+		return coremodel.DailyAnalysisSendFilter{}, errors.New("scope_date and analyte_tag are required")
+	}
+	item.SpecimenCodes = normalizedStringList(item.SpecimenCodes)
+	if item.Mode == "specimen_codes" && len(item.SpecimenCodes) == 0 {
+		return coremodel.DailyAnalysisSendFilter{}, errors.New("at least one specimen code is required")
+	}
+	codesJSON, _ := json.Marshal(item.SpecimenCodes)
+	now := time.Now().UTC().Format(time.RFC3339)
+	res, err := s.db.Exec(`insert into daily_analysis_send_filters(scope_date,analyte_tag,mode,specimen_codes_json,created_at,updated_at) values(?,?,?,?,?,?)`, item.ScopeDate, item.AnalyteTag, item.Mode, string(codesJSON), now, now)
+	if err != nil {
+		return coremodel.DailyAnalysisSendFilter{}, err
+	}
+	item.ID, _ = res.LastInsertId()
+	item.CreatedAt, _ = time.Parse(time.RFC3339, now)
+	item.UpdatedAt = item.CreatedAt
+	return item, nil
+}
+
+func (s *Store) DeleteDailyAnalysisSendFilter(id int64) error {
+	_, err := s.db.Exec(`delete from daily_analysis_send_filters where id=?`, id)
+	return err
+}
+
+func normalizedStringList(values []string) []string {
+	seen, out := map[string]bool{}, []string{}
+	for _, value := range values {
+		if value = strings.ToUpper(strings.TrimSpace(value)); value != "" && !seen[value] {
+			seen[value] = true
+			out = append(out, value)
+		}
+	}
+	sort.Strings(out)
+	return out
 }
 
 func normalizeDate(value string) string {

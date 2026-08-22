@@ -335,6 +335,10 @@ func (m *Module) runOrdersWithWiseMED(ctx context.Context, orderIDs []int64, rou
 		default:
 		}
 		order := bundle.Order
+		if orderHasCompleteWiseMEDMatch(order) {
+			summary["skipped_complete"] = summary["skipped_complete"].(int) + 1
+			continue
+		}
 		result, updatedOrder, updatedAnalyses := m.processOrder(settings, order, bundle.Analyses, equipmentID, wiseMED)
 		recordSummaryStatus(summary, result)
 		updatedOrder.Meta = mergeMeta(updatedOrder.Meta, result)
@@ -969,14 +973,15 @@ func cloneMap(src map[string]interface{}) map[string]interface{} {
 
 func newSummary(orderDate string) map[string]interface{} {
 	return map[string]interface{}{
-		"date":          orderDate,
-		"processed":     0,
-		"matched":       0,
-		"file_found":    0,
-		"qc":            0,
-		"invalid":       0,
-		"lookup_errors": 0,
-		"orders":        0,
+		"date":             orderDate,
+		"processed":        0,
+		"matched":          0,
+		"file_found":       0,
+		"qc":               0,
+		"invalid":          0,
+		"lookup_errors":    0,
+		"skipped_complete": 0,
+		"orders":           0,
 	}
 }
 

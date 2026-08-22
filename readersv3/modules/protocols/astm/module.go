@@ -60,27 +60,29 @@ type analyzerActivityTracker interface {
 }
 
 type tcpConfig struct {
-	CommType      string
-	Mode          string
-	ListenHost    string
-	ListenPort    string
-	RemoteHost    string
-	RemotePort    string
-	SendACK       bool
-	FrameTimeout  time.Duration
-	ChecksumMode  string
-	TrailerMode   string
-	SampleIDPaths []string
-	PatientIDPath []string
-	PatientName   []string
-	RunDatePaths  []string
-	ResultIDPaths []string
-	ResultName    []string
-	ResultValue   []string
-	ResultUnit    []string
-	ResultFlag    []string
-	QCPrefixes    []string
-	AnalyteMap    map[string]string
+	CommType          string
+	Mode              string
+	ListenHost        string
+	ListenPort        string
+	RemoteHost        string
+	RemotePort        string
+	SendACK           bool
+	FrameTimeout      time.Duration
+	ChecksumMode      string
+	TrailerMode       string
+	SampleIDPaths     []string
+	SampleIDTrimLeft  string
+	SampleIDTrimRight string
+	PatientIDPath     []string
+	PatientName       []string
+	RunDatePaths      []string
+	ResultIDPaths     []string
+	ResultName        []string
+	ResultValue       []string
+	ResultUnit        []string
+	ResultFlag        []string
+	QCPrefixes        []string
+	AnalyteMap        map[string]string
 }
 
 type protocolStatus struct {
@@ -614,12 +616,17 @@ func normalizeFrameText(text string) string {
 	return text
 }
 
+func formatASTMPackageText(payload string) string {
+	return strings.NewReplacer("\r", `\r`, "\n", `\n`).Replace(payload)
+}
+
 func (m *Module) processBatch(payload, remote string, cfg tcpConfig) error {
 	records := parseRecords(payload)
 	if len(records) == 0 {
 		m.logProcessing("astm parse source=%s records=0", remote)
 		return nil
 	}
+	m.rt.Logf("PARSED ASTM PACKAGE: TEXT: %s", formatASTMPackageText(payload))
 	m.logProcessing("astm parse source=%s records=%d types=%s", remote, len(records), summarizeRecordTypes(records))
 	results := parseBatch(records, cfg)
 	if len(results) == 0 {
@@ -780,7 +787,8 @@ func parseBatch(records []astmRecord, cfg tcpConfig) []astmResult {
 			currentPatientID = firstFromPaths(rec, cfg.PatientIDPath)
 			currentPatientName = normalizePersonName(firstFromPaths(rec, cfg.PatientName))
 		case "O":
-			sampleID := firstFromPaths(rec, cfg.SampleIDPaths)
+			sampleID := strings.TrimLeft(firstFromPaths(rec, cfg.SampleIDPaths), cfg.SampleIDTrimLeft)
+			sampleID = strings.TrimRight(sampleID, cfg.SampleIDTrimRight)
 			if strings.TrimSpace(sampleID) == "" {
 				sampleID = currentPatientID
 			}
@@ -896,27 +904,29 @@ func (m *Module) readConfig() tcpConfig {
 	transport := m.rt.ModuleSettings("transport-tcpip")
 	settings := m.rt.ModuleSettings(m.ID())
 	return tcpConfig{
-		CommType:      firstNonEmpty(asString(moduleServiceValue(m.rt, "analyzer-config", "comm_type")), "tcpip"),
-		Mode:          firstNonEmpty(asString(transport["mode"]), "server"),
-		ListenHost:    firstNonEmpty(asString(transport["host"]), "127.0.0.1"),
-		ListenPort:    firstNonEmpty(asString(transport["port"]), "9000"),
-		RemoteHost:    firstNonEmpty(asString(transport["remote_host"]), "127.0.0.1"),
-		RemotePort:    firstNonEmpty(asString(transport["remote_port"]), firstNonEmpty(asString(transport["port"]), "9000")),
-		SendACK:       boolSetting(settings, "send_ack", true),
-		FrameTimeout:  time.Duration(intSetting(settings, "frame_timeout_ms", 2000)) * time.Millisecond,
-		ChecksumMode:  astmFrameChecksumMode(settings),
-		TrailerMode:   astmFrameTrailerMode(settings),
-		SampleIDPaths: listSetting(settings, "sample_id_paths", []string{"O.3.1", "O.2.1"}),
-		PatientIDPath: listSetting(settings, "patient_id_paths", []string{"P.3.1", "P.2.1"}),
-		PatientName:   listSetting(settings, "patient_name_paths", []string{"P.5.1", "P.4.1"}),
-		RunDatePaths:  listSetting(settings, "run_date_paths", []string{"O.7.1", "O.6.1", "H.13.1"}),
-		ResultIDPaths: listSetting(settings, "result_id_paths", []string{"R.2.4", "R.2.1"}),
-		ResultName:    listSetting(settings, "result_name_paths", []string{"R.2.4", "R.2.1"}),
-		ResultValue:   listSetting(settings, "result_value_paths", []string{"R.3.1"}),
-		ResultUnit:    listSetting(settings, "result_unit_paths", []string{"R.4.1"}),
-		ResultFlag:    listSetting(settings, "result_flag_paths", []string{"R.6.1", "R.8.1"}),
-		QCPrefixes:    listSetting(settings, "qc_prefixes", []string{"QC", "CTRL", "CONTROL"}),
-		AnalyteMap:    stringMapSetting(settings, "analyte_mappings"),
+		CommType:          firstNonEmpty(asString(moduleServiceValue(m.rt, "analyzer-config", "comm_type")), "tcpip"),
+		Mode:              firstNonEmpty(asString(transport["mode"]), "server"),
+		ListenHost:        firstNonEmpty(asString(transport["host"]), "127.0.0.1"),
+		ListenPort:        firstNonEmpty(asString(transport["port"]), "9000"),
+		RemoteHost:        firstNonEmpty(asString(transport["remote_host"]), "127.0.0.1"),
+		RemotePort:        firstNonEmpty(asString(transport["remote_port"]), firstNonEmpty(asString(transport["port"]), "9000")),
+		SendACK:           boolSetting(settings, "send_ack", true),
+		FrameTimeout:      time.Duration(intSetting(settings, "frame_timeout_ms", 2000)) * time.Millisecond,
+		ChecksumMode:      astmFrameChecksumMode(settings),
+		TrailerMode:       astmFrameTrailerMode(settings),
+		SampleIDPaths:     listSetting(settings, "sample_id_paths", []string{"O.3.1", "O.2.1"}),
+		SampleIDTrimLeft:  asString(settings["sample_id_trim_left"]),
+		SampleIDTrimRight: asString(settings["sample_id_trim_right"]),
+		PatientIDPath:     listSetting(settings, "patient_id_paths", []string{"P.3.1", "P.2.1"}),
+		PatientName:       listSetting(settings, "patient_name_paths", []string{"P.5.1", "P.4.1"}),
+		RunDatePaths:      listSetting(settings, "run_date_paths", []string{"O.7.1", "O.6.1", "H.13.1"}),
+		ResultIDPaths:     listSetting(settings, "result_id_paths", []string{"R.2.4", "R.2.1"}),
+		ResultName:        listSetting(settings, "result_name_paths", []string{"R.2.4", "R.2.1"}),
+		ResultValue:       listSetting(settings, "result_value_paths", []string{"R.3.1"}),
+		ResultUnit:        listSetting(settings, "result_unit_paths", []string{"R.4.1"}),
+		ResultFlag:        listSetting(settings, "result_flag_paths", []string{"R.6.1", "R.8.1"}),
+		QCPrefixes:        listSetting(settings, "qc_prefixes", []string{"QC", "CTRL", "CONTROL"}),
+		AnalyteMap:        stringMapSetting(settings, "analyte_mappings"),
 	}
 }
 

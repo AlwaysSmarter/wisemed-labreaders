@@ -5,12 +5,14 @@ go 1.24.0
 require (
 	github.com/extrame/xls v0.0.1
 	github.com/gorilla/websocket v1.5.3
+	go.bug.st/serial v1.6.2
 	golang.org/x/sys v0.37.0
 	gopkg.in/yaml.v3 v3.0.1
 	modernc.org/sqlite v1.46.1
 )
 
 require (
+	github.com/creack/goselect v0.1.2 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/extrame/ole2 v0.0.0-20160812065207-d69429661ad7 // indirect
 	github.com/google/uuid v1.6.0 // indirect

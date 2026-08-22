@@ -1,0 +1,177 @@
+﻿Thread Start: Thread ID: 2100. Process ABXPentra400Reader.exe (2860)
+Thread Start: Thread ID: 2608. Process ABXPentra400Reader.exe (2860)
+Thread Start: Thread ID: 3472. Process ABXPentra400Reader.exe (2860)
+Debug Output: ===> Process ABXPentra400Reader.exe (2860)
+Debug Output: Parsing: ===> Process ABXPentra400Reader.exe (2860)
+Debug Output: got ENQ Process ABXPentra400Reader.exe (2860)
+Debug Output: out: Process ABXPentra400Reader.exe (2860)
+Debug Output: ===>1H|\^&|||ABXP400|||||||P|E1394-97|2014092415551442  Process ABXPentra400Reader.exe (2860)
+Debug Output: Parsing: ===>1H|\^&|||ABXP400|||||||P|E1394-97|2014092415551442  Process ABXPentra400Reader.exe (2860)
+Debug Output: got STX Process ABXPentra400Reader.exe (2860)
+Debug Output: Parse Record:H Process ABXPentra400Reader.exe (2860)
+Debug Output: out: Process ABXPentra400Reader.exe (2860)
+Debug Output: ===>2P|1||AUTO_PID00009931||TUDOSE^MIHAELA  P2|||UE8  Process ABXPentra400Reader.exe (2860)
+Debug Output: Parsing: ===>2P|1||AUTO_PID00009931||TUDOSE^MIHAELA  P2|||UE8  Process ABXPentra400Reader.exe (2860)
+Debug Output: got STX Process ABXPentra400Reader.exe (2860)
+Debug Output: Parse Record:P Process ABXPentra400Reader.exe (2860)
+Debug Output: out: Process ABXPentra400Reader.exe (2860)
+Debug Output: ===>3O|1|16041||||20140924150237|20140924000000||||||||1||||||||||FD0  Process ABXPentra400Reader.exe (2860)
+Debug Output: Parsing: ===>3O|1|16041||||20140924150237|20140924000000||||||||1||||||||||FD0  Process ABXPentra400Reader.exe (2860)
+Debug Output: got STX Process ABXPentra400Reader.exe (2860)
+Debug Output: Parse Record:O Process ABXPentra400Reader.exe (2860)
+Debug Output: SegReceived order Process ABXPentra400Reader.exe (2860)
+Debug Output: out: Process ABXPentra400Reader.exe (2860)
+Debug Output: ===>4R|1|^^^211^CREA3|0.80|15||||F|||20140924150611AB  Process ABXPentra400Reader.exe (2860)
+Debug Output: Parsing: ===>4R|1|^^^211^CREA3|0.80|15||||F|||20140924150611AB  Process ABXPentra400Reader.exe (2860)
+Debug Output: got STX Process ABXPentra400Reader.exe (2860)
+Debug Output: Parse Record:R Process ABXPentra400Reader.exe (2860)
+Debug Output: out: Process ABXPentra400Reader.exe (2860)
+Debug Output: ===>5C|1|I|Flag^CALC_ERROR|I0F  Process ABXPentra400Reader.exe (2860)
+Debug Output: Parsing: ===>5C|1|I|Flag^CALC_ERROR|I0F  Process ABXPentra400Reader.exe (2860)
+Debug Output: got STX Process ABXPentra400Reader.exe (2860)
+Debug Output: Parse Record:C Process ABXPentra400Reader.exe (2860)
+Debug Output: out: Process ABXPentra400Reader.exe (2860)
+Debug Output: ===>6R|2|^^^25^GluP|96.79|15||||F|||20140924150635F8  Process ABXPentra400Reader.exe (2860)
+Debug Output: Parsing: ===>6R|2|^^^25^GluP|96.79|15||||F|||20140924150635F8  Process ABXPentra400Reader.exe (2860)
+Debug Output: got STX Process ABXPentra400Reader.exe (2860)
+Debug Output: Parse Record:R Process ABXPentra400Reader.exe (2860)
+Debug Output: out: Process ABXPentra400Reader.exe (2860)
+Debug Output: ===>7R|3|^^^4^ALT|12|26||||F|||2014092415053587  Process ABXPentra400Reader.exe (2860)
+Debug Output: Parsing: ===>7R|3|^^^4^ALT|12|26||||F|||2014092415053587  Process ABXPentra400Reader.exe (2860)
+Debug Output: got STX Process ABXPentra400Reader.exe (2860)
+Debug Output: Parse Record:R Process ABXPentra400Reader.exe (2860)
+Debug Output: out: Process ABXPentra400Reader.exe (2860)
+Debug Output: ===>0R|4|^^^5^AST|19|26||||F|||2014092415054793  Process ABXPentra400Reader.exe (2860)
+Debug Output: Parsing: ===>0R|4|^^^5^AST|19|26||||F|||2014092415054793  Process ABXPentra400Reader.exe (2860)
+Debug Output: got STX Process ABXPentra400Reader.exe (2860)
+Debug Output: Parse Record:R Process ABXPentra400Reader.exe (2860)
+Debug Output: out: Process ABXPentra400Reader.exe (2860)
+Debug Output: ===>1R|5|^^^215^CaAS|8.95|15||||F|||20140924150647B1  Process ABXPentra400Reader.exe (2860)
+Debug Output: Parsing: ===>1R|5|^^^215^CaAS|8.95|15||||F|||20140924150647B1  Process ABXPentra400Reader.exe (2860)
+Debug Output: got STX Process ABXPentra400Reader.exe (2860)
+Debug Output: Parse Record:R Process ABXPentra400Reader.exe (2860)
+Debug Output: out: Process ABXPentra400Reader.exe (2860)
+Debug Output: ===>2R|6|^^^39^Urea|18.94|15||||F|||201409241505590E  Process ABXPentra400Reader.exe (2860)
+Debug Output: Parsing: ===>2R|6|^^^39^Urea|18.94|15||||F|||201409241505590E  Process ABXPentra400Reader.exe (2860)
+Debug Output: got STX Process ABXPentra400Reader.exe (2860)
+Debug Output: Parse Record:R Process ABXPentra400Reader.exe (2860)
+Debug Output: out: Process ABXPentra400Reader.exe (2860)
+Debug Output: ===>3C|1|I|Flag^CALC_ERROR|I0D  Process ABXPentra400Reader.exe (2860)
+Debug Output: Parsing: ===>3C|1|I|Flag^CALC_ERROR|I0D  Process ABXPentra400Reader.exe (2860)
+Debug Output: got STX Process ABXPentra400Reader.exe (2860)
+Debug Output: Parse Record:C Process ABXPentra400Reader.exe (2860)
+Debug Output: out: Process ABXPentra400Reader.exe (2860)
+Debug Output: ===>4L|1|N07  Process ABXPentra400Reader.exe (2860)
+Debug Output: Parsing: ===>4L|1|N07  Process ABXPentra400Reader.exe (2860)
+Debug Output: got STX Process ABXPentra400Reader.exe (2860)
+Debug Output: Parse Record:L Process ABXPentra400Reader.exe (2860)
+Debug Output: saveresultsall:6 Process ABXPentra400Reader.exe (2860)
+Debug Output: out: Process ABXPentra400Reader.exe (2860)
+Debug Output: Result pacient::patient id:2 runda:rack:position:cnt  results:6 Process ABXPentra400Reader.exe (2860)
+Debug Output: test: 211 , val:0.80 Process ABXPentra400Reader.exe (2860)
+Debug Output: Test ID:211 = 0.80 Process ABXPentra400Reader.exe (2860)
+Debug Output: test: 25 , val:96.79 Process ABXPentra400Reader.exe (2860)
+Debug Output: Test ID:25 = 96.79 Process ABXPentra400Reader.exe (2860)
+Debug Output: test: 4 , val:12 Process ABXPentra400Reader.exe (2860)
+Debug Output: Test ID:4 = 12 Process ABXPentra400Reader.exe (2860)
+Debug Output: test: 5 , val:19 Process ABXPentra400Reader.exe (2860)
+Debug Output: Test ID:5 = 19 Process ABXPentra400Reader.exe (2860)
+Debug Output: test: 215 , val:8.95 Process ABXPentra400Reader.exe (2860)
+Debug Output: Test ID:215 = 8.95 Process ABXPentra400Reader.exe (2860)
+Debug Output: test: 39 , val:18.94 Process ABXPentra400Reader.exe (2860)
+Debug Output: Test ID:39 = 18.94 Process ABXPentra400Reader.exe (2860)
+Debug Output: ===> Process ABXPentra400Reader.exe (2860)
+Debug Output: Parsing: ===> Process ABXPentra400Reader.exe (2860)
+Debug Output: got EOT Process ABXPentra400Reader.exe (2860)
+Debug Output: out: Process ABXPentra400Reader.exe (2860)
+Debug Output: ===> Process ABXPentra400Reader.exe (2860)
+Debug Output: Parsing: ===> Process ABXPentra400Reader.exe (2860)
+Debug Output: got ACK Process ABXPentra400Reader.exe (2860)
+Debug Output: out: Process ABXPentra400Reader.exe (2860)
+Debug Output: ===> Process ABXPentra400Reader.exe (2860)
+Debug Output: Parsing: ===> Process ABXPentra400Reader.exe (2860)
+Debug Output: got ENQ Process ABXPentra400Reader.exe (2860)
+Debug Output: out: Process ABXPentra400Reader.exe (2860)
+Debug Output: ===>1H|\^&|||ABXP400|||||||P|E1394-97|2014092415553444  Process ABXPentra400Reader.exe (2860)
+Debug Output: Parsing: ===>1H|\^&|||ABXP400|||||||P|E1394-97|2014092415553444  Process ABXPentra400Reader.exe (2860)
+Debug Output: got STX Process ABXPentra400Reader.exe (2860)
+Debug Output: Parse Record:H Process ABXPentra400Reader.exe (2860)
+Debug Output: out: Process ABXPentra400Reader.exe (2860)
+Debug Output: ===>2P|1||AUTO_PID00009931||TUDOSE^MIHAELA  P2|||UE8  Process ABXPentra400Reader.exe (2860)
+Debug Output: Parsing: ===>2P|1||AUTO_PID00009931||TUDOSE^MIHAELA  P2|||UE8  Process ABXPentra400Reader.exe (2860)
+Debug Output: got STX Process ABXPentra400Reader.exe (2860)
+Debug Output: Parse Record:P Process ABXPentra400Reader.exe (2860)
+Debug Output: out: Process ABXPentra400Reader.exe (2860)
+Debug Output: ===>3O|1|16041||||20140924150237|20140924000000||||||||1||||||||||FD0  Process ABXPentra400Reader.exe (2860)
+Debug Output: Parsing: ===>3O|1|16041||||20140924150237|20140924000000||||||||1||||||||||FD0  Process ABXPentra400Reader.exe (2860)
+Debug Output: got STX Process ABXPentra400Reader.exe (2860)
+Debug Output: Parse Record:O Process ABXPentra400Reader.exe (2860)
+Debug Output: SegReceived order Process ABXPentra400Reader.exe (2860)
+Debug Output: out: Process ABXPentra400Reader.exe (2860)
+Debug Output: ===>4R|1|^^^211^CREA3|0.80|15||||F|||20140924150611AB  Process ABXPentra400Reader.exe (2860)
+Debug Output: Parsing: ===>4R|1|^^^211^CREA3|0.80|15||||F|||20140924150611AB  Process ABXPentra400Reader.exe (2860)
+Debug Output: got STX Process ABXPentra400Reader.exe (2860)
+Debug Output: Parse Record:R Process ABXPentra400Reader.exe (2860)
+Debug Output: out: Process ABXPentra400Reader.exe (2860)
+Debug Output: ===>5C|1|I|Flag^CALC_ERROR|I0F  Process ABXPentra400Reader.exe (2860)
+Debug Output: Parsing: ===>5C|1|I|Flag^CALC_ERROR|I0F  Process ABXPentra400Reader.exe (2860)
+Debug Output: got STX Process ABXPentra400Reader.exe (2860)
+Debug Output: Parse Record:C Process ABXPentra400Reader.exe (2860)
+Debug Output: out: Process ABXPentra400Reader.exe (2860)
+Debug Output: ===>6R|2|^^^25^GluP|96.79|15||||F|||20140924150635F8  Process ABXPentra400Reader.exe (2860)
+Debug Output: Parsing: ===>6R|2|^^^25^GluP|96.79|15||||F|||20140924150635F8  Process ABXPentra400Reader.exe (2860)
+Debug Output: got STX Process ABXPentra400Reader.exe (2860)
+Debug Output: Parse Record:R Process ABXPentra400Reader.exe (2860)
+Debug Output: out: Process ABXPentra400Reader.exe (2860)
+Debug Output: ===>7R|3|^^^4^ALT|12|26||||F|||2014092415053587  Process ABXPentra400Reader.exe (2860)
+Debug Output: Parsing: ===>7R|3|^^^4^ALT|12|26||||F|||2014092415053587  Process ABXPentra400Reader.exe (2860)
+Debug Output: got STX Process ABXPentra400Reader.exe (2860)
+Debug Output: Parse Record:R Process ABXPentra400Reader.exe (2860)
+Debug Output: out: Process ABXPentra400Reader.exe (2860)
+Debug Output: ===>0R|4|^^^5^AST|19|26||||F|||2014092415054793  Process ABXPentra400Reader.exe (2860)
+Debug Output: Parsing: ===>0R|4|^^^5^AST|19|26||||F|||2014092415054793  Process ABXPentra400Reader.exe (2860)
+Debug Output: got STX Process ABXPentra400Reader.exe (2860)
+Debug Output: Parse Record:R Process ABXPentra400Reader.exe (2860)
+Debug Output: out: Process ABXPentra400Reader.exe (2860)
+Debug Output: ===>1R|5|^^^215^CaAS|8.95|15||||F|||20140924150647B1  Process ABXPentra400Reader.exe (2860)
+Debug Output: Parsing: ===>1R|5|^^^215^CaAS|8.95|15||||F|||20140924150647B1  Process ABXPentra400Reader.exe (2860)
+Debug Output: got STX Process ABXPentra400Reader.exe (2860)
+Debug Output: Parse Record:R Process ABXPentra400Reader.exe (2860)
+Debug Output: out: Process ABXPentra400Reader.exe (2860)
+Debug Output: ===>2R|6|^^^39^Urea|18.94|15||||F|||201409241505590E  Process ABXPentra400Reader.exe (2860)
+Debug Output: Parsing: ===>2R|6|^^^39^Urea|18.94|15||||F|||201409241505590E  Process ABXPentra400Reader.exe (2860)
+Debug Output: got STX Process ABXPentra400Reader.exe (2860)
+Debug Output: Parse Record:R Process ABXPentra400Reader.exe (2860)
+Debug Output: out: Process ABXPentra400Reader.exe (2860)
+Debug Output: ===>3C|1|I|Flag^CALC_ERROR|I0D  Process ABXPentra400Reader.exe (2860)
+Debug Output: Parsing: ===>3C|1|I|Flag^CALC_ERROR|I0D  Process ABXPentra400Reader.exe (2860)
+Debug Output: got STX Process ABXPentra400Reader.exe (2860)
+Debug Output: Parse Record:C Process ABXPentra400Reader.exe (2860)
+Debug Output: out: Process ABXPentra400Reader.exe (2860)
+Debug Output: ===>4L|1|N07  Process ABXPentra400Reader.exe (2860)
+Debug Output: Parsing: ===>4L|1|N07  Process ABXPentra400Reader.exe (2860)
+Debug Output: got STX Process ABXPentra400Reader.exe (2860)
+Debug Output: Parse Record:L Process ABXPentra400Reader.exe (2860)
+Debug Output: saveresultsall:6 Process ABXPentra400Reader.exe (2860)
+Debug Output: out: Process ABXPentra400Reader.exe (2860)
+Debug Output: Result pacient::patient id:2 runda:rack:position:cnt  results:6 Process ABXPentra400Reader.exe (2860)
+Debug Output: test: 211 , val:0.80 Process ABXPentra400Reader.exe (2860)
+Debug Output: Test ID:211 = 0.80 Process ABXPentra400Reader.exe (2860)
+Debug Output: test: 25 , val:96.79 Process ABXPentra400Reader.exe (2860)
+Debug Output: Test ID:25 = 96.79 Process ABXPentra400Reader.exe (2860)
+Debug Output: test: 4 , val:12 Process ABXPentra400Reader.exe (2860)
+Debug Output: Test ID:4 = 12 Process ABXPentra400Reader.exe (2860)
+Debug Output: test: 5 , val:19 Process ABXPentra400Reader.exe (2860)
+Debug Output: Test ID:5 = 19 Process ABXPentra400Reader.exe (2860)
+Debug Output: test: 215 , val:8.95 Process ABXPentra400Reader.exe (2860)
+Debug Output: Test ID:215 = 8.95 Process ABXPentra400Reader.exe (2860)
+Debug Output: test: 39 , val:18.94 Process ABXPentra400Reader.exe (2860)
+Debug Output: Test ID:39 = 18.94 Process ABXPentra400Reader.exe (2860)
+Debug Output: ===> Process ABXPentra400Reader.exe (2860)
+Debug Output: Parsing: ===> Process ABXPentra400Reader.exe (2860)
+Debug Output: got EOT Process ABXPentra400Reader.exe (2860)
+Debug Output: out: Process ABXPentra400Reader.exe (2860)
+Debug Output: ===> Process ABXPentra400Reader.exe (2860)
+Debug Output: Parsing: ===> Process ABXPentra400Reader.exe (2860)
+Debug Output: got ACK Process ABXPentra400Reader.exe (2860)
+Debug Output: out: Process ABXPentra400Reader.exe (2860)

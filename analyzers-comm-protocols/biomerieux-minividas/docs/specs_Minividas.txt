@@ -1,0 +1,44 @@
+mod de operare aparat:
+
+
+main menu (but. mijloc)
+  -> results menu
+    -> validate lis results -> send
+    
+    la iesire din menu se transmite
+    
+    
+  eventual 
+  main menu -> utilities -> on/off line
+  
+  setari port:
+  main menu -> utilities -> (down) -> configuration -> (down) lis user options:
+      lis upload enabled (chck)
+      ev. lis autovalidation  (chck)
+      
+                                                     -> lis interface options ->
+        communicastion settings -> baud rate : (down) 9600 check
+                                -> parity : none
+                                -> character size: 8
+                                
+        (in principiu nu este necesar sa intri aici, fol. default:
+        data format -> misc format -> alternate protocol )
+                                
+      
+9600 8, n , 1
+
+cablu normal      
+
+tip resultready: patientid
+
+codificari: ev. din dump 
+
+qc se poate face cu ora/data/nivel(lot)
+    
+todo:
+  qc
+
+
+  
+  
+  

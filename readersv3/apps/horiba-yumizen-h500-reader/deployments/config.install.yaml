@@ -1,0 +1,85 @@
+reader:
+  id: horiba-yumizen-h500-reader-v3
+  label: HORIBA Yumizen H500 Reader V3
+  analyzer_name: HORIBA Yumizen H500
+  analyzer_code: horiba-yumizen-h500-reader-v3
+  db_name: horiba-yumizen-h500-reader-v3.db
+logging:
+  verbose_level: 1
+results:
+  auto_confirm_wisemed: false
+local_http:
+  enabled: true
+  address: 127.0.0.1:18080
+  language: ro
+  tls: false
+wisemed_ws:
+  enabled: true
+  url: wss://wslocal.wisemed.eu/ws
+  heartbeat_ms: 15000
+  reconnect_delay_ms: 5000
+analyzer:
+  comm_type: tcpip
+  protocol: astm
+modules:
+  app-updates:
+    enabled: true
+    app_id: horiba-yumizen-h500-reader-v3
+    channel: stable
+    base_url: http://127.0.0.1:19090
+    auto_download: true
+    download_dir: ./updates
+  qc:
+    levels: ["negativ", "pozitiv", "pcrescut", "pscazut", "nivel1", "nivel2", "nivel3", "nivel4", "nivel5"]
+  result-sync:
+    enabled: true
+    interval_minutes: 5
+    sample_prefixes: []
+    sample_suffixes: []
+    separators: ["-"]
+    qc_prefixes: []
+  logging:
+    verbose_level: 1
+  results:
+    auto_confirm_wisemed: false
+  local-http:
+    enabled: true
+    address: 127.0.0.1:18080
+    language: ro
+    repeat_mode: individual
+    tls: false
+  storage-sqlite:
+    path: ./horiba-yumizen-h500-reader-v3.db
+  wisemed-api:
+    base_url: https://api.wisemed.example
+    cfg_wisemed_protocol: https
+    cfg_wisemed_ip: hitmed.wisemed.eu
+    cfg_wisemed_port: "443"
+    cfg_wisemed_path: /wisemed-api/apiv2
+    cfg_wisemed_key: 27c490bb-c9e4-47aa-bf6d-ebd2a1add35e
+  help:
+    help_dir: ./help
+  transport-tcpip:
+    mode: server
+    host: 127.0.0.1
+    port: 5150
+    remote_host: 127.0.0.1
+    remote_port: 5150
+  protocol-astm:
+    specimen_code_default: "1"
+    specimen_code_map: {}
+    send_ack: true
+    frame_timeout_ms: 2000
+    checksum_mode: astm
+    trailer_mode: crlf
+    sample_id_paths: ["O.3.1", "O.2.1"]
+    patient_id_paths: ["P.3.1", "P.2.1"]
+    patient_name_paths: ["P.5.1", "P.4.1"]
+    run_date_paths: ["O.7.1", "O.6.1", "H.13.1"]
+    result_id_paths: ["R.2.4", "R.2.1"]
+    result_name_paths: ["R.2.4", "R.2.1"]
+    result_value_paths: ["R.3.1"]
+    result_unit_paths: ["R.4.1"]
+    result_flag_paths: ["R.6.1", "R.8.1"]
+    qc_prefixes: ["QC", "CTRL", "CONTROL"]
+    analyte_mappings: {}

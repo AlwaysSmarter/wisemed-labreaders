@@ -11,6 +11,13 @@ func TestASTMExpectedTrailerBytes(t *testing.T) {
 	}
 }
 
+func TestFormatASTMPackageTextKeepsRecordSeparatorsVisible(t *testing.T) {
+	payload := "H|\\^&\rP|1\nL|1|N\r"
+	if got, want := formatASTMPackageText(payload), `H|\^&\rP|1\nL|1|N\r`; got != want {
+		t.Fatalf("formatted package = %q, want %q", got, want)
+	}
+}
+
 func TestParseBatchExtractsSampleResult(t *testing.T) {
 	cfg := tcpConfig{
 		SampleIDPaths: []string{"O.3.1", "O.2.1"},
@@ -60,6 +67,64 @@ func TestParseBatchMarksQCSamples(t *testing.T) {
 	}
 	if !items[0].Order.IsQC {
 		t.Fatal("expected QC sample to be detected")
+	}
+}
+
+func TestParseBatchUsesLifotronicOrderSampleID(t *testing.T) {
+	cfg := tcpConfig{
+		SampleIDPaths:     []string{"O.2.1", "O.3.1"},
+		SampleIDTrimRight: "-",
+		ResultIDPaths:     []string{"R.2.4"},
+		ResultName:        []string{"R.2.4"},
+		ResultValue:       []string{"R.3.1"},
+	}
+	payload := "O|1|23124-------------^1519^***^03|****|^^^HbA1c|R\rR|1|^^^HbA1c|5.5|%\rL|1|N\r"
+	items := parseBatch(parseRecords(payload), cfg)
+	if len(items) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(items))
+	}
+	if got, want := items[0].Order.SampleID, "23124"; got != want {
+		t.Fatalf("sample id = %q, want %q", got, want)
+	}
+}
+
+func TestParseBatchTrimsConfiguredSampleIDCharacters(t *testing.T) {
+	cfg := tcpConfig{
+		SampleIDPaths:     []string{"O.2.1"},
+		SampleIDTrimLeft:  "*",
+		SampleIDTrimRight: "-",
+		ResultIDPaths:     []string{"R.2.4"},
+		ResultName:        []string{"R.2.4"},
+		ResultValue:       []string{"R.3.1"},
+	}
+	payload := "O|1|***23124---\rR|1|^^^HbA1c|5.5|%\rL|1|N\r"
+	items := parseBatch(parseRecords(payload), cfg)
+	if len(items) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(items))
+	}
+	if got, want := items[0].Order.SampleID, "23124"; got != want {
+		t.Fatalf("sample id = %q, want %q", got, want)
+	}
+}
+
+func TestParseBatchUsesAutoLumoResultFields(t *testing.T) {
+	cfg := tcpConfig{
+		SampleIDPaths: []string{"O.3.2", "O.3.1", "O.2.1"},
+		ResultIDPaths: []string{"R.2.2", "R.2.1"},
+		ResultName:    []string{"R.5.1", "R.2.1"},
+		ResultValue:   []string{"R.3.2", "R.3.1"},
+	}
+	payload := "H|\\^&|||AutoLumo S900||0|||||REQ5|1394-97|20260821230912\rP|1|||||||||||||||||||||||||||||||||\rO|1||^23159^9^9|1256^214^||||||||||||||||||||||||||\rR|1|1256^214^|109856625^35.467^||25-OH Vitamin D^214^20260310^03/09/2027|||F||||20260821123402|\rL|1|N\r"
+	items := parseBatch(parseRecords(payload), cfg)
+	if len(items) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(items))
+	}
+	got := items[0]
+	if got.Order.SampleID != "23159" {
+		t.Fatalf("sample id = %q, want %q", got.Order.SampleID, "23159")
+	}
+	if got.AnalyteTag != "214" || got.AnalyteName != "25-OH Vitamin D" || got.Value != "35.467" {
+		t.Fatalf("unexpected result: %#v", got)
 	}
 }
 

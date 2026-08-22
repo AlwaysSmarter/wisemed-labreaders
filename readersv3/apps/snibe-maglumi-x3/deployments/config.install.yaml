@@ -66,6 +66,8 @@ modules:
     remote_host: 127.0.0.1
     remote_port: 9000
   protocol-astm:
+    specimen_code_default: "1"
+    specimen_code_map: {}
     send_ack: true
     frame_timeout_ms: 2000
     checksum_mode: none

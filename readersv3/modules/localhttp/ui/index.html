@@ -76,7 +76,9 @@
             <button class="nav-sublink" data-view="analytes" data-settings-subview="reader" data-i18n="settings_reader">Setari reader</button>
             <button class="nav-sublink" data-view="analytes" data-settings-subview="analytes" data-i18n="settings_analytes">Analize</button>
             <button class="nav-sublink" data-view="analytes" data-settings-subview="daily-details" data-i18n="settings_daily_details">Detalii zilnice</button>
+            <button class="nav-sublink" data-view="analytes" data-settings-subview="daily-analysis-filters">Filtre blocare analize</button>
             <button class="nav-sublink" data-view="analytes" data-settings-subview="qc" data-i18n="settings_qc">Setari QC</button>
+            <button id="astm-specimen-settings-link" class="nav-sublink" data-view="analytes" data-settings-subview="astm-specimens" hidden>ASTM - Tipuri probe</button>
           </div>
           <button id="debug-nav-link" class="nav-link" data-view="debug" data-i18n="nav_debug" hidden>Debug</button>
           <button class="nav-link" data-view="help" data-i18n="nav_help">Help</button>
@@ -118,6 +120,7 @@
                 <span class="dot"></span>
                 <span id="result-sync-status-label">Syncro Match WiseMED</span>
               </button>
+              <button id="daily-analysis-filter-pill" class="status-pill status-pill-button danger" type="button" hidden>Filtre: 0</button>
             </div>
           </div>
           <div id="app-toast" class="app-toast" hidden>
@@ -325,6 +328,38 @@
                       <input name="tcpip_remote_port" type="text">
                     </label>
                   </div>
+                  <div id="reader-settings-serial-row" class="settings-subsection" hidden>
+                    <div class="settings-subsection-head">
+                      <h5>Comunicare seriala</h5>
+                      <p class="small muted">Modificarile sunt aplicate dupa repornirea readerului.</p>
+                    </div>
+                    <div class="settings-section-grid">
+                      <label class="reader-settings-field">
+                        <span>Port serial</span>
+                        <input name="serial_port" type="text" placeholder="COM3 sau /dev/cu.usbserial-...">
+                      </label>
+                      <label class="reader-settings-field">
+                        <span>Baud</span>
+                        <select name="serial_baud"></select>
+                      </label>
+                      <label class="reader-settings-field">
+                        <span>Data bits</span>
+                        <select name="serial_data_bits"></select>
+                      </label>
+                      <label class="reader-settings-field">
+                        <span>Parity</span>
+                        <select name="serial_parity"></select>
+                      </label>
+                      <label class="reader-settings-field">
+                        <span>Stop bits</span>
+                        <select name="serial_stop_bits"></select>
+                      </label>
+                      <label class="reader-settings-field">
+                        <span>Flow control</span>
+                        <select name="serial_flow_control"></select>
+                      </label>
+                    </div>
+                  </div>
                   <div class="two-col" id="reader-settings-astm-framing-row" hidden>
                     <label class="reader-settings-field">
                       <span>ASTM checksum mode</span>
@@ -333,6 +368,24 @@
                     <label class="reader-settings-field">
                       <span>ASTM trailer mode</span>
                       <select name="astm_trailer_mode"></select>
+                    </label>
+                  </div>
+                  <div class="two-col" id="reader-settings-astm-specimen-row" hidden>
+                    <label class="reader-settings-field">
+                      <span>Cod proba ASTM implicit</span>
+                      <input name="astm_specimen_code_default" type="text" placeholder="1">
+                    </label>
+                    <label class="reader-settings-field">
+                      <span>Mapare coduri probe WiseMED -> analizor</span>
+                      <textarea name="astm_specimen_code_map" rows="3" placeholder="SR=1&#10;SG=2"></textarea>
+                      <small class="muted">Cate o regula pe linie: codul primit din API = codul transmis analizorului.</small>
+                    </label>
+                  </div>
+                  <div id="reader-settings-zonci-separator-row" hidden>
+                    <label class="reader-settings-field">
+                      <span>Separator rezultate Zonci</span>
+                      <input name="zonci_result_separator" type="text" placeholder="VIRGULA, TAB, SPATIU sau ;">
+                      <small class="muted">Implicit VIRGULA. Se acceptă TAB, VIRGULA, SPATIU, un caracter sau cod hex, ex. 0x09.</small>
                     </label>
                   </div>
                   <div id="reader-settings-file-row" class="settings-subsection">
@@ -569,6 +622,26 @@
             </div>
             <div id="analyte-list" class="analyte-list"></div>
           </article>
+          <article id="settings-panel-astm-specimens" class="panel full-span" hidden>
+            <div class="orders-toolbar">
+              <div>
+                <h3>Tipuri probe ASTM</h3>
+                <p class="small muted">Leaga codul de tip proba primit din WiseMED de codul transmis analizorului. Codul implicit este folosit cand WiseMED nu transmite un tip de proba sau nu exista o legatura.</p>
+              </div>
+              <div class="orders-buttons">
+                <button id="new-astm-specimen" class="ghost" type="button">Noua legatura</button>
+                <button id="save-astm-specimens" class="primary" type="button">Salveaza</button>
+              </div>
+            </div>
+            <div class="settings-section-grid">
+              <label class="reader-settings-field">
+                <span>Cod implicit analizor</span>
+                <input id="astm-specimen-default" type="text" maxlength="64" placeholder="ex. 1">
+              </label>
+            </div>
+            <div id="astm-specimen-list" class="analyte-list"></div>
+            <p id="astm-specimen-message" class="small muted"></p>
+          </article>
           <article id="settings-panel-qc-editor" class="panel full-span" hidden>
             <div class="orders-toolbar">
               <div class="orders-filters">
@@ -598,6 +671,18 @@
               </div>
             </div>
             <div id="daily-detail-definition-list" class="analyte-list"></div>
+          </article>
+          <article id="settings-panel-daily-analysis-filters" class="panel full-span" hidden>
+            <div class="orders-toolbar"><div><h3>Filtre blocare analize</h3><p class="small muted">Analizele care nu apar aici sunt transmise către analizor. Filtrele se aplică doar datei selectate.</p></div></div>
+            <div class="settings-section-grid">
+              <label class="reader-settings-field"><span>Data</span><input id="daily-analysis-filter-date" type="date"></label>
+              <label class="reader-settings-field"><span>Analiza</span><select id="daily-analysis-filter-analyte"></select></label>
+              <label class="reader-settings-field"><span>Mod blocare</span><select id="daily-analysis-filter-mode"><option value="global">Global - nu se trimite deloc</option><option value="specimen_codes">Numai pentru coduri de probă</option></select></label>
+              <label id="daily-analysis-filter-specimens-box" class="reader-settings-field" hidden><span>Coduri probă blocate</span><select id="daily-analysis-filter-specimens" multiple size="5"></select></label>
+            </div>
+            <div class="orders-buttons"><button id="add-daily-analysis-filter" class="primary" type="button">Adaugă filtru</button><button id="refresh-daily-analysis-filters" class="ghost" type="button">Refresh</button></div>
+            <div id="daily-analysis-filter-list" class="analyte-list"></div>
+            <p id="daily-analysis-filter-message" class="small muted"></p>
           </article>
         </section>
         <section id="view-daily-details" class="panel-grid" hidden>

@@ -1,0 +1,6 @@
+<?xml version="1.0"?>
+<f1102 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="mfp:anaf:dgti:f1102:declaratie:v1" xmlns="mfp:anaf:dgti:f1102:declaratie:v1" d_rec="0" suma_control="0" luna_r="7" an="2026" data_document="12.08.2026" nume_ip="Institutul National de Sanatate Publica." cui_ip="" formular_fara_valori="0">
+  <cont simbol_p_cont="4010100" cod_sursa="A" cod_sector="01" cf="665050" ce="203030" str_cont="401010001A665050203030XXXXXXXXXXXXXXXXXX" rulaj_deb="358463.5" rulaj_cred="380738.5"/>
+  <cont simbol_p_cont="5150102" cod_sursa="D" cod_sector="01" cf="" ce="" str_cont="515010201DXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" rulaj_deb="4445113.55" rulaj_cred="4438388.55"/>
+  <cont simbol_p_cont="6270000" cod_sursa="D" cod_sector="01" cf="665050" ce="200130" str_cont="627000001D665050200130XXXXXXXXXXXXXXXXXX" rulaj_deb="434.36" rulaj_cred="434.36"/>
+</f1102>

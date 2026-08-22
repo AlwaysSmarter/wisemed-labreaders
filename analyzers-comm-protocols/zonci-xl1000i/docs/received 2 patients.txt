@@ -1,0 +1,7 @@
+﻿Debug Output: Connect Process ZonciXL1000iReader.exe (1696)
+Debug Output: ===>3 46408 sampleNo 1 patientNo 46408 name  sex  age  sampleType Plasma department  hospitalNo  treatmentRoom  bedLabel  diagnosis  date 2017-12-29 time 12:12:17 doctor  operator admin validator admin  FIB 255 mg/dl 2 4  Process ZonciXL1000iReader.exe (1696)
+Debug Output: primul caracter:2 Process ZonciXL1000iReader.exe (1696)
+Debug Output: ultimul caracter:3 Process ZonciXL1000iReader.exe (1696)
+Debug Output: ===>3 46988 sampleNo 2 patientNo 46988 name  sex  age  sampleType Plasma department  hospitalNo  treatmentRoom  bedLabel  diagnosis  date 2017-12-29 time 12:12:28 doctor  operator admin validator admin  PT-S 28.4 s 9.0 14.0 PT-% 28.23 % 80.00 120.00 PTR 2.09  0.82 1.15 PT-INR 2.01  0.80 1.20  Process ZonciXL1000iReader.exe (1696)
+Debug Output: primul caracter:2 Process ZonciXL1000iReader.exe (1696)
+Debug Output: ultimul caracter:3 Process ZonciXL1000iReader.exe (1696)
