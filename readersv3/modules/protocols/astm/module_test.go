@@ -16,9 +16,28 @@ func TestQuerySampleIDAndSnibeReplyFraming(t *testing.T) {
 	if got, want := querySampleID(records), "566639"; got != want {
 		t.Fatalf("query sample id = %q, want %q", got, want)
 	}
-	frame := buildOutgoingFrame("H|\\^&|||WISEMED", 1, tcpConfig{ChecksumMode: "none", TrailerMode: "none"})
-	if got, want := string(frame), "\x021H|\\^&|||WISEMED\x03"; got != want {
+	frame := buildOutgoingFrame("H|\\^&|||WISEMED\r", 1, tcpConfig{ChecksumMode: "none", TrailerMode: "none", QueryReplySequence: false})
+	if got, want := string(frame), "\x02H|\\^&|||WISEMED\r\x03"; got != want {
 		t.Fatalf("Snibe frame = %q, want %q", got, want)
+	}
+}
+
+func TestQueryReplyDefaultsToFullPackageWithCRRecords(t *testing.T) {
+	settings := map[string]interface{}{}
+	if got, want := astmQueryReplyMode(settings), "full_package"; got != want {
+		t.Fatalf("query reply mode = %q, want %q", got, want)
+	}
+	if got, want := astmQueryReplyTerminator(settings), "cr"; got != want {
+		t.Fatalf("query reply terminator = %q, want %q", got, want)
+	}
+	if !astmQueryReplyEOTOnSend(settings) {
+		t.Fatal("full package reply must append EOT in the same outbound write")
+	}
+	if astmQueryReplySequence(map[string]interface{}{"checksum_mode": "none", "trailer_mode": "none"}) {
+		t.Fatal("raw ASTM framing must omit the sequence by default")
+	}
+	if got := buildOutgoingFrame("H|\\^&\rP|1\rL|1|N\r", 1, tcpConfig{ChecksumMode: "none", TrailerMode: "none", QueryReplySequence: false}); string(got) != "\x02H|\\^&\rP|1\rL|1|N\r\x03" {
+		t.Fatalf("full package framing = %q", got)
 	}
 }
 

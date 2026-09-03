@@ -69,30 +69,39 @@ type analyzerActivityTracker interface {
 }
 
 type tcpConfig struct {
-	CommType          string
-	Mode              string
-	ListenHost        string
-	ListenPort        string
-	RemoteHost        string
-	RemotePort        string
-	SendACK           bool
-	FrameTimeout      time.Duration
-	ChecksumMode      string
-	TrailerMode       string
-	SampleIDPaths     []string
-	SampleIDTrimLeft  string
-	SampleIDTrimRight string
-	PatientIDPath     []string
-	PatientName       []string
-	RunDatePaths      []string
-	ResultIDPaths     []string
-	ResultName        []string
-	ResultValue       []string
-	ResultUnit        []string
-	ResultFlag        []string
-	QCPrefixes        []string
-	AnalyteMap        map[string]string
-	HostQuerySpecimen string
+	CommType             string
+	Mode                 string
+	ListenHost           string
+	ListenPort           string
+	RemoteHost           string
+	RemotePort           string
+	SendACK              bool
+	FrameTimeout         time.Duration
+	ChecksumMode         string
+	TrailerMode          string
+	SampleIDPaths        []string
+	SampleIDTrimLeft     string
+	SampleIDTrimRight    string
+	PatientIDPath        []string
+	PatientName          []string
+	RunDatePaths         []string
+	ResultIDPaths        []string
+	ResultName           []string
+	ResultValue          []string
+	ResultUnit           []string
+	ResultFlag           []string
+	QCPrefixes           []string
+	AnalyteMap           map[string]string
+	HostQuerySpecimen    string
+	QueryReplyMode       string
+	QueryReplyTerminator string
+	QueryReplySequence   bool
+	QueryReplyEOTOnSend  bool
+}
+
+type queryReply struct {
+	SampleID string
+	Frames   [][]byte
 }
 
 type protocolStatus struct {
@@ -503,6 +512,8 @@ func (m *Module) handleConn(ctx context.Context, conn net.Conn, cfg tcpConfig, m
 	var rawLines []string
 	var lineBuf strings.Builder
 	var pendingReply [][]byte
+	queuedReplies := []queryReply{}
+	queryReplyCh := make(chan queryReply, 8)
 	replyActive := false
 	frameActive := false
 	frameEnded := false
@@ -517,10 +528,45 @@ func (m *Module) handleConn(ctx context.Context, conn net.Conn, cfg tcpConfig, m
 		framePayload = framePayload[:0]
 		frameTrailer = frameTrailer[:0]
 	}
-	for {
-		if cfg.FrameTimeout > 0 {
-			_ = conn.SetReadDeadline(time.Now().Add(cfg.FrameTimeout))
+	startReply := func(reply queryReply) {
+		pendingReply = reply.Frames
+		replyActive = len(pendingReply) > 0
+		if !replyActive {
+			return
 		}
+		m.logLevel1("astm query received sample_id=%s reply_frames=%d", reply.SampleID, len(pendingReply))
+		_, _ = conn.Write([]byte{ctrlENQ})
+		m.tracePacket("out", "tcpip", remote+" ENQ query-reply", []byte{ctrlENQ})
+	}
+	startNextReply := func() {
+		if len(queuedReplies) == 0 {
+			return
+		}
+		next := queuedReplies[0]
+		queuedReplies = queuedReplies[1:]
+		startReply(next)
+	}
+	pollQueryReplies := func() {
+		for {
+			select {
+			case reply := <-queryReplyCh:
+				if replyActive {
+					queuedReplies = append(queuedReplies, reply)
+				} else {
+					startReply(reply)
+				}
+			default:
+				return
+			}
+		}
+	}
+	for {
+		pollQueryReplies()
+		readTimeout := cfg.FrameTimeout
+		if readTimeout <= 0 || readTimeout > 100*time.Millisecond {
+			readTimeout = 100 * time.Millisecond
+		}
+		_ = conn.SetReadDeadline(time.Now().Add(readTimeout))
 		b, err := reader.ReadByte()
 		if err != nil {
 			if ne, ok := err.(net.Error); ok && ne.Timeout() {
@@ -598,13 +644,8 @@ func (m *Module) handleConn(ctx context.Context, conn net.Conn, cfg tcpConfig, m
 			if len(frames) > 0 {
 				payload := strings.Join(frames, "")
 				if sampleID := querySampleID(parseRecords(payload)); sampleID != "" {
-					// ASTM transfers change direction only after the analyzer's EOT.
-					// Send ENQ first so an API lookup cannot make the analyzer time out.
-					replyActive = true
-					_, _ = conn.Write([]byte{ctrlENQ})
-					m.tracePacket("out", "tcpip", remote+" ENQ query-reply", []byte{ctrlENQ})
-					pendingReply = m.hostQueryReply(sampleID, cfg)
-					m.logLevel1("astm query received sample_id=%s reply_frames=%d", sampleID, len(pendingReply))
+					m.logLevel1("astm query queued sample_id=%s", sampleID)
+					go m.loadQueryReply(ctx, sampleID, cfg, queryReplyCh)
 				} else if err := m.processBatch(payload, remote, cfg); err != nil {
 					m.setError(err)
 				}
@@ -617,10 +658,19 @@ func (m *Module) handleConn(ctx context.Context, conn net.Conn, cfg tcpConfig, m
 					_, _ = conn.Write([]byte{ctrlEOT})
 					m.tracePacket("out", "tcpip", remote+" EOT query-reply", []byte{ctrlEOT})
 					replyActive = false
+					startNextReply()
 					continue
 				}
 				framePayload := pendingReply[0]
 				pendingReply = pendingReply[1:]
+				if cfg.QueryReplyEOTOnSend && len(pendingReply) == 0 {
+					packagePayload := append(append([]byte(nil), framePayload...), ctrlEOT)
+					_, _ = conn.Write(packagePayload)
+					m.tracePacket("out", "tcpip", remote+" query-reply full-package", packagePayload)
+					replyActive = false
+					startNextReply()
+					continue
+				}
 				_, _ = conn.Write(framePayload)
 				m.tracePacket("out", "tcpip", remote+" query-reply frame", framePayload)
 			}
@@ -909,6 +959,14 @@ func (m *Module) hostQueryReply(sampleID string, cfg tcpConfig) [][]byte {
 	return m.hostQueryFrames(firstNonEmpty(order.SampleID, order.FileID, sampleID), order.PatientName, analyses, cfg)
 }
 
+func (m *Module) loadQueryReply(ctx context.Context, sampleID string, cfg tcpConfig, replies chan<- queryReply) {
+	reply := queryReply{SampleID: sampleID, Frames: m.hostQueryReply(sampleID, cfg)}
+	select {
+	case replies <- reply:
+	case <-ctx.Done():
+	}
+}
+
 func (m *Module) findHostQueryOrder(sampleID string, lookupDays int) (coremodel.Order, []coremodel.OrderAnalysis, bool) {
 	store := m.importStore()
 	if store == nil {
@@ -995,6 +1053,14 @@ func (m *Module) hostQueryFrames(sampleID, patientName string, analyses []coremo
 		records = append(records, strings.Join(fields, "|"))
 	}
 	records = append(records, "L|1|N")
+	if cfg.QueryReplyTerminator == "cr" {
+		for index := range records {
+			records[index] += "\r"
+		}
+	}
+	if cfg.QueryReplyMode == "full_package" {
+		return [][]byte{buildOutgoingFrame(strings.Join(records, ""), 1, cfg)}
+	}
 	frames := make([][]byte, 0, len(records))
 	for index, record := range records {
 		frames = append(frames, buildOutgoingFrame(record, byte((index+1)%8), cfg))
@@ -1018,7 +1084,10 @@ func (m *Module) hostQueryCodes(analyses []coremodel.OrderAnalysis) []string {
 }
 
 func buildOutgoingFrame(record string, sequence byte, cfg tcpConfig) []byte {
-	payload := append([]byte{byte('0' + sequence)}, []byte(record)...)
+	payload := []byte(record)
+	if cfg.QueryReplySequence {
+		payload = append([]byte{byte('0' + sequence)}, payload...)
+	}
 	frame := append([]byte{ctrlSTX}, payload...)
 	frame = append(frame, ctrlETX)
 	if cfg.ChecksumMode != "none" {
@@ -1131,31 +1200,69 @@ func (m *Module) readConfig() tcpConfig {
 	transport := m.rt.ModuleSettings("transport-tcpip")
 	settings := m.rt.ModuleSettings(m.ID())
 	return tcpConfig{
-		CommType:          firstNonEmpty(asString(moduleServiceValue(m.rt, "analyzer-config", "comm_type")), "tcpip"),
-		Mode:              firstNonEmpty(asString(transport["mode"]), "server"),
-		ListenHost:        firstNonEmpty(asString(transport["host"]), "127.0.0.1"),
-		ListenPort:        firstNonEmpty(asString(transport["port"]), "9000"),
-		RemoteHost:        firstNonEmpty(asString(transport["remote_host"]), "127.0.0.1"),
-		RemotePort:        firstNonEmpty(asString(transport["remote_port"]), firstNonEmpty(asString(transport["port"]), "9000")),
-		SendACK:           boolSetting(settings, "send_ack", true),
-		FrameTimeout:      time.Duration(intSetting(settings, "frame_timeout_ms", 2000)) * time.Millisecond,
-		ChecksumMode:      astmFrameChecksumMode(settings),
-		TrailerMode:       astmFrameTrailerMode(settings),
-		SampleIDPaths:     listSetting(settings, "sample_id_paths", []string{"O.3.1", "O.2.1"}),
-		SampleIDTrimLeft:  asString(settings["sample_id_trim_left"]),
-		SampleIDTrimRight: asString(settings["sample_id_trim_right"]),
-		PatientIDPath:     listSetting(settings, "patient_id_paths", []string{"P.3.1", "P.2.1"}),
-		PatientName:       listSetting(settings, "patient_name_paths", []string{"P.5.1", "P.4.1"}),
-		RunDatePaths:      listSetting(settings, "run_date_paths", []string{"O.7.1", "O.6.1", "H.13.1"}),
-		ResultIDPaths:     listSetting(settings, "result_id_paths", []string{"R.2.4", "R.2.1"}),
-		ResultName:        listSetting(settings, "result_name_paths", []string{"R.2.4", "R.2.1"}),
-		ResultValue:       listSetting(settings, "result_value_paths", []string{"R.3.1"}),
-		ResultUnit:        listSetting(settings, "result_unit_paths", []string{"R.4.1"}),
-		ResultFlag:        listSetting(settings, "result_flag_paths", []string{"R.6.1", "R.8.1"}),
-		QCPrefixes:        listSetting(settings, "qc_prefixes", []string{"QC", "CTRL", "CONTROL"}),
-		AnalyteMap:        stringMapSetting(settings, "analyte_mappings"),
-		HostQuerySpecimen: firstNonEmpty(asString(settings["specimen_code_default"]), "1"),
+		CommType:             firstNonEmpty(asString(moduleServiceValue(m.rt, "analyzer-config", "comm_type")), "tcpip"),
+		Mode:                 firstNonEmpty(asString(transport["mode"]), "server"),
+		ListenHost:           firstNonEmpty(asString(transport["host"]), "127.0.0.1"),
+		ListenPort:           firstNonEmpty(asString(transport["port"]), "9000"),
+		RemoteHost:           firstNonEmpty(asString(transport["remote_host"]), "127.0.0.1"),
+		RemotePort:           firstNonEmpty(asString(transport["remote_port"]), firstNonEmpty(asString(transport["port"]), "9000")),
+		SendACK:              boolSetting(settings, "send_ack", true),
+		FrameTimeout:         time.Duration(intSetting(settings, "frame_timeout_ms", 2000)) * time.Millisecond,
+		ChecksumMode:         astmFrameChecksumMode(settings),
+		TrailerMode:          astmFrameTrailerMode(settings),
+		SampleIDPaths:        listSetting(settings, "sample_id_paths", []string{"O.3.1", "O.2.1"}),
+		SampleIDTrimLeft:     asString(settings["sample_id_trim_left"]),
+		SampleIDTrimRight:    asString(settings["sample_id_trim_right"]),
+		PatientIDPath:        listSetting(settings, "patient_id_paths", []string{"P.3.1", "P.2.1"}),
+		PatientName:          listSetting(settings, "patient_name_paths", []string{"P.5.1", "P.4.1"}),
+		RunDatePaths:         listSetting(settings, "run_date_paths", []string{"O.7.1", "O.6.1", "H.13.1"}),
+		ResultIDPaths:        listSetting(settings, "result_id_paths", []string{"R.2.4", "R.2.1"}),
+		ResultName:           listSetting(settings, "result_name_paths", []string{"R.2.4", "R.2.1"}),
+		ResultValue:          listSetting(settings, "result_value_paths", []string{"R.3.1"}),
+		ResultUnit:           listSetting(settings, "result_unit_paths", []string{"R.4.1"}),
+		ResultFlag:           listSetting(settings, "result_flag_paths", []string{"R.6.1", "R.8.1"}),
+		QCPrefixes:           listSetting(settings, "qc_prefixes", []string{"QC", "CTRL", "CONTROL"}),
+		AnalyteMap:           stringMapSetting(settings, "analyte_mappings"),
+		HostQuerySpecimen:    firstNonEmpty(asString(settings["specimen_code_default"]), "1"),
+		QueryReplyMode:       astmQueryReplyMode(settings),
+		QueryReplyTerminator: astmQueryReplyTerminator(settings),
+		QueryReplySequence:   astmQueryReplySequence(settings),
+		QueryReplyEOTOnSend:  astmQueryReplyEOTOnSend(settings),
 	}
+}
+
+func astmQueryReplyMode(settings map[string]interface{}) string {
+	switch strings.ToLower(strings.TrimSpace(asString(settings["query_reply_mode"]))) {
+	case "record_frames":
+		return "record_frames"
+	default:
+		return "full_package"
+	}
+}
+
+func astmQueryReplyTerminator(settings map[string]interface{}) string {
+	switch strings.ToLower(strings.TrimSpace(asString(settings["query_reply_record_terminator"]))) {
+	case "none":
+		return "none"
+	default:
+		return "cr"
+	}
+}
+
+func astmQueryReplyEOTOnSend(settings map[string]interface{}) bool {
+	if _, configured := settings["query_reply_eot_on_send"]; configured {
+		return boolSetting(settings, "query_reply_eot_on_send", true)
+	}
+	return astmQueryReplyMode(settings) == "full_package"
+}
+
+func astmQueryReplySequence(settings map[string]interface{}) bool {
+	if _, configured := settings["query_reply_include_sequence"]; configured {
+		return boolSetting(settings, "query_reply_include_sequence", true)
+	}
+	// Raw ASTM dialects such as MAGLUMI omit both the checksum/trailer and
+	// the frame sequence; keep existing deployed configurations compatible.
+	return astmFrameChecksumMode(settings) != "none" || astmFrameTrailerMode(settings) != "none"
 }
 
 func astmExpectedTrailerBytes(cfg tcpConfig) int {

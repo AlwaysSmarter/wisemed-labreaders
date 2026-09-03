@@ -72,6 +72,10 @@ modules:
     frame_timeout_ms: 2000
     checksum_mode: none
     trailer_mode: none
+    query_reply_mode: full_package
+    query_reply_record_terminator: cr
+    query_reply_include_sequence: false
+    query_reply_eot_on_send: true
     sample_id_paths: ["O.3.1", "O.2.1"]
     patient_id_paths: ["P.3.1", "P.2.1"]
     patient_name_paths: ["P.5.1", "P.4.1"]
