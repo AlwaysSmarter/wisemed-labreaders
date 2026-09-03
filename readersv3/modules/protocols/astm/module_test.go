@@ -11,6 +11,17 @@ func TestASTMExpectedTrailerBytes(t *testing.T) {
 	}
 }
 
+func TestQuerySampleIDAndSnibeReplyFraming(t *testing.T) {
+	records := parseRecords("H|\\^&||PSWD|Maglumi X3\rQ|1|^566639||ALL||||||||O\rL|1|N\r")
+	if got, want := querySampleID(records), "566639"; got != want {
+		t.Fatalf("query sample id = %q, want %q", got, want)
+	}
+	frame := buildOutgoingFrame("H|\\^&|||WISEMED", 1, tcpConfig{ChecksumMode: "none", TrailerMode: "none"})
+	if got, want := string(frame), "\x021H|\\^&|||WISEMED\x03"; got != want {
+		t.Fatalf("Snibe frame = %q, want %q", got, want)
+	}
+}
+
 func TestFormatASTMPackageTextKeepsRecordSeparatorsVisible(t *testing.T) {
 	payload := "H|\\^&\rP|1\nL|1|N\r"
 	if got, want := formatASTMPackageText(payload), `H|\^&\rP|1\nL|1|N\r`; got != want {

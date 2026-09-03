@@ -178,6 +178,7 @@ func parseDebugReplayScript(content string) ([]debugreplay.Step, error) {
 		}
 		startLine := i + 2
 		payloadLines := []string{}
+		writeBytewise := false
 		foundTerminator := false
 		for j := i + 1; j < len(lines); j++ {
 			line := lines[j]
@@ -185,19 +186,21 @@ func parseDebugReplayScript(content string) ([]debugreplay.Step, error) {
 			switch {
 			case trimmed == "<EOF>" || trimmed == "<==EOF>":
 				steps = append(steps, debugreplay.Step{
-					Index:      len(steps) + 1,
-					Line:       startLine,
-					Input:      debugreplay.DecodeTokens(strings.Join(payloadLines, "\n")),
-					Terminator: debugreplay.TerminatorEOF,
+					Index:         len(steps) + 1,
+					Line:          startLine,
+					Input:         debugreplay.DecodeTokens(strings.Join(payloadLines, "\n")),
+					Terminator:    debugreplay.TerminatorEOF,
+					WriteBytewise: writeBytewise,
 				})
 				i = j
 				foundTerminator = true
 			case trimmed == "<==EOT" || trimmed == "<==EOT>":
 				steps = append(steps, debugreplay.Step{
-					Index:      len(steps) + 1,
-					Line:       startLine,
-					Input:      debugreplay.DecodeTokens(strings.Join(payloadLines, "\n")),
-					Terminator: debugreplay.TerminatorEOT,
+					Index:         len(steps) + 1,
+					Line:          startLine,
+					Input:         debugreplay.DecodeTokens(strings.Join(payloadLines, "\n")),
+					Terminator:    debugreplay.TerminatorEOT,
+					WriteBytewise: writeBytewise,
 				})
 				i = j
 				foundTerminator = true
@@ -208,10 +211,15 @@ func parseDebugReplayScript(content string) ([]debugreplay.Step, error) {
 					Input:          debugreplay.DecodeTokens(strings.Join(payloadLines, "\n")),
 					ExpectedOutput: debugreplay.DecodeTokens(strings.TrimSpace(strings.TrimPrefix(trimmed, "<==OUT "))),
 					Terminator:     debugreplay.TerminatorOUT,
+					WriteBytewise:  writeBytewise,
 				})
 				i = j
 				foundTerminator = true
 			default:
+				if trimmed == "<BYTEWISE>" {
+					writeBytewise = true
+					continue
+				}
 				payloadLines = append(payloadLines, line)
 			}
 			if foundTerminator {

@@ -47,6 +47,15 @@ type importStore interface {
 	UpsertQCRecord(item coremodel.QCRecord) (coremodel.QCRecord, error)
 	UpsertQCAnalysis(item coremodel.QCAnalysis) (coremodel.QCAnalysis, error)
 	ReapplyQCTransformations(recordIDs []int64) error
+	ListOrders(roundNo int, orderDate string) ([]coremodel.Order, error)
+	ListOrderAnalyses(orderID int64) ([]coremodel.OrderAnalysis, error)
+	UpsertOrder(item coremodel.Order) (coremodel.Order, error)
+	SaveOrderAnalysis(item coremodel.OrderAnalysis) (coremodel.OrderAnalysis, error)
+}
+
+type wiseMEDLookup interface {
+	Settings() map[string]string
+	FetchFileForAnalyzer(fileID, equipmentID string) (map[string]interface{}, error)
 }
 
 type auditLogger interface {
@@ -83,6 +92,7 @@ type tcpConfig struct {
 	ResultFlag        []string
 	QCPrefixes        []string
 	AnalyteMap        map[string]string
+	HostQuerySpecimen string
 }
 
 type protocolStatus struct {
@@ -316,7 +326,7 @@ func (m *Module) RunDebugReplay(ctx context.Context, scriptName string, steps []
 			Passed:         true,
 		}
 		if len(step.Input) > 0 {
-			if _, err := client.Write(step.Input); err != nil {
+			if err := writeReplayInput(client, step.Input, step.WriteBytewise); err != nil {
 				stepResult.Passed = false
 				stepResult.Error = err.Error()
 			}
@@ -367,6 +377,19 @@ func (m *Module) RunDebugReplay(ctx context.Context, scriptName string, steps []
 	}
 	result.FinishedAt = time.Now().UTC()
 	return result, nil
+}
+
+func writeReplayInput(conn net.Conn, payload []byte, bytewise bool) error {
+	if !bytewise {
+		_, err := conn.Write(payload)
+		return err
+	}
+	for _, value := range payload {
+		if _, err := conn.Write([]byte{value}); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func readReplayOutput(conn net.Conn, startTimeout, quietWindow time.Duration) ([]byte, error) {
@@ -479,6 +502,8 @@ func (m *Module) handleConn(ctx context.Context, conn net.Conn, cfg tcpConfig, m
 	var frames []string
 	var rawLines []string
 	var lineBuf strings.Builder
+	var pendingReply [][]byte
+	replyActive := false
 	frameActive := false
 	frameEnded := false
 	frameTerminator := byte(0)
@@ -571,12 +596,40 @@ func (m *Module) handleConn(ctx context.Context, conn net.Conn, cfg tcpConfig, m
 			frameTrailer = frameTrailer[:0]
 		case ctrlEOT:
 			if len(frames) > 0 {
-				if err := m.processBatch(strings.Join(frames, ""), remote, cfg); err != nil {
+				payload := strings.Join(frames, "")
+				if sampleID := querySampleID(parseRecords(payload)); sampleID != "" {
+					// ASTM transfers change direction only after the analyzer's EOT.
+					// Send ENQ first so an API lookup cannot make the analyzer time out.
+					replyActive = true
+					_, _ = conn.Write([]byte{ctrlENQ})
+					m.tracePacket("out", "tcpip", remote+" ENQ query-reply", []byte{ctrlENQ})
+					pendingReply = m.hostQueryReply(sampleID, cfg)
+					m.logLevel1("astm query received sample_id=%s reply_frames=%d", sampleID, len(pendingReply))
+				} else if err := m.processBatch(payload, remote, cfg); err != nil {
 					m.setError(err)
 				}
 				frames = nil
 			}
 			resetFrame()
+		case ctrlACK:
+			if replyActive {
+				if len(pendingReply) == 0 {
+					_, _ = conn.Write([]byte{ctrlEOT})
+					m.tracePacket("out", "tcpip", remote+" EOT query-reply", []byte{ctrlEOT})
+					replyActive = false
+					continue
+				}
+				framePayload := pendingReply[0]
+				pendingReply = pendingReply[1:]
+				_, _ = conn.Write(framePayload)
+				m.tracePacket("out", "tcpip", remote+" query-reply frame", framePayload)
+			}
+		case ctrlNAK:
+			if replyActive {
+				m.rt.Logf("astm query reply rejected by analyzer remote=%s", remote)
+				replyActive = false
+				pendingReply = nil
+			}
 		case '\r', '\n':
 			line := strings.TrimSpace(lineBuf.String())
 			lineBuf.Reset()
@@ -824,6 +877,180 @@ func parseBatch(records []astmRecord, cfg tcpConfig) []astmResult {
 	return results
 }
 
+func querySampleID(records []astmRecord) string {
+	for _, record := range records {
+		if record.Type != "Q" || len(record.Fields) < 3 {
+			continue
+		}
+		for _, part := range strings.Split(record.Fields[2], "^") {
+			if sampleID := strings.TrimSpace(part); sampleID != "" {
+				return sampleID
+			}
+		}
+	}
+	return ""
+}
+
+// hostQueryReply starts a fresh ASTM ENQ/ACK exchange after a Q message arrives.
+func (m *Module) hostQueryReply(sampleID string, cfg tcpConfig) [][]byte {
+	order, analyses, found := m.findHostQueryOrder(sampleID, 7)
+	if !found || len(analyses) == 0 {
+		loadedOrder, loadedAnalyses, err := m.loadHostQueryOrder(sampleID)
+		if err != nil {
+			m.rt.Logf("astm query sample_id=%s WiseMED lookup failed: %v", sampleID, err)
+		} else {
+			order, analyses, found = loadedOrder, loadedAnalyses, true
+		}
+	}
+	if !found {
+		m.rt.Logf("astm query sample_id=%s: no order found; sending empty ASTM reply", sampleID)
+		return m.hostQueryFrames(sampleID, "", nil, cfg)
+	}
+	return m.hostQueryFrames(firstNonEmpty(order.SampleID, order.FileID, sampleID), order.PatientName, analyses, cfg)
+}
+
+func (m *Module) findHostQueryOrder(sampleID string, lookupDays int) (coremodel.Order, []coremodel.OrderAnalysis, bool) {
+	store := m.importStore()
+	if store == nil {
+		return coremodel.Order{}, nil, false
+	}
+	if lookupDays <= 0 {
+		lookupDays = 7
+	}
+	for offset := 0; offset < lookupDays; offset++ {
+		orders, err := store.ListOrders(0, time.Now().AddDate(0, 0, -offset).Format("2006-01-02"))
+		if err != nil {
+			continue
+		}
+		for _, order := range orders {
+			if sampleID != order.SampleID && sampleID != order.FileID && sampleID != order.PatientID {
+				continue
+			}
+			analyses, _ := store.ListOrderAnalyses(order.ID)
+			return order, analyses, true
+		}
+	}
+	return coremodel.Order{}, nil, false
+}
+
+func (m *Module) loadHostQueryOrder(sampleID string) (coremodel.Order, []coremodel.OrderAnalysis, error) {
+	store := m.importStore()
+	if store == nil {
+		return coremodel.Order{}, nil, errors.New("storage service unavailable")
+	}
+	service, ok := m.rt.Service("wisemed-api")
+	if !ok {
+		return coremodel.Order{}, nil, errors.New("wisemed api service unavailable")
+	}
+	wiseMED, ok := service.(wiseMEDLookup)
+	if !ok {
+		return coremodel.Order{}, nil, errors.New("wisemed api does not support file lookup")
+	}
+	equipmentID := strings.TrimSpace(wiseMED.Settings()["echipament_id"])
+	if equipmentID == "" {
+		return coremodel.Order{}, nil, errors.New("missing echipament_id in WiseMED settings")
+	}
+	response, err := wiseMED.FetchFileForAnalyzer(sampleID, equipmentID)
+	if err != nil {
+		return coremodel.Order{}, nil, fmt.Errorf("WiseMED file lookup failed: %w", err)
+	}
+	date := firstNonEmpty(valueString(response["o_file_date"]), time.Now().Format("2006-01-02"))
+	round, err := store.CurrentRoundNo(date)
+	if err != nil {
+		return coremodel.Order{}, nil, err
+	}
+	order, err := store.UpsertOrder(coremodel.Order{RoundNo: round, OrderDate: date, SampleID: sampleID, FileID: firstNonEmpty(valueString(response["o_file_id"]), sampleID), PatientID: valueString(response["o_patient_id"]), PatientName: valueString(response["o_patient_name"]), Status: "scheduled", SourceFile: "wisemed-host-query"})
+	if err != nil {
+		return coremodel.Order{}, nil, err
+	}
+	for _, test := range mapValues(response["o_tests"]) {
+		tag := strings.TrimSpace(valueString(test["t_tag"]))
+		if tag == "" {
+			continue
+		}
+		_, err := store.SaveOrderAnalysis(coremodel.OrderAnalysis{OrderID: order.ID, AnalyteTag: tag, AnalyteName: firstNonEmpty(valueString(test["t_name"]), tag), WiseMEDSMID: valueString(test["t_sm_id"]), WiseMEDFSMID: valueString(test["t_fsm_id"]), Status: "scheduled", SourceFile: "wisemed-host-query", Flags: map[string]interface{}{"analyzer_code": firstNonEmpty(valueString(test["t_code"]), tag)}})
+		if err != nil {
+			return coremodel.Order{}, nil, err
+		}
+	}
+	analyses, err := store.ListOrderAnalyses(order.ID)
+	if err != nil {
+		return coremodel.Order{}, nil, err
+	}
+	m.rt.Logf("astm query sample_id=%s: loaded WiseMED order id=%d tests=%d", sampleID, order.ID, len(analyses))
+	return order, analyses, nil
+}
+
+func (m *Module) hostQueryFrames(sampleID, patientName string, analyses []coremodel.OrderAnalysis, cfg tcpConfig) [][]byte {
+	codes := m.hostQueryCodes(analyses)
+	patientName = strings.ReplaceAll(strings.TrimSpace(patientName), " ", "^")
+	if patientName == "" {
+		patientName = sampleID
+	}
+	records := []string{"H|\\^&|||WISEMED|||||||P|E1394-97|" + time.Now().Format("20060102150405"), "P|1||" + sampleID + "||" + patientName}
+	if len(codes) > 0 {
+		fields := make([]string, 27)
+		fields[0], fields[1], fields[2] = "O", "1", sampleID
+		fields[4], fields[5], fields[7], fields[15], fields[25] = strings.Join(codes, "\\"), "R", time.Now().Format("20060102150405"), firstNonEmpty(cfg.HostQuerySpecimen, "1"), "O"
+		records = append(records, strings.Join(fields, "|"))
+	}
+	records = append(records, "L|1|N")
+	frames := make([][]byte, 0, len(records))
+	for index, record := range records {
+		frames = append(frames, buildOutgoingFrame(record, byte((index+1)%8), cfg))
+	}
+	return frames
+}
+
+func (m *Module) hostQueryCodes(analyses []coremodel.OrderAnalysis) []string {
+	analytes, _ := m.knownAnalytes()
+	seen, codes := map[string]bool{}, []string{}
+	for _, analysis := range analyses {
+		tag := strings.ToUpper(strings.TrimSpace(analysis.AnalyteTag))
+		code := firstNonEmpty(valueString(analysis.Flags["analyzer_code"]), analytes[tag].Code, analysis.AnalyteTag)
+		if code == "" || seen[code] {
+			continue
+		}
+		seen[code] = true
+		codes = append(codes, "^^^"+code)
+	}
+	return codes
+}
+
+func buildOutgoingFrame(record string, sequence byte, cfg tcpConfig) []byte {
+	payload := append([]byte{byte('0' + sequence)}, []byte(record)...)
+	frame := append([]byte{ctrlSTX}, payload...)
+	frame = append(frame, ctrlETX)
+	if cfg.ChecksumMode != "none" {
+		frame = append(frame, []byte(computeASTMChecksum(payload, ctrlETX))...)
+	}
+	if cfg.TrailerMode == "crlf" {
+		frame = append(frame, '\r', '\n')
+	}
+	return frame
+}
+
+func valueString(value interface{}) string {
+	if value == nil {
+		return ""
+	}
+	return strings.TrimSpace(fmt.Sprint(value))
+}
+
+func mapValues(value interface{}) []map[string]interface{} {
+	items, ok := value.([]interface{})
+	if !ok {
+		return nil
+	}
+	result := make([]map[string]interface{}, 0, len(items))
+	for _, item := range items {
+		if mapped, ok := item.(map[string]interface{}); ok {
+			result = append(result, mapped)
+		}
+	}
+	return result
+}
+
 func readFrame(r *bufio.Reader) (string, error) {
 	var payload []byte
 	for {
@@ -927,6 +1154,7 @@ func (m *Module) readConfig() tcpConfig {
 		ResultFlag:        listSetting(settings, "result_flag_paths", []string{"R.6.1", "R.8.1"}),
 		QCPrefixes:        listSetting(settings, "qc_prefixes", []string{"QC", "CTRL", "CONTROL"}),
 		AnalyteMap:        stringMapSetting(settings, "analyte_mappings"),
+		HostQuerySpecimen: firstNonEmpty(asString(settings["specimen_code_default"]), "1"),
 	}
 }
 

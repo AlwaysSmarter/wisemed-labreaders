@@ -22,6 +22,7 @@ type Step struct {
 	Input          []byte     `json:"-"`
 	ExpectedOutput []byte     `json:"-"`
 	Terminator     Terminator `json:"terminator"`
+	WriteBytewise  bool       `json:"write_bytewise,omitempty"`
 }
 
 type StepResult struct {

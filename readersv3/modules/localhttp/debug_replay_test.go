@@ -41,3 +41,13 @@ TEXT:
 		t.Fatalf("expected third terminator EOF, got %s", steps[2].Terminator)
 	}
 }
+
+func TestParseDebugReplayScriptBytewise(t *testing.T) {
+	steps, err := parseDebugReplayScript("TEXT:\n<BYTEWISE>\n<STX>Q|1|^566639<ETX>\n<==OUT <ACK>\n")
+	if err != nil {
+		t.Fatalf("parseDebugReplayScript returned error: %v", err)
+	}
+	if len(steps) != 1 || !steps[0].WriteBytewise {
+		t.Fatalf("bytewise replay step was not parsed: %#v", steps)
+	}
+}
