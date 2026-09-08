@@ -14,18 +14,24 @@ import (
 
 type fakeLegacyPad struct {
 	fakePad
-	events  chan padEvent
-	started chan struct{}
+	events    chan padEvent
+	started   chan struct{}
+	imageType string
+	points    signaturePoints
 }
 
 func (p *fakeLegacyPad) BeginLegacy(string) (<-chan padEvent, error) {
 	close(p.started)
 	return p.events, nil
 }
-func (p *fakeLegacyPad) SignData() ([]byte, error) { return []byte("vendor signature data"), nil }
+func (p *fakeLegacyPad) SigString() (string, error) { return "310D0A310D0A31302032300D0A300D0A", nil }
+func (p *fakeLegacyPad) ConfirmLegacy(imageType string) ([]byte, error) {
+	p.imageType = imageType
+	return p.Confirm()
+}
 
 func TestLegacyWiseMEDProtocol(t *testing.T) {
-	rt := &testRuntime{dir: t.TempDir(), mux: http.NewServeMux(), settings: map[string]interface{}{"sigenc_format": "signotec-sign-data-base64", "session_timeout_seconds": 2}}
+	rt := &testRuntime{dir: t.TempDir(), mux: http.NewServeMux(), settings: map[string]interface{}{"session_timeout_seconds": 2}}
 	m := &Module{}
 	if err := m.Init(rt); err != nil {
 		t.Fatal(err)
@@ -82,7 +88,10 @@ func TestLegacyWiseMEDProtocol(t *testing.T) {
 		if actual.String() != expected.String() {
 			t.Fatal("forevent changed", actual.String())
 		}
-		if reply.Data["sigbase64"] != base64.StdEncoding.EncodeToString([]byte("PNG bytes")) || reply.Data["sigenc"] != base64.StdEncoding.EncodeToString([]byte("vendor signature data")) {
+		if reply.Data["id"] != float64(1) {
+			t.Fatal("missing legacy id", reply)
+		}
+		if reply.Data["sigbase64"] != base64.StdEncoding.EncodeToString([]byte("PNG bytes")) || reply.Data["sigenc"] != "310D0A310D0A31302032300D0A300D0A" {
 			t.Fatal(reply)
 		}
 	case err := <-failures:
@@ -103,14 +112,16 @@ func TestLegacyWiseMEDProtocol(t *testing.T) {
 	}
 }
 
-func TestLegacySigencRequiresKnownFormat(t *testing.T) {
-	rt := &testRuntime{dir: t.TempDir(), mux: http.NewServeMux(), settings: map[string]interface{}{}}
+func (p *fakeLegacyPad) LastActivity() time.Time { return p.points.lastActivity() }
+
+func TestLegacyAutomaticConfirmAfterLastPoint(t *testing.T) {
+	rt := &testRuntime{dir: t.TempDir(), mux: http.NewServeMux(), settings: map[string]interface{}{"session_timeout_seconds": 20}}
 	m := &Module{}
-	m.Init(rt)
-	m.driverFactory = func(string) (padDriver, error) {
-		t.Error("must not start capture with unknown sigenc format")
-		return nil, nil
+	if err := m.Init(rt); err != nil {
+		t.Fatal(err)
 	}
+	pad := &fakeLegacyPad{fakePad: fakePad{closed: make(chan struct{})}, events: make(chan padEvent, 8), started: make(chan struct{})}
+	m.driverFactory = func(string) (padDriver, error) { return pad, nil }
 	server := httptest.NewServer(rt.mux)
 	defer server.Close()
 	conn, _, err := websocket.DefaultDialer.Dial("ws"+strings.TrimPrefix(server.URL, "http")+"/ws", nil)
@@ -118,13 +129,54 @@ func TestLegacySigencRequiresKnownFormat(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer conn.Close()
-	conn.WriteMessage(1, []byte(`{"cmd":"signpatient","sig_type":1,"pacient_id":"p1","nume_pacient":"Test"}`))
-	conn.SetReadDeadline(time.Now().Add(time.Second))
-	var response legacyResponse
-	if err := conn.ReadJSON(&response); err != nil {
-		t.Fatal(err)
+	conn.SetReadDeadline(time.Now().Add(15 * time.Second))
+	conn.WriteMessage(1, []byte(`{"cmd":"signpatient","sig_type":1,"pacient_id":"p1","nume_pacient":"Test","img_type":"jpg"}`))
+	select {
+	case <-pad.started:
+	case <-time.After(time.Second):
+		t.Fatal("capture did not start")
 	}
-	if response.Success || !strings.Contains(response.Error, "sigenc") {
-		t.Fatal(response)
+	replies := make(chan legacyResponse, 1)
+	failures := make(chan error, 1)
+	go func() {
+		var reply legacyResponse
+		if err := conn.ReadJSON(&reply); err != nil {
+			failures <- err
+		} else {
+			replies <- reply
+		}
+	}()
+	noReply := func(delay time.Duration) {
+		t.Helper()
+		select {
+		case reply := <-replies:
+			t.Fatal("premature completion", reply)
+		case err := <-failures:
+			t.Fatal(err)
+		case <-time.After(delay):
+		}
+	}
+	// An empty pad is never automatically confirmed.
+	noReply(legacyIdleDelay + 50*time.Millisecond)
+	pad.points.add(10, 20, 0)
+	pad.events <- padEvent{Action: "activity"}
+	noReply(1500 * time.Millisecond)
+	// Simulate a coalesced callback: the timer must check the latest point even
+	// without a second notification, rather than confirming after the first one.
+	pad.points.add(30, 40, 100)
+	noReply(1700 * time.Millisecond)
+	select {
+	case reply := <-replies:
+		if !reply.Success {
+			t.Fatal(reply)
+		}
+	case err := <-failures:
+		t.Fatal(err)
+	case <-time.After(2 * time.Second):
+		t.Fatal("automatic confirmation did not occur")
+	}
+	<-pad.closed
+	if pad.imageType != "jpg" {
+		t.Fatal("img_type ignored", pad.imageType)
 	}
 }

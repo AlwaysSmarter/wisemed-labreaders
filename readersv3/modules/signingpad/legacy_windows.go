@@ -5,11 +5,13 @@ import (
 	"golang.org/x/sys/windows"
 	"runtime"
 	"sync/atomic"
+	"time"
 	"unsafe"
 )
 
 type signotecEventSink struct {
 	events   chan padEvent
+	points   signaturePoints
 	hotspots map[int32]string
 }
 
@@ -23,6 +25,12 @@ var signotecCallback = windows.NewCallbackCDecl(func(event, data, size, custom u
 		return 0
 	}
 	action := ""
+	if event == 4 && data != 0 && size >= 16 {
+		point := *(*[4]int32)(unsafe.Pointer(data))
+		sink.points.add(point[0], point[1], point[2])
+		action = "activity"
+
+	}
 	if event == 0 {
 		action = "disconnect"
 	}
@@ -42,7 +50,7 @@ var signotecCallback = windows.NewCallbackCDecl(func(event, data, size, custom u
 })
 
 func (d *signotecDriver) legacyExports() error {
-	for _, name := range []string{"ControlSetCallback", "DisplayGetWidth", "DisplayGetHeight", "DisplaySetFont", "DisplaySetFontColor", "DisplaySetText", "SensorSetSignRect", "SensorClearHotSpots", "SensorAddHotSpot", "SignatureGetSignData"} {
+	for _, name := range []string{"ControlSetCallback", "DisplayGetWidth", "DisplayGetHeight", "DisplaySetFont", "DisplaySetFontColor", "DisplaySetText", "SensorSetSignRect", "SensorClearHotSpots", "SensorAddHotSpot"} {
 		if d.procs[name] != nil {
 			continue
 		}
@@ -131,22 +139,30 @@ func (d *signotecDriver) BeginLegacy(name string) (<-chan padEvent, error) {
 	}
 	return sink.events, nil
 }
-func (d *signotecDriver) SignData() ([]byte, error) {
-	var size int32
-	if _, err := d.call("SignatureGetSignData", 0, uintptr(unsafe.Pointer(&size))); err != nil {
-		return nil, err
+func (d *signotecDriver) SigString() (string, error) {
+	if d.eventSink == nil {
+		return "", fmt.Errorf("signature capture is not initialized")
 	}
-	if size <= 0 || size > 16*1024*1024 {
-		return nil, fmt.Errorf("invalid SignData size %d", size)
+	return d.eventSink.points.sigString()
+}
+func (d *signotecDriver) ConfirmLegacy(imageType string) ([]byte, error) {
+	fileType := uintptr(1)
+	switch imageType {
+	case "tiff":
+		fileType = 0
+	case "bmp":
+		fileType = 2
+	case "jpg":
+		fileType = 3
+	case "gif":
+		fileType = 4
 	}
-	data := make([]byte, int(size))
-	_, err := d.call("SignatureGetSignData", uintptr(unsafe.Pointer(&data[0])), uintptr(unsafe.Pointer(&size)))
-	runtime.KeepAlive(data)
-	if err != nil {
-		return nil, err
+	return d.confirmImage(500, 150, fileType, 8)
+}
+
+func (d *signotecDriver) LastActivity() time.Time {
+	if d.eventSink == nil {
+		return time.Time{}
 	}
-	if size <= 0 || int(size) > len(data) {
-		return nil, fmt.Errorf("invalid exported SignData size")
-	}
-	return data[:int(size)], nil
+	return d.eventSink.points.lastActivity()
 }

@@ -144,21 +144,30 @@ protocolul vechi cu `cmd`. Pagina HTTP de la rădăcină rămâne consola cu log
   `cnp_pacient` și orice alte câmpuri în `forevent`, fără conversia identificatorilor.
 - Nu există răspuns de succes intermediar: clientul salvează orice succes
   `signpatient` imediat în baza de date. Succesul final conține `data.sigbase64`
-  (PNG base64 fără prefix) și `data.sigenc`.
+  (base64 fără prefix), `data.sigenc` și `data.id: 1`. Imaginea este centrată,
+  500×150 pixeli; `img_type` acceptă tiff/gif/jpg/bmp, implicit PNG.
 - Pe pad se afișează numele și hotspot-uri Anulează / Reia / Confirmă; acestea
-  încheie captura fără comenzi suplimentare din JavaScript-ul WiseMED.
+  încheie captura fără comenzi suplimentare din JavaScript-ul WiseMED. După primul
+  punct, 3 secunde fără puncte noi declanșează aceeași confirmare automat. Reia
+  șterge punctele și oprește numărătoarea; o captură goală nu se confirmă automat.
 - Anularea, timeout-ul și erorile trimit `success:false` și `error`, fără salvare.
 - Conexiunea veche rămâne deschisă între semnări; timeout-ul se aplică doar capturii.
 - CNP-ul, numele și imaginea nu sunt scrise de server în istoricul operațiilor.
 
-**Compatibilitatea 100% a lui `sigenc` nu este încă demonstrată.** JavaScript-ul
-îl transmite opac drept `_s_sir_verificare`; nu conține algoritmul C# sau formatul.
-Implicit serverul refuză `signpatient` cu o eroare explicită până la confirmarea
-formatului, în loc să emită o valoare de verificare inventată. Există implementat
-exportul nativ Signotec SignData → base64, selectabil prin
-`modules.signing-pad.sigenc_format: signotec-sign-data-base64`, exclusiv dacă acesta
-este formatul confirmat al vechiului server. Dacă C# folosește altă criptare,
-serializare sau cheie, adaptorul trebuie completat după codul original.
+Formatul `sigenc` a fost identificat din proiectul `docs/WiseMEDeSIGNATURE`:
+`GetSigString()` Topaz, cu criptarea și compresia dezactivate, fără metadate opționale.
+Adaptorul convertește punctele Signotec în același format: hexazecimal uppercase al
+numărului de puncte, numărului de trasări, coordonatelor X/Y și offseturilor de început,
+separate prin CRLF. Presiunea zero Signotec marchează începutul unei trasări.
+Nu este Base64 al exportului Signotec SignData. Nu mai este necesară setarea
+`sigenc_format`; vechea blocare „original C# encoding must be confirmed” a fost eliminată.
+
+Fixture-ul Go a fost verificat cu DLL-ul **original** `SigPlusNET.dll`, atât prin
+`GetSigString()`, cât și prin import `SetSigString()` și reexport identic.
+Punctele și imaginile provin în continuare din Signotec; suportul hardware Topaz
+urmează separat. SDK-ul Signotec nu expune PenUp, astfel temporizarea se măsoară
+de la ultimul punct primit, nu de la un eveniment fizic de ridicare a pixului.
+
 Valoarea efectivă a `app_ws_esignature_url` nu a fost inclusă în sursa JS.
 
 Teste suplimentare:
@@ -170,5 +179,14 @@ go test -race ./modules/signingpad ./modules/localhttp
 
 Testele verifică folosirea răspunsului de către clientul JS original, lipsa unui
 ACK prematur de salvare, păstrarea `forevent`, retry/confirm, conexiunea persistentă,
-refuzul formatului `sigenc` necunoscut și protecția Settings/Demo fără login.
+confirmarea automată după ultimul punct, excluderea capturii goale, formatul
+Topaz și protecția Settings/Demo fără login.
 Butoanele fizice/virtuale pe pad și DLL-ul trebuie validate hardware pe Windows.
+
+Verificare reproductibilă cu DLL-ul furnizat (din rădăcina repository-ului, .NET 8):
+
+```sh
+dotnet run --project readersv3/apps/esignature-server/tests/sigstring-oracle -- docs/WiseMEDeSIGNATURE/SigPlusNET.dll readersv3/modules/signingpad/testdata/topaz-sigstring.json
+```
+
+Acest test nu deschide dispozitive și nu necesită instalarea Topaz în runtime.

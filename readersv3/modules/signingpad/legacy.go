@@ -11,11 +11,15 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+const legacyIdleDelay = 3 * time.Second
+
 type padEvent struct{ Action string }
 type legacyDriver interface {
 	padDriver
 	BeginLegacy(name string) (<-chan padEvent, error)
-	SignData() ([]byte, error)
+	SigString() (string, error)
+	LastActivity() time.Time
+	ConfirmLegacy(imageType string) ([]byte, error)
 }
 
 type legacyResponse struct {
@@ -82,7 +86,17 @@ func (m *Module) handleLegacyConnection(conn *websocket.Conn, first json.RawMess
 	var pending json.RawMessage
 	var timer *time.Timer
 	var timeout <-chan time.Time
+	var idleTimer *time.Timer
+	var idle <-chan time.Time
+	stopIdle := func() {
+		if idleTimer != nil {
+			idleTimer.Stop()
+		}
+		idleTimer = nil
+		idle = nil
+	}
 	cleanup := func() {
+		stopIdle()
 		if timer != nil {
 			timer.Stop()
 		}
@@ -120,11 +134,6 @@ func (m *Module) handleLegacyConnection(conn *websocket.Conn, first json.RawMess
 			if driver != nil {
 				return send(raw, nil, fmt.Errorf("a signature is already in progress"))
 			}
-			// The supplied JS does not define sigenc. Do not silently substitute a hash,
-			// empty string or unrelated biometric format for the C# verification data.
-			if asString(m.rt.ModuleSettings(m.ID())["sigenc_format"]) != "signotec-sign-data-base64" {
-				return send(raw, nil, fmt.Errorf("sigenc compatibility is not configured: the original C# encoding must be confirmed"))
-			}
 			if !m.deviceMu.TryLock() {
 				return send(raw, nil, fmt.Errorf("pad is busy in another session"))
 			}
@@ -159,8 +168,44 @@ func (m *Module) handleLegacyConnection(conn *websocket.Conn, first json.RawMess
 	if !process(first) {
 		return
 	}
+	finishCapture := func() bool {
+		image, err := driver.ConfirmLegacy(legacyImageType(pending))
+		var sigString string
+		if err == nil {
+			sigString, err = driver.SigString()
+		}
+		if err == nil && sigString == "" {
+			err = fmt.Errorf("empty signature verification data")
+		}
+		var data map[string]interface{}
+		if err == nil {
+			data = map[string]interface{}{"id": 1, "sigbase64": base64.StdEncoding.EncodeToString(image), "sigenc": sigString}
+		}
+		raw := pending
+		cleanup()
+		m.recordAction(padCommand{Action: "signpatient"}, map[string]interface{}{"ok": err == nil})
+		return send(raw, data, err)
+	}
 	for {
 		select {
+		case <-idle:
+			last := driver.LastActivity()
+			if last.IsZero() {
+				stopIdle()
+				continue
+			}
+			// Callback notifications are coalesced. A queued timer must consult the
+			// actual last point before confirming, even if the activity event is pending.
+			if remaining := legacyIdleDelay - time.Since(last); remaining > 0 {
+				stopIdle()
+				idleTimer = time.NewTimer(remaining)
+				idle = idleTimer.C
+				continue
+			}
+			if !finishCapture() {
+				return
+			}
+
 		case raw := <-incoming:
 			if !process(raw) {
 				return
@@ -170,22 +215,21 @@ func (m *Module) handleLegacyConnection(conn *websocket.Conn, first json.RawMess
 			var err error
 			switch event.Action {
 			case "retry":
+				stopIdle()
 				err = driver.Retry()
 				if err == nil {
 					continue
 				}
+			case "activity":
+				stopIdle()
+				idleTimer = time.NewTimer(legacyIdleDelay)
+				idle = idleTimer.C
+				continue
 			case "confirm":
-				var png, signData []byte
-				png, err = driver.Confirm()
-				if err == nil {
-					signData, err = driver.SignData()
+				if !finishCapture() {
+					return
 				}
-				if err == nil && len(signData) == 0 {
-					err = fmt.Errorf("empty signature verification data")
-				}
-				if err == nil {
-					data = map[string]interface{}{"sigbase64": base64.StdEncoding.EncodeToString(png), "sigenc": base64.StdEncoding.EncodeToString(signData)}
-				}
+				continue
 			case "cancel":
 				err = fmt.Errorf("signature cancelled")
 			case "disconnect":

@@ -15,7 +15,7 @@ vm.runInContext('addESIGLogMessage=function(){}; wmESIGConfigWebSocket(); wmESIG
 assert.equal(sent[0].cmd,'init');
 const request=sent[1];
 assert.equal(request.cmd,'signpatient');
-const response={success:true,forevent:request,data:{sigbase64:Buffer.from('PNG fixture').toString('base64'),sigenc:'fixture-verification-format'}};
+const response={success:true,forevent:request,data:{sigbase64:Buffer.from('PNG fixture').toString('base64'),id:1,sigenc:JSON.parse(fs.readFileSync(path.join(__dirname,'../../../modules/signingpad/testdata/topaz-sigstring.json'),'utf8')).sigenc}};
 context.reply=JSON.stringify(response);
 vm.runInContext('wmESIG.websocket.onmessage({data:reply});',context);
 assert.equal(saved.length,1);

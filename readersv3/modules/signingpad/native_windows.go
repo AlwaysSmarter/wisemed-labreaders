@@ -68,18 +68,27 @@ func (d *signotecDriver) Start() error {
 	_, err := d.call("SignatureStart")
 	return err
 }
-func (d *signotecDriver) Retry() error  { _, err := d.call("SignatureRetry"); return err }
+func (d *signotecDriver) Retry() error {
+	_, err := d.call("SignatureRetry")
+	if err == nil && d.eventSink != nil {
+		d.eventSink.points.reset()
+	}
+	return err
+}
 func (d *signotecDriver) Cancel() error { _, err := d.call("SignatureCancel", 0); return err }
 func (d *signotecDriver) Confirm() ([]byte, error) {
+	return d.confirmImage(0, 0, 1, 0)
+}
+func (d *signotecDriver) confirmImage(width, height, fileType, options uintptr) ([]byte, error) {
 	count, err := d.call("SignatureConfirm")
 	if err != nil {
 		return nil, err
 	}
-	if count <= int32(d.deviceIndex) {
+	if count <= 0 {
 		return nil, fmt.Errorf("signature is empty; start a new capture")
 	}
 	var size int32
-	_, err = d.call("SignatureSaveAsStreamEx", 0, uintptr(unsafe.Pointer(&size)), 150, 0, 0, 1, 0, 0, 0)
+	_, err = d.call("SignatureSaveAsStreamEx", 0, uintptr(unsafe.Pointer(&size)), 150, width, height, fileType, 0, 0, options)
 	if err != nil {
 		return nil, err
 	}
@@ -87,7 +96,7 @@ func (d *signotecDriver) Confirm() ([]byte, error) {
 		return nil, fmt.Errorf("invalid PNG size: %d", size)
 	}
 	data := make([]byte, int(size))
-	_, err = d.call("SignatureSaveAsStreamEx", uintptr(unsafe.Pointer(&data[0])), uintptr(unsafe.Pointer(&size)), 150, 0, 0, 1, 0, 0, 0)
+	_, err = d.call("SignatureSaveAsStreamEx", uintptr(unsafe.Pointer(&data[0])), uintptr(unsafe.Pointer(&size)), 150, width, height, fileType, 0, 0, options)
 	runtime.KeepAlive(data)
 	if err != nil {
 		return nil, err
