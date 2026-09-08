@@ -211,6 +211,9 @@ func (m *Module) Init(rt module.Runtime) error {
 	m.rt.RegisterService("daily-analysis-send-filters", m)
 	m.rt.AddMenu(module.MenuEntry{ID: "overview", Group: "core", Label: "Acasa", Path: "/", Order: 10})
 	m.rt.Handle("/", m.withNoCache(http.HandlerFunc(m.handleIndex)))
+	m.rt.Handle("/settings/pad", m.withNoCache(http.HandlerFunc(m.handleIndex)))
+	m.rt.Handle("/settings/demo", m.withNoCache(http.HandlerFunc(m.handleIndex)))
+	m.rt.Handle("/settings/reader", m.withNoCache(http.HandlerFunc(m.handleIndex)))
 	m.rt.Handle("/settings", m.withNoCache(http.HandlerFunc(m.handleIndex)))
 	m.rt.Handle("/orders", m.withNoCache(http.HandlerFunc(m.handleIndex)))
 	m.rt.Handle("/qc", m.withNoCache(http.HandlerFunc(m.handleIndex)))
@@ -527,6 +530,10 @@ func (m *Module) requestRestart(addr string, tls bool) {
 	}
 }
 
+func (m *Module) HasSession(r *http.Request) bool { _, ok := m.currentSession(r); return ok }
+
+func (m *Module) RequireSession(next http.Handler) http.Handler { return m.requireSession(next) }
+
 func (m *Module) requireSession(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, ok := m.currentSession(r)
@@ -539,16 +546,23 @@ func (m *Module) requireSession(next http.Handler) http.Handler {
 }
 
 func (m *Module) handleIndex(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path == "/" && m.analyzerSetting("protocol", "") == "signing-pad" {
-		http.Redirect(w, r, "/esignature", http.StatusTemporaryRedirect)
-		return
+	if r.URL.Path == "/" && strings.EqualFold(r.Header.Get("Upgrade"), "websocket") && m.analyzerSetting("protocol", "") == "signing-pad" {
+		if service, ok := m.rt.Service("signing-pad"); ok {
+			if handler, ok := service.(interface {
+				ServeWebSocket(http.ResponseWriter, *http.Request)
+			}); ok {
+				handler.ServeWebSocket(w, r)
+				return
+			}
+		}
 	}
+
 	if r.URL.Path == "/help" {
 		http.Redirect(w, r, "/help/", http.StatusTemporaryRedirect)
 		return
 	}
 	switch r.URL.Path {
-	case "/", "/daily-details", "/settings", "/settings/analytes", "/settings/qc", "/settings/daily-details", "/settings/daily-analysis-filters", "/orders", "/qc", "/debug":
+	case "/", "/daily-details", "/settings", "/settings/pad", "/settings/demo", "/settings/reader", "/settings/analytes", "/settings/qc", "/settings/daily-details", "/settings/daily-analysis-filters", "/orders", "/qc", "/debug":
 	default:
 		http.NotFound(w, r)
 		return

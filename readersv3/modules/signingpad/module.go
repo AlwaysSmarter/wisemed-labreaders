@@ -84,10 +84,28 @@ func (m *Module) Init(rt module.Runtime) error {
 		}
 	}
 	m.rt.Handle("/api/esignature/command", http.HandlerFunc(m.handleNativeCommand))
-	m.rt.Handle("/api/esignature/jobs", http.HandlerFunc(m.handleHistory))
-	m.rt.Handle("/api/esignature/stats/daily", http.HandlerFunc(m.handleStats))
+	historyHandler := http.Handler(http.HandlerFunc(m.handleHistory))
+	statsHandler := http.Handler(http.HandlerFunc(m.handleStats))
+	demoHandler := http.Handler(http.HandlerFunc(m.handleWebSocket))
 	m.rt.Handle("/ws", http.HandlerFunc(m.handleWebSocket))
-	m.rt.Handle("/api/esignature/settings", http.HandlerFunc(m.handlePadSettings))
+	settingsHandler := http.Handler(http.HandlerFunc(m.handlePadSettings))
+	if parseBool(asString(rt.ModuleSettings(m.ID())["shared_http"])) {
+		service, ok := rt.Service("local-http-control")
+		guard, valid := service.(interface {
+			RequireSession(http.Handler) http.Handler
+		})
+		if !ok || !valid {
+			return errors.New("signing-pad shared HTTP requires session authentication service")
+		}
+		settingsHandler = guard.RequireSession(settingsHandler)
+		historyHandler = guard.RequireSession(historyHandler)
+		statsHandler = guard.RequireSession(statsHandler)
+		demoHandler = guard.RequireSession(demoHandler)
+	}
+	m.rt.Handle("/api/esignature/settings", settingsHandler)
+	m.rt.Handle("/api/esignature/jobs", historyHandler)
+	m.rt.Handle("/api/esignature/stats/daily", statsHandler)
+	m.rt.Handle("/ws/demo", demoHandler)
 	m.rt.RegisterService("signing-pad", m)
 	if !parseBool(asString(rt.ModuleSettings(m.ID())["shared_http"])) {
 		m.rt.Handle("/", m.withCORS(http.HandlerFunc(m.handleIndex)))
@@ -169,6 +187,16 @@ func (m *Module) Start(ctx context.Context) error {
 }
 
 func (m *Module) handleIndex(w http.ResponseWriter, r *http.Request) {
+	if parseBool(asString(m.rt.ModuleSettings(m.ID())["shared_http"])) {
+		service, ok := m.rt.Service("local-http-control")
+		guard, valid := service.(interface{ HasSession(*http.Request) bool })
+		if !ok || !valid || !guard.HasSession(r) {
+			http.Redirect(w, r, "/", http.StatusSeeOther)
+			return
+		}
+		http.Redirect(w, r, "/settings/demo", http.StatusTemporaryRedirect)
+		return
+	}
 	if r.URL.Path != "/" && r.URL.Path != "/health" && r.URL.Path != "/esignature" {
 		http.NotFound(w, r)
 		return

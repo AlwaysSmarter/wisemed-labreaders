@@ -38,6 +38,11 @@ func (session *padSession) execute(cmd padCommand) map[string]interface{} {
 			} else {
 				path := m.rt.ResolvePath(firstNonEmpty(asString(m.rt.ModuleSettings(m.ID())["dll_path"]), "./signotec/STPadLib.dll"))
 				session.driver, commandErr = m.driverFactory(path)
+				if commandErr == nil {
+					if configurable, ok := session.driver.(interface{ SetDeviceIndex(int) }); ok {
+						configurable.SetDeviceIndex(m.padSettingsSnapshot().DeviceIndex)
+					}
+				}
 				if commandErr != nil {
 					m.deviceMu.Unlock()
 				}

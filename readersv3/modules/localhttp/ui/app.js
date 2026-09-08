@@ -852,6 +852,7 @@ const state = {
   statusPollTimer: null,
   toastTimer: null,
   barcodeMode: false,
+ signatureSocket: null,
   utilityMode: false,
   barcodeSettings: {},
   barcodePrinters: [],
@@ -1231,7 +1232,8 @@ function bindEvents() {
   els.closeAnalyteModalBtn.addEventListener("click", closeAnalyteModal);
   els.navLinks.forEach((link) => link.addEventListener("click", () => {
     if (link.dataset.view === "analytes") {
-      state.settingsSubView = "reader";
+      state.settingsSubView = isESignatureMode() ? "pad" : "reader";
+      if(isESignatureMode()) window.history.replaceState({},"","/settings/pad");
     }
     activateView(link.dataset.view);
   }));
@@ -1269,6 +1271,7 @@ function bindEvents() {
     }
   });
   window.addEventListener("popstate", () => {
+    if(isESignatureMode()) state.settingsSubView=settingsSubViewFromLocation();
     activateView(viewFromLocation(), false);
   });
 }
@@ -1331,6 +1334,10 @@ function setButtonLoading(button, loading) {
   button.removeAttribute("aria-busy");
 }
 
+function isESignatureMode() {
+ return state.readerInfo?.protocol === "signing-pad" || state.readerInfo?.id === "esignature-server";
+}
+
 function isBarcodeMode() {
   const code = String(state.readerInfo?.analyzer_code || "").toLowerCase();
   const readerID = String(state.readerInfo?.id || "").toLowerCase();
@@ -1353,6 +1360,7 @@ function barcodeNavButton(viewName) {
 }
 
 function applyBarcodeModeUI() {
+ if (isESignatureMode()) {state.utilityMode=true; applyESignatureUI(); return;}
   state.barcodeMode = isBarcodeMode();
   state.utilityMode = isUtilityMode();
   if (!state.utilityMode) return;
@@ -1400,7 +1408,9 @@ async function onLanguageChange(event) {
   syncLanguageControls();
   applyLanguage();
   if (!els.dashboardView.hidden) {
-    if (state.barcodeMode) {
+    if (isESignatureMode()) {
+      applyESignatureUI(); await Promise.all([loadStatus(), loadLogs(), loadDashboard()]);
+    } else if (state.barcodeMode) {
       await Promise.all([loadStatus(), loadLogs(), loadDashboard(), loadBarcodeSettingsView(), loadBarcodeHistory()]);
     } else if (state.utilityMode) {
       if (isDocsmartMode()) {
@@ -1452,6 +1462,7 @@ async function onLogin(event) {
 }
 
 async function onLogout() {
+ closeESignatureDemo();
   await api("/api/session/logout", { method: "POST" });
   state.session = null;
   state.orders = [];
@@ -1470,6 +1481,7 @@ async function onLogout() {
 }
 
 function showLogin() {
+ closeESignatureDemo();
   els.loginView.hidden = false;
   els.dashboardView.hidden = true;
   hideAppUpdateMessage();
@@ -1479,6 +1491,7 @@ function showLogin() {
   });
   syncLanguageControls();
   applyLanguage();
+ if(isESignatureMode()) {document.title="eSignature server";document.getElementById("login-title").textContent="eSignature server";}
 }
 
 async function renderLoginSetupPanel() {
@@ -1598,12 +1611,15 @@ async function mountDashboard(sessionResp) {
   state.debugEnabled = !!sessionResp.permissions?.can_debug_tests;
   syncDebugNavVisibility();
   syncOrderControls();
+  if(isESignatureMode()) applyESignatureUI();
   if (!state.barcodeMode) {
     activateSettingsSubView(state.settingsSubView || "reader");
   }
   renderRoundSelect();
   activateView(viewFromLocation(), false);
-  if (state.barcodeMode) {
+  if (isESignatureMode()) {
+    await Promise.all([loadStatus(), loadLogs(), loadDashboard()]);
+  } else if (state.barcodeMode) {
     await Promise.all([loadStatus(), loadLogs(), loadDashboard(), loadBarcodeSettingsView(), loadBarcodeHistory()]);
   } else if (state.utilityMode) {
     if (isDocsmartMode()) {
@@ -1801,6 +1817,7 @@ function onAppUpdateIndicatorClick(event) {
 }
 
 function activateView(name, pushHistory = true) {
+ if (isESignatureMode() && name !== "analytes") closeESignatureDemo();
   if (name === "help") {
     const helpTab = window.open("/help/", "_blank", "noopener");
     if (helpTab) helpTab.opener = null;
@@ -1812,7 +1829,7 @@ function activateView(name, pushHistory = true) {
   if (state.utilityMode && name === "qc") {
     name = "orders";
   }
-  if (name === "analytes") {
+  if (name === "analytes" && !isESignatureMode()) {
     state.settingsSubView = settingsSubViewFromLocation();
   }
   state.currentView = name;
@@ -1828,6 +1845,7 @@ function activateView(name, pushHistory = true) {
     }
   }
   if (name === "analytes") {
+    if (isESignatureMode()) {activateSettingsSubView(state.settingsSubView); return;}
     if (state.barcodeMode) {
       loadBarcodeSettingsView().catch(() => {});
     } else {
@@ -1845,6 +1863,7 @@ function activateView(name, pushHistory = true) {
     });
   }
   if (name === "orders") {
+    if (isESignatureMode()) {loadESignatureHistory().catch(error => showToast(error.message,"error")); return;}
     if (state.barcodeMode) {
       loadBarcodeHistory().catch(() => {});
     } else {
@@ -1860,6 +1879,11 @@ function activateView(name, pushHistory = true) {
 }
 
 function renderTopbarTitle() {
+ if(isESignatureMode()) {
+ const title=document.getElementById("dashboard-title");
+ if(title) title.textContent=state.currentView==="analytes" ? ({pad:"Setări PAD",demo:"Demo",reader:"Server și update-uri"}[state.settingsSubView] || "Settings") : state.currentView==="orders" ? "Istoric semnături" : "eSignature server";
+ return;
+ }
   const title = document.getElementById("dashboard-title");
   if (!title) return;
   if (state.barcodeMode) {
@@ -1906,6 +1930,7 @@ function renderTopbarTitle() {
 }
 
 function viewFromLocation() {
+ if(isESignatureMode() && window.location.pathname.startsWith("/settings")) return "analytes";
   const path = window.location.pathname || "/";
   if (state.barcodeMode) {
     if (path === "/settings" || path === "/settings/reader" || path === "/settings/analytes" || path === "/settings/qc") return "analytes";
@@ -1925,6 +1950,7 @@ function viewFromLocation() {
 }
 
 function settingsSubViewFromLocation() {
+ if(isESignatureMode()) {return window.location.pathname==="/settings/demo" ? "demo" : window.location.pathname==="/settings/reader" ? "reader" : "pad";}
   const path = window.location.pathname || "/";
   if (path === "/settings/reader" || path === "/settings") return "reader";
   if (path === "/settings/qc") return "qc";
@@ -1935,6 +1961,7 @@ function settingsSubViewFromLocation() {
 }
 
 function pathForView(name) {
+ if(isESignatureMode() && name==="analytes") return "/settings/"+(["pad","demo","reader"].includes(state.settingsSubView)?state.settingsSubView:"pad");
   if (state.barcodeMode) {
     if (name === "analytes") return "/settings";
     if (name === "daily-details") return "/daily-details";
@@ -1960,6 +1987,7 @@ function pathForView(name) {
 }
 
 function activateSettingsSubView(name) {
+ if(isESignatureMode()) {activateESignatureSettings(name);return;}
   if (state.barcodeMode) {
     state.settingsSubView = "reader";
     if (els.settingsPanelAnalytes) els.settingsPanelAnalytes.hidden = false;
@@ -2136,7 +2164,8 @@ async function loadStatus() {
   state.resultsDelivery = { ...(state.resultsDelivery || {}), ...(data.results_delivery || {}) };
   const connections = data.connections || {};
   updateConnectionPills(connections);
-  const cards = state.barcodeMode ? [
+ if(isESignatureMode()) applyESignatureUI();
+  const cards = isESignatureMode() ? [{label:"Utilitar",value:"eSignature server"},{label:"Comunicare",value:"HTTP / WSS"}] : state.barcodeMode ? [
     { label: "Tipariri", value: stats.orders ?? 0 },
     { label: "Etichete", value: stats.results ?? 0 },
     { label: t("events"), value: stats.events ?? 0 },
@@ -2158,6 +2187,14 @@ async function loadStatus() {
 }
 
 async function loadDashboard() {
+ if(isESignatureMode()) {
+ const data=await api("/api/esignature/stats/daily");
+ const rows=data.stats||[];const today=rows.find(row=>row.date===new Date().toISOString().slice(0,10))||{};
+ els.todayLegend.innerHTML=`<p>Semnături confirmate: ${Number(today.confirmed||0)}</p><p>Anulări: ${Number(today.cancelled||0)}</p><p>Erori: ${Number(today.failed||0)}</p>`;
+ els.todayDonut.style.background="#e8f0ed";
+ els.lineChart.innerHTML=""; els.lineLegend.textContent="Statistici operații de semnare (UTC)";
+ return;
+ }
   if (state.barcodeMode) {
     const today = localISODate();
     const resp = await api(`/api/barcode/stats/daily?date_from=${encodeURIComponent(today)}&date_to=${encodeURIComponent(today)}`);
@@ -3924,7 +3961,7 @@ async function onOrdersImportFileChange() {
     });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok || payload.ok === false) {
-      throw new Error(payload.error || `Request failed with ${response.status}`);
+      throw new Error(payload.error || payload.message || `Request failed with ${response.status}`);
     }
     showToast(buildImportMessage(payload, file.name), "success");
     await Promise.all([
@@ -5908,7 +5945,7 @@ async function api(url, options = {}) {
   });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok || payload.ok === false) {
-    throw new Error(payload.error || `Request failed with ${response.status}`);
+    throw new Error(payload.error || payload.message || `Request failed with ${response.status}`);
   }
   return payload;
 }
@@ -6335,4 +6372,98 @@ function escapeHtml(value) {
     .replaceAll(">", "&gt;")
     .replaceAll("\"", "&quot;")
     .replaceAll("'", "&#39;");
+}
+
+function applyESignatureUI() {
+  document.title='eSignature server';
+  for (const [id,text] of [['reader-eyebrow','UTILITAR'],['today-chart-title','Semnături astăzi'],['reader-summary-title','Rezumat utilitar'],['reader-identity-title','Semnătură electronică'],['reader-identity-icon','S']]) {const node=document.getElementById(id);if(node)node.textContent=text;}
+  for(const id of ['analyzer-pill','result-sync-pill']) {const node=document.getElementById(id);if(node)node.hidden=true;}
+
+  els.settingsSubmenu.hidden = false;
+  els.navSublinks.forEach(link => {
+    link.hidden = !['pad', 'demo', 'reader'].includes(link.dataset.settingsSubview);
+    if (link.dataset.settingsSubview === 'reader') link.textContent = 'Server și update-uri';
+  });
+  for (const view of ['daily-details', 'qc']) { const node = barcodeNavButton(view); if(node) node.hidden = true; }
+  const history = barcodeNavButton('orders'); if(history) history.textContent = 'Istoric';
+  for (const node of [els.importOrdersBtn, els.exportOrdersBtn, els.worklistOrdersBtn, els.newRoundBtn, els.ordersSelectAllBox, els.orderDate?.parentElement, els.roundSelect?.parentElement]) { if(node) node.hidden=true; }
+  if(els.qcSummary?.closest('.panel')) els.qcSummary.closest('.panel').hidden=true;
+  document.getElementById('orders-title').textContent='Istoric semnături';
+}
+function activateESignatureSettings(name) {
+  const next = ['pad','demo','reader'].includes(name) ? name : 'pad';
+  if(next !== 'demo') closeESignatureDemo();
+  state.settingsSubView=next;
+  for(const node of document.querySelectorAll('[id^="settings-panel-"]')) node.hidden=true;
+  const panel=document.getElementById('settings-panel-esignature');
+  if(next==='reader') { els.settingsPanelReader.hidden=false; loadReaderSettings().catch(error=>showToast(error.message,'error')); }
+  else { panel.hidden=false; renderESignaturePanel(next).catch(error=>{panel.textContent=error.message;}); }
+  els.navSublinks.forEach(link=>link.classList.toggle('active',link.dataset.settingsSubview===next));
+  if(!els.views.analytes.hidden) { window.history.replaceState({view:'analytes'},'',pathForView('analytes')); renderTopbarTitle(); }
+}
+async function renderESignaturePanel(view) {
+  const panel=document.getElementById('settings-panel-esignature');
+  if(view==='demo') {
+    if(state.signatureSocket && panel.querySelector('#esignature-demo-status')) return;
+    panel.innerHTML=`<div class="panel-head"><h3>Demo semnătură</h3></div><p>Detectează pad-ul, începe captura și semnează pe dispozitiv. Confirmă pentru a vedea imaginea.</p>
+      <div class="orders-buttons">${[['devices','Detectează PAD'],['start','Începe'],['retry','Reia'],['confirm','Confirmă'],['cancel','Anulează']].map(([action,label])=>`<button class="ghost" type="button" data-signature-action="${action}">${label}</button>`).join('')}</div>
+      <p id="esignature-demo-status" role="status" aria-live="polite">Pregătit pentru test.</p><img id="esignature-demo-image" alt="Semnătura capturată" hidden style="max-width:100%;background:white">`;
+    panel.querySelectorAll('[data-signature-action]').forEach(button=>button.onclick=()=>sendESignatureDemo(button.dataset.signatureAction));
+    return;
+  }
+  const settings=await api('/api/esignature/settings');
+  if(state.settingsSubView!=='pad') return;
+  const modelOptions=['','Evolis Sig200','Signotec Omega'];
+  if(settings.model && !modelOptions.includes(settings.model)) modelOptions.push(settings.model);
+  panel.innerHTML=`<div class="panel-head"><h3>Setări PAD</h3></div>
+    <form id="esignature-settings-form" class="barcode-settings-grid">
+      <label>Firma producătoare<select name="manufacturer"><option value="signotec">Signotec</option></select></label>
+      <label>Tip PAD<select name="pad_type"><option value="omega">Omega</option></select></label>
+      <label>Model<select name="model">${modelOptions.map(model=>`<option value="${escapeHtml(model)}" ${settings.model===model?'selected':''}>${escapeHtml(model||'Nespecificat')}</option>`).join('')}</select></label>
+      <label>Conectare<input value="USB (HID / WinUSB)" readonly></label>
+      <label>Index dispozitiv<input name="device_index" type="number" min="0" max="31" value="${Number(settings.device_index||0)}" required><span class="small muted">0 = primul pad detectat</span></label>
+      <label>Durata maximă a sesiunii (secunde)<input name="session_timeout_seconds" type="number" min="1" max="600" value="${Number(settings.session_timeout_seconds||180)}" required></label>
+      <div class="orders-buttons"><button class="ghost" type="submit">Salvează</button></div><p id="esignature-save-status" role="status"></p>
+    </form>`;
+  const form=panel.querySelector('form');
+  form.elements.manufacturer.onchange=()=>{form.elements.pad_type.value='omega';form.elements.model.value='';};
+  form.elements.pad_type.onchange=()=>{form.elements.model.value='';};
+  form.onsubmit=async event=>{
+    event.preventDefault(); const button=form.querySelector('button');button.disabled=true;
+    const data=Object.fromEntries(new FormData(form));data.device_index=Number(data.device_index);data.session_timeout_seconds=Number(data.session_timeout_seconds);
+    try {await api('/api/esignature/settings',{method:'PUT',body:JSON.stringify(data)});panel.querySelector('#esignature-save-status').textContent='Salvat. Setările se aplică sesiunilor noi.';}
+    catch(error){panel.querySelector('#esignature-save-status').textContent=error.message;}
+    finally{button.disabled=false;}
+  };
+}
+function closeESignatureDemo() {
+  const socket=state.signatureSocket;state.signatureSocket=null;
+  if(socket) socket.close();
+  const image=document.getElementById('esignature-demo-image');if(image){image.hidden=true;image.removeAttribute('src');}
+}
+function sendESignatureDemo(action) {
+  const panel=document.getElementById('settings-panel-esignature');
+  const status=panel.querySelector('#esignature-demo-status');
+  if(!status || !state.session) return;
+  const buttons=[...panel.querySelectorAll('[data-signature-action]')];buttons.forEach(button=>button.disabled=true);
+  const send=socket=>{
+    if(['start','retry','cancel'].includes(action)){const image=panel.querySelector('img');image.hidden=true;image.removeAttribute('src');}
+    socket.send(JSON.stringify({id:String(Date.now()),action}));status.textContent='Se execută comanda…';
+  };
+  if(state.signatureSocket?.readyState===WebSocket.OPEN){send(state.signatureSocket);return;}
+  const socket=new WebSocket(`${location.protocol==='https:'?'wss:':'ws:'}//${location.host}/ws/demo`);
+  state.signatureSocket=socket;
+  socket.onopen=()=>{if(state.signatureSocket===socket)send(socket);else socket.close();};
+  socket.onmessage=event=>{
+    if(state.signatureSocket!==socket)return;
+    const data=JSON.parse(event.data);buttons.forEach(button=>button.disabled=false);
+    status.textContent=data.ok ? (data.count!==undefined?`Pad-uri detectate: ${data.count}`:({start:'Semnează pe pad, apoi apasă Confirmă.',retry:'Semnează din nou.',confirm:'Semnătură capturată.',cancel:'Captură anulată.'}[data.action]||'Comandă executată.')) : data.message;
+    if(data.imageBase64){const image=panel.querySelector('img');image.src=`data:image/png;base64,${data.imageBase64}`;image.hidden=false;}
+  };
+  socket.onerror=()=>{status.textContent='Conexiunea cu serviciul nu a reușit.';};
+  socket.onclose=()=>{buttons.forEach(button=>button.disabled=false);if(state.signatureSocket===socket){state.signatureSocket=null;status.textContent='Sesiune închisă. Poți începe un test nou.';}};
+}
+async function loadESignatureHistory() {
+  const data=await api('/api/esignature/jobs');
+  els.ordersLayout.innerHTML=`<div class="table-wrap"><table class="data-table"><thead><tr><th>Data (UTC)</th><th>Operație</th><th>Rezultat</th><th>Mesaj</th></tr></thead><tbody>${(data.jobs||[]).map(row=>`<tr><td>${escapeHtml(row.created_at)}</td><td>${escapeHtml(row.action)}</td><td>${row.ok?'OK':'Eroare'}</td><td>${escapeHtml(row.message||'')}</td></tr>`).join('')}</tbody></table></div>`;
 }

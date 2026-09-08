@@ -73,12 +73,15 @@
           <button class="nav-link" data-view="qc" data-i18n="nav_qc">QC</button>
           <button class="nav-link" data-view="analytes" data-i18n="nav_settings">Settings</button>
           <div class="nav-submenu" id="settings-submenu">
+
             <button class="nav-sublink" data-view="analytes" data-settings-subview="reader" data-i18n="settings_reader">Setari reader</button>
             <button class="nav-sublink" data-view="analytes" data-settings-subview="analytes" data-i18n="settings_analytes">Analize</button>
             <button class="nav-sublink" data-view="analytes" data-settings-subview="daily-details" data-i18n="settings_daily_details">Detalii zilnice</button>
             <button class="nav-sublink" data-view="analytes" data-settings-subview="daily-analysis-filters">Filtre blocare analize</button>
             <button class="nav-sublink" data-view="analytes" data-settings-subview="qc" data-i18n="settings_qc">Setari QC</button>
             <button id="astm-specimen-settings-link" class="nav-sublink" data-view="analytes" data-settings-subview="astm-specimens" hidden>ASTM - Tipuri probe</button>
+ <button class="nav-sublink" data-view="analytes" data-settings-subview="pad" hidden>Setări PAD</button>
+ <button class="nav-sublink" data-view="analytes" data-settings-subview="demo" hidden>Demo</button>
           </div>
           <button id="debug-nav-link" class="nav-link" data-view="debug" data-i18n="nav_debug" hidden>Debug</button>
           <button class="nav-link" data-view="help" data-i18n="nav_help">Help</button>
@@ -170,6 +173,7 @@
           </article>
         </section>
         <section id="view-analytes" class="panel-grid" hidden>
+          <article id="settings-panel-esignature" class="panel full-span" hidden></article>
           <article id="settings-panel-reader" class="panel full-span">
             <div class="panel-head">
               <h3 id="reader-settings-title">Setari reader</h3>

@@ -49,3 +49,4 @@ modules:
     model: Evolis Sig200
     dll_path: ./signotec/STPadLib.dll
     session_timeout_seconds: 180
+    device_index: 0

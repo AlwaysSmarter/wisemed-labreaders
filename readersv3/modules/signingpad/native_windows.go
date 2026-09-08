@@ -8,9 +8,11 @@ import (
 )
 
 type signotecDriver struct {
-	dll    *windows.DLL
-	procs  map[string]*windows.Proc
-	opened bool
+	dll         *windows.DLL
+	procs       map[string]*windows.Proc
+	opened      bool
+	deviceIndex int
+	eventSink   *signotecEventSink
 }
 
 func openNative(path string) (padDriver, error) {
@@ -43,19 +45,25 @@ func (d *signotecDriver) call(name string, args ...uintptr) (int32, error) {
 	return result, nil
 }
 func (d *signotecDriver) Count() (int32, error) { return d.call("DeviceGetCount") }
-func (d *signotecDriver) Start() error {
+func (d *signotecDriver) openDevice() error {
 	if !d.opened {
 		count, err := d.Count()
 		if err != nil {
 			return err
 		}
-		if count == 0 {
-			return fmt.Errorf("no Signotec USB pad detected")
+		if count <= int32(d.deviceIndex) {
+			return fmt.Errorf("configured pad index %d is unavailable; detected %d Signotec USB pads", d.deviceIndex, count)
 		}
-		if _, err := d.call("DeviceOpen", 0, 1); err != nil {
+		if _, err := d.call("DeviceOpen", uintptr(d.deviceIndex), 1); err != nil {
 			return err
 		}
 		d.opened = true
+	}
+	return nil
+}
+func (d *signotecDriver) Start() error {
+	if err := d.openDevice(); err != nil {
+		return err
 	}
 	_, err := d.call("SignatureStart")
 	return err
@@ -67,7 +75,7 @@ func (d *signotecDriver) Confirm() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	if count == 0 {
+	if count <= int32(d.deviceIndex) {
 		return nil, fmt.Errorf("signature is empty; start a new capture")
 	}
 	var size int32
@@ -90,9 +98,15 @@ func (d *signotecDriver) Confirm() ([]byte, error) {
 	return data[:int(size)], nil
 }
 func (d *signotecDriver) Close() {
+	if d.eventSink != nil {
+		signotecCallbackSink.CompareAndSwap(d.eventSink, nil)
+		d.procs["ControlSetCallback"].Call(0, 0)
+	}
 	if d.opened {
-		d.call("DeviceClose", 0)
+		d.call("DeviceClose", uintptr(d.deviceIndex))
 	}
 	d.procs["ControlExit"].Call()
 	d.dll.Release()
 }
+
+func (d *signotecDriver) SetDeviceIndex(index int) { d.deviceIndex = index }

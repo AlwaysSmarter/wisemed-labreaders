@@ -34,7 +34,8 @@ livrează: configurația de lucru, certificatele, istoricul și logurile rămân
 ## Pornire și administrare
 
 Porniți `esignature-server.exe` din directorul runtime. Pagina de test:
-`https://localhost:19111/esignature`, administrare: `/settings`, diagnostic:
+`https://localhost:19111/settings/demo`, disponibilă după login; setări PAD:
+`/settings/pad`, server și update-uri: `/settings/reader`, diagnostic:
 `/debug`, ajutor: `/help/`. Sunt comune cu barcodeprinter: serverul local-http,
 certificatele/CA Windows, autentificarea WiseMED, setările de server și update,
 help, evenimente, logurile și ciclul de serviciu/restart.
@@ -97,7 +98,11 @@ este disponibil prin dispecerul WiseMED cu acțiunile `esignature.health`,
 pierderea conexiunii HTTP/WiseMED nu închide instantaneu sesiunea: folosiți cancel,
 altfel o eliberează timeout-ul absolut.
 
-Setări pad: `GET/POST/PUT /api/esignature/settings`.
+Setări pad (autentificare obligatorie): `GET/POST/PUT /api/esignature/settings`.
+`/esignature` redirecționează la login pentru vizitatori și la Settings → Demo
+pentru utilizatori autentificați. Demo folosește `/ws/demo`, care verifică sesiunea
+la handshake; logout-ul și părăsirea demo-ului închid captura. Indexul pad-ului
+(`device_index`, 0–31) și timeout-ul (1–600 secunde) se aplică sesiunilor noi.
 Istoric (ultimele 100 operații): `GET /api/esignature/jobs`.
 Statistici UTC (ultimele 30 zile cu activitate): `GET /api/esignature/stats/daily`.
 
@@ -115,8 +120,8 @@ Statistici UTC (ultimele 30 zile cu activitate): `GET /api/esignature/stats/dail
 | Test dispozitiv, istoric și statistici | Captură PNG, istoric operații și statistici confirmări |
 
 ZPL, imprimante și profile poștale rămân funcții exclusiv barcodeprinter.
-Captura Signotec nu implementează încă butoane desenate pe pad, previzualizare
-live sau compatibilitate cu JSON-ul serverului vendor. DLL-ul Windows nu poate
+Captura Signotec nu implementează încă previzualizare live sau protocolul JSON
+al serverului vendor Signotec. Protocolul WiseMED/C# este descris mai jos. DLL-ul Windows nu poate
 fi folosit pentru USB din macOS/Linux.
 
 Teste: `go test -race ./modules/signingpad ./modules/localhttp ./shared/localtls
@@ -126,3 +131,44 @@ verifică WSS/TLS, concurența local/remote, timeout-ul, istoricul și maparea d
 Captura fizică, instalarea/rularea serviciului pe Windows și login-ul cu cont real
 rămân teste pe mediul țintă. NSIS local macOS 3.12 se prăbușește cu std::bad_alloc
 inclusiv pe un installer gol; generarea executabilului installer nu a fost validată.
+
+
+## Compatibilitate cu JavaScript-ul WiseMED/C# furnizat
+
+Sursa nemodificată a clientului este în `docs/wisemed-client.js`. Serverul acceptă
+pe `/ws` și la rădăcină (upgrade WebSocket) atât protocolul nou cu `action`, cât și
+protocolul vechi cu `cmd`. Pagina HTTP de la rădăcină rămâne consola cu login.
+
+- `{"cmd":"init"}` primește `{ "success": true, "forevent": <cererea originală>, "data": {...} }`.
+- `signpatient` păstrează integral `cmd`, `sig_type`, `pacient_id`, `nume_pacient`,
+  `cnp_pacient` și orice alte câmpuri în `forevent`, fără conversia identificatorilor.
+- Nu există răspuns de succes intermediar: clientul salvează orice succes
+  `signpatient` imediat în baza de date. Succesul final conține `data.sigbase64`
+  (PNG base64 fără prefix) și `data.sigenc`.
+- Pe pad se afișează numele și hotspot-uri Anulează / Reia / Confirmă; acestea
+  încheie captura fără comenzi suplimentare din JavaScript-ul WiseMED.
+- Anularea, timeout-ul și erorile trimit `success:false` și `error`, fără salvare.
+- Conexiunea veche rămâne deschisă între semnări; timeout-ul se aplică doar capturii.
+- CNP-ul, numele și imaginea nu sunt scrise de server în istoricul operațiilor.
+
+**Compatibilitatea 100% a lui `sigenc` nu este încă demonstrată.** JavaScript-ul
+îl transmite opac drept `_s_sir_verificare`; nu conține algoritmul C# sau formatul.
+Implicit serverul refuză `signpatient` cu o eroare explicită până la confirmarea
+formatului, în loc să emită o valoare de verificare inventată. Există implementat
+exportul nativ Signotec SignData → base64, selectabil prin
+`modules.signing-pad.sigenc_format: signotec-sign-data-base64`, exclusiv dacă acesta
+este formatul confirmat al vechiului server. Dacă C# folosește altă criptare,
+serializare sau cheie, adaptorul trebuie completat după codul original.
+Valoarea efectivă a `app_ws_esignature_url` nu a fost inclusă în sursa JS.
+
+Teste suplimentare:
+
+```sh
+node apps/esignature-server/tests/wisemed-client.test.cjs
+go test -race ./modules/signingpad ./modules/localhttp
+```
+
+Testele verifică folosirea răspunsului de către clientul JS original, lipsa unui
+ACK prematur de salvare, păstrarea `forevent`, retry/confirm, conexiunea persistentă,
+refuzul formatului `sigenc` necunoscut și protecția Settings/Demo fără login.
+Butoanele fizice/virtuale pe pad și DLL-ul trebuie validate hardware pe Windows.

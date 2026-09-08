@@ -17,7 +17,7 @@ type remoteSession struct {
 }
 
 func (m *Module) sessionTimeout() time.Duration {
-	timeout := time.Duration(intSetting(m.rt.ModuleSettings(m.ID()), "session_timeout_seconds", 180)) * time.Second
+	timeout := time.Duration(m.padSettingsSnapshot().TimeoutSeconds) * time.Second
 	if timeout < time.Second || timeout > 10*time.Minute {
 		return 180 * time.Second
 	}
