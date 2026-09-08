@@ -1,0 +1,101 @@
+[Version]
+Signature = "$Windows NT$"
+Class = USB
+ClassGUID = {36FC9E60-C465-11CF-8056-444553540000}
+Provider = %ProviderName%
+DriverPackageDisplayName = %Product%
+DriverVer = 02/22/2017,1.3.0.0
+CatalogFile = SigPad.cat
+
+; ========== Manufacturer/Models sections ===========
+
+[Manufacturer]
+%ProviderName% = DeviceInstall,NTx86,NTamd64
+
+[DeviceInstall.NTx86]
+%Product1% = DDInstall, USB\VID_2133&PID_001F&MI_01
+%Product2% = DDInstall, USB\VID_2133&PID_000F
+%Product3% = DDInstall, USB\VID_2133&PID_0015
+%Product4% = DDInstall, USB\VID_2133&PID_000B&REV_0002
+
+[DeviceInstall.NTamd64]
+%Product1% = DDInstall, USB\VID_2133&PID_001F&MI_01
+%Product2% = DDInstall, USB\VID_2133&PID_000F
+%Product3% = DDInstall, USB\VID_2133&PID_0015
+%Product4% = DDInstall, USB\VID_2133&PID_000B&REV_0002
+
+; =================== Installation ===================
+
+[DDInstall]
+Include=winusb.inf
+Needs=WINUSB.NT
+
+[DDInstall.Services]
+Include=winusb.inf
+AddService=WinUSB,0x00000002,WinUSB_ServiceInstall
+
+[WinUSB_ServiceInstall]
+DisplayName     = %WinUSB_SvcDesc%
+ServiceType     = 1
+StartType       = 3
+ErrorControl    = 1
+ServiceBinary   = %12%\WinUSB.sys
+
+[DDInstall.Wdf]
+KmdfService=WINUSB, WinUsb_Install
+UmdfServiceOrder=WINUSB
+
+[WinUSB_Install]
+KmdfLibraryVersion=1.9
+
+[DDInstall.HW]
+AddReg=Dev_AddReg
+
+[Dev_AddReg]
+HKR,,DeviceInterfaceGUIDs,0x10000,"{4d51d267-ef80-4593-b78c-55d9316afdb5}"
+
+[DDInstall.CoInstallers]
+AddReg=CoInstallers_AddReg
+CopyFiles=CoInstallers_CopyFiles
+
+[CoInstallers_AddReg]
+HKR,,CoInstallers32,0x00010000,"WinUSBCoInstaller2.dll","WUDFUpdate_01009.dll","WdfCoInstaller01009.dll,WdfCoInstaller"
+
+[CoInstallers_CopyFiles]
+WinUSBCoInstaller2.dll
+WdfCoInstaller01009.dll
+WUDFUpdate_01009.dll
+
+[DestinationDirs]
+CoInstallers_CopyFiles=11
+
+; ================= Source Media Section =====================
+
+[SourceDisksNames.x86]
+1 = %DISK_NAME%,,,\x86
+
+[SourceDisksNames.amd64]
+2 = %DISK_NAME%,,,\amd64
+
+[SourceDisksFiles.x86]
+WinUSBCoInstaller2.dll=1
+WdfCoInstaller01009.dll=1
+WUDFUpdate_01009.dll=1
+
+[SourceDisksFiles.amd64]
+WinUSBCoInstaller2.dll=2
+WdfCoInstaller01009.dll=2
+WUDFUpdate_01009.dll=2
+
+; =================== Strings ===================
+
+[Strings]
+ProviderName="signotec GmbH"
+Product="signotec LCD Signature Pads"
+Product1="signotec LCD Signature Pad Alpha"
+Product2="signotec LCD Signature Pad Gamma"
+Product3="signotec LCD Signature Pad Delta"
+Product4="signotec LCD Signature Pad Omega"
+WinUSB_SvcDesc="signotec LCD Signature Pads"
+DISK_NAME="Driver Disk"
+

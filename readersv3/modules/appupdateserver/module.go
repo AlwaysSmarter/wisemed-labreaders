@@ -1707,6 +1707,8 @@ func isSupportedReleaseTarget(osName, arch string) bool {
 		return false
 	}
 	switch arch {
+	case "386":
+		return osName == "windows"
 	case "amd64", "arm64":
 		return true
 	default:

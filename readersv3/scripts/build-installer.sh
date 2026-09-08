@@ -22,6 +22,7 @@ INSTALL_DIR_NAME=""
 BINARY_NAME=""
 VERSION=""
 ICON_PATH=""
+APP_ARCH="amd64"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -32,6 +33,7 @@ while [[ $# -gt 0 ]]; do
     --install-dir-name) INSTALL_DIR_NAME="$2"; shift 2 ;;
     --binary-name) BINARY_NAME="$2"; shift 2 ;;
     --version) VERSION="$2"; shift 2 ;;
+    --arch) APP_ARCH="$2"; shift 2 ;;
     --icon) ICON_PATH="$2"; shift 2 ;;
     *) printf 'unknown argument: %s\n' "$1" >&2; exit 1 ;;
   esac
@@ -96,6 +98,7 @@ log "payload inclus in installer:"
 find "${PAYLOAD_DIR}" -type f | sort | sed 's#^#  - #'
 
 cat > "${WRAPPER_SCRIPT}" <<EOF
+!define APP_ARCH "${APP_ARCH}"
 !define APP_NAME "${APP_NAME}"
 !define APP_VERSION "${VERSION}"
 !define APP_BINARY_NAME "${BINARY_NAME}"

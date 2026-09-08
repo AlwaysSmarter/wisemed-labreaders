@@ -31,7 +31,14 @@ ShowUninstDetails show
 Name "${APP_NAME}"
 Caption "${APP_NAME} ${APP_VERSION} Setup"
 OutFile "${OUTPUT_EXE}"
-InstallDir "$PROGRAMFILES64\${APP_INSTALL_DIR_NAME}"
+!ifndef APP_ARCH
+  !define APP_ARCH "amd64"
+!endif
+!if "${APP_ARCH}" == "386"
+  InstallDir "$PROGRAMFILES\${APP_INSTALL_DIR_NAME}"
+!else
+  InstallDir "$PROGRAMFILES64\${APP_INSTALL_DIR_NAME}"
+!endif
 InstallDirRegKey HKLM "Software\WiseMED\${APP_INSTALL_DIR_NAME}" "InstallDir"
 
 Page directory

@@ -80,6 +80,7 @@ type targetInfo struct {
 }
 
 var targetMatrix = map[string]targetInfo{
+	"windows-386":   {GOOS: "windows", GOARCH: "386"},
 	"windows-amd64": {GOOS: "windows", GOARCH: "amd64"},
 	"windows-arm64": {GOOS: "windows", GOARCH: "arm64"},
 	"linux-amd64":   {GOOS: "linux", GOARCH: "amd64"},
@@ -227,7 +228,17 @@ func runBuildAll(root string, args []string) error {
 	}
 	targets := sortedTargetNames()
 	for _, app := range apps {
-		for _, target := range targets {
+		appTargets := targets
+		if app.ID == "esignature-server" {
+			appTargets = []string{"windows-386"}
+		}
+		for _, target := range appTargets {
+			if app.ID == "esignature-server" && target != "windows-386" {
+				continue
+			}
+			if app.ID != "esignature-server" && target == "windows-386" {
+				continue
+			}
 			ti := targetMatrix[target]
 			logf("building %s for %s", app.ID, target)
 			if _, err := buildRuntime(root, app, target, ti, *version); err != nil {
@@ -373,7 +384,7 @@ func runPackageAll(root string, args []string) error {
 	var targets []string
 	switch runtime.GOOS {
 	case "windows":
-		targets = []string{"windows-amd64", "windows-arm64"}
+		targets = []string{"windows-386", "windows-amd64", "windows-arm64"}
 	case "linux":
 		targets = []string{"linux-amd64", "linux-arm64"}
 	case "darwin":
@@ -382,7 +393,17 @@ func runPackageAll(root string, args []string) error {
 		return fmt.Errorf("unsupported host OS %q", runtime.GOOS)
 	}
 	for _, app := range apps {
-		for _, target := range targets {
+		appTargets := targets
+		if app.ID == "esignature-server" {
+			appTargets = []string{"windows-386"}
+		}
+		for _, target := range appTargets {
+			if app.ID == "esignature-server" && target != "windows-386" {
+				continue
+			}
+			if app.ID != "esignature-server" && target == "windows-386" {
+				continue
+			}
 			logf("packaging %s for %s", app.ID, target)
 			ti := targetMatrix[target]
 			manifest, err := buildRuntime(root, app, target, ti, *version)
@@ -409,6 +430,9 @@ func runPackageAll(root string, args []string) error {
 }
 
 func buildRuntime(root string, app appInfo, target string, ti targetInfo, versionOverride string) (runtimeManifest, error) {
+	if app.ID == "esignature-server" && target != "windows-386" {
+		return runtimeManifest{}, fmt.Errorf("esignature-server requires windows-386 for the bundled Signotec x86 DLL")
+	}
 	version := versionOverride
 	if version == "" {
 		version = discoverVersion(root)
@@ -486,6 +510,11 @@ func buildRuntime(root string, app appInfo, target string, ti targetInfo, versio
 	deploymentsDst := filepath.Join(runtimeDir, "deployments")
 	if err := copyDeployments(deploymentsSrc, deploymentsDst); err != nil {
 		return runtimeManifest{}, err
+	}
+	if app.ID == "esignature-server" {
+		if err := copyFile(filepath.Join(root, "..", "docs", "signotec", "WebSocketPadServer", "STPadLib.dll"), filepath.Join(deploymentsDst, "signotec", "STPadLib.dll"), 0o644); err != nil {
+			return runtimeManifest{}, fmt.Errorf("bundle Signotec DLL: %w", err)
+		}
 	}
 	logf("deployments copied: app=%s target=%s src=%s dst=%s", app.ID, target, deploymentsSrc, deploymentsDst)
 	manifest := runtimeManifest{
@@ -638,6 +667,7 @@ func packageWindows(root string, manifest runtimeManifest) (artifactInfo, error)
 		"--install-dir-name", manifest.App.DisplayName,
 		"--binary-name", filepath.Base(manifest.BinaryPath),
 		"--version", manifest.PackageVersion,
+		"--arch", manifest.GOARCH,
 	}
 	logf("building NSIS installer for %s %s", manifest.App.ID, manifest.Target)
 	if err := runCommand(root, nil, args[0], args[1:]...); err != nil {
@@ -863,6 +893,9 @@ func detectApps(root string) ([]appInfo, error) {
 		id := entry.Name()
 		binaryName := detectBinaryName(filepath.Join(root, "output", id), id)
 		title := prettyTitle(binaryName, id)
+		if id == "esignature-server" {
+			title = "eSignature server"
+		}
 		apps = append(apps, appInfo{
 			ID:               id,
 			Title:            title,
@@ -1051,6 +1084,8 @@ func windowsInstallerFileName(manifest runtimeManifest) string {
 
 func windresTarget(arch string) string {
 	switch arch {
+	case "386":
+		return "pe-i386"
 	case "amd64":
 		return "pe-x86-64"
 	case "arm64":
@@ -1319,6 +1354,7 @@ func ensureWinSW(dstExe, arch string) error {
 		return copyFile(local, dstExe, 0o755)
 	}
 	url := fmt.Sprintf("https://github.com/winsw/winsw/releases/download/v3.0.0/WinSW-%s.exe", map[string]string{
+		"386":   "x86",
 		"amd64": "x64",
 		"arm64": "arm64",
 	}[arch])
@@ -1767,7 +1803,11 @@ func appBuildMacShell(app appInfo) string {
 }
 
 func appBuildWindowsPS(app appInfo) string {
-	return fmt.Sprintf("$ErrorActionPreference = 'Stop'\nSet-Location (Join-Path $PSScriptRoot '..\\..\\..')\ngo run ./tools/releasectl build --app %s --target windows-amd64 @args\n", app.ID)
+	result := fmt.Sprintf("$ErrorActionPreference = 'Stop'\nSet-Location (Join-Path $PSScriptRoot '..\\..\\..')\ngo run ./tools/releasectl build --app %s --target windows-amd64 @args\n", app.ID)
+	if app.ID == "esignature-server" {
+		result = strings.ReplaceAll(result, "windows-amd64", "windows-386")
+	}
+	return result
 }
 
 func appBuildAllShell(app appInfo) string {
@@ -1779,7 +1819,11 @@ func appBuildAllPS(app appInfo) string {
 }
 
 func appPackageWindowsPS(app appInfo) string {
-	return fmt.Sprintf("$ErrorActionPreference = 'Stop'\nSet-Location (Join-Path $PSScriptRoot '..\\..\\..\\..')\ngo run ./tools/releasectl package --app %s --target windows-amd64 @args\n", app.ID)
+	result := fmt.Sprintf("$ErrorActionPreference = 'Stop'\nSet-Location (Join-Path $PSScriptRoot '..\\..\\..\\..')\ngo run ./tools/releasectl package --app %s --target windows-amd64 @args\n", app.ID)
+	if app.ID == "esignature-server" {
+		result = strings.ReplaceAll(result, "windows-amd64", "windows-386")
+	}
+	return result
 }
 
 func appPackageWindowsCMD() string {
@@ -1947,6 +1991,9 @@ func xmlEscape(value string) string {
 }
 
 func wixArch(arch string) string {
+	if arch == "386" {
+		return "x86"
+	}
 	if arch == "arm64" {
 		return "arm64"
 	}

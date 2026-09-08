@@ -430,6 +430,9 @@ func (m *Module) withNoCache(next http.Handler) http.Handler {
 	})
 }
 
+// CORSAllowedOrigins exposes the live policy to utility websocket endpoints.
+func (m *Module) CORSAllowedOrigins() string { return m.currentCORSAllowedOrigins() }
+
 func (m *Module) currentCORSAllowedOrigins() string {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -536,6 +539,10 @@ func (m *Module) requireSession(next http.Handler) http.Handler {
 }
 
 func (m *Module) handleIndex(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path == "/" && m.analyzerSetting("protocol", "") == "signing-pad" {
+		http.Redirect(w, r, "/esignature", http.StatusTemporaryRedirect)
+		return
+	}
 	if r.URL.Path == "/help" {
 		http.Redirect(w, r, "/help/", http.StatusTemporaryRedirect)
 		return
@@ -3708,7 +3715,7 @@ func (m *Module) supportedCommTypes() []string {
 			add("serial")
 		case "seegene-excel", "beosl-csv", "cfx96-quantitation", "cary60-uvvis", "analytikjena-plasmaquantms-elite", "shimatzu-tocl", "shimatzu-generic", "biosan-hipo-mpp96", "gammavision", "tricarb-5110-tr", "anatolia-geneworks", "generic-file":
 			add("file")
-		case "barcodeprinter", "anaf-docsmart":
+		case "barcodeprinter", "anaf-docsmart", "signing-pad":
 			add("utility")
 		}
 	}

@@ -3,6 +3,7 @@ package signingpad
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"embed"
 	"encoding/base64"
 	"encoding/json"
@@ -18,6 +19,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	wsmod "wisemed-labreaders/readersv3/modules/ws"
 
 	"wisemed-labreaders/readersv3/core/module"
 	"wisemed-labreaders/readersv3/shared/bindguard"
@@ -27,10 +29,17 @@ import (
 var uiAssets embed.FS
 
 type Module struct {
-	rt      module.Runtime
-	server  *http.Server
-	mu      sync.RWMutex
-	started time.Time
+	history        *sql.DB
+	remoteMu       sync.Mutex
+	remoteSessions map[string]*remoteSession
+	rt             module.Runtime
+	server         *http.Server
+	mu             sync.RWMutex
+	started        time.Time
+	deviceMu       sync.Mutex
+	nativeSettings padSettings
+	driverFactory  func(string) (padDriver, error)
+	stopping       chan struct{}
 }
 
 type captureRequest struct {
@@ -63,17 +72,46 @@ func (m *Module) ID() string { return "signing-pad" }
 func (m *Module) Init(rt module.Runtime) error {
 	m.rt = rt
 	m.started = time.Now()
+	m.initNative()
+	m.stopping = make(chan struct{})
+	m.remoteSessions = map[string]*remoteSession{}
+	if err := m.openHistory(); err != nil {
+		return err
+	}
+	if service, ok := rt.Service("ws-action-dispatcher"); ok {
+		if dispatcher, ok := service.(*wsmod.ActionDispatcher); ok {
+			dispatcher.Register(m)
+		}
+	}
+	m.rt.Handle("/api/esignature/command", http.HandlerFunc(m.handleNativeCommand))
+	m.rt.Handle("/api/esignature/jobs", http.HandlerFunc(m.handleHistory))
+	m.rt.Handle("/api/esignature/stats/daily", http.HandlerFunc(m.handleStats))
+	m.rt.Handle("/ws", http.HandlerFunc(m.handleWebSocket))
+	m.rt.Handle("/api/esignature/settings", http.HandlerFunc(m.handlePadSettings))
 	m.rt.RegisterService("signing-pad", m)
-	m.rt.Handle("/", m.withCORS(http.HandlerFunc(m.handleIndex)))
+	if !parseBool(asString(rt.ModuleSettings(m.ID())["shared_http"])) {
+		m.rt.Handle("/", m.withCORS(http.HandlerFunc(m.handleIndex)))
+	}
+	m.rt.Handle("/esignature", m.withCORS(http.HandlerFunc(m.handleIndex)))
 	m.rt.Handle("/health", m.withCORS(http.HandlerFunc(m.handleIndex)))
 	m.rt.Handle("/signing-pad/app.js", m.withCORS(http.HandlerFunc(m.handleStaticAsset("ui/app.js", "application/javascript; charset=utf-8"))))
 	m.rt.Handle("/signing-pad/styles.css", m.withCORS(http.HandlerFunc(m.handleStaticAsset("ui/styles.css", "text/css; charset=utf-8"))))
-	m.rt.Handle("/api/signing-pad/health", m.withCORS(http.HandlerFunc(m.handleHealth)))
-	m.rt.Handle("/api/signing-pad/capture", m.withCORS(http.HandlerFunc(m.handleCapture)))
+	if asString(rt.ModuleSettings(m.ID())["helper_command"]) != "" {
+		m.rt.Handle("/api/signing-pad/health", m.withCORS(http.HandlerFunc(m.handleHealth)))
+		m.rt.Handle("/api/signing-pad/capture", m.withCORS(http.HandlerFunc(m.handleCapture)))
+	}
 	return nil
 }
 
 func (m *Module) Start(ctx context.Context) error {
+	if m.history != nil {
+		defer m.history.Close()
+	}
+	go func() { <-ctx.Done(); close(m.stopping) }()
+	if parseBool(asString(m.rt.ModuleSettings(m.ID())["shared_http"])) {
+		<-ctx.Done()
+		return nil
+	}
 	addr := strings.TrimSpace(asString(m.rt.ModuleSettings(m.ID())["address"]))
 	if addr == "" {
 		addr = "127.0.0.1:19110"
@@ -131,7 +169,7 @@ func (m *Module) Start(ctx context.Context) error {
 }
 
 func (m *Module) handleIndex(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path != "/" && r.URL.Path != "/health" {
+	if r.URL.Path != "/" && r.URL.Path != "/health" && r.URL.Path != "/esignature" {
 		http.NotFound(w, r)
 		return
 	}

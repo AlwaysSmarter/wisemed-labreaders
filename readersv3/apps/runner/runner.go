@@ -19,6 +19,8 @@ import (
 )
 
 type RunOptions struct {
+	// SkipBootstrap is for standalone utilities with their own settings UI.
+	SkipBootstrap  bool
 	Headless       bool
 	HeadlessChild  bool
 	InstallService bool
@@ -46,7 +48,10 @@ func Run(configPath string, defaultModules []string, opts RunOptions) error {
 		fmt.Println("flag -showlog activ: logurile runtime vor fi afisate si in consola.")
 	}
 	cfg.EnabledModules = append([]string(nil), defaultModules...)
-	changed, err := ensureBootstrap(cfg, opts.Reconfigure)
+	changed := false
+	if !opts.SkipBootstrap || opts.Reconfigure {
+		changed, err = ensureBootstrap(cfg, opts.Reconfigure)
+	}
 	if err != nil {
 		log.Printf("bootstrap: non-blocking startup warning: %v", err)
 		startupConsolef("warning bootstrap: %v", err)

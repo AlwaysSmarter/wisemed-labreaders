@@ -60,16 +60,6 @@
     "supportsHeadless": true
   },
   {
-    "id": "biosan-hipo-mpp-96-reader",
-    "title": "Biosan Hipo Mpp 96 Reader",
-    "binaryName": "biosan-hipo-mpp-96-reader",
-    "serviceName": "wisemed-biosan-hipo-mpp-96-reader",
-    "displayName": "WiseMED Biosan Hipo Mpp 96 Reader",
-    "description": "WiseMED readersv3 Biosan Hipo Mpp 96 Reader background service",
-    "bundleId": "eu.wisemed.readersv3.biosan.hipo.mpp.96.reader",
-    "supportsHeadless": true
-  },
-  {
     "id": "biomerieux-minividas-reader",
     "title": "BioMerieux miniVIDAS Reader",
     "binaryName": "biomerieux-minividas-reader",
@@ -77,6 +67,16 @@
     "displayName": "WiseMED BioMerieux miniVIDAS Reader",
     "description": "WiseMED readersv3 BioMerieux miniVIDAS Reader background service",
     "bundleId": "eu.wisemed.readersv3.biomerieux.minividas.reader",
+    "supportsHeadless": true
+  },
+  {
+    "id": "biosan-hipo-mpp-96-reader",
+    "title": "Biosan Hipo Mpp 96 Reader",
+    "binaryName": "biosan-hipo-mpp-96-reader",
+    "serviceName": "wisemed-biosan-hipo-mpp-96-reader",
+    "displayName": "WiseMED Biosan Hipo Mpp 96 Reader",
+    "description": "WiseMED readersv3 Biosan Hipo Mpp 96 Reader background service",
+    "bundleId": "eu.wisemed.readersv3.biosan.hipo.mpp.96.reader",
     "supportsHeadless": true
   },
   {
@@ -97,6 +97,16 @@
     "displayName": "WiseMED Cfx96 Reader",
     "description": "WiseMED readersv3 Cfx96 Reader background service",
     "bundleId": "eu.wisemed.readersv3.cfx96.reader",
+    "supportsHeadless": true
+  },
+  {
+    "id": "esignature-server",
+    "title": "eSignature server",
+    "binaryName": "esignature-server",
+    "serviceName": "wisemed-esignature-server",
+    "displayName": "WiseMED eSignature server",
+    "description": "WiseMED eSignature server background service",
+    "bundleId": "eu.wisemed.readersv3.esignature.server",
     "supportsHeadless": true
   },
   {

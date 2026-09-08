@@ -1,0 +1,8 @@
+<!doctype html><html lang="ro"><meta charset="utf-8"><title>Ajutor eSignature server</title>
+<body><h1>eSignature server</h1>
+<p>Utilitar Signotec Omega / Evolis Sig200. <a href="/esignature">Test și setări pad</a> · <a href="/settings">Administrare comună</a></p>
+<p>În administrare se configurează HTTP/HTTPS, originile web permise, conectarea WiseMED și update-urile, folosind aceleași componente ca barcodeprinter.</p>
+<p>Update server: App ID <code>esignature-server</code>, OS <code>windows</code>, arhitectură <code>386</code>, canal <code>stable</code>. Kitul conține STPadLib.dll x86.</p>
+<p>API local: <code>wss://localhost:19111/ws</code>. Comenzi JSON cu <code>id</code> și <code>action</code>: health, devices, start, retry, confirm, cancel. Confirmarea returnează PNG base64. Captura este exclusivă, iar deconectarea și timeout-ul eliberează pad-ul.</p>
+<p>Certificatul este gestionat de local-http. Driverele USB Signotec trebuie instalate separat. Testarea hardware se face pe Windows. DLL-ul Windows nu poate comunica cu USB din macOS/Linux.</p>
+<p>CLI: <code>-headless</code>, <code>-installservice</code>, <code>-showlog</code>, <code>-version</code>, <code>-config</code>, <code>-reconfigure</code>. Nu porniți serverul Signotec simultan cu acest utilitar.</p></body></html>

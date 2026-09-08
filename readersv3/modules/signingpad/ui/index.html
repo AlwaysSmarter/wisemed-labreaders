@@ -1,20 +1,37 @@
 <!doctype html>
-<html lang="en">
+<html lang="ro">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Signing Pad Utility</title>
+  <title>eSignature server</title>
   <link rel="stylesheet" href="/signing-pad/styles.css">
 </head>
 <body>
-  <main class="shell">
-    <section class="card">
-      <p class="eyebrow">UTILITY APP</p>
-      <h1>Signing Pad Utility</h1>
-      <p class="lead">Local API bridge for signature pad capture.</p>
-      <pre id="health">Loading health...</pre>
-    </section>
-  </main>
+  <main class="shell"><section class="card">
+    <p class="eyebrow">WISEMED · UTILITAR LOCAL</p>
+    <h1>eSignature server</h1>
+    <p class="lead">Conectează aplicațiile web la pad-ul de semnătură.</p>
+    <nav><a href="/settings">Administrare și update-uri</a> · <a href="/debug">Diagnostic</a> · <a href="/help/">Ajutor</a></nav>
+    <form id="settings">
+      <label>Firma producătoare <select name="manufacturer"><option value="signotec">Signotec</option></select></label>
+      <label>Tip PAD <select name="pad_type"><option value="omega">Omega</option></select></label>
+      <label>Model (opțional) <input name="model" maxlength="128" placeholder="Evolis Sig200"></label>
+      <button type="submit">Salvează setările</button>
+    </form>
+    <h2>Test semnătură</h2>
+    <p>Pornește captura, semnează pe pad, apoi confirmă din această pagină. O sesiune durează maximum 3 minute.</p>
+    <div id="controls">
+      <button data-action="devices">Detectează pad</button>
+      <button data-action="start">Începe</button>
+      <button data-action="retry">Reia</button>
+      <button data-action="confirm">Confirmă</button>
+      <button data-action="cancel">Anulează</button>
+    </div>
+    <pre id="health" role="status" aria-live="polite">Conectare…</pre>
+    <img id="signature" alt="Semnătura capturată" hidden>
+ <h2>Istoric și statistici</h2><button id="refresh-history" type="button">Actualizează</button>
+ <pre id="stats"></pre><pre id="history"></pre>
+  </section></main>
   <script src="/signing-pad/app.js"></script>
 </body>
 </html>
