@@ -23,6 +23,7 @@ import (
 	"wisemed-labreaders/readersv3/modules/protocols/biosanhipompp96"
 	"wisemed-labreaders/readersv3/modules/protocols/cary60uvvis"
 	"wisemed-labreaders/readersv3/modules/protocols/cfx96quantitation"
+	"wisemed-labreaders/readersv3/modules/protocols/erbamannheimlaura"
 	"wisemed-labreaders/readersv3/modules/protocols/gammavision"
 	"wisemed-labreaders/readersv3/modules/protocols/genericfile"
 	"wisemed-labreaders/readersv3/modules/protocols/horibaabxpentra400"
@@ -79,6 +80,7 @@ func RegisterAll(reg *module.Registry) {
 	reg.Register("protocol-shimatzu-generic", shimatzugeneric.New)
 	reg.Register("protocol-tricarb-5110-tr", tricarb5110tr.New)
 	reg.Register("protocol-ir-biotyper", irbiotyper.New)
+	reg.Register("protocol-erba-mannheim-laura", erbamannheimlaura.New)
 	reg.Register("protocol-astm", astmproto.New)
 	reg.Register("protocol-horiba-abx-pentra400", horibaabxpentra400.New)
 	reg.Register("protocol-biomerieux-minividas", biomerieuxminividas.New)

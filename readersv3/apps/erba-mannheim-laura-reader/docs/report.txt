@@ -1,0 +1,21 @@
+
+DEKAPHAN LAURA
+Seq.No:0001
+ID: 21009
+2026.05.05            13:05
+...........................
+
+ BLD      NEG
+ BIL      NEG
+ UBG     NORM
+ KET      NEG
+ GLU      NEG
+*PRO      100  mg/dl
+ pH         5
+ NIT      NEG
+ LEU      NEG
+ SG     1.000   
+
+---------------------------
+
+

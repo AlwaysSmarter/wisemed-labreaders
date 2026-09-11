@@ -2,6 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
+APP_FILTER="${1:-}"
 SOURCE_SVG="$ROOT_DIR/WiseMED LION.svg"
 OUT_DIR="$ROOT_DIR/app-icons"
 PNG_DIR="$OUT_DIR/png"
@@ -28,6 +29,7 @@ magick "$SOURCE_SVG" \
 
 generate_icon() {
   local app="$1"
+  if [[ -n "${APP_FILTER:-}" && "$app" != "$APP_FILTER" ]]; then return; fi
   local primary="$2"
   local secondary="$3"
   local accent="$4"
@@ -85,6 +87,8 @@ generate_icon() {
     \( +clone -resize 16x16 \) \
     "$icon"
 }
+
+generate_icon "erba-mannheim-laura-reader" "#176B57" "#2A8C73" "#176B57" "LAURA" "Urine analyzer" "UR"
 
 generate_icon "barcodeprinter"      "#0D3B66" "#F59E0B" "#184E77" "BARCODE" "Label print utility" "BC"
 generate_icon "beosl-reader"        "#0F4C5C" "#14B8A6" "#1D7874" "BEOSL"   "CSV file reader"      "BE"

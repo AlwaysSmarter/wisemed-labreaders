@@ -100,6 +100,16 @@
     "supportsHeadless": true
   },
   {
+    "id": "erba-mannheim-laura-reader",
+    "title": "Erba Mannheim Laura Reader",
+    "binaryName": "erba-mannheim-laura-reader",
+    "serviceName": "wisemed-erba-mannheim-laura-reader",
+    "displayName": "WiseMED Erba Mannheim Laura Reader",
+    "description": "WiseMED readersv3 Erba Mannheim Laura Reader background service",
+    "bundleId": "eu.wisemed.readersv3.erba.mannheim.laura.reader",
+    "supportsHeadless": true
+  },
+  {
     "id": "esignature-server",
     "title": "eSignature server",
     "binaryName": "esignature-server",

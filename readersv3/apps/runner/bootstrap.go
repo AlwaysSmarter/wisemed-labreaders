@@ -691,6 +691,8 @@ func supportedProtocols(cfg *config.Config) []string {
 		case "protocol-labnovation-ld560":
 			add("hl7")
 			add("simple")
+		case "protocol-erba-mannheim-laura":
+			add("erba-mannheim-laura")
 		case "protocol-astm":
 			add("astm")
 		case "protocol-ir-biotyper":
@@ -741,6 +743,9 @@ func supportedCommTypes(cfg *config.Config) []string {
 	}
 	for _, protocol := range supportedProtocols(cfg) {
 		switch strings.ToLower(strings.TrimSpace(protocol)) {
+		case "erba-mannheim-laura":
+			add("serial")
+			add("tcpip")
 		case "hl7", "simple", "astm", "ir-biotyper":
 			add("tcpip")
 		case "seegene-excel", "beosl-csv", "beoslcsv", "cfx96-quantitation", "cary60-uvvis", "analytikjena-plasmaquantms-elite", "shimatzu-tocl", "shimatzu-generic", "biosan-hipo-mpp96", "gammavision", "tricarb-5110-tr", "anatolia-geneworks", "generic-file":
@@ -757,7 +762,7 @@ func supportedCommTypes(cfg *config.Config) []string {
 
 func supportedTCPModes(cfg *config.Config) []string {
 	for _, item := range cfg.EnabledModules {
-		if strings.EqualFold(strings.TrimSpace(item), "protocol-labnovation-ld560") {
+		if strings.EqualFold(strings.TrimSpace(item), "protocol-labnovation-ld560") || strings.EqualFold(strings.TrimSpace(item), "protocol-erba-mannheim-laura") {
 			return []string{"server", "client"}
 		}
 	}

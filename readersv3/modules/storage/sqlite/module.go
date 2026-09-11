@@ -110,6 +110,9 @@ func explainSQLiteOpenError(path string, err error) error {
 		return nil
 	}
 	message := strings.ToLower(strings.TrimSpace(err.Error()))
+	if strings.Contains(message, "readonly") || strings.Contains(message, "read-only") || strings.Contains(message, "read only") {
+		return fmt.Errorf("sqlite database is not writable: %s. Stop the reader and check the Read-only attribute and write permissions for the database, its -wal/-shm files, and directory %s. SQLite must be able to create and update files in that directory. Preserve the database and sidecar files; do not delete the WAL, which may contain uncheckpointed results: %w", path, filepath.Dir(path), err)
+	}
 	if strings.Contains(message, "disk i/o error") || strings.Contains(message, "(522)") {
 		walPath := path + "-wal"
 		shmPath := path + "-shm"
@@ -123,7 +126,7 @@ func explainSQLiteOpenError(path string, err error) error {
 			if shmExists {
 				hints = append(hints, filepath.Base(shmPath))
 			}
-			return fmt.Errorf("sqlite open failed: stale WAL/SHM sidecar files detected (%s). Stop the reader, delete these files, then start again", strings.Join(hints, ", "))
+			return fmt.Errorf("sqlite open failed for %s with WAL/SHM sidecar files present (%s). Stop the reader and preserve the database and sidecar files together before investigating permissions or an incomplete database copy. Do not delete the WAL: it may contain uncheckpointed results: %w", path, strings.Join(hints, ", "), err)
 		}
 		return fmt.Errorf("sqlite open failed with disk I/O error for %s. The database or its sidecar files may be corrupted", filepath.Base(path))
 	}
@@ -1250,12 +1253,19 @@ func (s *Store) SetDefaultResult(orderAnalysisID, resultID int64, repeatMode str
 	if err != nil {
 		return err
 	}
+	// New panel imports use a stable measurement ID; preserve legacy timestamp grouping.
+	predicate := "oar.created_at = ?"
+	groupValue := result.CreatedAt.UTC().Format(time.RFC3339)
+	if panelID, ok := result.Flags["panel_id"].(string); ok && panelID != "" {
+		predicate = "json_extract(oar.flags_json, '$.panel_id') = ?"
+		groupValue = panelID
+	}
 	rows, err := s.db.Query(`select oar.id, oar.order_analysis_id
 		from order_analysis_results oar
 		join order_analyses oa on oa.id = oar.order_analysis_id
 		join orders o on o.id = oa.order_id
-		where o.sample_id = ? and o.order_date = ? and oar.created_at = ?
-		order by oar.order_analysis_id asc, oar.id asc`, order.SampleID, order.OrderDate, result.CreatedAt.UTC().Format(time.RFC3339))
+		where o.sample_id = ? and o.order_date = ? and `+predicate+`
+		order by oar.order_analysis_id asc, oar.id asc`, order.SampleID, order.OrderDate, groupValue)
 	if err != nil {
 		return err
 	}
@@ -1294,8 +1304,8 @@ func (s *Store) SetDefaultResult(orderAnalysisID, resultID int64, repeatMode str
 			return err
 		}
 		flagsJSON, _ := json.Marshal(metaOrEmpty(targetResult.Flags))
-		if _, execErr := tx.Exec(`update order_analyses set default_result_id=?,result_value=?,raw_value=?,interpreted_value=?,unit=?,source_file=?,flags_json=? where id = ?`,
-			item.resultID, targetResult.ResultValue, targetResult.RawValue, targetResult.Interpreted, targetResult.Unit, targetResult.SourceFile, string(flagsJSON), item.orderAnalysisID); execErr != nil {
+		if _, execErr := tx.Exec(`update order_analyses set default_result_id=?,result_value=?,raw_value=?,interpreted_value=?,source_result_value=?,source_raw_value=?,source_interpreted_value=?,unit=?,source_file=?,flags_json=? where id = ?`,
+			item.resultID, targetResult.ResultValue, targetResult.RawValue, targetResult.Interpreted, targetResult.SourceResultValue, targetResult.SourceRawValue, targetResult.SourceInterpreted, targetResult.Unit, targetResult.SourceFile, string(flagsJSON), item.orderAnalysisID); execErr != nil {
 			err = execErr
 			return err
 		}

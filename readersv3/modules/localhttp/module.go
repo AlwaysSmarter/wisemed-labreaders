@@ -3670,6 +3670,8 @@ func (m *Module) supportedProtocols() []string {
 		case "protocol-labnovation-ld560":
 			add("hl7")
 			add("simple")
+		case "protocol-erba-mannheim-laura":
+			add("erba-mannheim-laura")
 		case "protocol-astm":
 			add("astm")
 		case "protocol-biomerieux-minividas":
@@ -3723,6 +3725,9 @@ func (m *Module) supportedCommTypes() []string {
 	}
 	for _, protocol := range m.supportedProtocols() {
 		switch strings.ToLower(strings.TrimSpace(protocol)) {
+		case "erba-mannheim-laura":
+			add("serial")
+			add("tcpip")
 		case "hl7", "simple", "astm", "ir-biotyper":
 			add("tcpip")
 		case "biomerieux-minividas":
@@ -3743,7 +3748,7 @@ func (m *Module) supportedCommTypes() []string {
 
 func (m *Module) supportedTCPModes() []string {
 	for _, item := range m.enabledModules() {
-		if strings.EqualFold(strings.TrimSpace(item), "protocol-labnovation-ld560") {
+		if strings.EqualFold(strings.TrimSpace(item), "protocol-labnovation-ld560") || strings.EqualFold(strings.TrimSpace(item), "protocol-erba-mannheim-laura") {
 			return []string{"server", "client"}
 		}
 	}

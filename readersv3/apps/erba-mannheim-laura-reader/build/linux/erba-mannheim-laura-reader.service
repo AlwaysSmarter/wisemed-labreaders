@@ -1,0 +1,17 @@
+[Unit]
+Description=WiseMED readersv3 Erba Mannheim Laura Reader background service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/erba-mannheim-laura-reader
+ExecStart=/opt/erba-mannheim-laura-reader/erba-mannheim-laura-reader -config deployments/config.yaml -headless
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

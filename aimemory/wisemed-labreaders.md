@@ -8,6 +8,8 @@
 
 ## Project generation rules
 
+- Every new reader must include EVERYTHING in the standard reader layout before delivery: app/module registration, configuration, help and protocol docs, branded PNG/ICO icons, build/install/service scripts, and a populated `readersv3/output/<reader>/` workspace with runnable binary, `deployments/config.yaml`, `config.install.yaml`, and help assets. Verify these explicitly; a `dist/` package alone is insufficient. Preserve existing local configuration and runtime data when refreshing output.
+
 - When generating a new readersv3 application or a new related project, also generate an application icon.
 - The Windows delivery path should include a real `.ico` file derived from the WiseMED brand mark but made distinct for that specific app by color, label, or app-specific graphic accent.
 - Keep generated icon assets under the project resources tree so they can be reused by packaging/build automation.

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>eu.wisemed.readersv3.erba.mannheim.laura.reader</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/local/erba-mannheim-laura-reader/erba-mannheim-laura-reader</string>
+    <string>-config</string>
+    <string>deployments/config.yaml</string>
+    <string>-headless</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>WorkingDirectory</key>
+  <string>/usr/local/erba-mannheim-laura-reader</string>
+  <key>StandardOutPath</key>
+  <string>/var/log/erba-mannheim-laura-reader.log</string>
+  <key>StandardErrorPath</key>
+  <string>/var/log/erba-mannheim-laura-reader.log</string>
+</dict>
+</plist>
