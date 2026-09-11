@@ -414,10 +414,7 @@ func deriveSampleID(sampleRaw, well string) string {
 }
 
 func normalizeTag(value string) string {
-	value = strings.ToUpper(strings.TrimSpace(value))
-	value = strings.ReplaceAll(value, " ", "_")
-	value = strings.ReplaceAll(value, "-", "_")
-	return value
+	return coremodel.NormalizeAnalyteTag(value)
 }
 
 func normalizeCq(value string) string {

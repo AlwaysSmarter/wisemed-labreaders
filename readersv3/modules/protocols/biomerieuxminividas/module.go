@@ -7,7 +7,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"unicode"
 
 	"go.bug.st/serial"
 
@@ -394,21 +393,7 @@ func trimLeadingZeroes(value string) string {
 }
 
 func normalizeTag(value string) string {
-	value = strings.TrimSpace(value)
-	var out strings.Builder
-	underscore := false
-	for _, r := range value {
-		if unicode.IsLetter(r) || unicode.IsDigit(r) {
-			out.WriteRune(unicode.ToUpper(r))
-			underscore = false
-			continue
-		}
-		if out.Len() > 0 && !underscore {
-			out.WriteByte('_')
-			underscore = true
-		}
-	}
-	return strings.Trim(out.String(), "_")
+	return coremodel.NormalizeAnalyteTag(value)
 }
 
 func firstNonEmpty(values ...string) string {

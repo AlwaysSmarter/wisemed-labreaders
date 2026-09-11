@@ -190,16 +190,7 @@ func normalizeMaybeNumber(value string) string {
 }
 
 func normalizeElementTag(value string) string {
-	value = strings.TrimSpace(value)
-	if value == "" {
-		return ""
-	}
-	replacer := strings.NewReplacer(" ", "_", "[", "_", "]", "", "/", "_", "\\", "_", "-", "_", ".", "_")
-	value = strings.ToUpper(replacer.Replace(value))
-	for strings.Contains(value, "__") {
-		value = strings.ReplaceAll(value, "__", "_")
-	}
-	return strings.Trim(value, "_")
+	return coremodel.NormalizeAnalyteTag(value)
 }
 
 func buildTimestamp(dateValue, timeValue string) string {

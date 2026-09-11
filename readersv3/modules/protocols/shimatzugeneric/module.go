@@ -227,17 +227,7 @@ func firstTableSection(lines []string, names ...string) []map[string]string {
 }
 
 func normalizeAnalyteTag(name string) string {
-	name = strings.TrimSpace(name)
-	if name == "" {
-		return ""
-	}
-	tag := strings.ToUpper(name)
-	replacer := strings.NewReplacer(" ", "_", "/", "_", "\\", "_", "-", "_", ".", "_", "(", "", ")", "", ",", "", "%", "PCT")
-	tag = replacer.Replace(tag)
-	for strings.Contains(tag, "__") {
-		tag = strings.ReplaceAll(tag, "__", "_")
-	}
-	return strings.Trim(tag, "_")
+	return coremodel.NormalizeAnalyteTag(name)
 }
 
 func isControlSample(sampleID string, sampleInfo map[string]string) bool {

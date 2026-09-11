@@ -138,8 +138,7 @@ func cleanField(value string) string {
 }
 
 func normalizeTag(value string) string {
-	value = strings.ToUpper(strings.TrimSpace(value))
-	return strings.ReplaceAll(value, " ", "_")
+	return coremodel.NormalizeAnalyteTag(value)
 }
 
 func detectControlLevel(controlID, label string) string {

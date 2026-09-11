@@ -1701,25 +1701,7 @@ func stringMapSetting(settings map[string]interface{}, key string) map[string]st
 }
 
 func normalizeTag(value string) string {
-	value = strings.TrimSpace(value)
-	if value == "" {
-		return ""
-	}
-	var b strings.Builder
-	lastUnderscore := false
-	for _, r := range strings.ToUpper(value) {
-		if unicode.IsLetter(r) || unicode.IsDigit(r) {
-			b.WriteRune(r)
-			lastUnderscore = false
-			continue
-		}
-		if lastUnderscore {
-			continue
-		}
-		b.WriteByte('_')
-		lastUnderscore = true
-	}
-	return strings.Trim(b.String(), "_")
+	return coremodel.NormalizeAnalyteTag(value)
 }
 
 func sanitizeSourceName(remote string) string {

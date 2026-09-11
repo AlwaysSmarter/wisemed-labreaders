@@ -155,3 +155,18 @@ WiseMED. Sincronizarea/trimiterea în curs se încheie înainte de schimbarea ID
 
 Nu este necesar un modul per aparat sau activarea unei opțiuni. Pentru instalările
 existente, funcția devine disponibilă după înlocuirea executabilului cu buildul nou.
+
+### Caractere speciale în TAG-urile analizelor
+
+TAG-urile păstrează punctuația primită de la analizor: `NEU#` și `NEU%`
+identifică două analize distincte, la fel ca `MON#`/`MON%`, `LYM#`/`LYM%`,
+`EOS#`/`EOS%`, `BAS#`/`BAS%` și `LIC#`/`LIC%`. Cratimele, de exemplu în
+`P-LCR` și `RDW-CV`, rămân în TAG. Normalizarea comună păstrează conversia
+la majuscule și înlocuirea spațiilor cu `_`, dar nu elimină punctuația.
+Mapările explicite configurate de utilizator se aplică în continuare.
+WiseMED trebuie să aibă TAG-urile distincte corespunzătoare.
+
+Corecția se aplică importurilor noi. Rezultatele vechi deja comasate sub un
+TAG precum `NEU` nu pot fi separate sigur doar din acel TAG; pentru recuperare
+este necesară retransmiterea/reimportarea datelor originale și verificarea
+cererii înainte de confirmare. Nu se redenumesc automat analizele istorice.

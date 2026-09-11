@@ -149,7 +149,7 @@ func parseAnatolia(path string, _ module.Runtime) (fileimportbase.ImportData, er
 }
 
 func normalizeTarget(value string) string {
-	return strings.ToUpper(strings.ReplaceAll(strings.TrimSpace(value), " ", "_"))
+	return coremodel.NormalizeAnalyteTag(value)
 }
 
 func normalizeCt(value string) string {
