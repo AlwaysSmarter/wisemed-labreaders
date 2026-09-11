@@ -5617,9 +5617,15 @@ function renderOrderIDCorrection(order) {
 
 function openOrderIDChange(order) {
   if (document.getElementById("order-id-change-dialog")) return;
-  const dialog = document.createElement("dialog");
+  const shell = document.createElement("div");
+  shell.className = "modal-shell order-id-modal";
+  const backdrop = document.createElement("div");
+  backdrop.className = "modal-backdrop";
+  const dialog = document.createElement("section");
   dialog.id = "order-id-change-dialog";
-  dialog.className = "order-id-dialog";
+  dialog.className = "modal-card order-id-dialog";
+  dialog.setAttribute("role", "dialog");
+  dialog.setAttribute("aria-modal", "true");
   dialog.setAttribute("aria-labelledby", "order-id-change-title");
   dialog.innerHTML = `<form>
     <h2 id="order-id-change-title">Modificare ID cerere</h2>
@@ -5631,7 +5637,8 @@ function openOrderIDChange(order) {
     <p class="order-id-correction" role="alert" data-id-error></p>
     <div class="actions"><button type="button" data-id-cancel>Renunță</button><button type="submit" class="primary" data-id-save disabled>Confirmă modificarea</button></div>
   </form>`;
-  document.body.appendChild(dialog);
+  shell.append(backdrop, dialog);
+  document.body.appendChild(shell);
   const form = dialog.querySelector("form");
   const save = dialog.querySelector("[data-id-save]");
   const cancel = dialog.querySelector("[data-id-cancel]");
@@ -5640,9 +5647,27 @@ function openOrderIDChange(order) {
     save.disabled = saving || !form.elements.new_id.value.trim() || form.elements.new_id.value.trim() === String(order.sample_id) || form.elements.confirmation.value !== "deacord";
   };
   form.addEventListener("input", validate);
-  cancel.addEventListener("click", () => dialog.close());
-  dialog.addEventListener("cancel", (event) => { if (saving) event.preventDefault(); });
-  dialog.addEventListener("close", () => { dialog.remove(); els.orderDetails.querySelector("[data-edit-order-id]")?.focus(); });
+  const closeDialog = () => {
+    document.removeEventListener("keydown", onDialogKeydown, true);
+    shell.remove();
+    els.orderDetails.querySelector("[data-edit-order-id]")?.focus();
+  };
+  const onDialogKeydown = (event) => {
+    if (event.key === "Escape") {
+      event.preventDefault(); event.stopPropagation();
+      if (!saving) closeDialog();
+    }
+    if (event.key === "Tab") {
+      const controls = [...dialog.querySelectorAll("input:not(:disabled),textarea:not(:disabled),button:not(:disabled)")];
+      const first = controls[0], last = controls[controls.length - 1];
+      if (!first) { event.preventDefault(); return; }
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    }
+  };
+  document.addEventListener("keydown", onDialogKeydown, true);
+  cancel.addEventListener("click", () => { if (!saving) closeDialog(); });
+  backdrop.addEventListener("click", () => { if (!saving) closeDialog(); });
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     validate();
@@ -5656,7 +5681,7 @@ function openOrderIDChange(order) {
       const bundle = state.orders.find((item) => item.order.id === order.id);
       if (bundle) bundle.order = response.order;
       renderOrdersLayout(); renderOrderDetails();
-      dialog.close();
+      closeDialog();
       showToast("ID modificat. Rulează Synchro Match pentru noua asociere WiseMED.");
     } catch (error) {
       dialog.querySelector("[data-id-error]").textContent = error.message;
@@ -5666,7 +5691,6 @@ function openOrderIDChange(order) {
       validate();
     }
   });
-  dialog.showModal();
   form.elements.new_id.focus(); form.elements.new_id.select();
 }
 
@@ -5736,6 +5760,7 @@ function renderOrderDetails() {
       <div class="order-headline">
         <div class="order-title">
           <button type="button" class="order-id-edit" data-edit-order-id title="Modifică ID-ul cererii">${escapeHtml(bundle.order.sample_id)}</button>
+          <button type="button" class="order-id-edit-action" data-edit-order-id>Modifică ID</button>
           ${renderOrderIDCorrection(bundle.order)}
           <div class="small muted">${escapeHtml(`${t("sentSampleCode")}: ${sentSampleCode || "-"}`)}</div>
         </div>
@@ -5756,7 +5781,7 @@ function renderOrderDetails() {
         </div>
         <div class="meta-kpi">
           <span class="label">${escapeHtml(t("fileId"))}</span>
-          <span class="${fileIDValueClass}">${escapeHtml(fileID || "-")}</span>
+          <button type="button" class="order-id-edit ${fileIDValueClass}" data-edit-order-id title="Modifică ID-ul cererii">${escapeHtml(fileID || "-")}</button>
         </div>
         <div class="meta-kpi">
           <span class="label">${escapeHtml(t("sampleCode"))}</span>
@@ -5844,7 +5869,9 @@ function renderOrderDetails() {
           </label>
         </div>` : ""}
     </div>`;
-  els.orderDetails.querySelector("[data-edit-order-id]")?.addEventListener("click", () => openOrderIDChange(bundle.order));
+  els.orderDetails.querySelectorAll("[data-edit-order-id]").forEach((button) => {
+    button.addEventListener("click", () => openOrderIDChange(bundle.order));
+  });
   [...els.orderDetails.querySelectorAll("[data-analysis-id]")].forEach((row) => {
     row.addEventListener("click", () => {
       state.selectedOrderAnalysisID = Number(row.dataset.analysisId || 0) || null;

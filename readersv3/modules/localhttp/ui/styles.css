@@ -398,6 +398,8 @@ button.is-loading:hover{transform:none}
 .order-id-edit:hover { text-decoration: underline; }
 .order-id-correction { color: #c62828; font-size: 0.9rem; margin-top: 0.35rem; overflow-wrap: anywhere; }
 .order-id-dialog { width: min(560px, calc(100vw - 32px)); max-height: 90vh; overflow: auto; border: 1px solid #cbd5e1; border-radius: 12px; padding: 24px; color: #172033; background: #fff; }
-.order-id-dialog::backdrop { background: rgb(0 0 0 / 45%); }
+.order-id-modal { z-index: 100; }
 .order-id-dialog label { display: grid; gap: 6px; margin: 14px 0; }
 .order-id-dialog input, .order-id-dialog textarea { width: 100%; box-sizing: border-box; }
+
+.order-id-edit-action { justify-self: start; padding: 5px 10px; color: var(--accent-deep); background: var(--accent-soft); border: 1px solid var(--accent-deep); font-size: .85rem; }
