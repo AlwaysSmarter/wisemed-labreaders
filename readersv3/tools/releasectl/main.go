@@ -1665,7 +1665,7 @@ func detectBinaryName(outputDir, fallback string) string {
 		}
 		ext := strings.ToLower(filepath.Ext(name))
 		switch ext {
-		case ".zip", ".log", ".db", ".yaml", ".yml", ".txt", ".html", ".md":
+		case ".zip", ".log", ".db", ".yaml", ".yml", ".txt", ".html", ".md", ".cmd", ".bat", ".ps1", ".sh", ".json", ".ico", ".png":
 			continue
 		}
 		candidates = append(candidates, strings.TrimSuffix(name, extIfExe(ext)))

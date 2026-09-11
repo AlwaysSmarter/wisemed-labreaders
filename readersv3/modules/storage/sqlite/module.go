@@ -13,6 +13,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -29,6 +30,7 @@ type Module struct {
 }
 
 type Store struct {
+	identityMu   sync.RWMutex
 	db           *sql.DB
 	jsonPath     string
 	logf         func(string, ...interface{})
@@ -902,6 +904,12 @@ func (s *Store) UpsertOrder(item coremodel.Order) (coremodel.Order, error) {
 	if err != nil && err != sql.ErrNoRows {
 		return coremodel.Order{}, err
 	}
+	if existingID == 0 && item.ID == 0 {
+		lookupErr := s.db.QueryRow(`select id from orders where order_date=? and round_no=? and json_extract(meta_json, '$.id_correction.original_sample_id')=? limit 1`, item.OrderDate, item.RoundNo, item.SampleID).Scan(&existingID)
+		if lookupErr != nil && lookupErr != sql.ErrNoRows {
+			return coremodel.Order{}, lookupErr
+		}
+	}
 	if item.ID > 0 {
 		existingID = item.ID
 	}
@@ -909,6 +917,18 @@ func (s *Store) UpsertOrder(item coremodel.Order) (coremodel.Order, error) {
 		var existingMetaJSON string
 		if err := s.db.QueryRow(`select meta_json from orders where id = ?`, existingID).Scan(&existingMetaJSON); err == nil {
 			_ = json.Unmarshal([]byte(existingMetaJSON), &existingMeta)
+		}
+		if item.ID > 0 {
+			if err := checkOrderIdentity(existingMeta, item.Meta); err != nil {
+				return coremodel.Order{}, err
+			}
+		} else if identityRevision(existingMeta) > 0 {
+			current, err := s.GetOrder(existingID)
+			if err != nil {
+				return coremodel.Order{}, err
+			}
+			item.SampleID, item.FileID = current.SampleID, current.FileID
+			item.PatientID, item.PatientName = current.PatientID, current.PatientName
 		}
 		item.Meta = mergeMeta(existingMeta, item.Meta)
 		metaJSON, _ = json.Marshal(metaOrEmpty(item.Meta))

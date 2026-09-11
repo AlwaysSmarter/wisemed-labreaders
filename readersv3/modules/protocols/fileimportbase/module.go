@@ -588,6 +588,26 @@ func autoSaveResultSync(rt module.Runtime) resultSyncService {
 }
 
 func saveOrderBundlesToWiseMED(api wiseMedResultsService, bundles []coremodel.OrderBundle, rt module.Runtime) (map[string]interface{}, error) {
+	// Block identity changes while sending; reject a bundle loaded before a correction.
+	if service, ok := rt.Service("storage"); ok {
+		if guard, ok := service.(interface{ BeginOrderIdentityUse() func() }); ok {
+			defer guard.BeginOrderIdentityUse()()
+		}
+		if currentStore, ok := service.(interface {
+			GetOrder(int64) (coremodel.Order, error)
+		}); ok {
+			for _, bundle := range bundles {
+				current, err := currentStore.GetOrder(bundle.Order.ID)
+				if err != nil {
+					return nil, err
+				}
+				if current.SampleID != bundle.Order.SampleID || current.ManualFileID() != bundle.Order.ManualFileID() || fmt.Sprint(current.Meta["id_revision"]) != fmt.Sprint(bundle.Order.Meta["id_revision"]) {
+					return nil, coremodel.ErrOrderIdentityConflict
+				}
+			}
+		}
+	}
+
 	saved := 0
 	skipped := 0
 	files := make([]map[string]interface{}, 0, len(bundles))
@@ -595,6 +615,9 @@ func saveOrderBundlesToWiseMED(api wiseMedResultsService, bundles []coremodel.Or
 	rt.Logf("wisemed send-to-bulletin: begin bundles=%d", len(bundles))
 	for _, bundle := range bundles {
 		fileID := strings.TrimSpace(bundle.Order.FileID)
+		if corrected := bundle.Order.ManualFileID(); corrected != "" {
+			fileID = corrected
+		}
 		if fileID == "" {
 			fileID = strings.TrimSpace(asString(bundle.Order.Meta["file_id"]))
 		}

@@ -31,3 +31,7 @@ readersv3/release/
 /readersv3/output/*/deployments/processed/**
 /readersv3/output/*/deployments/output/**
 /readersv3/output/*/deployments/config.yaml
+
+# Temporary resources generated while compiling Windows readers.
+/readersv3/apps/*/zz_releasectl_windows_icon.rc
+/readersv3/apps/*/zz_releasectl_windows_icon.syso

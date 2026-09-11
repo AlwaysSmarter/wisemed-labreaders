@@ -235,6 +235,7 @@ func (m *Module) Init(rt module.Runtime) error {
 	m.rt.Handle("/api/logs", m.withNoCache(m.requireSession(http.HandlerFunc(m.handleLogs))))
 	m.rt.Handle("/api/analytes", m.withNoCache(m.requireSession(http.HandlerFunc(m.handleAnalytes))))
 	m.rt.Handle("/api/analytes/", m.withNoCache(m.requireSession(http.HandlerFunc(m.handleAnalyteByID))))
+	m.rt.Handle("/api/orders/id", m.withNoCache(m.requireSession(http.HandlerFunc(m.handleOrderIDChange))))
 	m.rt.Handle("/api/orders", m.withNoCache(m.requireSession(http.HandlerFunc(m.handleOrders))))
 	m.rt.Handle("/api/order-image", m.withNoCache(m.requireSession(http.HandlerFunc(m.handleOrderImage))))
 	m.rt.Handle("/api/orders/worklist", m.withNoCache(m.requireSession(http.HandlerFunc(m.handleOrdersWorklist))))

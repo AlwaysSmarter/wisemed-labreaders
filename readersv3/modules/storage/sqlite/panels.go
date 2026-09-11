@@ -54,6 +54,12 @@ func (s *Store) RecordImportedPanel(date string, records []model.ImportedRecord,
 		return 0, err
 	}
 	if orderID == 0 {
+		lookupErr := tx.QueryRow(`select id from orders where order_date=? and round_no=? and json_extract(meta_json, '$.id_correction.original_sample_id')=? limit 1`, date, round, sample).Scan(&orderID)
+		if lookupErr != nil && lookupErr != sql.ErrNoRows {
+			return 0, lookupErr
+		}
+	}
+	if orderID == 0 {
 		res, e := tx.Exec(`insert into orders(round_no,order_date,sample_id,file_id,status,source_file,meta_json,created_at,updated_at) values(?,?,?,?,'received',?,?,?,?)`, round, date, sample, records[0].FileID, source, string(meta), now, now)
 		if e != nil {
 			return 0, e

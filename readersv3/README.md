@@ -133,3 +133,25 @@ Migrarea logicii complete din `readerslast` se poate face incremental, modul cu 
 ## Propagare schimbări
 
 Dacă adaugi funcționalitate nouă în `modules/analytemanagement`, toate readerele care activează `analyte-management` o vor primi după recompilare, fără copiere manuală de cod între aplicații. Același model se aplică pentru QC, dashboard, WS, storage și celelalte module shared.
+
+## Corectarea ID-ului primit de la analizor
+
+Disponibilă în interfața comună a tuturor readerelor: în **Detalii cerere**, click
+pe ID. Introduceți ID-ul fișei WiseMED, scrieți exact `deacord` și, opțional, un
+motiv. Fiecare modificare necesită o confirmare nouă. Sub ID apare cu roșu
+`ID modificat de <utilizator>, valoarea initiala: <ID analizor> (<motiv>)`.
+La modificări repetate se păstrează ID-ul inițial și întregul istoric.
+
+Utilizatorul este preluat din sesiunea autentificată pe server. Schimbarea ID-ului,
+resetarea asocierii WiseMED vechi și înregistrarea auditului se salvează atomic.
+Rezultatele și istoricul lor se păstrează. Se resping ID-urile deja folosite de
+altă cerere în aceeași zi/rundă și modificările bazate pe un ID între timp schimbat.
+
+Synchro Match și confirmarea WiseMED folosesc ID-ul nou ca ID de fișă direct,
+fără eliminarea prefixelor sau separarea codurilor de analizor. Confirmarea
+rulează sincronizarea înainte de trimitere. Asocierea și starea de trimitere
+anterioare se resetează; o schimbare locală nu retrage rezultate deja trimise în
+WiseMED. Sincronizarea/trimiterea în curs se încheie înainte de schimbarea ID-ului.
+
+Nu este necesar un modul per aparat sau activarea unei opțiuni. Pentru instalările
+existente, funcția devine disponibilă după înlocuirea executabilului cu buildul nou.

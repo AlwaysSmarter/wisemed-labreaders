@@ -200,6 +200,12 @@ func (m *Module) Reset() {
 }
 
 func (m *Module) runOnce(ctx context.Context) (map[string]interface{}, error) {
+	if service, ok := m.rt.Service("storage"); ok {
+		if guard, ok := service.(interface{ BeginOrderIdentityUse() func() }); ok {
+			defer guard.BeginOrderIdentityUse()()
+		}
+	}
+
 	m.mu.Lock()
 	if m.running {
 		m.mu.Unlock()
@@ -267,6 +273,7 @@ func (m *Module) runOnce(ctx context.Context) (map[string]interface{}, error) {
 			updatedOrder.Meta = mergeMeta(updatedOrder.Meta, result)
 			if _, err := store.UpsertOrder(updatedOrder); err != nil {
 				m.rt.Logf("result-sync: failed to update order id=%d: %v", order.ID, err)
+				continue
 			}
 			for _, analysis := range updatedAnalyses {
 				if _, err := store.SaveOrderAnalysis(analysis); err != nil {
@@ -291,6 +298,12 @@ func (m *Module) runOrders(ctx context.Context, orderIDs []int64, roundNo int, o
 }
 
 func (m *Module) runOrdersWithWiseMED(ctx context.Context, orderIDs []int64, roundNo int, orderDate string, wiseMED wiseMedLookupService) (map[string]interface{}, error) {
+	if service, ok := m.rt.Service("storage"); ok {
+		if guard, ok := service.(interface{ BeginOrderIdentityUse() func() }); ok {
+			defer guard.BeginOrderIdentityUse()()
+		}
+	}
+
 	m.mu.Lock()
 	if m.running {
 		m.mu.Unlock()
@@ -344,6 +357,7 @@ func (m *Module) runOrdersWithWiseMED(ctx context.Context, orderIDs []int64, rou
 		updatedOrder.Meta = mergeMeta(updatedOrder.Meta, result)
 		if _, err := store.UpsertOrder(updatedOrder); err != nil {
 			m.rt.Logf("result-sync: failed to update order id=%d: %v", order.ID, err)
+			continue
 		}
 		for _, analysis := range updatedAnalyses {
 			if _, err := store.SaveOrderAnalysis(analysis); err != nil {
@@ -359,6 +373,9 @@ func (m *Module) runOrdersWithWiseMED(ctx context.Context, orderIDs []int64, rou
 func (m *Module) processOrder(settings syncSettings, order coremodel.Order, analyses []coremodel.OrderAnalysisBundle, equipmentID string, wiseMED wiseMedLookupService) (map[string]interface{}, coremodel.Order, []coremodel.OrderAnalysis) {
 	rawSampleID := strings.TrimSpace(order.SampleID)
 	info := postprocessSampleCode(rawSampleID, settings)
+	if corrected := order.ManualFileID(); corrected != "" {
+		info = processedCode{RawSampleID: corrected, NormalizedSampleID: corrected, FileID: corrected, Valid: true}
+	}
 	meta := map[string]interface{}{
 		"sample_code_raw":         info.RawSampleID,
 		"sample_code_normalized":  info.NormalizedSampleID,

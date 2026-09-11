@@ -5606,6 +5606,70 @@ function slotLabel(order) {
   return `#${order.sample_no || 0}`;
 }
 
+
+function renderOrderIDCorrection(order) {
+  const change = order?.meta?.id_correction;
+  if (!change) return "";
+  const message = `ID modificat de ${change.actor}, valoarea initiala: ${change.original_id}${change.reason ? ` (${change.reason})` : ""}`;
+  const history = order?.meta?.id_correction_history || [];
+  return `<div class="order-id-correction">${escapeHtml(message)}</div>${history.length > 1 ? `<details class="order-id-correction"><summary>Istoric modificări ID (${history.length})</summary>${history.map((item) => `<div>${escapeHtml(`${item.previous_id} → ${item.new_id} · ${item.actor} · ${formatDate(item.changed_at)}${item.reason ? ` (${item.reason})` : ""}`)}</div>`).join("")}</details>` : ""}`;
+}
+
+function openOrderIDChange(order) {
+  if (document.getElementById("order-id-change-dialog")) return;
+  const dialog = document.createElement("dialog");
+  dialog.id = "order-id-change-dialog";
+  dialog.className = "order-id-dialog";
+  dialog.setAttribute("aria-labelledby", "order-id-change-title");
+  dialog.innerHTML = `<form>
+    <h2 id="order-id-change-title">Modificare ID cerere</h2>
+    <p>ID curent: <strong>${escapeHtml(order.sample_id)}</strong></p>
+    <p>Noul ID va fi folosit la Synchro Match și confirmarea WiseMED. Asocierea WiseMED existentă va fi eliminată. Valorile analizelor se păstrează.</p>
+    <label>ID nou din WiseMED<input name="new_id" required maxlength="200" autocomplete="off" value="${escapeHtml(order.sample_id)}"></label>
+    <label>Motiv (opțional)<textarea name="reason" maxlength="1000" rows="3"></textarea></label>
+    <label>Pentru a confirma modificarea, scrie exact <strong>deacord</strong><input name="confirmation" required autocomplete="off" spellcheck="false"></label>
+    <p class="order-id-correction" role="alert" data-id-error></p>
+    <div class="actions"><button type="button" data-id-cancel>Renunță</button><button type="submit" class="primary" data-id-save disabled>Confirmă modificarea</button></div>
+  </form>`;
+  document.body.appendChild(dialog);
+  const form = dialog.querySelector("form");
+  const save = dialog.querySelector("[data-id-save]");
+  const cancel = dialog.querySelector("[data-id-cancel]");
+  let saving = false;
+  const validate = () => {
+    save.disabled = saving || !form.elements.new_id.value.trim() || form.elements.new_id.value.trim() === String(order.sample_id) || form.elements.confirmation.value !== "deacord";
+  };
+  form.addEventListener("input", validate);
+  cancel.addEventListener("click", () => dialog.close());
+  dialog.addEventListener("cancel", (event) => { if (saving) event.preventDefault(); });
+  dialog.addEventListener("close", () => { dialog.remove(); els.orderDetails.querySelector("[data-edit-order-id]")?.focus(); });
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    validate();
+    if (save.disabled) return;
+    const change = {order_id: order.id, expected_id: order.sample_id, expected_revision: Number(order.meta?.id_revision || 0), new_id: form.elements.new_id.value.trim(), confirmation: form.elements.confirmation.value, reason: form.elements.reason.value.trim()};
+    saving = true; save.disabled = true; cancel.disabled = true;
+    for (const input of form.querySelectorAll("input,textarea")) input.disabled = true;
+    dialog.querySelector("[data-id-error]").textContent = "";
+    try {
+      const response = await api("/api/orders/id", {method:"PUT", body:JSON.stringify(change)});
+      const bundle = state.orders.find((item) => item.order.id === order.id);
+      if (bundle) bundle.order = response.order;
+      renderOrdersLayout(); renderOrderDetails();
+      dialog.close();
+      showToast("ID modificat. Rulează Synchro Match pentru noua asociere WiseMED.");
+    } catch (error) {
+      dialog.querySelector("[data-id-error]").textContent = error.message;
+    } finally {
+      saving = false; cancel.disabled = false;
+      for (const input of form.querySelectorAll("input,textarea")) input.disabled = false;
+      validate();
+    }
+  });
+  dialog.showModal();
+  form.elements.new_id.focus(); form.elements.new_id.select();
+}
+
 function renderOrderDetails() {
   if (isDocsmartMode()) {
     const item = state.docsmartFiles.find((entry) => entry.id === state.selectedDocsmartFileID);
@@ -5671,7 +5735,8 @@ function renderOrderDetails() {
     <div class="order-card">
       <div class="order-headline">
         <div class="order-title">
-          <strong>${escapeHtml(bundle.order.sample_id)}</strong>
+          <button type="button" class="order-id-edit" data-edit-order-id title="Modifică ID-ul cererii">${escapeHtml(bundle.order.sample_id)}</button>
+          ${renderOrderIDCorrection(bundle.order)}
           <div class="small muted">${escapeHtml(`${t("sentSampleCode")}: ${sentSampleCode || "-"}`)}</div>
         </div>
         <div class="analysis-send-pill"><span class="status-stack"><span class="status-bar receive ${escapeHtml(receiveStatus)}"></span><span class="status-bar send ${escapeHtml(sendStatus)}"></span></span><span class="slot-pill">${escapeHtml(`${t("round")} ${bundle.order.round_no || 1}`)}</span></div>
@@ -5779,6 +5844,7 @@ function renderOrderDetails() {
           </label>
         </div>` : ""}
     </div>`;
+  els.orderDetails.querySelector("[data-edit-order-id]")?.addEventListener("click", () => openOrderIDChange(bundle.order));
   [...els.orderDetails.querySelectorAll("[data-analysis-id]")].forEach((row) => {
     row.addEventListener("click", () => {
       state.selectedOrderAnalysisID = Number(row.dataset.analysisId || 0) || null;
