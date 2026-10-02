@@ -17,3 +17,9 @@ Before reporting completion, verify:
 Use `scripts/prepare-reader-output.sh <reader>` to initialize or refresh the local
 output workspace. Preserve existing runtime configuration, databases, logs and
 other local state. Output is gitignored, so verify it on disk explicitly.
+
+Every utility must expose and configure the shared app-updates mechanism, just
+like readers: enabled by default, stable channel, correct app_id matching its
+release artifacts, standard update-server URL and auto_download defaults, and
+visible update settings/status/check controls. Preserve explicit operator choices
+when loading existing deployments. Do not omit updates for utility protocols.

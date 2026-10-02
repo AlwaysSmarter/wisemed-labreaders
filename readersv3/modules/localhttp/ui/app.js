@@ -1373,6 +1373,7 @@ function applyBarcodeModeUI() {
   for (const name of ["orders", "qc", "daily-details"]) { const link=barcodeNavButton(name); if(link) link.hidden=true; }
   if(els.settingsSubmenu) els.settingsSubmenu.hidden=false;
   els.navSublinks.forEach(link => { if(link.dataset.settingsSubview) link.hidden=!["siui","reader","wss"].includes(link.dataset.settingsSubview); });
+  els.navSublinks.forEach(link=>{if(link.dataset.settingsSubview==="reader")link.textContent=state.language==="en"?"Server and updates":"Server și actualizări";});
   return;
  }
  if (isESignatureMode()) {state.utilityMode=true; applyESignatureUI(); return;}
@@ -7004,6 +7005,8 @@ async function loadSIUIPanel() {
   const admin=(Number(state.session?.user_type)||0)<=0;
   const settings=admin ? (await api("/api/siui/settings")).settings : {};
   panel.innerHTML=`<h2>CNAS — conectare și verificări</h2>
+   <p><button type="button" id="siui-update-settings">Server și actualizări</button> <button type="button" id="siui-update-check">Verifică actualizări</button></p>
+   <p id="siui-update-result" role="status"></p>
    <p>Testează conectarea OCSP, verifică un CNP sau descarcă personalizarea. Validarea serviciilor este în secțiunea separată de mai jos.</p>
    <p>${status.native_supported ? "Certificatul este folosit direct din Windows. PIN-ul se introduce local, în dialogul driverului." : "Conectarea cu tokenul USB este disponibilă pe Windows. Pe această platformă poți verifica interfața și configurația."}</p>
    ${admin ? `<form id="siui-settings-form"><h3>Conectare CNAS</h3>
@@ -7011,6 +7014,8 @@ async function loadSIUIPanel() {
     <label>Seria de licență CNAS <input name="licence" type="password" autocomplete="new-password" maxlength="4096" placeholder="${settings.licence_configured ? "Lasă gol pentru a păstra licența" : "Introdu seria de licență CNAS"}"></label>
     <p id="siui-licence-info">${settings.licence_configured ? "Licență salvată: " + escapeHtml(settings.licence_hint||"••••••") : "Licență neconfigurată"}</p>
     <label>Adresa CNAS <input name="base_url" value="${escapeHtml(settings.base_url||"")}" type="url" required></label>
+    <label>Port SIUI <input id="siui-port" type="number" min="1" max="65535" value="${escapeHtml(new URL(settings.base_url||"https://www.siui.ro").port||"443")}" required></label>
+    <p>Implicit 443. Folosește 444 numai pentru endpointul CNAS corespunzător. Portul se salvează în adresa CNAS.</p>
     <label>Certificatele contului <select name="certificate_store"><option value="CurrentUser">Utilizator curent</option><option value="LocalMachine">Calculator local</option></select></label>
     <label>Certificat / token USB <select name="certificate_thumbprint"><option value="${escapeHtml(settings.certificate_thumbprint||"")}">${escapeHtml(settings.certificate_thumbprint||"Selectează un certificat")}</option></select></label>
     <button type="button" id="siui-certificates">Reîncarcă certificatele</button><button type="submit">Salvează configurarea</button>
@@ -7037,8 +7042,16 @@ async function loadSIUIPanel() {
     <button type="submit">Trimite pentru validare</button><button type="button" id="siui-new-id">ID pentru o cerere nouă</button>
     <p>Păstrează același ID dacă verifici o trimitere întreruptă. La corectarea datelor, folosește un ID de operație nou și păstrează AppID-urile serviciilor.</p>
    </form><h3>Validări recente</h3><button id="siui-refresh" type="button">Actualizează istoricul</button><div id="siui-history"></div><pre id="siui-result" style="white-space:pre-wrap;overflow-wrap:anywhere"></pre></details>`;
+  bindAsyncClick(panel.querySelector("#siui-update-settings"),async()=>{activateSettingsSubView("reader");await loadReaderSettings();});
+  bindAsyncClick(panel.querySelector("#siui-update-check"),async()=>{
+   const result=panel.querySelector("#siui-update-result");result.textContent="Verificare actualizări în curs…";
+   try {const status=await refreshAppUpdateStatus(true);result.textContent=status.message||"Verificare finalizată.";}catch(e){result.textContent=e.message;throw e;}
+  });
   if(admin) {
    const form=panel.querySelector("#siui-settings-form"); form.elements.certificate_store.value=settings.certificate_store||"CurrentUser";
+   const port=panel.querySelector("#siui-port");
+   form.elements.base_url.addEventListener("change",()=>{try{port.value=new URL(form.elements.base_url.value).port||"443";}catch{}});
+   port.addEventListener("change",()=>{if(port.checkValidity()){try{const url=new URL(form.elements.base_url.value);url.port=port.value;form.elements.base_url.value=url.origin;}catch{}}});
    const reload=async()=>{
     const data=await api("/api/siui/certificates?store="+encodeURIComponent(form.elements.certificate_store.value));
     const select=form.elements.certificate_thumbprint; const selected=select.value;

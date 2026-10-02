@@ -175,3 +175,38 @@ certutil -addstore -f Root ".\deployments\tls\wisemed-local-root-ca.pem"
 schimbă autoritatea care trebuie instalată. Dacă avertismentul persistă, verifică
 codul exact al erorii și emitentul certificatului prezentat de browser. Un browser
 pe alt calculator are nevoie de încredere în propria sa instalare.
+
+## Actualizări
+
+SIUI Bridge folosește mecanismul comun din runner și local-http, inclusiv la rularea
+ca serviciu. Implicit, actualizările și descărcarea automată sunt activate, canalul
+este `stable`, `app_id` este `siui-bridge`, iar serverul implicit este
+`http://127.0.0.1:19090`, ca la celelalte utilitare. Configurează adresa serverului
+real în **Server și actualizări** dacă serverul nu rulează pe același calculator.
+Verificarea folosește cheia WiseMED `cfg_wisemed_key`, nu licența CNAS.
+
+În panoul CNAS sunt disponibile **Server și actualizări** și **Verifică actualizări**;
+aceeași verificare este disponibilă prin click pe versiunea din interfața comună.
+Serverul trebuie să aibă publicat pachetul pentru `siui-bridge` și platforma curentă.
+Configurațiile existente sunt păstrate la instalare/update; dacă provin din prima
+versiune cu update dezactivat, activează-l din setări. Comportamentul de descărcare,
+verificare checksum și aplicare la pornire/ca serviciu este cel comun tuturor readerelor.
+
+## OCSP: Windows error 12175
+
+12175 indică un eșec de verificare/negociere HTTPS WinHTTP, nu un răspuns de
+licență greșită primit de la CNAS. Versiunea curentă afișează și flags/cauza din
+callback-ul WinHTTP: certificat expirat, CA necunoscută, nume diferit, revocare sau
+Schannel. Nici sesiunea OCSP, nici licența/PIN-ul nu apar în diagnostic.
+
+Portul este explicit în formular: implicit 443; 444 este disponibil dacă endpointul
+folosit îl cere. Se persistă în `base_url` (ex. `https://www.siui.ro:444`). Schimbarea
+portului nu reprezintă o soluție generală pentru erori de certificat.
+
+La verificarea TLS directă din 3 octombrie 2026 (ora României), www.siui.ro:443
+prezenta certificatul *.siui.ro emis de certSIGN Web CA, valabil până la
+9 aprilie 2026 08:20:01 UTC. Aceasta este o observație la acel moment, nu o valoare
+fixată în cod. Verifică data Windows și certificatul endpointului folosit.
+Vechiul C# folosea o politică ce accepta orice certificat de server; noul transport
+păstrează verificarea TLS. Un certificat expirat la server trebuie reînnoit de
+operatorul endpointului; instalarea autorității HTTPS locale nu remediază acest caz.

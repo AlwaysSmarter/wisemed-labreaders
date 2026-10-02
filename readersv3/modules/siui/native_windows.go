@@ -122,6 +122,12 @@ func (n nativeBackend) Do(ctx context.Context, method, raw string, headers http.
 	if request == 0 {
 		return 0, nil, nil, nativeError("request", e)
 	}
+	diagnosticID, secureFlags, cleanupDiagnostics, e := attachSecureDiagnostics(request)
+	if e != nil {
+		whClose.Call(request)
+		return 0, nil, nil, e
+	}
+	defer cleanupDiagnostics()
 	var once sync.Once
 	closeRequest := func() { once.Do(func() { whClose.Call(request) }) }
 	defer closeRequest()
@@ -151,15 +157,15 @@ func (n nativeBackend) Do(ctx context.Context, method, raw string, headers http.
 	if len(body) > 0 {
 		bp = uintptr(unsafe.Pointer(&body[0]))
 	}
-	r, _, e = whSend.Call(request, uintptr(unsafe.Pointer(hs)), ^uintptr(0)&0xffffffff, bp, uintptr(len(body)), uintptr(len(body)), 0)
+	r, _, e = whSend.Call(request, uintptr(unsafe.Pointer(hs)), ^uintptr(0)&0xffffffff, bp, uintptr(len(body)), uintptr(len(body)), diagnosticID)
 	runtime.KeepAlive(hs)
 	runtime.KeepAlive(body)
 	if r == 0 {
-		return 0, nil, nil, nativeError("send", e)
+		return 0, nil, nil, nativeRequestError("send", u.Host, e, secureFlags)
 	}
 	r, _, e = whReceive.Call(request, 0)
 	if r == 0 {
-		return 0, nil, nil, nativeError("receive", e)
+		return 0, nil, nil, nativeRequestError("receive", u.Host, e, secureFlags)
 	}
 	var status uint32
 	size := uint32(4)
@@ -190,7 +196,7 @@ func (n nativeBackend) Do(ctx context.Context, method, raw string, headers http.
 		var count uint32
 		r, _, e = whRead.Call(request, uintptr(unsafe.Pointer(&chunk[0])), uintptr(len(chunk)), uintptr(unsafe.Pointer(&count)))
 		if r == 0 {
-			return 0, nil, nil, nativeError("read", e)
+			return 0, nil, nil, nativeRequestError("read", u.Host, e, secureFlags)
 		}
 		if count == 0 {
 			break

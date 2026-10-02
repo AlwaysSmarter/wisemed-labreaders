@@ -31,11 +31,11 @@ modules:
   help:
     help_dir: ./help
   app-updates:
-    enabled: false
+    enabled: true
     app_id: siui-bridge
     channel: stable
-    base_url: ""
-    auto_download: false
+    base_url: http://127.0.0.1:19090
+    auto_download: true
     download_dir: ./updates
   wisemed-api:
     cfg_wisemed_protocol: https
