@@ -105,12 +105,7 @@ func (c *Config) ApplyDefaults() {
 	if !c.LocalHTTP.Enabled {
 		c.LocalHTTP.Enabled = true
 	}
-	if c.WiseMedWS.HeartbeatMS <= 0 {
-		c.WiseMedWS.HeartbeatMS = 15000
-	}
-	if c.WiseMedWS.ReconnectDelayMS <= 0 {
-		c.WiseMedWS.ReconnectDelayMS = 5000
-	}
+	syncWiseMedWSMirror(c)
 	syncLocalHTTPMirror(c)
 	syncLoggingMirror(c)
 	syncResultsMirror(c)
@@ -250,4 +245,51 @@ func syncResultsMirror(c *Config) {
 		c.Results.AutoConfirmWiseMED = value
 	}
 	item["auto_confirm_wisemed"] = c.Results.AutoConfirmWiseMED
+}
+
+// syncWiseMedWSMirror preserves module settings written by the settings UI.
+// The legacy top-level block only supplies values missing from the module.
+func syncWiseMedWSMirror(c *Config) {
+	item := c.Modules["wisemed-ws"]
+	if item == nil {
+		item = map[string]interface{}{}
+		c.Modules["wisemed-ws"] = item
+	}
+	if value, ok := item["enabled"].(bool); ok {
+		c.WiseMedWS.Enabled = value
+	} else {
+		item["enabled"] = c.WiseMedWS.Enabled
+	}
+	if value, ok := item["url"].(string); ok {
+		c.WiseMedWS.URL = strings.TrimSpace(value)
+	} else {
+		item["url"] = c.WiseMedWS.URL
+	}
+	if value, ok := item["heartbeat_ms"]; ok {
+		switch v := value.(type) {
+		case int:
+			c.WiseMedWS.HeartbeatMS = v
+		case int64:
+			c.WiseMedWS.HeartbeatMS = int(v)
+		case float64:
+			c.WiseMedWS.HeartbeatMS = int(v)
+		case string:
+			c.WiseMedWS.HeartbeatMS, _ = strconv.Atoi(strings.TrimSpace(v))
+		}
+	}
+	if c.WiseMedWS.HeartbeatMS <= 0 {
+		c.WiseMedWS.HeartbeatMS = 15000
+	}
+	item["heartbeat_ms"] = c.WiseMedWS.HeartbeatMS
+	// All clients retry on the same documented 30-second cadence.
+	c.WiseMedWS.ReconnectDelayMS = 30000
+	item["reconnect_delay_ms"] = 30000
+	for key, value := range map[string]interface{}{
+		"auth_mode": "device_key", "tenant_id": "", "key_id": "", "issuer": "",
+		"audience": "wsm-server", "secret_file": "", "token_file": "", "token_path": "", "ca_file": "",
+	} {
+		if _, exists := item[key]; !exists {
+			item[key] = value
+		}
+	}
 }

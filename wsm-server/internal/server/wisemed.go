@@ -2,6 +2,7 @@ package server
 
 import (
 	"bytes"
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
@@ -13,17 +14,42 @@ import (
 	"net/url"
 	"strings"
 	"time"
+	"wisemed-labreaders/serverlast/wsm-server/internal/config"
 )
 
-func (s *Server) handleServerCommand(msg Envelope) (map[string]interface{}, error) {
+func (s *Server) handleServerCommand(ctx context.Context, tenant config.Tenant, conn *Connection, msg Envelope) (map[string]interface{}, error) {
 	command := strings.ToLower(strings.TrimSpace(asString(msg.Payload["command"])))
 	args := mapPayload(msg.Payload["args"])
 
 	switch command {
+	case "equipment.status":
+		ids := []string{}
+		if id := asString(args["equipment_id"]); id != "" {
+			ids = append(ids, id)
+		}
+		if list, ok := args["equipment_ids"].([]interface{}); ok {
+			for _, id := range list {
+				ids = append(ids, asString(id))
+			}
+		}
+		if len(ids) == 0 || len(ids) > 100 {
+			return nil, errors.New("1..100 equipment IDs required")
+		}
+		results := make([]map[string]interface{}, 0, len(ids))
+		for _, id := range ids {
+			if !config.ValidID(id) {
+				return nil, errors.New("invalid equipment ID")
+			}
+			results = append(results, s.equipmentStatus(conn.TenantID, id))
+		}
+		return map[string]interface{}{"equipment": results}, nil
+	case "equipment.list":
+		return map[string]interface{}{"connections": s.hub.Snapshot(conn.TenantID)}, nil
 	case "server.status":
 		return map[string]interface{}{
 			"service":     "wsm-server",
-			"connections": len(s.hub.Snapshot()),
+			"tenant_id":   conn.TenantID,
+			"connections": len(s.hub.Snapshot(conn.TenantID)),
 			"now_utc":     time.Now().UTC(),
 		}, nil
 	case "wisemed.ensure_equipment_online":
@@ -31,7 +57,7 @@ func (s *Server) handleServerCommand(msg Envelope) (map[string]interface{}, erro
 		if len(reader) == 0 {
 			return nil, errors.New("reader payload is required")
 		}
-		return s.wiseMedPut("/administrative/analyzer?XDEBUG_TRIGGER=debug", reader)
+		return s.doWiseMedJSON(ctx, tenant.WiseMed, http.MethodPut, "/administrative/analyzer", reader)
 	case "wisemed.fetch_file_for_analyzer":
 		fileID := strings.TrimSpace(asString(args["file_id"]))
 		equipmentID := strings.TrimSpace(asString(args["equipment_id"]))
@@ -41,29 +67,18 @@ func (s *Server) handleServerCommand(msg Envelope) (map[string]interface{}, erro
 		if equipmentID == "" {
 			return nil, errors.New("equipment_id is required")
 		}
-		path := "/fileforanalyzer/" + url.PathEscape(fileID) + "/" + url.PathEscape(equipmentID) + "/?XDEBUG_TRIGGER=debug"
-		return s.wiseMedGet(path)
+		path := "/fileforanalyzer/" + url.PathEscape(fileID) + "/" + url.PathEscape(equipmentID) + "/"
+		return s.doWiseMedJSON(ctx, tenant.WiseMed, http.MethodGet, path, nil)
 	default:
 		return nil, errors.New("unsupported server command")
 	}
 }
 
-func (s *Server) wiseMedGet(path string) (map[string]interface{}, error) {
-	return s.doWiseMedJSON(http.MethodGet, path, nil)
-}
-
-func (s *Server) wiseMedPut(path string, payload interface{}) (map[string]interface{}, error) {
-	return s.doWiseMedJSON(http.MethodPut, path, payload)
-}
-
-func (s *Server) doWiseMedJSON(method, path string, payload interface{}) (map[string]interface{}, error) {
-	baseURL := strings.TrimSpace(s.cfg.WiseMed.BaseURL)
-	apiKey := strings.TrimSpace(s.cfg.WiseMed.APIKey)
-	if baseURL == "" {
-		return nil, errors.New("wisemed base_url is not configured")
-	}
-	if apiKey == "" {
-		return nil, errors.New("wisemed api_key is not configured")
+func (s *Server) doWiseMedJSON(ctx context.Context, upstream config.WiseMed, method, path string, payload interface{}) (map[string]interface{}, error) {
+	baseURL := strings.TrimSpace(upstream.BaseURL)
+	apiKey := strings.TrimSpace(upstream.APIKey)
+	if baseURL == "" || apiKey == "" {
+		return nil, errors.New("WiseMED proxy is not configured for this tenant")
 	}
 
 	targetURL := strings.TrimRight(baseURL, "/") + path
@@ -76,7 +91,7 @@ func (s *Server) doWiseMedJSON(method, path string, payload interface{}) (map[st
 		body = bytes.NewReader(blob)
 	}
 
-	req, err := http.NewRequest(method, targetURL, body)
+	req, err := http.NewRequestWithContext(ctx, method, targetURL, body)
 	if err != nil {
 		return nil, err
 	}
@@ -90,18 +105,21 @@ func (s *Server) doWiseMedJSON(method, path string, payload interface{}) (map[st
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
 
-	resp, err := (&http.Client{Timeout: 20 * time.Second}).Do(req)
+	resp, err := s.upstreamClient.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, errors.New("WiseMED upstream request failed")
 	}
 	defer resp.Body.Close()
 
-	blob, err := io.ReadAll(resp.Body)
+	blob, err := io.ReadAll(io.LimitReader(resp.Body, 4*1024*1024+1))
 	if err != nil {
 		return nil, err
 	}
-	if resp.StatusCode >= 400 {
-		return nil, fmt.Errorf("wisemed http %d: %s", resp.StatusCode, strings.TrimSpace(string(blob)))
+	if len(blob) > 4*1024*1024 {
+		return nil, errors.New("WiseMED response too large")
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("WiseMED HTTP %d", resp.StatusCode)
 	}
 	if len(bytes.TrimSpace(blob)) == 0 {
 		return map[string]interface{}{}, nil

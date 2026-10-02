@@ -22,7 +22,7 @@ func main() {
 		fmt.Println(appmeta.CurrentVersion())
 		return
 	}
-	modules := []string{"wisemed-api", "login", "help", "signing-pad"}
+	modules := []string{"local-http", "events", "wisemed-api", "wisemed-ws", "login", "help", "signing-pad"}
 	if err := runner.Run(*cfgPath, modules, runner.RunOptions{
 		Headless:       *headless,
 		HeadlessChild:  *headlessChild,

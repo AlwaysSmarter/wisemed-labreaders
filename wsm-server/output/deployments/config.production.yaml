@@ -1,0 +1,46 @@
+server:
+  control_ui_dir: /opt/wsm-server/control
+  address: "0.0.0.0"
+  port: 8443
+  tls:
+    cert_file: /etc/wsm-server/tls/fullchain.pem
+    key_file: /etc/wsm-server/tls/privkey.pem
+  hello_timeout_ms: 10000
+  read_timeout_ms: 60000
+  write_timeout_ms: 5000
+  ping_interval_ms: 25000
+  send_queue_size: 128
+  max_message_bytes: 8388608
+  max_connections: 2000
+  max_connections_per_tenant: 200
+  max_topics_per_connection: 64
+  messages_per_second: 50
+  message_burst: 100
+security:
+  audience: wsm-server
+  max_token_ttl_seconds: 900
+  # Enable only if browser integration uses ?token=. Prefer the JWT subprotocol below.
+  allow_query_token: false
+  keys:
+    clinic-a-2026-09:
+      tenant_id: clinic-a
+      secret_file: /etc/wsm-server/keys/clinic-a.key
+      roles: [browser, reader, service]
+      # Backend signing key: never distribute this key to readers.
+      scopes: ["route:command", "route:reply", "route:event", "route:broadcast", "topics:subscribe", "connections:read", "server:status", "wisemed:proxy", "devices:debug", "api:invoke", "api:admin"]
+    clinic-b-2026-09:
+      tenant_id: clinic-b
+      secret_file: /etc/wsm-server/keys/clinic-b.key
+      roles: [browser, reader, service]
+      scopes: ["route:command", "route:reply", "route:event", "route:broadcast", "topics:subscribe", "connections:read", "server:status", "wisemed:proxy", "devices:debug", "api:invoke", "api:admin"]
+tenants:
+  clinic-a:
+    issuer: https://clinic-a.example.ro
+    allowed_origins: ["https://clinic-a.example.ro"]
+    # Optional: configure separately per tenant to enable the WiseMED bridge.
+    # wisemed:
+    #   base_url: https://clinic-a.example.ro/api
+    #   api_key_file: /etc/wsm-server/keys/clinic-a-api.key
+  clinic-b:
+    issuer: https://clinic-b.example.ro
+    allowed_origins: ["https://clinic-b.example.ro"]

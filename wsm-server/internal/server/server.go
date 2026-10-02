@@ -1,586 +1,570 @@
 package server
 
 import (
-	"bufio"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"net"
 	"net/http"
+	"reflect"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/golang-jwt/jwt/v5"
 	"github.com/gorilla/websocket"
-
 	"wisemed-labreaders/serverlast/wsm-server/internal/config"
 )
 
 type Server struct {
-	cfg      *config.Config
-	hub      *Hub
-	upgrader websocket.Upgrader
+	admin          adminState
+	authEpoch      uint64
+	ticketMu       sync.Mutex
+	tickets        map[string]controlTicket
+	gate           sync.RWMutex // Serializes reload against admission and message dispatch.
+	cfg            *config.Config
+	hub            *Hub
+	activeMu       sync.Mutex
+	active         map[*Connection]bool // Includes sockets awaiting hello.
+	reserved       map[string]int
+	stopping       bool
+	upstreamClient *http.Client
 }
 
 func New(cfg *config.Config) *Server {
-	return &Server{
-		cfg: cfg,
-		hub: NewHub(),
-		upgrader: websocket.Upgrader{
-			CheckOrigin: func(_ *http.Request) bool { return true },
-		},
+	return &Server{tickets: map[string]controlTicket{}, cfg: cfg, hub: NewHub(), active: map[*Connection]bool{}, reserved: map[string]int{}, upstreamClient: &http.Client{Timeout: 20 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}}
+}
+func (s *Server) current() *config.Config { s.gate.RLock(); defer s.gate.RUnlock(); return s.cfg }
+
+// Reload atomically replaces validated credentials/origins/upstreams/certificate.
+// All sockets are disconnected so revoked credentials cannot retain access.
+func (s *Server) Reload(cfg *config.Config) error {
+	s.gate.Lock()
+	defer s.gate.Unlock()
+	a, b := s.cfg.Server, cfg.Server
+	a.TLS = config.TLS{}
+	b.TLS = config.TLS{}
+	if !reflect.DeepEqual(a, b) || (s.cfg.Certificate == nil) != (cfg.Certificate == nil) {
+		return errors.New("server limits/listener/TLS mode changes require restart")
+	}
+	candidate := *cfg
+	cfg = &candidate
+	if err := cfg.RefreshDevices(); err != nil {
+		return err
+	}
+	s.admin.mu.Lock()
+	s.admin.epoch++
+	s.admin.sessions = nil
+	s.admin.mu.Unlock()
+	s.authEpoch++
+	s.cfg = cfg
+	s.activeMu.Lock()
+	defer s.activeMu.Unlock()
+	for c := range s.active {
+		c.Close()
+	}
+	log.Printf("configuration reloaded; existing connections closed")
+	return nil
+}
+func (s *Server) Close() {
+	s.gate.Lock()
+	defer s.gate.Unlock()
+	s.activeMu.Lock()
+	defer s.activeMu.Unlock()
+	s.stopping = true
+	for c := range s.active {
+		c.Close()
 	}
 }
-
 func (s *Server) Run(ctx context.Context) error {
-	httpServer := &http.Server{
-		Addr:              s.cfg.Server.Address + ":" + itoa(s.cfg.Server.Port),
-		Handler:           s.routes(),
-		ReadHeaderTimeout: 5 * time.Second,
-	}
-
-	go func() {
-		<-ctx.Done()
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		_ = httpServer.Shutdown(shutdownCtx)
-	}()
-
-	log.Printf("wsm-server listening on %s", httpServer.Addr)
-	return httpServer.ListenAndServe()
+	cfg := s.current()
+	srv := &http.Server{Addr: net.JoinHostPort(cfg.Server.Address, fmt.Sprint(cfg.Server.Port)), Handler: s.routes(), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, WriteTimeout: 10 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 16 * 1024}
+	srv.TLSConfig = &tls.Config{MinVersion: tls.VersionTLS12, GetCertificate: func(*tls.ClientHelloInfo) (*tls.Certificate, error) { return s.current().Certificate, nil }}
+	return s.serve(ctx, srv, nil)
 }
 
+// A supplied listener is used by integration tests with the same production TLS path.
+func (s *Server) serve(ctx context.Context, srv *http.Server, listener net.Listener) error {
+	done := make(chan struct{})
+	shutdownDone := make(chan struct{})
+	go func() {
+		defer close(shutdownDone)
+		select {
+		case <-ctx.Done():
+			s.Close()
+			c, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			_ = srv.Shutdown(c)
+		case <-done:
+		}
+	}()
+	log.Printf("wsm-server listening address=%s tls=%t", srv.Addr, s.current().Certificate != nil)
+	var err error
+	if listener != nil {
+		if s.current().Certificate != nil {
+			err = srv.ServeTLS(listener, "", "")
+		} else {
+			err = srv.Serve(listener)
+		}
+	} else if s.current().Certificate != nil {
+		err = srv.ListenAndServeTLS("", "")
+	} else {
+		err = srv.ListenAndServe()
+	}
+	close(done)
+	<-shutdownDone
+	s.Close()
+	if errors.Is(err, http.ErrServerClosed) {
+		return nil
+	}
+	return err
+}
 func (s *Server) routes() http.Handler {
 	r := chi.NewRouter()
-	r.Use(s.httpLogger)
-	r.Use(cors)
-	r.Get("/", s.handleRoot)
-	r.Get("/healthz", s.healthz)
-	r.Get("/api/connections", s.listConnections)
-	r.Get("/api/debug/state", s.debugState)
-	r.Get("/api/test-token", s.handleTestToken)
+	// Never log query strings, headers or message payloads (JWT/medical data).
+	r.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("X-Content-Type-Options", "nosniff")
+			w.Header().Set("Cache-Control", "no-store")
+			if r.TLS != nil {
+				w.Header().Set("Strict-Transport-Security", "max-age=31536000")
+			}
+			next.ServeHTTP(w, r)
+		})
+	})
+	s.adminRoutes(r)
+	r.Group(func(adminUI chi.Router) {
+		adminUI.Use(func(next http.Handler) http.Handler {
+			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if s.adminConfig(w, r, false) != nil {
+					next.ServeHTTP(w, r)
+				}
+			})
+		})
+		registerAdminUI(adminUI)
+	})
+	r.Get("/app.js", s.controlAsset)
+	r.Get("/styles.css", s.controlAsset)
+	r.Get("/wss-remote.js", s.controlAsset)
+	r.Get("/control", s.controlAsset)
+	r.Get("/control/*", s.controlAsset)
+	r.Get("/healthz", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, 200, map[string]interface{}{"status": "ok", "service": "wsm-server"})
+	})
+	r.Get("/api/connections", s.connections)
+	r.Get("/api/debug/state", s.connections)
+	r.Get("/api/equipment/{id}", s.equipmentHTTP)
 	r.Get("/ws", s.handleWS)
-	r.Handle("/test/*", s.withNoCache(http.StripPrefix("/test/", http.FileServer(http.Dir("web")))))
 	return r
 }
-
-func (s *Server) httpLogger(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		start := time.Now()
-		lrw := &loggingResponseWriter{ResponseWriter: w, status: http.StatusOK}
-		next.ServeHTTP(lrw, r)
-		log.Printf("http %s %s status=%d remote=%s duration=%s ua=%q", r.Method, r.URL.RequestURI(), lrw.status, r.RemoteAddr, time.Since(start).Round(time.Millisecond), r.UserAgent())
-	})
-}
-
-func (s *Server) handleRoot(w http.ResponseWriter, r *http.Request) {
-	http.Redirect(w, r, "/test/", http.StatusFound)
-}
-
-func (s *Server) healthz(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"status":   "ok",
-		"service":  "wsm-server",
-		"wisemed":  s.cfg.WiseMed.BaseURL,
-		"now_utc":  time.Now().UTC(),
-		"ws_route": "/ws",
-	})
-}
-
-func (s *Server) listConnections(w http.ResponseWriter, _ *http.Request) {
-	snapshot := s.hub.Snapshot()
-	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"connections": snapshot,
-		"count":       len(snapshot),
-		"stats":       s.hub.Stats(),
-	})
-}
-
-func (s *Server) debugState(w http.ResponseWriter, _ *http.Request) {
-	snapshot := s.hub.Snapshot()
-	readers := 0
-	browsers := 0
-	for _, conn := range snapshot {
-		switch conn.ClientType {
-		case "reader":
-			readers++
-		case "browser":
-			browsers++
-		}
-	}
-	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"summary": map[string]interface{}{
-			"total_connections":   len(snapshot),
-			"reader_connections":  readers,
-			"browser_connections": browsers,
-		},
-		"connections": snapshot,
-		"hub_stats":   s.hub.Stats(),
-	})
-}
-
-func (s *Server) handleTestToken(w http.ResponseWriter, r *http.Request) {
-	subject := strings.TrimSpace(r.URL.Query().Get("subject"))
-	role := strings.TrimSpace(r.URL.Query().Get("role"))
-	clientID := strings.TrimSpace(r.URL.Query().Get("client_id"))
-	readerID := strings.TrimSpace(r.URL.Query().Get("reader_id"))
-	label := strings.TrimSpace(r.URL.Query().Get("label"))
-	if subject == "" {
-		log.Printf("test-token denied: missing subject remote=%s", r.RemoteAddr)
-		writeJSON(w, http.StatusBadRequest, map[string]interface{}{"ok": false, "error": "subject is required"})
-		return
-	}
-	secret, ok := s.cfg.Security.AcceptedKeys[subject]
-	if !ok || strings.TrimSpace(secret) == "" {
-		log.Printf("test-token denied: subject=%s not configured remote=%s", subject, r.RemoteAddr)
-		writeJSON(w, http.StatusBadRequest, map[string]interface{}{"ok": false, "error": "subject is not configured in accepted_keys"})
-		return
-	}
-	if role == "" {
-		role = "browser"
-	}
-	log.Printf("test-token issued: subject=%s role=%s client_id=%s reader_id=%s label=%q remote=%s", subject, role, clientID, readerID, label, r.RemoteAddr)
-	now := time.Now().UTC()
-	claims := AuthClaims{
-		Role:     role,
-		ClientID: clientID,
-		ReaderID: readerID,
-		Label:    label,
-		RegisteredClaims: jwt.RegisteredClaims{
-			Subject:   subject,
-			IssuedAt:  jwt.NewNumericDate(now),
-			NotBefore: jwt.NewNumericDate(now.Add(-1 * time.Minute)),
-			ExpiresAt: jwt.NewNumericDate(now.Add(2 * time.Hour)),
-		},
-	}
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	signed, err := token.SignedString([]byte(secret))
+func (s *Server) connections(w http.ResponseWriter, r *http.Request) {
+	cfg := s.current()
+	claims, err := authenticate(cfg, r, false)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]interface{}{"ok": false, "error": err.Error()})
+		http.Error(w, "unauthorized", 401)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"ok":      true,
-		"token":   signed,
-		"subject": subject,
-		"role":    role,
-	})
+	if !claims.Has("connections:read") || !allowedOrigin(r, cfg.Tenants[claims.TenantID]) {
+		http.Error(w, "forbidden", 403)
+		return
+	}
+	v := s.hub.Snapshot(claims.TenantID)
+	writeJSON(w, 200, map[string]interface{}{"tenant_id": claims.TenantID, "connections": v, "count": len(v), "stats": s.hub.Stats(claims.TenantID)})
 }
-
 func (s *Server) handleWS(w http.ResponseWriter, r *http.Request) {
-	log.Printf("ws upgrade requested remote=%s path=%s", r.RemoteAddr, r.URL.RequestURI())
-	claims, err := s.authenticateWS(r)
+	// Holding the admission gate prevents a token validated before reload from
+	// opening a socket after revocation has closed the old generation.
+	s.gate.RLock()
+	cfg := s.cfg
+	epoch := s.authEpoch
+	claims, err := s.authenticateSocket(cfg, r)
 	if err != nil {
-		log.Printf("ws auth denied remote=%s error=%v", r.RemoteAddr, err)
-		http.Error(w, err.Error(), http.StatusUnauthorized)
+		s.gate.RUnlock()
+		http.Error(w, "unauthorized", 401)
 		return
 	}
-	log.Printf("ws auth ok remote=%s subject=%s role=%s client_id=%s reader_id=%s label=%q", r.RemoteAddr, claims.Subject, claims.Role, claims.ClientID, claims.ReaderID, claims.Label)
-
-	ws, err := s.upgrader.Upgrade(w, r, nil)
-	if err != nil {
-		log.Printf("ws upgrade failed remote=%s error=%v", r.RemoteAddr, err)
+	tenant := cfg.Tenants[claims.TenantID]
+	if !socketOriginAllowed(r, tenant, claims) {
+		s.gate.RUnlock()
+		http.Error(w, "origin denied", 403)
 		return
 	}
-	defer ws.Close()
-
-	conn := s.hub.NewConnection(ws, r.RemoteAddr, s.cfg.Server.SendQueueSize)
-	defer s.hub.Remove(conn.ID)
-	go s.writePump(conn)
-
-	ws.SetReadLimit(s.cfg.Server.MaxMessageBytes)
-	_ = ws.SetReadDeadline(time.Now().Add(time.Duration(s.cfg.Server.ReadTimeoutMS) * time.Millisecond))
+	s.activeMu.Lock()
+	total := 0
+	for _, n := range s.reserved {
+		total += n
+	}
+	if s.stopping || total >= cfg.Server.MaxConnections || s.reserved[claims.TenantID] >= cfg.Server.MaxConnectionsPerTenant {
+		s.activeMu.Unlock()
+		s.gate.RUnlock()
+		http.Error(w, "connection limit", 503)
+		return
+	}
+	s.reserved[claims.TenantID]++
+	s.activeMu.Unlock()
+	release := func() {
+		s.activeMu.Lock()
+		s.reserved[claims.TenantID]--
+		if s.reserved[claims.TenantID] == 0 {
+			delete(s.reserved, claims.TenantID)
+		}
+		s.activeMu.Unlock()
+	}
+	upgrader := websocket.Upgrader{HandshakeTimeout: 5 * time.Second, Subprotocols: []string{"wsm.v1"}, CheckOrigin: func(r *http.Request) bool { return socketOriginAllowed(r, tenant, claims) }}
+	ws, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		release()
+		s.gate.RUnlock()
+		return
+	}
+	conn := s.hub.NewConnection(ws, claims.TenantID, cfg.Server.SendQueueSize)
+	conn.Subject = claims.Subject
+	conn.EquipmentID = claims.EquipmentID
+	conn.RemoteIP, _, _ = net.SplitHostPort(r.RemoteAddr)
+	ctx, cancel := context.WithCancel(r.Context())
+	conn.cancel = cancel
+	s.activeMu.Lock()
+	s.active[conn] = true
+	s.activeMu.Unlock()
+	s.gate.RUnlock()
+	defer func() {
+		conn.Close()
+		s.hub.Remove(conn.ID)
+		s.activeMu.Lock()
+		delete(s.active, conn)
+		s.activeMu.Unlock()
+		release()
+	}()
+	// Authentication is a lease; even an idle connection closes at JWT expiry.
+	expiry := time.AfterFunc(time.Until(claims.ExpiresAt.Time), conn.Close)
+	defer expiry.Stop()
+	writerDone := make(chan struct{})
+	go func(writerConfig *config.Config) { defer close(writerDone); s.writePump(conn, writerConfig) }(cfg)
+	defer func() { conn.Close(); <-writerDone }()
+	ws.SetReadLimit(cfg.Server.MaxMessageBytes)
+	helloDeadline := time.Now().Add(time.Duration(cfg.Server.HelloTimeoutMS) * time.Millisecond)
+	_ = ws.SetReadDeadline(helloDeadline)
+	registered := false
 	ws.SetPongHandler(func(string) error {
 		s.hub.Touch(conn.ID)
-		return ws.SetReadDeadline(time.Now().Add(time.Duration(s.cfg.Server.ReadTimeoutMS) * time.Millisecond))
+		if !registered {
+			return ws.SetReadDeadline(helloDeadline)
+		}
+		return ws.SetReadDeadline(time.Now().Add(time.Duration(cfg.Server.ReadTimeoutMS) * time.Millisecond))
 	})
-
-	registered := false
+	tokens := float64(cfg.Server.MessageBurst)
+	last := time.Now()
 	for {
 		var msg Envelope
 		if err := ws.ReadJSON(&msg); err != nil {
-			log.Printf("ws read closed connection_id=%s remote=%s registered=%t error=%v", conn.ID, r.RemoteAddr, registered, err)
 			if registered {
-				s.hub.Broadcast(Envelope{
-					Type: "presence",
-					Payload: map[string]interface{}{
-						"event":         "disconnected",
-						"connection_id": conn.ID,
-						"client_type":   conn.ClientType,
-						"client_id":     conn.ClientID,
-						"reader_id":     conn.ReaderID,
-						"label":         conn.Label,
-					},
-				})
+				s.hub.Remove(conn.ID)
+				s.hub.Broadcast(conn.TenantID, presence(conn, "disconnected"))
 			}
 			return
+		}
+		now := time.Now()
+		tokens = min(float64(cfg.Server.MessageBurst), tokens+now.Sub(last).Seconds()*float64(cfg.Server.MessagesPerSecond))
+		last = now
+		if tokens < 1 {
+			policyClose(ws, "message rate exceeded")
+			return
+		}
+		tokens--
+		s.gate.RLock()
+		if s.authEpoch != epoch || now.After(claims.ExpiresAt.Time) {
+			s.gate.RUnlock()
+			return
+		}
+		cfg = s.cfg // Device provisioning changes keys without invalidating unrelated leases.
+		if !registered {
+			if msg.Type != "hello" {
+				s.gate.RUnlock()
+				policyClose(ws, "hello required")
+				return
+			}
+			hello, e := decodeHello(msg)
+			if e != nil || validateHelloAgainstClaims(hello, claims) != nil {
+				s.gate.RUnlock()
+				policyClose(ws, "hello identity denied")
+				return
+			}
+			hello.Label = claims.Label
+			if !s.hub.Register(conn, hello) {
+				s.gate.RUnlock()
+				policyClose(ws, "reader identity already connected")
+				return
+			}
+			registered = true
+			_ = ws.SetReadDeadline(now.Add(time.Duration(cfg.Server.ReadTimeoutMS) * time.Millisecond))
+			s.hub.send(conn, Envelope{Type: "hello_ack", Payload: map[string]interface{}{"connection_id": conn.ID, "tenant_id": conn.TenantID, "equipment_id": conn.EquipmentID, "client_type": conn.ClientType, "client_id": conn.ClientID, "reader_id": conn.ReaderID, "subject": conn.Subject, "expires_at": claims.ExpiresAt.Time}})
+			s.hub.Broadcast(conn.TenantID, presence(conn, "connected"))
+			s.gate.RUnlock()
+			log.Printf("ws connected tenant=%s connection=%s role=%s", conn.TenantID, conn.ID, conn.ClientType)
+			continue
 		}
 		s.hub.Touch(conn.ID)
-
-		switch msg.Type {
-		case "hello":
-			log.Printf("ws rx hello connection_id=%s payload=%s", conn.ID, mustJSON(msg.Payload))
-			hello, err := decodeHello(msg)
-			if err != nil || hello.ClientType == "" || hello.ClientID == "" {
-				log.Printf("ws hello invalid connection_id=%s error=%v payload=%s", conn.ID, err, mustJSON(msg.Payload))
-				s.hub.send(conn, Envelope{
-					Type: "error",
-					Payload: map[string]interface{}{
-						"message": "invalid hello payload",
-					},
-				})
-				continue
-			}
-			if err := validateHelloAgainstClaims(hello, claims); err != nil {
-				log.Printf("ws hello denied connection_id=%s subject=%s role=%s error=%v", conn.ID, claims.Subject, claims.Role, err)
-				s.hub.send(conn, Envelope{
-					Type: "error",
-					Payload: map[string]interface{}{
-						"message": err.Error(),
-					},
-				})
-				return
-			}
-			conn.Subject = claims.Subject
-			conn.Role = claims.Role
-			s.hub.Register(conn, hello)
-			registered = true
-			log.Printf("ws hello accepted connection_id=%s client_type=%s client_id=%s reader_id=%s subject=%s role=%s label=%q", conn.ID, conn.ClientType, conn.ClientID, conn.ReaderID, conn.Subject, conn.Role, conn.Label)
-			s.hub.send(conn, Envelope{
-				Type: "hello_ack",
-				Payload: map[string]interface{}{
-					"connection_id": conn.ID,
-					"client_type":   conn.ClientType,
-					"client_id":     conn.ClientID,
-					"subject":       conn.Subject,
-					"role":          conn.Role,
-					"reader_id":     conn.ReaderID,
-					"label":         conn.Label,
-				},
-			})
-			s.hub.Broadcast(Envelope{
-				Type: "presence",
-				Payload: map[string]interface{}{
-					"event":         "connected",
-					"connection_id": conn.ID,
-					"client_type":   conn.ClientType,
-					"client_id":     conn.ClientID,
-					"reader_id":     conn.ReaderID,
-					"label":         conn.Label,
-				},
-			})
-		case "ping":
-			log.Printf("ws rx ping connection_id=%s request_id=%s", conn.ID, msg.RequestID)
-			s.hub.send(conn, Envelope{
-				Type:          "pong",
-				RequestID:     msg.RequestID,
-				CorrelationID: msg.RequestID,
-				Payload: map[string]interface{}{
-					"server_time": time.Now().UTC(),
-				},
-			})
-		case "subscribe":
-			topic, _ := msg.Payload["topic"].(string)
-			ok := s.hub.Subscribe(conn.ID, topic)
-			log.Printf("ws subscribe connection_id=%s topic=%s ok=%t", conn.ID, topic, ok)
-			s.hub.send(conn, Envelope{
-				Type:          "subscribe_ack",
-				RequestID:     msg.RequestID,
-				CorrelationID: msg.RequestID,
-				Payload: map[string]interface{}{
-					"topic":      topic,
-					"subscribed": ok,
-				},
-			})
-		case "unsubscribe":
-			topic, _ := msg.Payload["topic"].(string)
-			ok := s.hub.Unsubscribe(conn.ID, topic)
-			log.Printf("ws unsubscribe connection_id=%s topic=%s ok=%t", conn.ID, topic, ok)
-			s.hub.send(conn, Envelope{
-				Type:          "unsubscribe_ack",
-				RequestID:     msg.RequestID,
-				CorrelationID: msg.RequestID,
-				Payload: map[string]interface{}{
-					"topic":        topic,
-					"unsubscribed": ok,
-				},
-			})
-		case "command", "reply", "event":
-			if !registered {
-				log.Printf("ws %s denied connection_id=%s reason=hello_required", msg.Type, conn.ID)
-				s.hub.send(conn, Envelope{
-					Type: "error",
-					Payload: map[string]interface{}{
-						"message": "send hello before other messages",
-					},
-				})
-				continue
-			}
-			if msg.Type == "command" && msg.Target != nil && msg.Target.Mode == "server" {
-				replyPayload, err := s.handleServerCommand(msg)
-				replyType := "reply"
-				if err != nil {
-					replyType = "error"
-					replyPayload = map[string]interface{}{"message": err.Error()}
-				}
-				s.hub.send(conn, Envelope{
-					Type:          replyType,
-					RequestID:     msg.RequestID,
-					CorrelationID: msg.RequestID,
-					Payload:       replyPayload,
-				})
-				log.Printf("ws server-command type=%s request_id=%s connection_id=%s payload=%s err=%v", msg.Type, msg.RequestID, conn.ID, mustJSON(msg.Payload), err)
-				continue
-			}
-			deliver := msg
-			deliver.Payload = clonePayload(msg.Payload)
-			deliver.Payload["sender_connection_id"] = conn.ID
-			deliver.Payload["sender_client_type"] = conn.ClientType
-			deliver.Payload["sender_client_id"] = conn.ClientID
-			deliver.Payload["sender_reader_id"] = conn.ReaderID
-
-			recipients := s.hub.Route(deliver, conn)
-			log.Printf("ws route type=%s request_id=%s sender_connection_id=%s sender_client_type=%s sender_client_id=%s sender_reader_id=%s recipients=%d target=%s broadcast=%t payload=%s", msg.Type, msg.RequestID, conn.ID, conn.ClientType, conn.ClientID, conn.ReaderID, recipients, mustJSON(msg.Target), msg.Broadcast, mustJSON(msg.Payload))
-			s.hub.send(conn, Envelope{
-				Type:          "command_ack",
-				RequestID:     msg.RequestID,
-				CorrelationID: msg.RequestID,
-				Payload: map[string]interface{}{
-					"routed_type": msg.Type,
-					"recipients":  recipients,
-					"target":      msg.Target,
-					"broadcast":   msg.Broadcast,
-				},
-			})
-		case "list_connections":
-			log.Printf("ws list_connections connection_id=%s", conn.ID)
-			s.hub.send(conn, Envelope{
-				Type:          "connections",
-				RequestID:     msg.RequestID,
-				CorrelationID: msg.RequestID,
-				Payload: map[string]interface{}{
-					"connections": s.hub.Snapshot(),
-				},
-			})
-		default:
-			log.Printf("ws unsupported type=%s connection_id=%s payload=%s", msg.Type, conn.ID, mustJSON(msg.Payload))
-			s.hub.send(conn, Envelope{
-				Type: "error",
-				Payload: map[string]interface{}{
-					"message": "unsupported message type",
-					"type":    msg.Type,
-				},
-			})
-		}
-	}
-}
-
-type loggingResponseWriter struct {
-	http.ResponseWriter
-	status int
-}
-
-func (w *loggingResponseWriter) WriteHeader(status int) {
-	w.status = status
-	w.ResponseWriter.WriteHeader(status)
-}
-
-func (w *loggingResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
-	hijacker, ok := w.ResponseWriter.(http.Hijacker)
-	if !ok {
-		return nil, nil, errors.New("underlying response writer does not implement http.Hijacker")
-	}
-	return hijacker.Hijack()
-}
-
-func (w *loggingResponseWriter) Flush() {
-	if flusher, ok := w.ResponseWriter.(http.Flusher); ok {
-		flusher.Flush()
-	}
-}
-
-func (w *loggingResponseWriter) Push(target string, opts *http.PushOptions) error {
-	pusher, ok := w.ResponseWriter.(http.Pusher)
-	if !ok {
-		return http.ErrNotSupported
-	}
-	return pusher.Push(target, opts)
-}
-
-type AuthClaims struct {
-	Role     string `json:"role"`
-	ClientID string `json:"client_id"`
-	ReaderID string `json:"reader_id"`
-	Label    string `json:"label"`
-	jwt.RegisteredClaims
-}
-
-func (s *Server) authenticateWS(r *http.Request) (*AuthClaims, error) {
-	tokenString := strings.TrimSpace(r.URL.Query().Get("token"))
-	if tokenString == "" {
-		authHeader := strings.TrimSpace(r.Header.Get("Authorization"))
-		if strings.HasPrefix(strings.ToLower(authHeader), "bearer ") {
-			tokenString = strings.TrimSpace(authHeader[7:])
-		}
-	}
-	if tokenString == "" {
-		return nil, errors.New("missing bearer token")
-	}
-	if len(s.cfg.Security.AcceptedKeys) == 0 {
-		return nil, errors.New("server has no accepted keys configured")
-	}
-
-	var lastErr error
-	for subject, secret := range s.cfg.Security.AcceptedKeys {
-		claims := &AuthClaims{}
-		token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
-			if token.Method != jwt.SigningMethodHS256 {
-				return nil, errors.New("unsupported signing method")
-			}
-			return []byte(secret), nil
-		})
-		if err != nil {
-			lastErr = err
-			continue
-		}
-		if !token.Valid {
-			lastErr = errors.New("invalid token")
-			continue
-		}
-		if claims.Subject == "" {
-			lastErr = errors.New("missing subject")
-			continue
-		}
-		if claims.Subject != subject {
-			lastErr = errors.New("token subject does not match accepted key entry")
-			continue
-		}
-		log.Printf("ws token matched accepted key subject=%s role=%s client_id=%s reader_id=%s", claims.Subject, claims.Role, claims.ClientID, claims.ReaderID)
-		return claims, nil
-	}
-	if lastErr == nil {
-		lastErr = errors.New("token validation failed")
-	}
-	return nil, lastErr
-}
-
-func validateHelloAgainstClaims(hello HelloPayload, claims *AuthClaims) error {
-	if claims == nil {
-		return errors.New("missing auth claims")
-	}
-	if claims.Role == "" {
-		return errors.New("missing role in token")
-	}
-	if claims.ClientID != "" && hello.ClientID != claims.ClientID {
-		return errors.New("hello client_id does not match token")
-	}
-	if claims.Label != "" && hello.Label != "" && hello.Label != claims.Label {
-		return errors.New("hello label does not match token")
-	}
-	switch claims.Role {
-	case "reader":
-		if hello.ClientType != "reader" {
-			return errors.New("reader token can only open reader connections")
-		}
-		expectedReaderID := claims.ReaderID
-		if expectedReaderID == "" {
-			expectedReaderID = claims.Subject
-		}
-		if hello.ReaderID != expectedReaderID {
-			return errors.New("hello reader_id does not match token")
-		}
-	default:
-		if hello.ClientType == "reader" && claims.ReaderID != "" && hello.ReaderID != claims.ReaderID {
-			return errors.New("hello reader_id does not match token")
-		}
-	}
-	return nil
-}
-
-func (s *Server) writePump(conn *Connection) {
-	pingTicker := time.NewTicker(time.Duration(s.cfg.Server.PingIntervalMS) * time.Millisecond)
-	defer pingTicker.Stop()
-
-	for {
-		select {
-		case msg, ok := <-conn.send:
-			if !ok {
-				return
-			}
-			if err := conn.conn.SetWriteDeadline(time.Now().Add(time.Duration(s.cfg.Server.WriteTimeoutMS) * time.Millisecond)); err != nil {
-				return
-			}
-			if err := conn.conn.WriteJSON(msg); err != nil {
-				return
-			}
-		case <-pingTicker.C:
-			if err := conn.conn.SetWriteDeadline(time.Now().Add(time.Duration(s.cfg.Server.WriteTimeoutMS) * time.Millisecond)); err != nil {
-				return
-			}
-			if err := conn.conn.WriteMessage(websocket.PingMessage, []byte("ping")); err != nil {
-				return
-			}
-		case <-conn.closed:
+		if msg.Type == "hello" {
+			s.gate.RUnlock()
+			policyClose(ws, "hello already completed")
 			return
 		}
+		if err := authorizeMessage(claims, msg); err != nil {
+			s.hub.send(conn, errorReply(msg, "forbidden", err.Error()))
+			s.gate.RUnlock()
+			continue
+		}
+		// Upstream requests use the authenticated tenant snapshot. They are cancellable
+		// on disconnect/reload, and do not hold the reload gate while waiting on HTTP.
+		if msg.Type == "command" && msg.Target != nil && msg.Target.Mode == "server" {
+			s.gate.RUnlock()
+			var payload map[string]interface{}
+			var e error
+			if asString(msg.Payload["command"]) == "control.ticket" {
+				payload, e = s.issueControlTicket(cfg, claims, asString(mapPayload(msg.Payload["args"])["equipment_id"]))
+			} else {
+				payload, e = s.handleServerCommand(ctx, tenant, conn, msg)
+			}
+			if e != nil {
+				s.hub.send(conn, errorReply(msg, "command_failed", e.Error()))
+			} else {
+				s.hub.send(conn, Envelope{Type: "reply", RequestID: msg.RequestID, CorrelationID: msg.RequestID, Payload: payload})
+			}
+			continue
+		}
+		s.dispatch(conn, claims, msg, cfg)
+		s.gate.RUnlock()
 	}
 }
-
+func presence(c *Connection, event string) Envelope {
+	return Envelope{Type: "presence", Payload: map[string]interface{}{"event": event, "connection_id": c.ID, "client_type": c.ClientType, "client_id": c.ClientID, "reader_id": c.ReaderID, "equipment_id": c.EquipmentID}}
+}
+func policyClose(ws *websocket.Conn, reason string) {
+	_ = ws.WriteControl(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.ClosePolicyViolation, reason), time.Now().Add(time.Second))
+}
+func errorReply(m Envelope, code, message string) Envelope {
+	return Envelope{Type: "error", RequestID: m.RequestID, CorrelationID: m.RequestID, Payload: map[string]interface{}{"code": code, "message": message}}
+}
+func authorizeMessage(c *AuthClaims, m Envelope) error {
+	denied := errors.New("operation not permitted or invalid message")
+	if c.ControlEquipmentID != "" && m.Type != "ping" && !(m.Type == "command" && m.Target != nil && m.Target.Mode == "equipment" && m.Target.EquipmentID == c.ControlEquipmentID && asString(m.Payload["command"]) == "api.request") {
+		return denied
+	}
+	if len(m.RequestID) > 128 || len(m.CorrelationID) > 128 {
+		return denied
+	}
+	switch m.Type {
+	case "ping":
+		return nil
+	case "list_connections":
+		if c.Has("connections:read") {
+			return nil
+		}
+	case "subscribe", "unsubscribe":
+		topic, _ := m.Payload["topic"].(string)
+		if c.Has("topics:subscribe") && config.ValidID(topic) {
+			return nil
+		}
+	case "command", "reply", "event":
+		if m.Broadcast || m.Target == nil {
+			return errors.New("explicit target required; broadcast flag is unsupported")
+		}
+		t := m.Target
+		if m.Type == "command" && m.RequestID == "" {
+			return errors.New("command request_id required")
+		}
+		if m.Type == "reply" && m.CorrelationID == "" {
+			return errors.New("reply correlation_id required")
+		}
+		if t.Mode == "server" {
+			if m.Type != "command" {
+				return denied
+			}
+			command := asString(m.Payload["command"])
+			if command == "control.ticket" && c.Has("api:invoke") && c.Has("route:command") {
+				return nil
+			}
+			if (command == "equipment.status" || command == "equipment.list") && c.Has("connections:read") {
+				return nil
+			}
+			if command == "server.status" && c.Has("server:status") {
+				return nil
+			}
+			if strings.HasPrefix(command, "wisemed.") && c.Has("wisemed:proxy") {
+				return nil
+			}
+			return denied
+		}
+		if m.Type == "command" && asString(m.Payload["command"]) == "api.request" && !c.Has("api:invoke") {
+			return denied
+		}
+		if !c.Has("route:" + m.Type) {
+			return denied
+		}
+		if c.Role == "reader" {
+			if m.Type == "command" && asString(m.Payload["command"]) == "api.request" && c.Has("api:invoke") && (t.Mode == "connection" || t.Mode == "equipment" || t.Mode == "reader") {
+				id := t.ConnectionID
+				if t.Mode == "equipment" {
+					id = t.EquipmentID
+				}
+				if t.Mode == "reader" {
+					id = t.ReaderID
+				}
+				if config.ValidID(id) {
+					return nil
+				}
+			}
+			if m.Type == "command" && c.Has("devices:debug") && (asString(m.Payload["command"]) == "device.ping" || asString(m.Payload["command"]) == "ws.reconnect" || asString(m.Payload["command"]) == "debug.message") && (t.Mode == "connection" || t.Mode == "equipment" || t.Mode == "reader") {
+				id := t.ConnectionID
+				if t.Mode == "equipment" {
+					id = t.EquipmentID
+				}
+				if t.Mode == "reader" {
+					id = t.ReaderID
+				}
+				if config.ValidID(id) {
+					return nil
+				}
+			}
+			// Readers respond directly and publish only their own telemetry topic.
+			if m.Type == "command" {
+				return denied
+			}
+			if m.Type == "reply" && t.Mode != "connection" {
+				return denied
+			}
+			if m.Type == "event" && (t.Mode != "topic" || (t.Topic != "results:"+c.ReaderID && t.Topic != "logs:"+c.ReaderID)) {
+				return denied
+			}
+		}
+		switch t.Mode {
+		case "connection":
+			if config.ValidID(t.ConnectionID) {
+				return nil
+			}
+		case "equipment":
+			if config.ValidID(t.EquipmentID) {
+				return nil
+			}
+		case "reader":
+			if config.ValidID(t.ReaderID) {
+				return nil
+			}
+		case "self":
+			return nil
+		case "connections", "readers", "equipments":
+			ids := t.ConnectionIDs
+			if t.Mode == "equipments" {
+				ids = t.EquipmentIDs
+			}
+			if t.Mode == "readers" {
+				ids = t.ReaderIDs
+			}
+			if len(ids) == 0 || len(ids) > 100 {
+				return denied
+			}
+			for _, id := range ids {
+				if !config.ValidID(id) {
+					return denied
+				}
+			}
+			if c.Has("route:broadcast") {
+				return nil
+			}
+		case "all":
+			if c.Has("route:broadcast") {
+				return nil
+			}
+		case "client_type":
+			if c.Has("route:broadcast") && (t.ClientType == "reader" || t.ClientType == "browser" || t.ClientType == "service") {
+				return nil
+			}
+		case "topic":
+			if config.ValidID(t.Topic) && (c.Role == "reader" || c.Has("route:broadcast")) {
+				return nil
+			}
+		}
+	}
+	return denied
+}
+func (s *Server) dispatch(c *Connection, claims *AuthClaims, m Envelope, cfg *config.Config) {
+	response := Envelope{RequestID: m.RequestID, CorrelationID: m.RequestID}
+	switch m.Type {
+	case "ping":
+		response.Type = "pong"
+		response.Payload = map[string]interface{}{"server_time": time.Now().UTC()}
+	case "list_connections":
+		response.Type = "connections"
+		response.Payload = map[string]interface{}{"connections": s.hub.Snapshot(c.TenantID)}
+	case "subscribe", "unsubscribe":
+		topic := m.Payload["topic"].(string)
+		ok := false
+		if m.Type == "subscribe" {
+			ok = s.hub.Subscribe(c.ID, topic, cfg.Server.MaxTopicsPerConnection)
+		} else {
+			ok = s.hub.Unsubscribe(c.ID, topic)
+		}
+		response.Type = m.Type + "_ack"
+		response.Payload = map[string]interface{}{"topic": topic, "ok": ok, m.Type + "d": ok}
+	case "command", "reply", "event":
+		deliver := m
+		deliver.ConnectionID = c.ID
+		deliver.Timestamp = time.Now().UTC()
+		deliver.Payload = clonePayload(m.Payload)
+		deliver.Payload["sender_connection_id"] = c.ID
+		deliver.Payload["sender_client_type"] = c.ClientType
+		deliver.Payload["sender_client_id"] = c.ClientID
+		deliver.Payload["sender_reader_id"] = c.ReaderID
+		deliver.Payload["sender_tenant_id"] = c.TenantID
+		deliver.Payload["sender_subject"] = claims.Subject
+		deliver.Payload["sender_scopes"] = claims.Scopes
+		n := s.hub.Route(deliver, c)
+		response.Type = "command_ack"
+		response.Payload = map[string]interface{}{"routed_type": m.Type, "recipients": n, "target": m.Target, "delivery": "queued"}
+	}
+	s.hub.send(c, response)
+}
+func (s *Server) writePump(c *Connection, cfg *config.Config) {
+	defer c.Close()
+	ticker := time.NewTicker(time.Duration(cfg.Server.PingIntervalMS) * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-c.closed:
+			return
+		case msg := <-c.send:
+			_ = c.conn.SetWriteDeadline(time.Now().Add(time.Duration(cfg.Server.WriteTimeoutMS) * time.Millisecond))
+			if c.conn.WriteJSON(msg) != nil {
+				return
+			}
+		case <-ticker.C:
+			if c.conn.WriteControl(websocket.PingMessage, nil, time.Now().Add(time.Duration(cfg.Server.WriteTimeoutMS)*time.Millisecond)) != nil {
+				return
+			}
+		}
+	}
+}
 func writeJSON(w http.ResponseWriter, status int, payload interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(payload)
 }
-
-func (s *Server) withNoCache(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
-		w.Header().Set("Pragma", "no-cache")
-		w.Header().Set("Expires", "0")
-		next.ServeHTTP(w, r)
-	})
-}
-
 func clonePayload(in map[string]interface{}) map[string]interface{} {
-	if in == nil {
-		return map[string]interface{}{}
-	}
 	out := make(map[string]interface{}, len(in))
 	for k, v := range in {
 		out[k] = v
 	}
 	return out
 }
-
-func mustJSON(v interface{}) string {
-	raw, err := json.Marshal(v)
-	if err != nil {
-		return `{"marshal_error":true}`
+func decodeHello(m Envelope) (HelloPayload, error) {
+	var h HelloPayload
+	b, e := json.Marshal(m.Payload)
+	if e != nil {
+		return h, e
 	}
-	return string(raw)
-}
-
-func decodeHello(msg Envelope) (HelloPayload, error) {
-	var hello HelloPayload
-	raw, err := json.Marshal(msg.Payload)
-	if err != nil {
-		return hello, err
-	}
-	err = json.Unmarshal(raw, &hello)
-	return hello, err
-}
-
-func cors(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, OPTIONS")
-		if r.Method == http.MethodOptions {
-			w.WriteHeader(http.StatusNoContent)
-			return
-		}
-		next.ServeHTTP(w, r)
-	})
+	e = json.Unmarshal(b, &h)
+	return h, e
 }

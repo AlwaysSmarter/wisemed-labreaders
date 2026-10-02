@@ -150,6 +150,28 @@ func normalizeLegacyConfig(cfg *config.Config) {
 	if cfg == nil {
 		return
 	}
+	// Legacy signing-pad builds owned their listener. The shared local HTTP
+	// module now hosts that same API together with settings and WSS debug.
+	if strings.EqualFold(strings.TrimSpace(cfg.Analyzer.Protocol), "signing-pad") || strings.EqualFold(strings.TrimSpace(cfg.Reader.ID), "signing-pad-utility") {
+		if cfg.Modules == nil {
+			cfg.Modules = map[string]map[string]interface{}{}
+		}
+		pad := cfg.Modules["signing-pad"]
+		if pad == nil {
+			pad = map[string]interface{}{}
+			cfg.Modules["signing-pad"] = pad
+		}
+		if shared, _ := pad["shared_http"].(bool); !shared {
+			if address, _ := pad["address"].(string); strings.TrimSpace(address) != "" {
+				cfg.LocalHTTP.Address = address
+			}
+			if tls, ok := pad["tls"].(bool); ok {
+				cfg.LocalHTTP.TLS = tls
+			}
+		}
+		pad["shared_http"] = true
+		cfg.ApplyDefaults()
+	}
 	if !strings.EqualFold(strings.TrimSpace(cfg.Analyzer.Protocol), "shimatzu-generic") {
 		return
 	}
@@ -195,6 +217,7 @@ func runAppLoop(ctx context.Context, configPath string, defaultModules []string,
 		if err != nil {
 			return err
 		}
+		normalizeLegacyConfig(cfg)
 		cfg.EnabledModules = append([]string(nil), defaultModules...)
 
 		reg := module.NewRegistry()

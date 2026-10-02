@@ -131,6 +131,15 @@ func ensureBootstrap(cfg *config.Config, reconfigure bool) (bool, error) {
 		changed = true
 	}
 
+	if cfg.Analyzer.Protocol == "siui" && reconfigure {
+		section := cfg.ModuleSettings("siui")
+		promptString(reader, "CNAS base URL", section, "base_url", "https://www.siui.ro")
+		promptString(reader, "CNAS username", section, "username", "")
+		fmt.Println("Licența CNAS se introduce în interfața web: Setări → CNAS - validare 72h.")
+		promptString(reader, "Certificate store (CurrentUser/LocalMachine)", section, "certificate_store", "CurrentUser")
+		promptString(reader, "Certificate thumbprint (or select in the CNAS settings UI)", section, "certificate_thumbprint", "")
+		cfg.Modules["siui"] = section
+	}
 	bootstrapModuleSettings(reader, cfg, reconfigure)
 	cfg.Modules["wisemed-api"] = settings
 	syncModuleMirrors(cfg)
@@ -660,7 +669,7 @@ func defaultCommType(cfg *config.Config) string {
 		return "tcpip"
 	case "hl7", "simple":
 		return "tcpip"
-	case "barcodeprinter":
+	case "barcodeprinter", "siui":
 		return "utility"
 	default:
 		return "file"
@@ -750,7 +759,7 @@ func supportedCommTypes(cfg *config.Config) []string {
 			add("tcpip")
 		case "seegene-excel", "beosl-csv", "beoslcsv", "cfx96-quantitation", "cary60-uvvis", "analytikjena-plasmaquantms-elite", "shimatzu-tocl", "shimatzu-generic", "biosan-hipo-mpp96", "gammavision", "tricarb-5110-tr", "anatolia-geneworks", "generic-file":
 			add("file")
-		case "barcodeprinter", "anaf-docsmart":
+		case "barcodeprinter", "anaf-docsmart", "siui":
 			add("utility")
 		}
 	}

@@ -898,15 +898,12 @@ const els = {
   readerSummaryList: document.getElementById("reader-summary-list"),
   sessionUser: document.getElementById("session-user"),
   statusCards: document.getElementById("status-cards"),
-  wsDot: document.getElementById("ws-dot"),
   analyzerDot: document.getElementById("analyzer-dot"),
-  wisemedwsPill: document.getElementById("wisemedws-pill"),
   analyzerPill: document.getElementById("analyzer-pill"),
   resultSyncPill: document.getElementById("result-sync-pill"),
   appToast: document.getElementById("app-toast"),
   appToastBody: document.getElementById("app-toast-body"),
   appToastClose: document.getElementById("app-toast-close"),
-  wisemedwsStatusLabel: document.getElementById("wisemedws-status-label"),
   analyzerStatusLabel: document.getElementById("analyzer-status-label"),
   resultSyncStatusLabel: document.getElementById("result-sync-status-label"),
   logsList: document.getElementById("logs-list"),
@@ -1077,7 +1074,7 @@ const els = {
   debugResult: document.getElementById("debug-result"),
   logsPanel: document.getElementById("logs-panel"),
   navLinks: [...document.querySelectorAll(".nav-link")],
-  navSublinks: [...document.querySelectorAll("#settings-submenu .nav-sublink")],
+  navSublinks: [...document.querySelectorAll(".nav-sublink[data-settings-subview]")],
   views: {
     overview: document.getElementById("view-overview"),
     analytes: document.getElementById("view-analytes"),
@@ -1093,6 +1090,9 @@ init();
 
 async function init() {
   bindEvents();
+  initWSSUI();
+  if (!window.WSM_REMOTE) document.querySelector(".help-frame").src = "/help/";
+  else document.getElementById("help-open").addEventListener("click", event => { event.preventDefault(); showRemoteHelp(); });
   const prefResp = await api("/api/preferences");
   state.language = prefResp.preferences?.language || "ro";
   syncLanguageControls();
@@ -1232,11 +1232,16 @@ function bindEvents() {
   els.closeAnalyteModalBtn.addEventListener("click", closeAnalyteModal);
   els.navLinks.forEach((link) => link.addEventListener("click", () => {
     if (link.dataset.view === "analytes") {
-      state.settingsSubView = isESignatureMode() ? "pad" : "reader";
+      state.settingsSubView = isSIUIMode() ? "siui" : isESignatureMode() ? "pad" : "reader";
+      if(isSIUIMode()) window.history.replaceState({},"","/settings/siui");
       if(isESignatureMode()) window.history.replaceState({},"","/settings/pad");
+    }
+    if (link.dataset.view === "debug" && !state.debugEnabled) {
+      activateSettingsSubView("wss"); activateView("analytes"); return;
     }
     activateView(link.dataset.view);
   }));
+  document.getElementById("debug-communication-link").addEventListener("click", () => activateView("debug"));
   els.navSublinks.forEach((link) => link.addEventListener("click", () => {
     activateSettingsSubView(link.dataset.settingsSubview || "reader");
     activateView(link.dataset.view || "analytes");
@@ -1334,6 +1339,8 @@ function setButtonLoading(button, loading) {
   button.removeAttribute("aria-busy");
 }
 
+function isSIUIMode() { return state.readerInfo?.protocol === "siui"; }
+
 function isESignatureMode() {
  return state.readerInfo?.protocol === "signing-pad" || state.readerInfo?.id === "esignature-server";
 }
@@ -1360,6 +1367,14 @@ function barcodeNavButton(viewName) {
 }
 
 function applyBarcodeModeUI() {
+ if (isSIUIMode()) {
+  state.utilityMode = true; state.barcodeMode = false;
+  for(const id of ["analyzer-pill","result-sync-pill"]) {const node=document.getElementById(id);if(node)node.hidden=true;}
+  for (const name of ["orders", "qc", "daily-details"]) { const link=barcodeNavButton(name); if(link) link.hidden=true; }
+  if(els.settingsSubmenu) els.settingsSubmenu.hidden=false;
+  els.navSublinks.forEach(link => { if(link.dataset.settingsSubview) link.hidden=!["siui","reader","wss"].includes(link.dataset.settingsSubview); });
+  return;
+ }
  if (isESignatureMode()) {state.utilityMode=true; applyESignatureUI(); return;}
   state.barcodeMode = isBarcodeMode();
   state.utilityMode = isUtilityMode();
@@ -1373,7 +1388,7 @@ function applyBarcodeModeUI() {
   if (navQC) navQC.style.display = "none";
   if (isDocsmartMode()) {
     if (navDailyDetails) navDailyDetails.style.display = "none";
-    if (els.settingsSubmenu) els.settingsSubmenu.hidden = true;
+    if (els.settingsSubmenu) { els.settingsSubmenu.hidden = false; els.navSublinks.forEach(link => { link.hidden = !["reader", "wss"].includes(link.dataset.settingsSubview); }); }
     if (els.settingsPanelReader) els.settingsPanelReader.hidden = false;
     if (els.settingsPanelAnalytes) els.settingsPanelAnalytes.hidden = true;
     if (els.settingsPanelQCEditor) els.settingsPanelQCEditor.hidden = true;
@@ -1381,7 +1396,7 @@ function applyBarcodeModeUI() {
   }
   if (state.barcodeMode) {
     if (navDailyDetails) navDailyDetails.style.display = "none";
-    if (els.settingsSubmenu) els.settingsSubmenu.hidden = true;
+    if (els.settingsSubmenu) { els.settingsSubmenu.hidden = false; els.navSublinks.forEach(link => { link.hidden = !["reader", "wss"].includes(link.dataset.settingsSubview); }); }
     if (els.settingsPanelReader) els.settingsPanelReader.hidden = true;
     if (els.settingsPanelQCEditor) els.settingsPanelQCEditor.hidden = true;
   }
@@ -1408,7 +1423,9 @@ async function onLanguageChange(event) {
   syncLanguageControls();
   applyLanguage();
   if (!els.dashboardView.hidden) {
-    if (isESignatureMode()) {
+    if (isSIUIMode()) {
+      await Promise.all([loadStatus(), loadLogs(), loadReaderSettings()]);
+    } else if (isESignatureMode()) {
       applyESignatureUI(); await Promise.all([loadStatus(), loadLogs(), loadDashboard()]);
     } else if (state.barcodeMode) {
       await Promise.all([loadStatus(), loadLogs(), loadDashboard(), loadBarcodeSettingsView(), loadBarcodeHistory()]);
@@ -1462,8 +1479,30 @@ async function onLogin(event) {
 }
 
 async function onLogout() {
+  siuiPollGeneration++;
+  const siuiPanel=document.getElementById("settings-panel-siui");
+  if(siuiPanel) {siuiPanel.replaceChildren();delete siuiPanel.dataset.loaded;}
+  if (window.WSM_REMOTE) {
+    closeESignatureDemo();
+    window.WSM_REMOTE.close();
+    state.session = null;
+    els.dashboardView.hidden = true;
+    if (state.logPollTimer) clearInterval(state.logPollTimer);
+    if (state.statusPollTimer) clearInterval(state.statusPollTimer);
+    window.close();
+    document.body.replaceChildren();
+    const message = document.createElement("p");
+    message.textContent = "Controlul la distanță a fost închis. Poți închide această fereastră. Readerul continuă să funcționeze.";
+    document.body.append(message);
+    return;
+  }
  closeESignatureDemo();
   await api("/api/session/logout", { method: "POST" });
+  state.wss.snapshot = null;
+  state.wss.windows.clear();
+  const wssPanel = document.getElementById("settings-panel-wss");
+  wssPanel.replaceChildren();
+  delete wssPanel.dataset.ready;
   state.session = null;
   state.orders = [];
   state.selectedOrderId = null;
@@ -1594,6 +1633,7 @@ async function renderLoginSetupPanel() {
 }
 
 async function mountDashboard(sessionResp) {
+  loadWSSStatus().catch(() => {});
   els.loginView.hidden = true;
   els.dashboardView.hidden = false;
   state.readerInfo = { ...(sessionResp.reader || {}) };
@@ -1617,7 +1657,9 @@ async function mountDashboard(sessionResp) {
   }
   renderRoundSelect();
   activateView(viewFromLocation(), false);
-  if (isESignatureMode()) {
+  if (isSIUIMode()) {
+    await Promise.all([loadStatus(), loadLogs(), loadReaderSettings()]);
+  } else if (isESignatureMode()) {
     await Promise.all([loadStatus(), loadLogs(), loadDashboard()]);
   } else if (state.barcodeMode) {
     await Promise.all([loadStatus(), loadLogs(), loadDashboard(), loadBarcodeSettingsView(), loadBarcodeHistory()]);
@@ -1665,7 +1707,11 @@ async function refreshAppUpdateStatus(force = false) {
 function syncDebugNavVisibility() {
   if (!els.debugNavLink) return;
   const enabled = !!state.debugEnabled && (Number(state.session?.user_type) || 0) <= 0;
-  els.debugNavLink.hidden = !enabled;
+  const admin = (Number(state.session?.user_type) || 0) <= 0;
+  els.debugNavLink.hidden = !admin;
+  document.getElementById("debug-submenu").hidden = !admin;
+  document.getElementById("debug-communication-link").disabled = !enabled;
+  document.getElementById("debug-communication-link").title = enabled ? "" : "Debug de comunicație indisponibil pentru configurația curentă";
   if (!enabled && state.currentView === "debug") {
     activateView("overview");
   }
@@ -1819,6 +1865,7 @@ function onAppUpdateIndicatorClick(event) {
 function activateView(name, pushHistory = true) {
  if (isESignatureMode() && name !== "analytes") closeESignatureDemo();
   if (name === "help") {
+    if (window.WSM_REMOTE) { showRemoteHelp(); return; }
     const helpTab = window.open("/help/", "_blank", "noopener");
     if (helpTab) helpTab.opener = null;
     return;
@@ -1833,20 +1880,26 @@ function activateView(name, pushHistory = true) {
     state.settingsSubView = settingsSubViewFromLocation();
   }
   state.currentView = name;
-  els.navLinks.forEach((link) => link.classList.toggle("active", link.dataset.view === name));
+  const wssActive = name === "analytes" && state.settingsSubView === "wss";
+  els.navLinks.forEach((link) => link.classList.toggle("active", wssActive ? link.dataset.view === "debug" : link.dataset.view === name));
+  document.getElementById("debug-communication-link").classList.toggle("active", name === "debug");
+  if(name !== "analytes") els.navSublinks.forEach(link => link.classList.remove("active"));
   Object.entries(els.views).forEach(([key, view]) => {
     view.hidden = key !== name;
   });
   renderTopbarTitle();
   if (pushHistory) {
     const path = pathForView(name);
-    if (window.location.pathname !== path) {
+    if (currentUIPath() !== path) {
       window.history.pushState({ view: name }, "", path);
     }
   }
   if (name === "analytes") {
+    if (isSIUIMode()) {activateSettingsSubView(state.settingsSubView);if(state.settingsSubView==="reader")loadReaderSettings().catch(error=>showToast(error.message,"error"));return;}
     if (isESignatureMode()) {activateSettingsSubView(state.settingsSubView); return;}
+    if (state.settingsSubView === "wss") { activateSettingsSubView("wss"); return; }
     if (state.barcodeMode) {
+      activateSettingsSubView("reader");
       loadBarcodeSettingsView().catch(() => {});
     } else {
       activateSettingsSubView(state.settingsSubView || "reader");
@@ -1879,6 +1932,7 @@ function activateView(name, pushHistory = true) {
 }
 
 function renderTopbarTitle() {
+  if (state.currentView === "analytes" && state.settingsSubView === "wss") { document.getElementById("dashboard-title").textContent = "Debug WSS"; return; }
  if(isESignatureMode()) {
  const title=document.getElementById("dashboard-title");
  if(title) title.textContent=state.currentView==="analytes" ? ({pad:"Setări PAD",demo:"Demo",reader:"Server și update-uri"}[state.settingsSubView] || "Settings") : state.currentView==="orders" ? "Istoric semnături" : "eSignature server";
@@ -1907,7 +1961,7 @@ function renderTopbarTitle() {
   if (state.currentView === "analytes") {
     title.textContent = state.settingsSubView === "reader"
       ? t("settingsReader")
-      : (state.settingsSubView === "qc" ? t("settingsQc") : (state.settingsSubView === "daily-details" ? t("settingsDailyDetails") : (state.settingsSubView === "daily-analysis-filters" ? "Filtre blocare analize" : (state.settingsSubView === "astm-specimens" ? "ASTM - Tipuri probe" : t("settingsAnalytes")))));
+      : (state.settingsSubView === "qc" ? t("settingsQc") : (state.settingsSubView === "daily-details" ? t("settingsDailyDetails") : (state.settingsSubView === "daily-analysis-filters" ? "Filtre" : (state.settingsSubView === "astm-specimens" ? "Tipuri de probe" : t("settingsAnalytes")))));
     return;
   }
   if (state.currentView === "orders") {
@@ -1930,8 +1984,10 @@ function renderTopbarTitle() {
 }
 
 function viewFromLocation() {
- if(isESignatureMode() && window.location.pathname.startsWith("/settings")) return "analytes";
-  const path = window.location.pathname || "/";
+ if(isSIUIMode()) return currentUIPath()==="/debug" ? "debug" : "analytes";
+  if (currentUIPath() === "/settings/wss") return "analytes";
+ if(isESignatureMode() && currentUIPath().startsWith("/settings")) return "analytes";
+  const path = currentUIPath() || "/";
   if (state.barcodeMode) {
     if (path === "/settings" || path === "/settings/reader" || path === "/settings/analytes" || path === "/settings/qc") return "analytes";
     if (path === "/daily-details") return "daily-details";
@@ -1950,8 +2006,10 @@ function viewFromLocation() {
 }
 
 function settingsSubViewFromLocation() {
- if(isESignatureMode()) {return window.location.pathname==="/settings/demo" ? "demo" : window.location.pathname==="/settings/reader" ? "reader" : "pad";}
-  const path = window.location.pathname || "/";
+ if(isSIUIMode()) return currentUIPath()==="/settings/wss" ? "wss" : currentUIPath()==="/settings/reader" ? "reader" : "siui";
+  if (currentUIPath() === "/settings/wss") return "wss";
+ if(isESignatureMode()) {return currentUIPath()==="/settings/demo" ? "demo" : currentUIPath()==="/settings/reader" ? "reader" : "pad";}
+  const path = currentUIPath() || "/";
   if (path === "/settings/reader" || path === "/settings") return "reader";
   if (path === "/settings/qc") return "qc";
   if (path === "/settings/daily-details") return "daily-details";
@@ -1961,6 +2019,8 @@ function settingsSubViewFromLocation() {
 }
 
 function pathForView(name) {
+ if(isSIUIMode() && name==="analytes" && state.settingsSubView==="siui") return "/settings/siui";
+  if (name === "analytes" && state.settingsSubView === "wss") return "/settings/wss";
  if(isESignatureMode() && name==="analytes") return "/settings/"+(["pad","demo","reader"].includes(state.settingsSubView)?state.settingsSubView:"pad");
   if (state.barcodeMode) {
     if (name === "analytes") return "/settings";
@@ -1987,9 +2047,34 @@ function pathForView(name) {
 }
 
 function activateSettingsSubView(name) {
+ const siuiPanel=document.getElementById("settings-panel-siui");
+ if(siuiPanel) siuiPanel.hidden=name!=="siui";
+ if(name==="siui" && isSIUIMode()) {
+  state.settingsSubView="siui";
+  document.querySelectorAll('[id^="settings-panel-"]').forEach(p=>p.hidden=p.id!=="settings-panel-siui");
+  els.navSublinks.forEach(link=>link.classList.toggle("active",link.dataset.settingsSubview==="siui"));
+  window.history.replaceState({view:"analytes"},"","/settings/siui");
+  loadSIUIPanel().catch(error=>showToast(error.message,"error"));
+  return;
+ }
+  document.getElementById("settings-panel-wss").hidden = name !== "wss";
+  if (name === "wss") {
+    if (isESignatureMode()) closeESignatureDemo();
+    state.settingsSubView = "wss";
+    document.querySelectorAll('[id^="settings-panel-"]').forEach(panel => { panel.hidden = panel.id !== "settings-panel-wss"; });
+    els.navSublinks.forEach(link => link.classList.toggle("active", link.dataset.settingsSubview === "wss"));
+    window.history.replaceState({view:"analytes"}, "", "/settings/wss");
+    renderWSSPanel();
+    loadWSSStatus().catch(error => wssNotice(error.message));
+    renderTopbarTitle();
+    return;
+  }
+
  if(isESignatureMode()) {activateESignatureSettings(name);return;}
   if (state.barcodeMode) {
     state.settingsSubView = "reader";
+    window.history.replaceState({view:"analytes"}, "", "/settings");
+    els.navSublinks.forEach(link => link.classList.toggle("active", link.dataset.settingsSubview === "reader"));
     if (els.settingsPanelAnalytes) els.settingsPanelAnalytes.hidden = false;
     if (els.settingsPanelReader) els.settingsPanelReader.hidden = true;
     if (els.settingsPanelQCEditor) els.settingsPanelQCEditor.hidden = true;
@@ -2000,6 +2085,8 @@ function activateSettingsSubView(name) {
   }
   if (isDocsmartMode()) {
     state.settingsSubView = "reader";
+    window.history.replaceState({view:"analytes"}, "", "/settings/reader");
+    els.navSublinks.forEach(link => link.classList.toggle("active", link.dataset.settingsSubview === "reader"));
     if (els.settingsPanelReader) els.settingsPanelReader.hidden = false;
     if (els.settingsPanelAnalytes) els.settingsPanelAnalytes.hidden = true;
     if (els.settingsPanelQCEditor) els.settingsPanelQCEditor.hidden = true;
@@ -2027,7 +2114,7 @@ function activateSettingsSubView(name) {
   if (!els.views.analytes.hidden) {
     renderTopbarTitle();
     const path = pathForView("analytes");
-    if (window.location.pathname !== path) {
+    if (currentUIPath() !== path) {
       window.history.replaceState({ view: "analytes" }, "", path);
     }
   }
@@ -2187,6 +2274,7 @@ async function loadStatus() {
 }
 
 async function loadDashboard() {
+ if(isSIUIMode()) return;
  if(isESignatureMode()) {
  const data=await api("/api/esignature/stats/daily");
  const rows=data.stats||[];const today=rows.find(row=>row.date===new Date().toISOString().slice(0,10))||{};
@@ -3709,6 +3797,7 @@ function onPrintDailyWorksheetClick() {
   if (scope === "day_analyte" || scope === "day_round_analyte") {
     params.set("analyte_tag", String(state.dailyDetailsAnalyteTag || "").trim());
   }
+  if (window.WSM_REMOTE) { openRemotePrint("/api/daily-details/worksheet", params); return; }
   window.open(`/api/daily-details/worksheet?${params.toString()}`, "_blank", "noopener,noreferrer");
 }
 
@@ -3998,6 +4087,7 @@ function onWorklistOrdersClick() {
   const params = new URLSearchParams();
   if (state.selectedOrderDate) params.set("order_date", state.selectedOrderDate);
   if (state.selectedRoundNo > 0) params.set("round_no", String(state.selectedRoundNo));
+  if (window.WSM_REMOTE) { openRemotePrint("/api/orders/worklist", params); return; }
   window.open(`/api/orders/worklist?${params.toString()}`, "_blank", "noopener,noreferrer");
 }
 
@@ -5803,7 +5893,7 @@ function renderOrderDetails() {
       ${imagePath ? `
         <div class="order-image-preview">
           <span class="label">${escapeHtml(t("orderImage"))}</span>
-          <img src="/api/order-image?path=${encodeURIComponent(imagePath)}" alt="${escapeHtml(t("orderImage"))}" loading="lazy">
+          <img ${window.WSM_REMOTE ? 'data-wss-image' : 'src'}="/api/order-image?path=${encodeURIComponent(imagePath)}" alt="${escapeHtml(t("orderImage"))}" loading="lazy">
         </div>` : ""}
     </div>
     <div class="analysis-list">
@@ -5869,6 +5959,19 @@ function renderOrderDetails() {
           </label>
         </div>` : ""}
     </div>`;
+  if (window.WSM_REMOTE) {
+    els.orderDetails.querySelectorAll('[data-wss-image]').forEach(async image => {
+      try {
+        const response = await fetch(image.dataset.wssImage);
+        if (!response.ok) throw new Error('Imagine indisponibilă');
+        const blob = await response.blob();
+        if (!image.isConnected) return;
+        const objectURL = URL.createObjectURL(blob);
+        image.onload = image.onerror = () => URL.revokeObjectURL(objectURL);
+        image.src = objectURL;
+      } catch (error) { image.alt = error.message; }
+    });
+  }
   els.orderDetails.querySelectorAll("[data-edit-order-id]").forEach((button) => {
     button.addEventListener("click", () => openOrderIDChange(bundle.order));
   });
@@ -6140,10 +6243,8 @@ function applyLanguage() {
   document.getElementById("logs-title").textContent = t("recentLogs");
   document.getElementById("log-polling-label").textContent = t("logPolling");
   if (document.getElementById("analytes-title")) document.getElementById("analytes-title").textContent = t("navSettings");
-  if (els.navSublinks[0]) els.navSublinks[0].textContent = t("settingsReader");
-  if (els.navSublinks[1]) els.navSublinks[1].textContent = t("navAnalytes");
-  if (els.navSublinks[2]) els.navSublinks[2].textContent = t("settingsDailyDetails");
-  if (els.navSublinks[3]) els.navSublinks[3].textContent = t("settingsQc");
+  const settingsLabels = {reader:t("settingsReader"), analytes:t("navAnalytes"), "daily-details":t("settingsDailyDetails"), "daily-analysis-filters":state.language === "en" ? "Filters" : "Filtre", "astm-specimens":state.language === "en" ? "Specimen types" : "Tipuri de probe", qc:t("settingsQc"), wss:"WSS"};
+  els.navSublinks.forEach(link => { const label=settingsLabels[link.dataset.settingsSubview]; if(label) link.textContent=label; });
   if (els.debugNavLink) els.debugNavLink.textContent = t("navDebug");
   document.getElementById("orders-title").textContent = t("navOrders");
   if (document.getElementById("debug-title")) document.getElementById("debug-title").textContent = t("debugTitle");
@@ -6275,11 +6376,8 @@ function toggleLogsAccess(canViewLogs) {
 }
 
 function updateConnectionPills(connections) {
-  const wsConnected = !!connections.wisemed_ws_connected;
   const analyzerConnected = !!connections.analyzer_connected;
   const analyzerLastPacketAt = String(connections.analyzer_last_packet_at || "").trim();
-  els.wisemedwsPill.classList.toggle("connected", wsConnected);
-  els.wisemedwsPill.classList.toggle("disconnected", !wsConnected);
   if (state.barcodeMode) {
     els.analyzerPill.hidden = true;
   } else {
@@ -6287,9 +6385,7 @@ function updateConnectionPills(connections) {
     els.analyzerPill.classList.toggle("connected", analyzerConnected);
     els.analyzerPill.classList.toggle("disconnected", !analyzerConnected);
   }
-  els.wsDot.classList.toggle("offline", !wsConnected);
   els.analyzerDot.classList.toggle("offline", !analyzerConnected);
-  els.wisemedwsStatusLabel.textContent = `${t("wisemedws")} · ${wsConnected ? t("connected") : t("disconnected")}`;
   els.analyzerStatusLabel.textContent = `${t("analyzer")} · ${analyzerConnected ? t("connected") : t("disconnected")}`;
   if (analyzerLastPacketAt && analyzerLastPacketAt !== state.analyzerLastPacketAt) {
     pulseAnalyzerIndicator();
@@ -6474,7 +6570,7 @@ function applyESignatureUI() {
 
   els.settingsSubmenu.hidden = false;
   els.navSublinks.forEach(link => {
-    link.hidden = !['pad', 'demo', 'reader'].includes(link.dataset.settingsSubview);
+    link.hidden = !['pad', 'demo', 'reader', 'wss'].includes(link.dataset.settingsSubview);
     if (link.dataset.settingsSubview === 'reader') link.textContent = 'Server și update-uri';
   });
   for (const view of ['daily-details', 'qc']) { const node = barcodeNavButton(view); if(node) node.hidden = true; }
@@ -6530,6 +6626,10 @@ async function renderESignaturePanel(view) {
   };
 }
 function closeESignatureDemo() {
+  if (window.WSM_REMOTE && state.remoteSignatureSession) {
+    const sessionID = state.remoteSignatureSession; state.remoteSignatureSession = null;
+    api('/api/esignature/command', {method:'POST',body:JSON.stringify({id:crypto.randomUUID(),action:'cancel',session_id:sessionID})}).catch(() => {});
+  }
   const socket=state.signatureSocket;state.signatureSocket=null;
   if(socket) socket.close();
   const image=document.getElementById('esignature-demo-image');if(image){image.hidden=true;image.removeAttribute('src');}
@@ -6543,6 +6643,19 @@ function sendESignatureDemo(action) {
     if(['start','retry','cancel'].includes(action)){const image=panel.querySelector('img');image.hidden=true;image.removeAttribute('src');}
     socket.send(JSON.stringify({id:String(Date.now()),action}));status.textContent='Se execută comanda…';
   };
+  if (window.WSM_REMOTE) {
+    if (!state.remoteSignatureSession) state.remoteSignatureSession = crypto.randomUUID();
+    status.textContent = 'Se execută comanda prin WSS…';
+    api('/api/esignature/command', {method:'POST', body:JSON.stringify({id:crypto.randomUUID(), action, session_id:state.remoteSignatureSession})})
+      .then(data => {
+        if (data.ok !== false && ['confirm', 'cancel'].includes(action)) state.remoteSignatureSession = null;
+        status.textContent = data.ok === false ? data.message : (data.count !== undefined ? `Pad-uri detectate: ${data.count}` : ({start:'Semnează pe pad, apoi apasă Confirmă.',retry:'Semnează din nou.',confirm:'Semnătură capturată.',cancel:'Captură anulată.'}[action] || 'Comandă executată.'));
+        if (data.imageBase64) { const image = panel.querySelector('img'); image.src = `data:image/png;base64,${data.imageBase64}`; image.hidden = false; }
+      })
+      .catch(error => { status.textContent = error.message; })
+      .finally(() => buttons.forEach(button => button.disabled = false));
+    return;
+  }
   if(state.signatureSocket?.readyState===WebSocket.OPEN){send(state.signatureSocket);return;}
   const socket=new WebSocket(`${location.protocol==='https:'?'wss:':'ws:'}//${location.host}/ws/demo`);
   state.signatureSocket=socket;
@@ -6559,4 +6672,390 @@ function sendESignatureDemo(action) {
 async function loadESignatureHistory() {
   const data=await api('/api/esignature/jobs');
   els.ordersLayout.innerHTML=`<div class="table-wrap"><table class="data-table"><thead><tr><th>Data (UTC)</th><th>Operație</th><th>Rezultat</th><th>Mesaj</th></tr></thead><tbody>${(data.jobs||[]).map(row=>`<tr><td>${escapeHtml(row.created_at)}</td><td>${escapeHtml(row.action)}</td><td>${row.ok?'OK':'Eroare'}</td><td>${escapeHtml(row.message||'')}</td></tr>`).join('')}</tbody></table></div>`;
+}
+
+// The browser uses the authenticated local API; the runtime owns the WSS socket.
+function initWSSUI() {
+  state.wss = { snapshot: null, receivedAt: 0, loading: false, peers: [], windows: new Map() };
+  document.getElementById("wss-pill").addEventListener("click", () => {
+    if (window.WSM_REMOTE) { activateSettingsSubView("wss"); activateView("analytes"); return; }
+    const status = state.wss.snapshot?.status;
+    if ((Number(state.session?.user_type) || 0) <= 0 && status?.enabled && !status.connected) wssControl("reconnect").catch(error => wssNotice(error.message));
+    else { activateSettingsSubView("wss"); activateView("analytes"); }
+  });
+  window.addEventListener("message", async event => {
+    const entry = state.wss.windows.get(event.source);
+    if (!entry || event.origin !== entry.origin) return;
+    if (event.data?.type === "wsm-control-ready" && entry.ticket) {
+      event.source.postMessage({type:"wsm-control-auth", ticket:entry.ticket}, entry.origin);
+      entry.ticket = null;
+    } else if (["wsm-control-refresh", "wsm-control-ready"].includes(event.data?.type) && !entry.refreshing) {
+      entry.refreshing = true;
+      try {
+        const response = await api("/api/wss/open", {method:"POST", body:JSON.stringify({equipment_id:entry.equipmentID})});
+        if (new URL(response.url).origin !== entry.origin) throw new Error("Originea consolei s-a schimbat. Redeschide consola.");
+        event.source.postMessage({type:"wsm-control-auth",ticket:response.ticket}, entry.origin);
+      } catch (error) { wssNotice(`Reautentificare consolă: ${error.message}`); }
+      finally { entry.refreshing = false; }
+    }
+  });
+  setInterval(() => {
+    for (const child of state.wss.windows.keys()) if (child.closed) state.wss.windows.delete(child);
+    if (els.dashboardView.hidden) return;
+    renderWSSBadge();
+    if (!state.wss.loading && Date.now() - state.wss.receivedAt > 2000) loadWSSStatus().catch(() => {});
+  }, 1000);
+}
+
+function wssRetrySeconds(status, receivedAt, now = Date.now()) {
+  const deadline = Date.parse(status.next_retry_at || "");
+  if (Number.isFinite(deadline) && deadline > 0) return Math.max(0, Math.ceil((deadline - now) / 1000));
+  return Math.max(0, Math.ceil(Number(status.retry_in_seconds || 0) - (now - receivedAt) / 1000));
+}
+
+function renderWSSBadge() {
+  const status = state.wss.snapshot?.status;
+  const label = document.getElementById("wss-status-label");
+  const pill = document.getElementById("wss-pill");
+  const dot = document.getElementById("wss-dot");
+  if (!status || state.wss.statusError) { pill.classList.remove("connected"); pill.classList.add("disconnected"); label.textContent = "WSS: stare indisponibilă"; dot.style.backgroundColor = "var(--danger)"; return; }
+  const seconds = wssRetrySeconds(status, state.wss.receivedAt);
+  label.textContent = status.connected ? "WSS: conectat" : !status.enabled ? "WSS: neconfigurat" : status.paused ? "WSS: deconectat manual · reconectează" : status.phase === "connecting" ? "WSS: conectare…" : `WSS: deconectat · reîncercare în ${seconds}s`;
+  pill.classList.toggle("connected", !!status.connected);
+  pill.classList.toggle("disconnected", !status.connected);
+  dot.classList.toggle("ok", !!status.connected);
+  dot.style.backgroundColor = status.connected ? "var(--accent-deep)" : "var(--danger)";
+  pill.title = [status.url, status.equipment_id ? `Echipament ${status.equipment_id}` : "", status.last_error, status.connected ? "Deschide Debug WSS" : "Click pentru reîncercare imediată"].filter(Boolean).join(" · ");
+  const details = document.getElementById("wss-local-status");
+  if (details) details.textContent = JSON.stringify(status, null, 2);
+}
+
+async function loadWSSStatus() {
+  if (state.wss.loading) return;
+  state.wss.loading = true;
+  try {
+    const snapshot = await api("/api/wss/status");
+    state.wss.snapshot = snapshot;
+    state.wss.statusError = "";
+    state.wss.receivedAt = Date.now();
+    renderWSSBadge();
+    const form = document.getElementById("wss-settings-form");
+    if (form && !form.dataset.loaded) {
+      for (const [key, value] of Object.entries(snapshot.settings || {})) {
+        const field = form.elements.namedItem(key);
+        if (field && field.type !== "password") { if (field.type === "checkbox") field.checked = !!value; else field.value = Array.isArray(value) ? value.join(",") : value ?? ""; }
+      }
+      const secretField = form.elements.namedItem("device_secret");
+      if (secretField) {
+        secretField.value = "";
+        secretField.placeholder = snapshot.settings?.device_secret_configured ? "Cheie salvată · lasă gol pentru a o păstra" : "Lipește cheia generată în consola WSM";
+      }
+      form.dataset.loaded = "true";
+    }
+    const trace = document.getElementById("wss-trace");
+    if (trace) trace.textContent = (snapshot.trace || []).slice(-150).map(entry => JSON.stringify(entry, null, 2)).join("\n\n") || "Nu există mesaje în sesiunea curentă.";
+  } catch (error) {
+    state.wss.receivedAt = Date.now();
+    state.wss.statusError = error.message;
+    document.getElementById("wss-status-label").textContent = "WSS: stare indisponibilă";
+    document.getElementById("wss-pill").title = error.message;
+    throw error;
+  } finally { state.wss.loading = false; }
+}
+
+function wssNotice(text, success = false) {
+  const notice = document.getElementById("wss-notice");
+  if (notice) { notice.textContent = text; notice.classList.toggle("wss-error", !success); }
+  else showToast(text, success ? "success" : "error");
+}
+
+async function wssControl(action) {
+  if (window.WSM_REMOTE && action === "disconnect") throw new Error("Deconectarea permanentă a echipamentului nu este disponibilă din consola la distanță.");
+  await api("/api/wss/control", {method:"POST", body:JSON.stringify({action})});
+  await loadWSSStatus();
+  wssNotice(action === "disconnect" ? "Conexiune oprită manual. Folosește Reconectare pentru reluare." : "Reconectare solicitată.", true);
+}
+
+function renderWSSPanel() {
+  const panel = document.getElementById("settings-panel-wss");
+  if (panel.dataset.ready) return;
+  panel.dataset.ready = "true";
+  panel.innerHTML = `
+    <div class="panel-head"><h3>WiseMED WSS · configurare și debug</h3></div>
+    <p class="small muted">Conexiunea folosește ID-ul echipamentului înregistrat prin API WiseMED. Lista și comenzile sunt limitate la instanța WiseMED și permisiunile cheii curente.</p>
+    <p id="wss-notice" role="status" aria-live="polite"></p>
+    <form id="wss-settings-form" class="wss-grid">
+      <label class="wss-check"><input name="enabled" type="checkbox"> Activare WSS</label>
+      <label>Server WSS<input name="url" placeholder="wss://server.example/ws" spellcheck="false"></label>
+      <label>Autentificare<select name="auth_mode"><option value="device_key">Cheie echipament (JWT)</option><option value="token_file">Fișier JWT</option><option value="token_endpoint">Endpoint JWT WiseMED</option></select></label>
+      <label>Instanță WiseMED / tenant<input name="tenant_id" autocomplete="off"></label>
+      <label>ID cheie<input name="key_id" autocomplete="off"></label>
+      <label>Emitent JWT<input name="issuer"></label>
+      <label>Audiență JWT<input name="audience"></label>
+      <label>Subiect JWT<input name="subject"></label>
+      <label>ID client<input name="client_id"></label>
+      <label>Cheie WSS<input name="device_secret" type="password" autocomplete="new-password" spellcheck="false"><small>Cheia generată în consola WSM. Lasă gol pentru a păstra cheia salvată.</small></label>
+      <label>Fișier cheie pe calculatorul echipamentului<input name="secret_file" autocomplete="off" spellcheck="false"></label>
+      <label>Fișier JWT pe calculatorul echipamentului<input name="token_file" autocomplete="off" spellcheck="false"></label>
+      <label>Cale endpoint JWT<input name="token_path" spellcheck="false"></label>
+      <label>Fișier CA suplimentar (opțional)<input name="ca_file" spellcheck="false"></label>
+      <label>Permisiuni solicitate (separate prin virgulă)<input name="scopes" spellcheck="false"></label>
+      <div class="wss-wide orders-buttons"><button type="submit">Salvează și aplică</button></div>
+    </form>
+    <div class="orders-buttons wss-toolbar"><button data-wss-control="disconnect" type="button">Deconectare</button><button data-wss-control="reconnect" type="button">Reconectare acum</button><button data-wss-action="ping_server" type="button">Ping server</button><button data-wss-action="list" type="button">Actualizează lista clienților</button></div>
+    <details><summary>Starea conexiunii locale</summary><pre id="wss-local-status" class="wss-json"></pre></details>
+    <div id="wss-relay-debug">
+    <h4>Clienți conectați</h4><div id="wss-peers" class="wss-table-wrap"><p>Apasă „Actualizează lista clienților”.</p></div>
+    <div class="wss-grid"><label class="wss-wide">Client destinatar<select id="wss-target"><option value="">Selectează un client din listă</option></select></label><label class="wss-wide">Mesaj text<textarea id="wss-message" rows="2" maxlength="8192"></textarea></label></div>
+    <div class="orders-buttons wss-toolbar"><button data-wss-action="ping" type="button">Ping client</button><button data-wss-action="reconnect" type="button">Reconectează clientul</button><button data-wss-action="message" type="button">Trimite mesaj</button></div>
+    <details open><summary>Exemplu API prin WSS</summary><p class="small muted">Solicitarea este executată de același handler API al destinatarului. Se transmit numai date JSON. Operațiile de modificare se execută efectiv pe echipamentul selectat.</p>
+    <form id="wss-bridge-form" class="wss-grid"><label>Metodă<select name="method"><option>GET</option><option>POST</option><option>PUT</option><option>PATCH</option><option>DELETE</option></select></label><label>Cale API<input name="path" value="/api/status" required pattern="/api/.*" spellcheck="false"></label><label class="wss-wide">Corp JSON (opțional)<textarea name="body" rows="4" placeholder='{"example":"value"}' spellcheck="false"></textarea></label><div class="wss-wide"><button type="submit">Execută prin WSS</button></div></form></details>
+    <h4>Răspuns comandă</h4><pre id="wss-response" class="wss-json" aria-live="polite">Nicio comandă executată.</pre>
+    <details open><summary>Mesaje trimise / primite · ultimele 150 înregistrări</summary><pre id="wss-trace" class="wss-json">Se încarcă…</pre></details></div>`;
+  if (window.WSM_REMOTE) {
+    panel.querySelector("#wss-relay-debug").hidden = true;
+    panel.querySelectorAll("[data-wss-action], [data-wss-control='disconnect']").forEach(button => { button.hidden = true; });
+    panel.querySelector("[data-wss-control='reconnect']").textContent = "Reconectează echipamentul la WSS";
+    const note = document.createElement("p");
+    note.textContent = "Setările și reconectarea de aici afectează echipamentul. Reconectarea întrerupe temporar controlul; revine automat după reconectarea echipamentului. Butonul din bara albastră reconectează numai această fereastră.";
+    panel.prepend(note);
+  }
+  if ((Number(state.session?.user_type) || 0) > 0) {
+    panel.querySelector("#wss-settings-form").hidden = true;
+    panel.querySelector("#wss-relay-debug").hidden = true;
+    panel.querySelectorAll("[data-wss-control], [data-wss-action]").forEach(button => { button.hidden = true; });
+    wssNotice("Configurarea și comenzile WSS necesită un cont administrator. Starea conexiunii rămâne vizibilă.", true);
+  }
+  panel.querySelector("#wss-settings-form").addEventListener("submit", async event => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const payload = Object.fromEntries(new FormData(form));
+    payload.enabled = form.elements.enabled.checked;
+    await wssBusy(form.querySelector("button"), async () => {
+      await api("/api/wss/settings", {method:"PUT", body:JSON.stringify(payload)});
+      form.elements.namedItem("device_secret").value = "";
+      delete form.dataset.loaded;
+      await loadWSSStatus();
+      wssNotice("Setările WSS au fost salvate și aplicate.", true);
+    });
+  });
+  panel.querySelectorAll("[data-wss-control]").forEach(button => button.addEventListener("click", () => wssBusy(button, () => wssControl(button.dataset.wssControl))));
+  panel.querySelectorAll("[data-wss-action]").forEach(button => button.addEventListener("click", () => wssBusy(button, () => wssDebug(button.dataset.wssAction))));
+  panel.querySelector("#wss-bridge-form").addEventListener("submit", event => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    wssBusy(form.querySelector("button"), async () => {
+      const connectionID = wssSelectedTarget();
+      const payload = {connection_id:connectionID, method:form.elements.method.value, path:form.elements.path.value};
+      const raw = form.elements.body.value.trim();
+      if (raw) { try { payload.body = JSON.parse(raw); } catch { throw new Error("Corpul solicitării nu este JSON valid."); } }
+      const response = await api("/api/wss/bridge", {method:"POST", body:JSON.stringify(payload)});
+      document.getElementById("wss-response").textContent = JSON.stringify(response.data, null, 2);
+      wssNotice("Răspuns primit. Verifică statusul și corpul răspunsului de mai jos.", true);
+      await loadWSSStatus();
+    });
+  });
+}
+
+async function wssBusy(button, action) {
+  if (button.disabled) return;
+  button.disabled = true;
+  try { await action(); } catch (error) { wssNotice(error.message); }
+  finally {
+    await loadWSSStatus().catch(() => {});
+    button.disabled = false;
+  }
+}
+function wssSelectedTarget() {
+  const connectionID = document.getElementById("wss-target").value;
+  if (!connectionID) throw new Error("Selectează mai întâi un client conectat.");
+  return connectionID;
+}
+async function wssDebug(action) {
+  if (window.WSM_REMOTE) throw new Error("Comenzile către alte echipamente se inițiază din consola locală.");
+  const payload = {action};
+  if (!["list", "ping_server"].includes(action)) payload.connection_id = wssSelectedTarget();
+  if (action === "message") {
+    payload.text = document.getElementById("wss-message").value;
+    if (!payload.text.trim()) throw new Error("Scrie mesajul înainte de trimitere.");
+  }
+  const response = await api("/api/wss/debug", {method:"POST", body:JSON.stringify(payload)});
+  document.getElementById("wss-response").textContent = JSON.stringify(response.data, null, 2);
+  if (action === "list") renderWSSPeers(response.data?.connections || response.data?.clients || (Array.isArray(response.data) ? response.data : []));
+  wssNotice("Comandă executată.", true);
+  await loadWSSStatus();
+}
+function renderWSSPeers(peers) {
+  state.wss.peers = peers;
+  const target = document.getElementById("wss-target");
+  const selected = target.value;
+  target.replaceChildren(new Option("Selectează un client din listă", ""));
+  const host = document.getElementById("wss-peers");
+  host.replaceChildren();
+  if (!peers.length) { host.textContent = "Nu există clienți vizibili pentru cheia curentă."; return; }
+  const table = document.createElement("table"); table.className = "data-table";
+  const head = table.createTHead().insertRow();
+  ["Client / conexiune", "Echipament", "IP", "Conectat la", "Acțiuni"].forEach(label => { const cell = document.createElement("th"); cell.textContent = label; head.append(cell); });
+  const body = table.createTBody();
+  for (const peer of peers) {
+    const id = String(peer.connection_id || peer.id || "");
+    target.add(new Option(`${peer.client_id || id} · ${peer.equipment_id || "fără echipament"}`, id));
+    const row = body.insertRow();
+    [peer.client_id ? `${peer.client_id} / ${id}` : id, peer.equipment_id, peer.remote_ip, peer.connected_at].forEach(value => { row.insertCell().textContent = String(value || "—"); });
+    const actions = row.insertCell();
+    const select = document.createElement("button"); select.type = "button"; select.textContent = "Selectează";
+    select.addEventListener("click", () => { target.value = id; }); actions.append(select);
+    if (peer.equipment_id) {
+      const open = document.createElement("button"); open.type = "button"; open.textContent = "↗ Deschide"; open.title = "Deschide consola echipamentului prin WSS";
+      open.addEventListener("click", () => openWSSControl(String(peer.equipment_id), open)); actions.append(open);
+    }
+  }
+  if (peers.some(peer => String(peer.connection_id || peer.id || "") === selected)) target.value = selected;
+  host.append(table);
+}
+async function openWSSControl(equipmentID, button) {
+  if (window.WSM_REMOTE) { wssNotice("Deschide echipamentele din consola locală."); return; }
+  const child = window.open("about:blank", "_blank");
+  if (!child) { wssNotice("Browserul a blocat fereastra. Permite ferestrele pop-up pentru consola WSS."); return; }
+  await wssBusy(button, async () => {
+    try {
+      const response = await api("/api/wss/open", {method:"POST", body:JSON.stringify({equipment_id:equipmentID})});
+      const url = new URL(response.url);
+      url.searchParams.set("opener_origin", window.location.origin);
+      if (!["https:", "http:"].includes(url.protocol) || !response.ticket) throw new Error("Serverul nu a returnat o adresă de consolă validă.");
+      if (child.closed) throw new Error("Fereastra consolei a fost închisă înainte de conectare.");
+      state.wss.windows.set(child, {origin:url.origin, ticket:response.ticket, equipmentID});
+      child.location.replace(url.href);
+      wssNotice("Consola echipamentului a fost deschisă într-o fereastră nouă.", true);
+    } catch (error) { child.close(); state.wss.windows.delete(child); throw error; }
+  });
+}
+
+function currentUIPath() {
+  return window.WSM_REMOTE?.route() || window.location.pathname;
+}
+
+function showRemoteHelp() {
+  const dialog = document.createElement("dialog");
+  const title = document.createElement("h2"); title.textContent = "Control la distanță prin WiseMED WSS";
+  const text = document.createElement("p");
+  text.textContent = "Această interfață operează echipamentul selectat prin mesaje JSON WSS. Modificările, importurile și comenzile se execută pe echipament. Bara albastră indică legătura acestei ferestre; indicatorul WSS din aplicație arată legătura echipamentului. Menține deschisă fereastra din care ai lansat controlul pentru reautentificare automată. Logout închide numai controlul la distanță. Documentația specifică analizorului rămâne disponibilă în meniul Help al aplicației locale.";
+  const close = document.createElement("button"); close.textContent = "Închide"; close.type = "button";
+  close.addEventListener("click", () => dialog.close());
+  dialog.addEventListener("close", () => dialog.remove());
+  dialog.append(title, text, close); document.body.append(dialog); dialog.showModal();
+}
+
+async function openRemotePrint(path, params) {
+  const preview = window.open("about:blank", "_blank");
+  if (!preview) { showToast("Permite ferestre pop-up pentru previzualizarea tipăririi.", "error"); return; }
+  try {
+    preview.opener = null;
+    preview.document.title = "Se pregătește documentul…";
+    params.set("format", "json");
+    const response = await api(`${path}?${params.toString()}`);
+    if (preview.closed) return;
+    if (!response.document || !Array.isArray(response.document.columns) || !Array.isArray(response.document.rows)) throw new Error("Echipamentul nu a returnat un document valid pentru tipărire.");
+    renderRemotePrintDocument(preview.document, response.document, () => preview.print());
+    preview.focus();
+  } catch (error) {
+    if (!preview.closed) {
+      preview.document.body.textContent = `Nu se poate pregăti documentul: ${error.message}`;
+    }
+    showToast(error.message, "error");
+  }
+}
+function renderRemotePrintDocument(doc, data, print) {
+  doc.title = String(data.title || "Document");
+  doc.documentElement.lang = "ro";
+  doc.body.replaceChildren();
+  const style = doc.createElement("style");
+  style.textContent = "body{font:14px Arial,sans-serif;margin:28px;color:#111}h1{font-size:23px}table{border-collapse:collapse;width:100%;margin:18px 0}th,td{border:1px solid #555;padding:7px;text-align:left;white-space:pre-wrap;overflow-wrap:anywhere}th{background:#eee}button{padding:10px 20px}p{white-space:pre-wrap}@media print{button{display:none}thead{display:table-header-group}tr{break-inside:avoid}body{margin:0}}";
+  doc.head.append(style);
+  const title = doc.createElement("h1"); title.textContent = String(data.title || "Document"); doc.body.append(title);
+  const meta = doc.createElement("p");
+  meta.textContent = [data.order_date, data.round_no ? `Runda ${data.round_no}` : "", data.scope_label, data.analyte_tag, data.form_code].filter(Boolean).join(" · "); doc.body.append(meta);
+  const button = doc.createElement("button"); button.type = "button"; button.textContent = "Tipărește"; button.addEventListener("click", print); doc.body.append(button);
+  if (data.details_title) { const heading = doc.createElement("h2"); heading.textContent = String(data.details_title); doc.body.append(heading); }
+  for (const detail of data.details || []) {
+    const line = doc.createElement("p");
+    line.textContent = `${detail.label || ""}: ${detail.value ?? ""}`;
+    doc.body.append(line);
+  }
+  const table = doc.createElement("table");
+  const head = table.createTHead().insertRow();
+  for (const label of data.columns) { const cell = doc.createElement("th"); cell.textContent = String(label); head.append(cell); }
+  const body = table.createTBody();
+  for (const values of data.rows) {
+    const row = body.insertRow();
+    for (const value of values) row.insertCell().textContent = String(value ?? "");
+  }
+  doc.body.append(table);
+  if (!data.rows.length) { const empty = doc.createElement("p"); empty.textContent = "Nu există înregistrări pentru selecția curentă."; doc.body.append(empty); }
+}
+
+// CNAS data calls use the same fetch/api adapter locally and in the WSM control UI.
+async function loadSIUIPanel() {
+ const panel=document.getElementById("settings-panel-siui");
+ if(panel.dataset.loaded) return;
+ panel.dataset.loaded="loading";
+ try {
+  const status=await api("/api/siui/status");
+  const admin=(Number(state.session?.user_type)||0)<=0;
+  const settings=admin ? (await api("/api/siui/settings")).settings : {};
+  panel.innerHTML=`<h2>CNAS - validare 72h</h2>
+   <p>Trimite serviciile paraclinice spre validare imediat. Răspunsul CNAS stabilește validitatea fiecărui serviciu.</p>
+   <p>${status.native_supported ? "Certificatul este folosit direct din Windows. PIN-ul se introduce local, în dialogul driverului." : "Conectarea cu tokenul USB este disponibilă pe Windows. Pe această platformă poți verifica interfața și configurația."}</p>
+   ${admin ? `<form id="siui-settings-form"><h3>Conectare CNAS</h3>
+    <label>Utilizator CNAS <input name="username" value="${escapeHtml(settings.username||"")}" required></label>
+    <label>Seria de licență CNAS <input name="licence" type="password" autocomplete="new-password" maxlength="4096" placeholder="${settings.licence_configured ? "Lasă gol pentru a păstra licența" : "Introdu seria de licență CNAS"}"></label>
+    <p id="siui-licence-info">${settings.licence_configured ? "Licență salvată: " + escapeHtml(settings.licence_hint||"••••••") : "Licență neconfigurată"}</p>
+    <label>Adresa CNAS <input name="base_url" value="${escapeHtml(settings.base_url||"")}" type="url" required></label>
+    <label>Certificatele contului <select name="certificate_store"><option value="CurrentUser">Utilizator curent</option><option value="LocalMachine">Calculator local</option></select></label>
+    <label>Certificat / token USB <select name="certificate_thumbprint"><option value="${escapeHtml(settings.certificate_thumbprint||"")}">${escapeHtml(settings.certificate_thumbprint||"Selectează un certificat")}</option></select></label>
+    <button type="button" id="siui-certificates">Reîncarcă certificatele</button><button type="submit">Salvează configurarea</button>
+    <p>Nu se exportă și nu se salvează fișiere .cer. Licența se salvează în configurația utilitarului și nu este returnată de API. Poți salva configurarea înainte de alegerea tokenului pe Windows.</p><p id="siui-cert-info"></p></form>` : ""}
+   <form id="siui-validation-form"><h3>Test validare paraclinice</h3>
+    <label>ID operație <input name="operation_id" value="${escapeHtml(crypto.randomUUID())}" required></label>
+    <label>XML PIAS <textarea name="xml" rows="12" style="width:100%" spellcheck="false" required></textarea></label>
+    <button type="submit">Trimite pentru validare</button><button type="button" id="siui-new-id">ID pentru o cerere nouă</button>
+    <p>Păstrează același ID dacă verifici o trimitere întreruptă. La corectarea datelor, folosește un ID de operație nou și păstrează AppID-urile serviciilor.</p>
+   </form><h3>Validări recente</h3><button id="siui-refresh" type="button">Actualizează istoricul</button><div id="siui-history"></div><pre id="siui-result" style="white-space:pre-wrap;overflow-wrap:anywhere"></pre>`;
+  if(admin) {
+   const form=panel.querySelector("#siui-settings-form"); form.elements.certificate_store.value=settings.certificate_store||"CurrentUser";
+   const reload=async()=>{
+    const data=await api("/api/siui/certificates?store="+encodeURIComponent(form.elements.certificate_store.value));
+    const select=form.elements.certificate_thumbprint; const selected=select.value;
+    select.replaceChildren(new Option("Selectează un certificat", ""));
+    for(const cert of data.certificates||[]) {const option=new Option(`${cert.subject} | ${cert.issuer} | expiră ${cert.not_after.slice(0,10)} | ${cert.thumbprint.slice(-8)}`,cert.thumbprint);option.disabled=!cert.valid||!cert.has_private_key;select.add(option);}
+    select.value=selected;
+    panel.querySelector("#siui-cert-info").textContent="Lista reflectă certificatele înregistrate pentru contul care rulează utilitarul. Driverul verifică prezența tokenului la conectare.";
+   };
+   bindAsyncClick(panel.querySelector("#siui-certificates"),reload);
+   form.elements.certificate_store.addEventListener("change",()=>{form.elements.certificate_thumbprint.replaceChildren(new Option("Selectează un certificat", ""));reload().catch(e=>showToast(e.message,"error"));});
+   bindAsyncSubmit(form,async event=>{event.preventDefault();const saved=await api("/api/siui/settings",{method:"PUT",body:JSON.stringify(Object.fromEntries(new FormData(form)))});panel.querySelector("#siui-licence-info").textContent=saved.licence_hint ? "Licență salvată: "+saved.licence_hint : "Licență neconfigurată";form.elements.licence.value="";form.elements.licence.placeholder="Licență salvată; lasă gol pentru a o păstra";showToast("Configurarea CNAS a fost salvată.","success");});
+  }
+  const validation=panel.querySelector("#siui-validation-form");
+  panel.querySelector("#siui-new-id").onclick=()=>{validation.elements.operation_id.value=crypto.randomUUID();};
+  bindAsyncSubmit(validation,async event=>{event.preventDefault();const response=await api("/api/siui/validations",{method:"POST",body:JSON.stringify(Object.fromEntries(new FormData(validation)))});await showSIUIJob(response.job.id);await loadSIUIHistory();});
+  bindAsyncClick(panel.querySelector("#siui-refresh"),loadSIUIHistory);
+  panel.dataset.loaded="true";
+  await loadSIUIHistory();
+ } catch(error) {delete panel.dataset.loaded;throw error;}
+}
+async function loadSIUIHistory() {
+ const data=await api("/api/siui/validations"); const list=document.getElementById("siui-history");if(!list)return;
+ list.replaceChildren();
+ for(const job of data.jobs||[]) {const button=document.createElement("button");button.type="button";button.textContent=`${job.created_at} | ${job.operation_id} | ${job.status}`;button.onclick=()=>showSIUIJob(job.id).catch(e=>showToast(e.message,"error"));list.append(button);}
+}
+let siuiPollGeneration=0;
+async function showSIUIJob(id) {
+ const generation=++siuiPollGeneration;
+ const poll=async()=>{
+  const data=await api("/api/siui/validations/"+encodeURIComponent(id));
+  if(generation!==siuiPollGeneration)return;
+  document.getElementById("siui-result").textContent=JSON.stringify(data.job,null,2);
+  if(["queued","running"].includes(data.job.status)&&state.settingsSubView==="siui"&&state.currentView==="analytes")setTimeout(()=>poll().catch(e=>showToast(e.message,"error")),2000);
+ };
+ await poll();
 }

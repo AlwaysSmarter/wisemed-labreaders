@@ -48,7 +48,9 @@ type ServiceResultEntry struct {
 }
 
 type Module struct {
-	rt module.Runtime
+	initializeMu sync.Mutex
+	initialized  bool
+	rt           module.Runtime
 
 	mu       sync.RWMutex
 	settings map[string]string
@@ -163,8 +165,8 @@ func (m *Module) Init(rt module.Runtime) error {
 }
 
 func (m *Module) Start(ctx context.Context) error {
-	if m.SetupComplete() && !m.skipSetupCompletion() {
-		if _, err := m.EnsureEquipmentOnline(nil); err != nil {
+	if m.SetupComplete() {
+		if _, err := m.EnsureEquipmentInitialized(); err != nil {
 			m.rt.Logf("wisemed-api startup sync failed: %v", err)
 		}
 	}
@@ -297,21 +299,30 @@ func (m *Module) Login(req LoginRequest) (LoginResponse, error) {
 	return resp, nil
 }
 
-func (m *Module) EnsureEquipmentOnline(reader map[string]interface{}) (map[string]interface{}, error) {
-	if m.skipSetupCompletion() {
-		return map[string]interface{}{"success": true, "skipped": true}, nil
+// EnsureEquipmentInitialized serializes startup registration so WSS never races it.
+func (m *Module) EnsureEquipmentInitialized() (map[string]interface{}, error) {
+	m.initializeMu.Lock()
+	defer m.initializeMu.Unlock()
+	if m.initialized {
+		return map[string]interface{}{"echipament_id": m.Settings()["echipament_id"]}, nil
 	}
+	return m.ensureEquipmentHTTP(nil)
+}
+func (m *Module) EnsureEquipmentOnline(reader map[string]interface{}) (map[string]interface{}, error) {
+	m.initializeMu.Lock()
+	defer m.initializeMu.Unlock()
+	return m.ensureEquipmentHTTP(reader)
+}
+func (m *Module) ensureEquipmentHTTP(reader map[string]interface{}) (map[string]interface{}, error) {
 	if !m.SetupComplete() {
 		return nil, errors.New("WiseMED setup is incomplete")
 	}
 	payload := m.analyzerPayload(reader)
-	resp, err := m.ensureEquipmentOnlineViaWS(payload)
-	if err != nil {
-		resp = map[string]interface{}{}
-		if err := m.putJSON("/administrative/analyzer?XDEBUG_TRIGGER=debug", payload, &resp); err != nil {
-			return nil, err
-		}
+	resp := map[string]interface{}{}
+	if err := m.putJSON("/administrative/analyzer", payload, &resp); err != nil {
+		return nil, err
 	}
+
 	updates := map[string]string{}
 	for _, key := range []string{
 		"cod_echipament",
@@ -339,11 +350,20 @@ func (m *Module) EnsureEquipmentOnline(reader map[string]interface{}) (map[strin
 			}
 		}
 	}
+	// Validate before persistence: a malformed response must not erase a working ID/key.
+	responseID := strings.TrimSpace(asString(resp["echipament_id"]))
+	if id, e := strconv.Atoi(responseID); e != nil || id <= 0 {
+		return nil, errors.New("WiseMED did not return a valid equipment ID")
+	}
 	if len(updates) > 0 {
 		if _, err := m.SaveSetup(updates); err != nil {
 			return nil, err
 		}
 	}
+	if id, e := strconv.Atoi(m.Settings()["echipament_id"]); e != nil || id <= 0 {
+		return nil, errors.New("WiseMED did not return a valid equipment ID")
+	}
+	m.initialized = true
 	return resp, nil
 }
 

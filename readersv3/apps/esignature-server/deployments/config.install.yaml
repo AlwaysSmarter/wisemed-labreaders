@@ -36,10 +36,20 @@ modules:
     cfg_wisemed_path: /wisemed-api/apiv2
     cfg_wisemed_key: 27c490bb-c9e4-47aa-bf6d-ebd2a1add35e
   wisemed-ws:
+    # JWT signed with this equipment's dedicated key; provision the matching key on WSM.
+    auth_mode: device_key
+    tenant_id: ""
+    key_id: ""
+    issuer: ""
+    audience: wsm-server
+    secret_file: ""
+    token_file: ""
+    token_path: ""
+    ca_file: ""
     enabled: false
     url: wss://wslocal.wisemed.eu/ws
     heartbeat_ms: 15000
-    reconnect_delay_ms: 5000
+    reconnect_delay_ms: 30000
   signing-pad:
     shared_http: true
     log_db_path: ./esignature-log.db

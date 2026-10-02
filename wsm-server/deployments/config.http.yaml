@@ -1,0 +1,34 @@
+# HTTP/WS backend for Nginx TLS termination. Keep port 8090 private.
+# For same-host Nginx: address 127.0.0.1; allow_insecure_loopback: true.
+# For a separate Nginx container: 0.0.0.0 on an isolated Docker network,
+# without publishing the WSM port to public interfaces.
+server:
+  address: "0.0.0.0"
+  port: 8090
+  allow_insecure_http: true
+  control_ui_dir: /opt/wsm-server/control
+  max_message_bytes: 8388608
+  # No tls block: certificate/private key are configured in Nginx.
+security:
+  audience: wsm-server
+  max_token_ttl_seconds: 900
+  allow_query_token: false
+  keys:
+    clinic-a-backend:
+      tenant_id: clinic-a
+      secret_file: /etc/wsm-server/keys/clinic-a.key
+      roles: [browser, service]
+      scopes: ["route:command", "route:reply", "route:event", "route:broadcast", "topics:subscribe", "connections:read", "server:status", "wisemed:proxy", "devices:debug", "api:invoke", "api:admin"]
+tenants:
+  clinic-a:
+    issuer: https://clinic-a.example.ro
+    allowed_origins: ["https://clinic-a.example.ro"]
+# Add dedicated reader keys bound to equipment_id; see docs/remote-control.md.
+
+# Optional WiseMED administrator console; see docs/admin-console.md.
+admin:
+  enabled: false
+  public_origin: https://ws.example.ro
+  session_ttl_seconds: 900
+# When enabling, also set security.device_keys_file to a writable persistent path
+# such as /var/lib/wsm-server/device-keys.yaml and configure tenant.wisemed HTTPS API.

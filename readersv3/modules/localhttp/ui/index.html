@@ -73,17 +73,21 @@
           <button class="nav-link" data-view="qc" data-i18n="nav_qc">QC</button>
           <button class="nav-link" data-view="analytes" data-i18n="nav_settings">Settings</button>
           <div class="nav-submenu" id="settings-submenu">
-
-            <button class="nav-sublink" data-view="analytes" data-settings-subview="reader" data-i18n="settings_reader">Setari reader</button>
             <button class="nav-sublink" data-view="analytes" data-settings-subview="analytes" data-i18n="settings_analytes">Analize</button>
             <button class="nav-sublink" data-view="analytes" data-settings-subview="daily-details" data-i18n="settings_daily_details">Detalii zilnice</button>
-            <button class="nav-sublink" data-view="analytes" data-settings-subview="daily-analysis-filters">Filtre blocare analize</button>
+            <button class="nav-sublink" data-view="analytes" data-settings-subview="daily-analysis-filters">Filtre</button>
+            <button id="astm-specimen-settings-link" class="nav-sublink" data-view="analytes" data-settings-subview="astm-specimens" hidden>Tipuri de probe</button>
+            <button class="nav-sublink" data-view="analytes" data-settings-subview="reader" data-i18n="settings_reader">Setari reader</button>
             <button class="nav-sublink" data-view="analytes" data-settings-subview="qc" data-i18n="settings_qc">Setari QC</button>
-            <button id="astm-specimen-settings-link" class="nav-sublink" data-view="analytes" data-settings-subview="astm-specimens" hidden>ASTM - Tipuri probe</button>
- <button class="nav-sublink" data-view="analytes" data-settings-subview="pad" hidden>Setări PAD</button>
- <button class="nav-sublink" data-view="analytes" data-settings-subview="demo" hidden>Demo</button>
+            <button class="nav-sublink" data-view="analytes" data-settings-subview="siui" hidden>CNAS - validare 72h</button>
+            <button class="nav-sublink" data-view="analytes" data-settings-subview="pad" hidden>Setări PAD</button>
+            <button class="nav-sublink" data-view="analytes" data-settings-subview="demo" hidden>Demo</button>
           </div>
           <button id="debug-nav-link" class="nav-link" data-view="debug" data-i18n="nav_debug" hidden>Debug</button>
+          <div class="nav-submenu" id="debug-submenu" hidden>
+            <button id="debug-communication-link" class="nav-sublink" data-view="debug">Communication</button>
+            <button class="nav-sublink" data-view="analytes" data-settings-subview="wss">WSS</button>
+          </div>
           <button class="nav-link" data-view="help" data-i18n="nav_help">Help</button>
         </nav>
         <section id="reader-summary-card" class="reader-card reader-summary-card">
@@ -111,10 +115,7 @@
               <h1 id="dashboard-title">Control Panel</h1>
             </div>
             <div class="status-cluster">
-              <div id="wisemedws-pill" class="status-pill">
-                <span id="ws-dot" class="dot"></span>
-                <span id="wisemedws-status-label">WiseMEDWS</span>
-              </div>
+              <button id="wss-pill" class="status-pill status-pill-button" type="button" title="Configurare și debug WSS"><span id="wss-dot" class="dot"></span><span id="wss-status-label">WSS: verificare…</span></button>
               <div id="analyzer-pill" class="status-pill">
                 <span id="analyzer-dot" class="dot"></span>
                 <span id="analyzer-status-label">Analyzer</span>
@@ -173,6 +174,8 @@
           </article>
         </section>
         <section id="view-analytes" class="panel-grid" hidden>
+          <article id="settings-panel-siui" class="panel full-span" hidden></article>
+          <article id="settings-panel-wss" class="panel full-span" hidden></article>
           <article id="settings-panel-esignature" class="panel full-span" hidden></article>
           <article id="settings-panel-reader" class="panel full-span">
             <div class="panel-head">
@@ -837,7 +840,7 @@
               <h3 id="help-title">How To</h3>
               <a id="help-open" class="ghost link-button" href="/help/" target="_blank" rel="noreferrer">Deschide separat</a>
             </div>
-            <iframe class="help-frame" src="/help/"></iframe>
+            <iframe class="help-frame" src="about:blank"></iframe>
           </article>
         </section>
         <section id="view-debug" class="panel-grid" hidden>
@@ -1302,6 +1305,7 @@ RES_FCAT = rezultatul brut al analitului cu cod FCAT"></textarea>
       </div>
     </section>
   </div>
+  <script src="/wss-remote.js"></script>
   <script type="module" src="/app.js"></script>
 </body>
 </html>

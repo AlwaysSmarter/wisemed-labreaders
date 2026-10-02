@@ -14,17 +14,22 @@ type Envelope struct {
 }
 
 type Target struct {
-	Mode         string `json:"mode,omitempty"`
-	ConnectionID string `json:"connection_id,omitempty"`
-	ClientType   string `json:"client_type,omitempty"`
-	ReaderID     string `json:"reader_id,omitempty"`
-	Topic        string `json:"topic,omitempty"`
+	EquipmentID   string   `json:"equipment_id,omitempty"`
+	EquipmentIDs  []string `json:"equipment_ids,omitempty"`
+	ConnectionIDs []string `json:"connection_ids,omitempty"`
+	ReaderIDs     []string `json:"reader_ids,omitempty"`
+	Mode          string   `json:"mode,omitempty"`
+	ConnectionID  string   `json:"connection_id,omitempty"`
+	ClientType    string   `json:"client_type,omitempty"`
+	ReaderID      string   `json:"reader_id,omitempty"`
+	Topic         string   `json:"topic,omitempty"`
 }
 
 type HelloPayload struct {
-	ClientType string `json:"client_type"`
-	ClientID   string `json:"client_id"`
-	UserID     string `json:"user_id"`
-	ReaderID   string `json:"reader_id"`
-	Label      string `json:"label"`
+	EquipmentID string `json:"equipment_id,omitempty"`
+	ClientType  string `json:"client_type"`
+	ClientID    string `json:"client_id"`
+	UserID      string `json:"user_id"`
+	ReaderID    string `json:"reader_id"`
+	Label       string `json:"label"`
 }

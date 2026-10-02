@@ -17,11 +17,22 @@ wisemed_ws:
   enabled: false
   url: wss://wslocal.wisemed.eu/ws
   heartbeat_ms: 15000
-  reconnect_delay_ms: 5000
+  reconnect_delay_ms: 30000
 analyzer:
   comm_type: file
   protocol: analytikjena-plasmaquantms-elite
 modules:
+  wisemed-ws:
+    # JWT signed with this equipment's dedicated key; provision the matching key on WSM.
+    auth_mode: device_key
+    tenant_id: ""
+    key_id: ""
+    issuer: ""
+    audience: wsm-server
+    secret_file: ""
+    token_file: ""
+    token_path: ""
+    ca_file: ""
   app-updates:
     enabled: true
     app_id: analytikjena-plasmaquantms-elite-v3

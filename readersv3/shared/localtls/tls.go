@@ -7,14 +7,12 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
-	"errors"
 	"fmt"
+	"log"
 	"math/big"
 	"net"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"runtime"
 	"sort"
 	"strings"
 	"time"
@@ -26,6 +24,15 @@ type localCA struct {
 }
 
 func EnsureMaterial(configDir, addr string) (string, string, error) {
+	return EnsureMaterialWithLogger(configDir, addr, log.Printf)
+}
+
+// Trust-store failures leave HTTPS available, but must be visible to the operator.
+func EnsureMaterialWithLogger(configDir, addr string, logf func(string, ...any)) (string, string, error) {
+	return ensureMaterial(configDir, addr, trustLocalCA, logf)
+}
+
+func ensureMaterial(configDir, addr string, trust func(string, *x509.Certificate) (string, error), logf func(string, ...any)) (string, string, error) {
 	baseDir := filepath.Join(strings.TrimSpace(configDir), "tls")
 	if err := os.MkdirAll(baseDir, 0o755); err != nil {
 		return "", "", err
@@ -43,8 +50,15 @@ func EnsureMaterial(configDir, addr string) (string, string, error) {
 	if err := ensureServerCertificate(serverCertPath, serverKeyPath, ca, hosts); err != nil {
 		return "", "", err
 	}
-	if runtime.GOOS == "windows" {
-		_ = trustLocalCAWindows(caCertPath, ca.cert)
+	if trust != nil {
+		scope, err := trust(caCertPath, ca.cert)
+		if logf != nil {
+			if err != nil {
+				logf("local HTTPS: CA generated at %s, but system trust installation failed: %v; browser may report CERT_AUTHORITY_INVALID", caCertPath, err)
+			} else if scope != "" {
+				logf("local HTTPS: CA trusted in %s (%s)", scope, caCertPath)
+			}
+		}
 	}
 	return serverCertPath, serverKeyPath, nil
 }
@@ -253,30 +267,6 @@ func existingServerCertValid(certPath, keyPath string, ca *localCA, hosts []stri
 		}
 	}
 	return true, nil
-}
-
-func trustLocalCAWindows(certPath string, cert *x509.Certificate) error {
-	if cert == nil {
-		return errors.New("ca certificate is nil")
-	}
-	thumbprint := strings.ToUpper(strings.TrimSpace(fmt.Sprintf("%X", cert.SerialNumber.Bytes())))
-	script := `
-$path = $env:WMR_CA_CERT_PATH
-$serial = $env:WMR_CA_SERIAL
-if (-not (Test-Path $path)) { exit 0 }
-$stores = @("Cert:\LocalMachine\Root", "Cert:\CurrentUser\Root")
-foreach ($store in $stores) {
-  try {
-    $exists = Get-ChildItem -Path $store -ErrorAction Stop | Where-Object { $_.SerialNumber -eq $serial } | Select-Object -First 1
-    if (-not $exists) {
-      Import-Certificate -FilePath $path -CertStoreLocation $store -ErrorAction Stop | Out-Null
-    }
-  } catch {}
-}
-`
-	cmd := exec.Command("powershell", "-NoProfile", "-NonInteractive", "-Command", script)
-	cmd.Env = append(os.Environ(), "WMR_CA_CERT_PATH="+certPath, "WMR_CA_SERIAL="+thumbprint)
-	return cmd.Run()
 }
 
 func randomSerialNumber() (*big.Int, error) {

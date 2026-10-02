@@ -1,106 +1,91 @@
 package server
 
 import (
+	"fmt"
 	"testing"
-	"time"
 )
 
-func TestHubBroadcastTo50Connections(t *testing.T) {
-	hub := NewHub()
-	totalClients := 50
-	connections := make([]*Connection, 0, totalClients)
-
-	for i := 0; i < totalClients; i++ {
-		conn := &Connection{
-			ID:          "conn-" + itoa(i),
-			ClientType:  "browser",
-			ClientID:    "client-" + itoa(i),
-			ConnectedAt: time.Now().UTC(),
-			LastSeenAt:  time.Now().UTC(),
-			send:        make(chan Envelope, 8),
-			closed:      make(chan struct{}),
-		}
-		hub.Register(conn, HelloPayload{
-			ClientType: "browser",
-			ClientID:   conn.ClientID,
-			Label:      "test",
-		})
-		connections = append(connections, conn)
+func hubClient(h *Hub, tenant, id, kind, reader string) *Connection {
+	c := h.NewConnection(nil, tenant, 128)
+	c.ID = id
+	h.Register(c, HelloPayload{ClientType: kind, ClientID: id, ReaderID: reader})
+	return c
+}
+func TestHubTenantIsolationEveryRoute(t *testing.T) {
+	h := NewHub()
+	a := hubClient(h, "a", "a-client", "browser", "")
+	b := hubClient(h, "a", "a-reader", "reader", "reader-1")
+	x := hubClient(h, "b", "b-reader", "reader", "reader-1")
+	h.Subscribe(b.ID, "results:reader-1", 64)
+	h.Subscribe(x.ID, "results:reader-1", 64)
+	cases := []struct {
+		target *Target
+		want   int
+	}{
+		{&Target{Mode: "all"}, 2}, {&Target{Mode: "connection", ConnectionID: x.ID}, 0},
+		{&Target{Mode: "connection", ConnectionID: b.ID}, 1}, {&Target{Mode: "reader", ReaderID: "reader-1"}, 1},
+		{&Target{Mode: "readers", ReaderIDs: []string{"reader-1", "reader-1"}}, 1},
+		{&Target{Mode: "connections", ConnectionIDs: []string{b.ID, x.ID, b.ID}}, 1},
+		{&Target{Mode: "topic", Topic: "results:reader-1"}, 1}, {&Target{Mode: "client_type", ClientType: "reader"}, 1},
+		{&Target{Mode: "self"}, 1}, {nil, 0},
 	}
-
-	sent := hub.Broadcast(Envelope{
-		Type:      "command",
-		RequestID: "broadcast-1",
-		Broadcast: true,
-		Payload: map[string]interface{}{
-			"text": "enterprise-broadcast",
-		},
-	})
-	if sent != totalClients {
-		t.Fatalf("expected %d routed messages, got %d", totalClients, sent)
-	}
-
-	for _, conn := range connections {
-		select {
-		case msg := <-conn.send:
-			if msg.Type != "command" {
-				t.Fatalf("expected command message for %s, got %s", conn.ID, msg.Type)
-			}
-		case <-time.After(1 * time.Second):
-			t.Fatalf("timeout waiting for message on %s", conn.ID)
+	for _, tc := range cases {
+		if n := h.Route(Envelope{Type: "command", Target: tc.target}, a); n != tc.want {
+			t.Errorf("target=%+v got %d want %d", tc.target, n, tc.want)
 		}
+	}
+	if len(x.send) != 0 {
+		t.Fatal("cross-tenant message leaked")
+	}
+	if len(h.Snapshot("a")) != 2 || len(h.Snapshot("b")) != 1 {
+		t.Fatal("snapshot leaked")
+	}
+	if h.Stats("a").TotalAccepted != 2 || h.Stats("b").TotalAccepted != 1 {
+		t.Fatal("stats leaked")
 	}
 }
-
-func TestHubTargetSingleConnection(t *testing.T) {
-	hub := NewHub()
-
-	left := &Connection{
-		ID:          "conn-left",
-		ClientType:  "browser",
-		ClientID:    "left",
-		ConnectedAt: time.Now().UTC(),
-		LastSeenAt:  time.Now().UTC(),
-		send:        make(chan Envelope, 4),
-		closed:      make(chan struct{}),
+func TestHubBroadcastTo50Connections(t *testing.T) {
+	h := NewHub()
+	for i := 0; i < 50; i++ {
+		hubClient(h, "a", fmt.Sprint(i), "browser", "")
 	}
-	right := &Connection{
-		ID:          "conn-right",
-		ClientType:  "browser",
-		ClientID:    "right",
-		ConnectedAt: time.Now().UTC(),
-		LastSeenAt:  time.Now().UTC(),
-		send:        make(chan Envelope, 4),
-		closed:      make(chan struct{}),
+	hubClient(h, "b", "foreign", "browser", "")
+	if n := h.Broadcast("a", Envelope{Type: "event"}); n != 50 {
+		t.Fatal(n)
 	}
-
-	hub.Register(left, HelloPayload{ClientType: "browser", ClientID: "left"})
-	hub.Register(right, HelloPayload{ClientType: "browser", ClientID: "right"})
-
-	sent := hub.Route(Envelope{
-		Type: "command",
-		Target: &Target{
-			Mode:         "connection",
-			ConnectionID: "conn-right",
-		},
-		Payload: map[string]interface{}{"text": "hello"},
-	}, left)
-	if sent != 1 {
-		t.Fatalf("expected one routed message, got %d", sent)
+}
+func TestHubDuplicateAndBackpressure(t *testing.T) {
+	h := NewHub()
+	c := hubClient(h, "a", "first", "reader", "r")
+	other := h.NewConnection(nil, "a", 1)
+	if h.Register(other, HelloPayload{ClientType: "reader", ClientID: "second", ReaderID: "r"}) {
+		t.Fatal("duplicate reader")
 	}
-
-	select {
-	case <-left.send:
-		t.Fatalf("left should not receive the targeted message")
-	default:
+	if h.Register(c, HelloPayload{}) {
+		t.Fatal("duplicate hello")
 	}
-
-	select {
-	case msg := <-right.send:
-		if msg.Type != "command" {
-			t.Fatalf("expected command message, got %s", msg.Type)
+	if !h.Subscribe(c.ID, "one", 1) || h.Subscribe(c.ID, "two", 1) {
+		t.Fatal("topic bound")
+	}
+	h.Unsubscribe(c.ID, "one")
+	if !h.Subscribe(c.ID, "two", 1) {
+		t.Fatal("unsubscribe")
+	}
+	for i := 0; i < 128; i++ {
+		if !h.send(c, Envelope{}) {
+			t.Fatal(i)
 		}
-	case <-time.After(1 * time.Second):
-		t.Fatal("right did not receive the targeted message")
+	}
+	if h.send(c, Envelope{}) || h.Stats("a").TotalDropped != 1 {
+		t.Fatal("overflow not counted")
+	}
+	select {
+	case <-c.closed:
+	default:
+		t.Fatal("slow consumer not disconnected")
+	}
+	h.Remove(c.ID)
+	if len(h.Snapshot("a")) != 0 {
+		t.Fatal("not removed")
 	}
 }

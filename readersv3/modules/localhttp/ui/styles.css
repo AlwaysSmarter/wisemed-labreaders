@@ -403,3 +403,20 @@ button.is-loading:hover{transform:none}
 .order-id-dialog input, .order-id-dialog textarea { width: 100%; box-sizing: border-box; }
 
 .order-id-edit-action { justify-self: start; padding: 5px 10px; color: var(--accent-deep); background: var(--accent-soft); border: 1px solid var(--accent-deep); font-size: .85rem; }
+
+/* Shared reader / utility WSS console. Payloads are rendered as text. */
+#settings-panel-wss{display:grid;gap:16px}
+#settings-panel-wss[hidden]{display:none}
+.wss-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.wss-grid label{display:grid;gap:7px;font-size:.92rem;min-width:0}
+.wss-grid input,.wss-grid select,.wss-grid textarea{width:100%;min-width:0;padding:10px;border:1px solid var(--line);border-radius:10px;background:white;color:var(--ink)}
+.wss-grid .wss-check{display:flex;align-items:center;gap:10px}
+.wss-check input{width:auto}
+.wss-wide{grid-column:1/-1}
+.wss-json{white-space:pre-wrap;overflow-wrap:anywhere;max-height:380px;overflow:auto;background:#17231e;color:#e5f5eb;border-radius:12px;padding:14px;font:12px/1.55 ui-monospace,monospace}
+.wss-toolbar{display:flex;flex-wrap:wrap;gap:8px}
+.wss-table-wrap{overflow:auto;max-height:420px}
+.wss-table-wrap td{overflow-wrap:anywhere;max-width:340px}
+.wss-table-wrap td button{margin:3px}
+.wss-error{color:var(--danger)}
+@media(max-width:760px){.wss-grid{grid-template-columns:1fr}}

@@ -1,0 +1,13 @@
+/dist/
+/wsm-server
+/wsmctl
+/deployments/keys/
+/deployments/tls/
+/deployments/config.local.yaml
+/output/deployments/local/
+/output/deployments/.wsm-local.*/
+/output/deployments/keys/
+/output/deployments/.backups/
+/output/control/
+/output/state/
+/deployments/device-keys.yaml

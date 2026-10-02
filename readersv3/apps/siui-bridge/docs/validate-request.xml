@@ -1,0 +1,1 @@
+<request xmlns="http://www.cnas.ro/siui/2.0" providerCode="TEST" providerName="Test" insuranceHouse="CAS-TEST" contractNo="TEST" contractType="PARA" reportDate="2026-09-29" reportType="PARA"><laboratoryService AppID="test-service-1" stencilNo="TEST" reportedService="TEST" medSrvPack="TEST" quantity="1" personType="ASIGURAT" serviceDate="2026-09-29T10:00:00+03:00"/></request>

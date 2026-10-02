@@ -2,6 +2,6 @@ package localhttp
 
 import "wisemed-labreaders/readersv3/shared/localtls"
 
-func ensureLocalHTTPSMaterial(configDir, addr string) (string, string, error) {
-	return localtls.EnsureMaterial(configDir, addr)
+func ensureLocalHTTPSMaterial(configDir, addr string, logf func(string, ...any)) (string, string, error) {
+	return localtls.EnsureMaterialWithLogger(configDir, addr, logf)
 }

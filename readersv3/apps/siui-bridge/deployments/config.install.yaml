@@ -1,0 +1,67 @@
+reader:
+  id: siui-bridge
+  label: SIUI Bridge
+  analyzer_name: WiseMED CNAS Validation Utility
+  analyzer_code: siui-bridge
+  db_name: siui-bridge.db
+logging:
+  verbose_level: 0
+local_http:
+  enabled: true
+  address: 127.0.0.1:19112
+  language: ro
+  tls: true
+wisemed_ws:
+  enabled: false
+  url: wss://wslocal.wisemed.eu/ws
+  heartbeat_ms: 15000
+  reconnect_delay_ms: 30000
+analyzer:
+  comm_type: utility
+  protocol: siui
+modules:
+  local-http:
+    enabled: true
+    address: 127.0.0.1:19112
+    language: ro
+    tls: true
+    cors_allowed_origins: ""
+  events:
+    enabled: true
+  help:
+    help_dir: ./help
+  app-updates:
+    enabled: false
+    app_id: siui-bridge
+    channel: stable
+    base_url: ""
+    auto_download: false
+    download_dir: ./updates
+  wisemed-api:
+    cfg_wisemed_protocol: https
+    cfg_wisemed_ip: ""
+    cfg_wisemed_port: "443"
+    cfg_wisemed_path: /wisemed-api/apiv2
+    cfg_wisemed_key: ""
+  wisemed-ws:
+    enabled: false
+    url: wss://wslocal.wisemed.eu/ws
+    auth_mode: device_key
+    tenant_id: ""
+    key_id: ""
+    issuer: ""
+    audience: wsm-server
+    subject: ""
+    secret_file: ""
+    token_file: ""
+    token_path: ""
+    ca_file: ""
+    heartbeat_ms: 15000
+    reconnect_delay_ms: 30000
+  siui:
+    base_url: https://www.siui.ro
+    username: ""
+    licence: ""
+    certificate_store: CurrentUser
+    certificate_thumbprint: ""
+    database: ./siui-jobs.db

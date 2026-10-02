@@ -1,5 +1,12 @@
 # wisemed-labreaders memory
 
+## Application-specific memories
+
+- [WSM Server](wsm-server.md): current server architecture, protocol, startup,
+  verification and known gaps. Agent entrypoint: `wsm-server/AGENTS.md`.
+- [Shared WSS control for readers and utilities](../readersv3/docs/wss-control.md):
+  setup, remote control, the common API adapter and verification commands for all 26 equipment apps.
+
 ## Workspace
 
 - Root workspace: `/Users/raduichim/work/gowork/wisemed-labreaders`
@@ -420,3 +427,26 @@ Current implementation is heuristic string-matching in frontend JS. If robustnes
 - `/Users/raduichim/work/gowork/wisemed-labreaders/Readers Last/generic-test-reader/internal/webui/ui/app.js`
 - `/Users/raduichim/work/gowork/wisemed-labreaders/Readers Last/generic-test-reader/internal/webui/ui/styles.css`
 - `/Users/raduichim/work/gowork/wisemed-labreaders/Readers Last/generic-test-reader/internal/webui/ui/index.html`
+
+2026-09-24: Shared localhttp navigation groups Communication and WSS under Debug.
+WSS retains /settings/wss for compatibility, but highlights Debug instead of Settings.
+Communication retains existing debug availability/admin checks (disabled when
+unavailable); WSS does not require analyzer debug fixtures. Settings order: analytes,
+daily-details, daily-analysis-filters (Filtre), astm-specimens (Tipuri de probe),
+reader, qc, plus app-specific PAD/demo entries where applicable. Translation uses
+subview identifiers, not positional indexes that mislabeled Filters as QC.
+Shared Node WSS tests and Chrome local/remote reader+utility smoke passed.
+
+### SIUI Bridge (2026-09-29)
+- Added `readersv3/apps/siui-bridge`, protocol `siui`, communication `utility`, using the standard runner/service/logging/login/HTTP/HTTPS/WSM infrastructure. Scope is PIAS paraclinical 72h validation (`SiuiValidateWS.validateReport`, PARA/RQ_PARA_SRV), not all PIAS services or patient eCard operations.
+- Windows native WinHTTP uses a selected MY store certificate (CurrentUser/LocalMachine + thumbprint), without exporting a .cer or private key. Select via `/settings/siui`; service identity must have token access. CNAS activation licence is a separate local protected text file.
+- `/api/siui/validations` is asynchronous and idempotent per authenticated owner + operation_id, with SQLite history, polling, no automatic submission retry, and unknown state after interrupted submission/restart. Same API works through WSM api.request. XML request/response use embedded official XSD validation; mocks never contact CNAS.
+- See `readersv3/apps/siui-bridge/README.md` and `docs/protocol.md`. Real token/CNAS acceptance still needs Windows testing. Local NSIS aborts even on the standard minimal self-test (std::bad_alloc); Windows executable/update ZIP build, but local Setup generation is blocked by that tool.
+
+### Local HTTPS trust fix (2026-10-03)
+- SIUI uses the shared localtls implementation, with localhost already in SAN. Prior Windows PowerShell CA import swallowed every store error and EnsureMaterial discarded the process error; a browser warning did not prove that CA generation was missing.
+- Replaced shell/PEM import with native Windows certificate-store operations on DER, exact thumbprint lookup and post-import verification. Read-only lookup permits reuse of already trusted machine CA without elevation. Interactive fallback is CurrentUser; noninteractive service execution requires LocalMachine trust.
+- EnsureMaterialWithLogger sends trust success/failure to reader logs; trust failure keeps HTTPS available and does not rotate a valid CA. Tests do not mutate system trust stores. SIUI README documents importing the existing public local root with certutil from an elevated terminal, distinct from the CNAS token certificate.
+- Follow-up: user tests on macOS before Windows deployment (Athena token; macOS CNAS driver support is not requested now). Added macOS Keychain verification/import with OS authorization and timeout; Linux supports root installation through update-ca-certificates/update-ca-trust, otherwise actionable log. HTTPS CA generation remains shared across OSes.
+- CNAS licence is now a masked write-only settings field stored in modules.siui.licence inside config.yaml (Unix 0600 on save). No separate licence file. Empty/omitted field preserves saved secret; GET exposes only licence_configured. Settings can be saved with no token selected on Mac; submissions require complete configuration. Old licence_file is removed on settings save; re-enter existing licence in UI.
+- Requested licence visibility: settings GET/PUT expose a redacted licence_hint (first 3 + … + last 3 characters; <=6 entirely masked). UI displays the hint separately from the empty replacement field so it cannot overwrite the real licence. User's running macOS entrypoint was output/siui-bridge/bin/SIUI_Bridge; refresh that executable too when rebuilding, preserving deployments/config.yaml.

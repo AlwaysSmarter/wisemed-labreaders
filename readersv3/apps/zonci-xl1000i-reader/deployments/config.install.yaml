@@ -43,10 +43,20 @@ modules:
     cfg_wisemed_key: ""
     echipament_id: ""
   wisemed-ws:
+    # JWT signed with this equipment's dedicated key; provision the matching key on WSM.
+    auth_mode: device_key
+    tenant_id: ""
+    key_id: ""
+    issuer: ""
+    audience: wsm-server
+    secret_file: ""
+    token_file: ""
+    token_path: ""
+    ca_file: ""
     enabled: true
     url: wss://wslocal.wisemed.eu/ws
     heartbeat_ms: 15000
-    reconnect_delay_ms: 5000
+    reconnect_delay_ms: 30000
   help:
     help_dir: ./help
   result-sync:

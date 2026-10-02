@@ -13,7 +13,7 @@ wisemed_ws:
   enabled: true
   url: wss://wslocal.wisemed.eu/ws
   heartbeat_ms: 15000
-  reconnect_delay_ms: 5000
+  reconnect_delay_ms: 30000
 analyzer:
   comm_type: utility
   protocol: anaf-docsmart
@@ -59,7 +59,17 @@ modules:
     tip_de_echipament_id: ""
     api_key_echipament: ""
   wisemed-ws:
+    # JWT signed with this equipment's dedicated key; provision the matching key on WSM.
+    auth_mode: device_key
+    tenant_id: ""
+    key_id: ""
+    issuer: ""
+    audience: wsm-server
+    secret_file: ""
+    token_file: ""
+    token_path: ""
+    ca_file: ""
     enabled: true
     url: wss://wslocal.wisemed.eu/ws
     heartbeat_ms: 15000
-    reconnect_delay_ms: 5000
+    reconnect_delay_ms: 30000

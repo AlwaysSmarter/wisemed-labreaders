@@ -1,0 +1,17 @@
+# Only source needed for the server and the four shared UI assets enters the build.
+**
+!wsm-server/
+!wsm-server/go.mod
+!wsm-server/go.sum
+!wsm-server/cmd/
+!wsm-server/cmd/**
+!wsm-server/internal/
+!wsm-server/internal/**
+!readersv3/
+!readersv3/modules/
+!readersv3/modules/localhttp/
+!readersv3/modules/localhttp/ui/
+!readersv3/modules/localhttp/ui/index.html
+!readersv3/modules/localhttp/ui/app.js
+!readersv3/modules/localhttp/ui/styles.css
+!readersv3/modules/localhttp/ui/wss-remote.js

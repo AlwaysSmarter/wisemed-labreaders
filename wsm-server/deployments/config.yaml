@@ -1,21 +1,28 @@
+# HTTP/WS backend for Nginx. Keep port 8090 on a private network.
 server:
   address: "0.0.0.0"
   port: 8090
-  write_timeout_ms: 5000
-  read_timeout_ms: 60000
-  ping_interval_ms: 25000
-  send_queue_size: 128
-  max_message_bytes: 1048576
-
+  control_ui_dir: ../control
+  max_message_bytes: 8388608
+  allow_insecure_http: true
 security:
-  accepted_keys:
-    reader-generic-001: "reader-key-demo-001"
-    reader-file-001: "gnXooDkx5En2fU1KQL7zOJDPWzp86l0z"
-    browser-test-a: "browser-test-key-a"
-    browser-test-b: "browser-test-key-b"
-    wisemed-gui: "2ZUC5Ql5oL479YauF1b7G7vP1uaQhNgq"
+  audience: wsm-server
+  max_token_ttl_seconds: 900
+  keys:
+    local-backend:
+      tenant_id: local
+      secret_file: keys/local-backend.key
+      roles: [browser, service]
+      scopes: ["route:command", "route:reply", "route:event", "route:broadcast", "topics:subscribe", "connections:read", "server:status", "devices:debug", "api:invoke", "api:admin"]
+tenants:
+  local:
+    issuer: https://localhost:8443
+    allowed_origins: ["https://localhost:8443"]
 
-wisemed:
-  base_url: "https://example.wisemed.local/api"
-  api_key: ""
-  api_key_ref: "WISEMED_API_KEY"
+# Optional WiseMED administrator console; see docs/admin-console.md.
+admin:
+  enabled: false
+  public_origin: https://ws.example.ro
+  session_ttl_seconds: 900
+# When enabling, also set security.device_keys_file to a writable persistent path
+# such as /var/lib/wsm-server/device-keys.yaml and configure tenant.wisemed HTTPS API.

@@ -11,7 +11,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"html"
 	"io"
 	"io/fs"
 	"net"
@@ -31,6 +30,7 @@ import (
 	"wisemed-labreaders/readersv3/modules/protocols/fileimportbase"
 	"wisemed-labreaders/readersv3/modules/wisemedapi"
 	"wisemed-labreaders/readersv3/shared/analyzeractivity"
+	"wisemed-labreaders/readersv3/shared/apibridge"
 	"wisemed-labreaders/readersv3/shared/appmeta"
 	"wisemed-labreaders/readersv3/shared/appupdates"
 	"wisemed-labreaders/readersv3/shared/bindguard"
@@ -211,6 +211,7 @@ func (m *Module) Init(rt module.Runtime) error {
 	m.rt.RegisterService("daily-analysis-send-filters", m)
 	m.rt.AddMenu(module.MenuEntry{ID: "overview", Group: "core", Label: "Acasa", Path: "/", Order: 10})
 	m.rt.Handle("/", m.withNoCache(http.HandlerFunc(m.handleIndex)))
+	m.rt.Handle("/settings/siui", m.withNoCache(http.HandlerFunc(m.handleIndex)))
 	m.rt.Handle("/settings/pad", m.withNoCache(http.HandlerFunc(m.handleIndex)))
 	m.rt.Handle("/settings/demo", m.withNoCache(http.HandlerFunc(m.handleIndex)))
 	m.rt.Handle("/settings/reader", m.withNoCache(http.HandlerFunc(m.handleIndex)))
@@ -218,6 +219,7 @@ func (m *Module) Init(rt module.Runtime) error {
 	m.rt.Handle("/orders", m.withNoCache(http.HandlerFunc(m.handleIndex)))
 	m.rt.Handle("/qc", m.withNoCache(http.HandlerFunc(m.handleIndex)))
 	m.rt.Handle("/debug", m.withNoCache(http.HandlerFunc(m.handleIndex)))
+	m.rt.Handle("/wss-remote.js", m.withNoCache(http.HandlerFunc(m.handleStaticAsset("ui/wss-remote.js", "application/javascript; charset=utf-8"))))
 	m.rt.Handle("/app.js", m.withNoCache(http.HandlerFunc(m.handleStaticAsset("ui/app.js", "application/javascript; charset=utf-8"))))
 	m.rt.Handle("/styles.css", m.withNoCache(http.HandlerFunc(m.handleStaticAsset("ui/styles.css", "text/css; charset=utf-8"))))
 	m.rt.Handle("/api/session", m.withNoCache(http.HandlerFunc(m.handleSessionStatus)))
@@ -230,6 +232,7 @@ func (m *Module) Init(rt module.Runtime) error {
 	m.rt.Handle("/api/session/logout", m.withNoCache(m.requireSession(http.HandlerFunc(m.handleLogout))))
 	m.rt.Handle("/api/app-update/status", m.withNoCache(http.HandlerFunc(m.handleAppUpdateStatus)))
 	m.rt.Handle("/api/app-update/settings", m.withNoCache(m.requireSession(http.HandlerFunc(m.handleAppUpdateSettings))))
+	m.rt.Handle("/api/wss/", m.withNoCache(m.requireSession(http.HandlerFunc(m.handleWSS))))
 	m.rt.Handle("/api/status", m.withNoCache(m.requireSession(http.HandlerFunc(m.handleStatus))))
 	m.rt.Handle("/api/dashboard", m.withNoCache(m.requireSession(http.HandlerFunc(m.handleDashboard))))
 	m.rt.Handle("/api/logs", m.withNoCache(m.requireSession(http.HandlerFunc(m.handleLogs))))
@@ -321,7 +324,7 @@ func (m *Module) Start(ctx context.Context) error {
 		keyFile := ""
 		if useTLS {
 			var err error
-			certFile, keyFile, err = ensureLocalHTTPSMaterial(m.rt.ConfigDir(), addr)
+			certFile, keyFile, err = ensureLocalHTTPSMaterial(m.rt.ConfigDir(), addr, m.rt.Logf)
 			if err != nil {
 				return err
 			}
@@ -535,6 +538,12 @@ func (m *Module) HasSession(r *http.Request) bool { _, ok := m.currentSession(r)
 
 func (m *Module) RequireSession(next http.Handler) http.Handler { return m.requireSession(next) }
 
+// SessionIdentity exposes authenticated identity to utility modules, including WSM principals.
+func (m *Module) SessionIdentity(r *http.Request) (string, bool, bool) {
+	s, ok := m.currentSession(r)
+	return s.Username, ok && s.UserType <= 0, ok
+}
+
 func (m *Module) requireSession(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, ok := m.currentSession(r)
@@ -563,7 +572,7 @@ func (m *Module) handleIndex(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	switch r.URL.Path {
-	case "/", "/daily-details", "/settings", "/settings/pad", "/settings/demo", "/settings/reader", "/settings/analytes", "/settings/qc", "/settings/daily-details", "/settings/daily-analysis-filters", "/orders", "/qc", "/debug":
+	case "/settings/siui", "/settings/wss", "/", "/daily-details", "/settings", "/settings/pad", "/settings/demo", "/settings/reader", "/settings/analytes", "/settings/qc", "/settings/daily-details", "/settings/daily-analysis-filters", "/orders", "/qc", "/debug":
 	default:
 		http.NotFound(w, r)
 		return
@@ -1302,6 +1311,7 @@ func (m *Module) handleStatus(w http.ResponseWriter, r *http.Request) {
 		"stats": stats,
 		"connections": map[string]interface{}{
 			"wisemed_ws_connected":    wsConnected,
+			"wisemed_ws":              m.wssStatus(),
 			"analyzer_connected":      analyzerConnected,
 			"analyzer_last_packet_at": analyzerLastPacketAt,
 			"analyzer_transport":      analyzerTransport,
@@ -1942,8 +1952,7 @@ func (m *Module) handleOrdersWorklist(w http.ResponseWriter, r *http.Request) {
 	for _, analyte := range analytes {
 		analyteIndex[strings.TrimSpace(analyte.Tag)] = analyte
 	}
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_, _ = w.Write([]byte(m.renderCaryWorklistHTML(orderDate, roundNo, bundles, analyteIndex, definitions, values)))
+	writePrintDocument(w, r, m.buildCaryWorklistDocument(orderDate, roundNo, bundles, analyteIndex, definitions, values))
 }
 
 func (m *Module) handleDailyDetails(w http.ResponseWriter, r *http.Request) {
@@ -2140,8 +2149,7 @@ func (m *Module) handleDailyDetailsWorksheet(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	m.appendAuditLog(r, "daily-worksheet-print", fmt.Sprintf("Utilizatorul %s a deschis fisa de lucru pentru %s.", m.auditActor(r), orderDate), map[string]interface{}{"order_date": orderDate, "scope": scope, "round_no": roundNo, "analyte_tag": analyteTag, "orders": len(bundles)})
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_, _ = w.Write([]byte(m.renderDailyWorksheetHTML(orderDate, scope, roundNo, analyteTag, formCode, detailRows, bundles)))
+	writePrintDocument(w, r, m.buildDailyWorksheetDocument(orderDate, scope, roundNo, analyteTag, formCode, detailRows, bundles))
 }
 
 func (m *Module) handleDailyDetailDefinitions(w http.ResponseWriter, r *http.Request) {
@@ -2506,6 +2514,13 @@ func (m *Module) createSessionFromWiseMED(info wisemedapi.LoginResponse, setting
 }
 
 func (m *Module) currentSession(r *http.Request) (session, bool) {
+	if p, ok := apibridge.PrincipalFrom(r.Context()); ok {
+		userType := 1
+		if p.Admin {
+			userType = 0
+		}
+		return session{ID: "wss:" + p.ConnectionID, Username: p.Subject, UserType: userType, CreatedAt: time.Now(), ExpiresAt: time.Now().Add(time.Minute)}, true
+	}
 	cookie, err := m.requestSessionCookie(r)
 	if err != nil || cookie.Value == "" {
 		return session{}, false
@@ -2528,6 +2543,10 @@ func (m *Module) currentSession(r *http.Request) (session, bool) {
 }
 
 func (m *Module) currentSessionWithAuth(r *http.Request) (session, sessionAuth, bool) {
+	if _, ok := apibridge.PrincipalFrom(r.Context()); ok {
+		sess, ok := m.currentSession(r)
+		return sess, sessionAuth{}, ok
+	}
 	cookie, err := m.requestSessionCookie(r)
 	if err != nil || cookie.Value == "" {
 		return session{}, sessionAuth{}, false
@@ -3821,249 +3840,6 @@ func (m *Module) saveManualQCRecord(runDate string, analysis coremodel.QCAnalysi
 		runDate = time.Now().Format("2006-01-02")
 	}
 	return store.SaveManualQCRecord(runDate, analysis, actor, enteredAt)
-}
-
-func (m *Module) renderCaryWorklistHTML(orderDate string, roundNo int, bundles []coremodel.OrderBundle, analyteIndex map[string]coremodel.Analyte, definitions []coremodel.DailyDetailDefinition, values []coremodel.DailyDetailValue) string {
-	type headerItem struct {
-		Tag      string
-		Name     string
-		AMartor  string
-		Worklist string
-	}
-	valueIndex := map[string]string{}
-	for _, item := range values {
-		key := item.DefinitionKey + "|" + item.ScopeDate + "|" + strconv.Itoa(item.RoundNo) + "|" + strings.ToUpper(strings.TrimSpace(item.AnalyteTag))
-		valueIndex[key] = item.ValueText
-	}
-	headerMap := map[string]headerItem{}
-	for _, bundle := range bundles {
-		for _, analysis := range bundle.Analyses {
-			tag := strings.TrimSpace(analysis.Analysis.AnalyteTag)
-			if tag == "" {
-				continue
-			}
-			if _, ok := headerMap[tag]; ok {
-				continue
-			}
-			analyte := analyteIndex[tag]
-			amartor := firstNonEmpty(
-				valueIndex["amartor|"+orderDate+"|0|"+strings.ToUpper(tag)],
-				valueIndex["amartor|"+orderDate+"|"+strconv.Itoa(roundNo)+"|"+strings.ToUpper(tag)],
-			)
-			worklistLabel := strings.TrimSpace(asString(analyte.ProtocolOptions["worklist_label"]))
-			if worklistLabel == "" {
-				worklistLabel = strings.TrimSpace(analyte.ResultMeasureUnit)
-			}
-			headerMap[tag] = headerItem{
-				Tag:      tag,
-				Name:     firstNonEmpty(analyte.Name, analysis.Analysis.AnalyteName, tag),
-				AMartor:  amartor,
-				Worklist: worklistLabel,
-			}
-		}
-	}
-	headers := make([]headerItem, 0, len(headerMap))
-	for _, item := range headerMap {
-		headers = append(headers, item)
-	}
-	sort.Slice(headers, func(i, j int) bool { return headers[i].Name < headers[j].Name })
-	rows := make([]string, 0)
-	sort.Slice(bundles, func(i, j int) bool {
-		if bundles[i].Order.SampleNo != bundles[j].Order.SampleNo {
-			return bundles[i].Order.SampleNo < bundles[j].Order.SampleNo
-		}
-		return bundles[i].Order.SampleID < bundles[j].Order.SampleID
-	})
-	for _, bundle := range bundles {
-		sort.Slice(bundle.Analyses, func(i, j int) bool {
-			return firstNonEmpty(bundle.Analyses[i].Analysis.AnalyteName, bundle.Analyses[i].Analysis.AnalyteTag) < firstNonEmpty(bundle.Analyses[j].Analysis.AnalyteName, bundle.Analyses[j].Analysis.AnalyteTag)
-		})
-		for _, item := range bundle.Analyses {
-			flags := item.Analysis.Flags
-			worklistLabel := strings.TrimSpace(asString(flags["worklist_label"]))
-			if worklistLabel == "" {
-				if domain := strings.TrimSpace(asString(flags["domain_label"])); domain != "" {
-					worklistLabel = domain
-				} else if domain := strings.TrimSpace(asString(flags["domain"])); domain != "" {
-					worklistLabel = domain
-				}
-				if unit := strings.TrimSpace(item.Analysis.Unit); unit != "" {
-					if worklistLabel != "" {
-						worklistLabel += " / " + unit
-					} else {
-						worklistLabel = unit
-					}
-				}
-			}
-			if worklistLabel == "" {
-				analyte := analyteIndex[strings.TrimSpace(item.Analysis.AnalyteTag)]
-				worklistLabel = strings.TrimSpace(asString(analyte.ProtocolOptions["worklist_label"]))
-				if worklistLabel == "" {
-					worklistLabel = strings.TrimSpace(analyte.ResultMeasureUnit)
-				}
-			}
-			rows = append(rows, `<tr>`+
-				`<td>`+html.EscapeString(bundle.Order.SampleID)+`</td>`+
-				`<td>`+html.EscapeString(bundle.Order.OrderDate)+`</td>`+
-				`<td>`+html.EscapeString(worklistLabel)+`</td>`+
-				`<td>`+html.EscapeString(firstNonEmpty(asString(flags["measured_concentration"]), item.Analysis.RawValue))+`</td>`+
-				`<td>`+html.EscapeString(firstNonEmpty(asString(flags["dilution_factor"]), "-"))+`</td>`+
-				`<td>`+html.EscapeString(firstNonEmpty(asString(flags["final_concentration"]), item.Analysis.ResultValue))+`</td>`+
-				`<td class="sign"></td><td class="sign"></td>`+
-				`</tr>`)
-		}
-	}
-	headerRows := make([]string, 0, len(headers))
-	for _, item := range headers {
-		headerRows = append(headerRows, `<tr><td>`+html.EscapeString(item.Name)+`</td><td>`+html.EscapeString(item.AMartor)+`</td></tr>`)
-	}
-	return `<!doctype html><html lang="ro"><head><meta charset="utf-8"><title>Lista de lucru ` + html.EscapeString(orderDate) + `</title><style>
-body{font-family:Arial,sans-serif;margin:24px;color:#111}
-h1,h2{margin:0 0 12px}
-.meta{margin-bottom:20px;color:#444}
-table{width:100%;border-collapse:collapse;margin:0 0 20px}
-th,td{border:1px solid #222;padding:8px 10px;font-size:12px;vertical-align:top}
-th{background:#f2f2f2}
-.head-grid{display:grid;grid-template-columns:340px 1fr;gap:24px;align-items:start;margin-bottom:20px}
-.sign{height:32px;min-width:120px}
-@media print{body{margin:8mm}.print-btn{display:none}}
-</style></head><body>
-<button class="print-btn" onclick="window.print()">Print</button>
-<h1>Lista de lucru</h1>
-<div class="meta">Data analizei: ` + html.EscapeString(orderDate) + ` · Runda: ` + html.EscapeString(strconv.Itoa(roundNo)) + `</div>
-<div class="head-grid">
-<div><h2>A martor</h2><table><thead><tr><th>Analiza</th><th>Valoare</th></tr></thead><tbody>` + strings.Join(headerRows, "") + `</tbody></table></div>
-</div>
-<table><thead><tr><th>Cod proba</th><th>Data analizei</th><th>Domeniu de lucru / UM</th><th>Concentratie masurata</th><th>Dilutie</th><th>Concentratie finala</th><th>Executant</th><th>Responsabil</th></tr></thead><tbody>` + strings.Join(rows, "") + `</tbody></table>
-</body></html>`
-}
-
-func (m *Module) dailyWorksheetMeta(scopeDate, scope string, roundNo int, analyteTag string) (string, []string, error) {
-	definitions, err := m.combinedDailyDetailDefinitions()
-	if err != nil {
-		return "", nil, err
-	}
-	values, err := m.listDailyDetailValues(scopeDate, roundNo)
-	if err != nil {
-		return "", nil, err
-	}
-	usesRound := scope == "day_round" || scope == "day_round_analyte"
-	usesAnalyte := scope == "day_analyte" || scope == "day_round_analyte"
-	currentRound := 0
-	currentAnalyte := ""
-	if usesRound {
-		currentRound = roundNo
-	}
-	if usesAnalyte {
-		currentAnalyte = strings.TrimSpace(analyteTag)
-	}
-	findValue := func(key string) string {
-		for _, item := range values {
-			if strings.TrimSpace(item.DefinitionKey) != key {
-				continue
-			}
-			if item.RoundNo != currentRound {
-				continue
-			}
-			if strings.TrimSpace(item.AnalyteTag) != currentAnalyte {
-				continue
-			}
-			return strings.TrimSpace(item.ValueText)
-		}
-		return ""
-	}
-	formCode := findValue("cod_formular_fisa_lucru")
-	rows := []string{}
-	for _, def := range definitions {
-		key := strings.TrimSpace(def.Key)
-		if key == "" {
-			continue
-		}
-		if key != "cod_formular_fisa_lucru" && def.Scope != scope {
-			continue
-		}
-		value := findValue(key)
-		if value == "" {
-			value = strings.TrimSpace(def.DefaultValue)
-		}
-		if key == "cod_formular_fisa_lucru" {
-			if formCode == "" {
-				formCode = value
-			}
-			continue
-		}
-		if value == "" {
-			continue
-		}
-		rows = append(rows, `<tr><th>`+html.EscapeString(firstNonEmpty(def.Label, key))+`</th><td>`+html.EscapeString(value)+`</td></tr>`)
-	}
-	return formCode, rows, nil
-}
-
-func (m *Module) renderDailyWorksheetHTML(orderDate, scope string, roundNo int, analyteTag, formCode string, detailRows []string, bundles []coremodel.OrderBundle) string {
-	scopeLabel := map[string]string{
-		"day":               "Pe zi",
-		"day_round":         "Pe zi si runda",
-		"day_analyte":       "Pe zi si analiza",
-		"day_round_analyte": "Pe zi, runda si analiza",
-	}[scope]
-	if scopeLabel == "" {
-		scopeLabel = scope
-	}
-	rows := make([]string, 0, len(bundles))
-	for _, bundle := range bundles {
-		analyses := make([]string, 0, len(bundle.Analyses))
-		for _, analysisBundle := range bundle.Analyses {
-			analysis := analysisBundle.Analysis
-			if analyteTag != "" && !strings.EqualFold(strings.TrimSpace(analysis.AnalyteTag), analyteTag) {
-				continue
-			}
-			result := firstNonEmpty(strings.TrimSpace(analysis.ResultValue), strings.TrimSpace(analysis.RawValue), "-")
-			analyses = append(analyses, firstNonEmpty(analysis.AnalyteTag, analysis.AnalyteName)+` = `+result)
-		}
-		if analyteTag != "" && len(analyses) == 0 {
-			continue
-		}
-		rows = append(rows, `<tr>`+
-			`<td>`+html.EscapeString(bundle.Order.SampleID)+`</td>`+
-			`<td>`+html.EscapeString(firstNonEmpty(asString(bundle.Order.Meta["sent_sample_code"]), "-"))+`</td>`+
-			`<td>`+html.EscapeString(firstNonEmpty(bundle.Order.FileID, "-"))+`</td>`+
-			`<td>`+html.EscapeString(firstNonEmpty(bundle.Order.PatientID, "-"))+`</td>`+
-			`<td>`+html.EscapeString(firstNonEmpty(bundle.Order.PatientName, "-"))+`</td>`+
-			`<td>`+html.EscapeString(strings.Join(analyses, " | "))+`</td>`+
-			`</tr>`)
-	}
-	if len(rows) == 0 {
-		rows = append(rows, `<tr><td colspan="6">Nu exista cereri pentru filtrul selectat.</td></tr>`)
-	}
-	metaParts := []string{`Data: ` + html.EscapeString(orderDate), `Scope: ` + html.EscapeString(scopeLabel)}
-	if roundNo > 0 {
-		metaParts = append(metaParts, `Runda: `+html.EscapeString(strconv.Itoa(roundNo)))
-	}
-	if strings.TrimSpace(analyteTag) != "" {
-		metaParts = append(metaParts, `Analiza: `+html.EscapeString(analyteTag))
-	}
-	formCodeText := firstNonEmpty(strings.TrimSpace(formCode), "-")
-	detailsHTML := ""
-	if len(detailRows) > 0 {
-		detailsHTML = `<table class="details"><tbody>` + strings.Join(detailRows, "") + `</tbody></table>`
-	}
-	return `<!doctype html><html lang="ro"><head><meta charset="utf-8"><title>Fisa de lucru</title><style>
-body{font-family:Arial,sans-serif;margin:24px;color:#111}
-h1{margin:0 0 12px}
-.top{display:flex;justify-content:space-between;align-items:flex-start;gap:24px;margin-bottom:20px}
-.meta,.form-code{color:#444;font-size:12px}
-table{width:100%;border-collapse:collapse;margin:0 0 20px}
-th,td{border:1px solid #222;padding:8px 10px;font-size:12px;vertical-align:top}
-th{background:#f2f2f2}
-.details{width:auto;min-width:360px}
-@media print{body{margin:8mm}.print-btn{display:none}}
-</style></head><body>
-<button class="print-btn" onclick="window.print()">Print</button>
-<div class="top"><div><h1>Fisa de lucru</h1><div class="meta">` + strings.Join(metaParts, ` · `) + `</div></div><div class="form-code"><strong>Cod formular:</strong> ` + html.EscapeString(formCodeText) + `</div></div>
-` + detailsHTML + `
-<table><thead><tr><th>Proba</th><th>Cod trimis</th><th>Fisa</th><th>Sample code</th><th>Specimen code</th><th>Analize</th></tr></thead><tbody>` + strings.Join(rows, "") + `</tbody></table>
-</body></html>`
 }
 
 func parsePathInt64(path, prefix string) (int64, error) {

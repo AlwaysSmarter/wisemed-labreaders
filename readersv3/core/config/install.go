@@ -52,7 +52,10 @@ func Ensure(path string) (EnsureResult, error) {
 	if err != nil {
 		return EnsureResult{}, err
 	}
-	changed := mergeMissing(current, template)
+	changed := preserveLegacyConnectionSettings(current)
+	if mergeMissing(current, template) {
+		changed = true
+	}
 	if !changed {
 		return EnsureResult{ConfigPath: path, TemplatePath: templatePath}, nil
 	}
@@ -173,4 +176,52 @@ func cloneValue(value interface{}) interface{} {
 	default:
 		return typed
 	}
+}
+
+// Preserve explicitly configured legacy connection values before an installer
+// template fills missing module keys with its defaults.
+func preserveLegacyConnectionSettings(current map[string]interface{}) bool {
+	changed := false
+	modules, _ := current["modules"].(map[string]interface{})
+	if modules == nil {
+		modules = map[string]interface{}{}
+		current["modules"] = modules
+	}
+	if legacy, ok := current["wisemed_ws"].(map[string]interface{}); ok {
+		ws, _ := modules["wisemed-ws"].(map[string]interface{})
+		if ws == nil {
+			ws = map[string]interface{}{}
+			modules["wisemed-ws"] = ws
+		}
+		for _, key := range []string{"enabled", "url", "heartbeat_ms", "reconnect_delay_ms"} {
+			if value, exists := legacy[key]; exists {
+				if _, already := ws[key]; !already {
+					ws[key] = value
+					changed = true
+				}
+			}
+		}
+	}
+	reader, _ := current["reader"].(map[string]interface{})
+	analyzer, _ := current["analyzer"].(map[string]interface{})
+	if reader["id"] == "signing-pad-utility" || analyzer["protocol"] == "signing-pad" {
+		pad, _ := modules["signing-pad"].(map[string]interface{})
+		if pad != nil {
+			if shared, _ := pad["shared_http"].(bool); !shared {
+				local, _ := current["local_http"].(map[string]interface{})
+				if local == nil {
+					local = map[string]interface{}{}
+					current["local_http"] = local
+				}
+				for _, key := range []string{"address", "tls"} {
+					if value, exists := pad[key]; exists {
+						local[key] = value
+					}
+				}
+				pad["shared_http"] = true
+				changed = true
+			}
+		}
+	}
+	return changed
 }

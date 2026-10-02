@@ -1,0 +1,40 @@
+admin:
+    enabled: true
+    public_origin: https://wslocal.wisemed.eu
+    session_ttl_seconds: 900
+security:
+    audience: wsm-server
+    device_keys_file: ../state/device-keys.yaml
+    keys:
+        local-backend:
+            roles:
+                - browser
+                - service
+            scopes:
+                - route:command
+                - route:reply
+                - route:event
+                - route:broadcast
+                - topics:subscribe
+                - connections:read
+                - server:status
+                - devices:debug
+                - api:invoke
+                - api:admin
+            secret_file: keys/local-backend.key
+            tenant_id: local
+    max_token_ttl_seconds: 900
+server:
+    address: 0.0.0.0
+    allow_insecure_http: true
+    control_ui_dir: ../control
+    max_message_bytes: 8388608
+    port: 8090
+tenants:
+    local:
+        allowed_origins:
+            - https://localhost:8443
+        issuer: https://localhost:8443
+        wisemed:
+            api_key_file: keys/local-wisemed-api.key
+            base_url: https://php.wisemed.eu/git/wisemed/wisemed-api/apiv2
