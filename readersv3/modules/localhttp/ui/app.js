@@ -7016,6 +7016,8 @@ async function loadSIUIPanel() {
     <label>Adresa CNAS <input name="base_url" value="${escapeHtml(settings.base_url||"")}" type="url" required></label>
     <label>Port SIUI <input id="siui-port" type="number" min="1" max="65535" value="${escapeHtml(new URL(settings.base_url||"https://www.siui.ro").port||"443")}" required></label>
     <p>Implicit 443. Folosește 444 numai pentru endpointul CNAS corespunzător. Portul se salvează în adresa CNAS.</p>
+    <label><input id="siui-allow-invalid-date" type="checkbox" ${settings.allow_invalid_server_certificate_date ? "checked" : ""}> Permite certificatul CNAS expirat / încă nevalabil</label>
+    <p class="muted">Excepție TLS doar pentru perioada de valabilitate a certificatului serverului CNAS. Activează pentru eroarea flags=0x00000020. Numele serverului și autoritatea emitentă rămân verificate.</p>
     <label>Certificatele contului <select name="certificate_store"><option value="CurrentUser">Utilizator curent</option><option value="LocalMachine">Calculator local</option></select></label>
     <label>Certificat / token USB <select name="certificate_thumbprint"><option value="${escapeHtml(settings.certificate_thumbprint||"")}">${escapeHtml(settings.certificate_thumbprint||"Selectează un certificat")}</option></select></label>
     <button type="button" id="siui-certificates">Reîncarcă certificatele</button><button type="submit">Salvează configurarea</button>
@@ -7062,7 +7064,7 @@ async function loadSIUIPanel() {
    };
    bindAsyncClick(panel.querySelector("#siui-certificates"),reload);
    form.elements.certificate_store.addEventListener("change",()=>{form.elements.certificate_thumbprint.replaceChildren(new Option("Selectează un certificat", ""));reload().catch(e=>showToast(e.message,"error"));});
-   bindAsyncSubmit(form,async event=>{event.preventDefault();const saved=await api("/api/siui/settings",{method:"PUT",body:JSON.stringify(Object.fromEntries(new FormData(form)))});panel.querySelector("#siui-licence-info").textContent=saved.licence_hint ? "Licență salvată: "+saved.licence_hint : "Licență neconfigurată";form.elements.licence.value="";form.elements.licence.placeholder="Licență salvată; lasă gol pentru a o păstra";showToast("Configurarea CNAS a fost salvată.","success");});
+   bindAsyncSubmit(form,async event=>{event.preventDefault();const saved=await api("/api/siui/settings",{method:"PUT",body:JSON.stringify({...Object.fromEntries(new FormData(form)),allow_invalid_server_certificate_date:panel.querySelector("#siui-allow-invalid-date").checked})});panel.querySelector("#siui-licence-info").textContent=saved.licence_hint ? "Licență salvată: "+saved.licence_hint : "Licență neconfigurată";form.elements.licence.value="";form.elements.licence.placeholder="Licență salvată; lasă gol pentru a o păstra";showToast("Configurarea CNAS a fost salvată.","success");});
   }
   bindAsyncClick(panel.querySelector("#siui-test-local"),async()=>{
    const result=panel.querySelector("#siui-connection-result");result.textContent="Test local în curs…";

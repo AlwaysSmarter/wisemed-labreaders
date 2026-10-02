@@ -143,6 +143,12 @@ func (n nativeBackend) Do(ctx context.Context, method, raw string, headers http.
 	if r == 0 {
 		return 0, nil, nil, nativeError("client certificate", e)
 	}
+	// Scoped to this CNAS request: retain CA, hostname and usage validation.
+	if n.cfg.AllowInvalidServerCertificateDate {
+		if e = option(request, 31, 0x00002000); e != nil {
+			return 0, nil, nil, e
+		} // WINHTTP_OPTION_SECURITY_FLAGS / IGNORE_CERT_DATE_INVALID
+	}
 	var hb strings.Builder
 	for k, values := range headers {
 		for _, v := range values {

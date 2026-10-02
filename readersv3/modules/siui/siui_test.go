@@ -14,6 +14,7 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+	"wisemed-labreaders/readersv3/core/config"
 	"wisemed-labreaders/readersv3/core/module"
 	"wisemed-labreaders/readersv3/shared/apibridge"
 )
@@ -378,6 +379,67 @@ func TestLicenceHint(t *testing.T) {
 	for input, want := range map[string]string{"": "", "ABC123456XYZ": "ABC…XYZ", "123456": "••••••", "abc": "••••••", "ĂBC12345ȘȚZ": "ĂBC…ȘȚZ"} {
 		if got := licenceHint(input); got != want {
 			t.Errorf("unexpected hint: %q", got)
+		}
+	}
+}
+
+func TestServerCertificateDateExceptionSettings(t *testing.T) {
+	dir := t.TempDir()
+	rt := &testRuntime{mux: http.NewServeMux(), path: filepath.Join(dir, "config.yaml"), guard: testGuard{}, settings: map[string]interface{}{}}
+	if err := os.WriteFile(rt.path, []byte("modules:\n  siui:\n    base_url: https://www.siui.ro\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	m := &Module{}
+	if err := m.Init(rt); err != nil {
+		t.Fatal(err)
+	}
+	if m.cfg.AllowInvalidServerCertificateDate {
+		t.Fatal("exception enabled by default")
+	}
+	call := func(method, body string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(method, "/api/siui/settings", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "test-local-session")
+		res := httptest.NewRecorder()
+		rt.mux.ServeHTTP(res, req)
+		return res
+	}
+	base := `{"username":"TEST_CAS","base_url":"https://www.siui.ro","certificate_store":"CurrentUser"`
+	for _, tc := range []struct {
+		field string
+		want  bool
+	}{
+		{`,"allow_invalid_server_certificate_date":true`, true},
+		{"", true}, // Older clients preserve an explicit operator choice.
+		{`,"allow_invalid_server_certificate_date":false`, false},
+	} {
+		if res := call("PUT", base+tc.field+"}"); res.Code != 200 {
+			t.Fatal(res.Body.String())
+		}
+		if m.cfg.AllowInvalidServerCertificateDate != tc.want {
+			t.Fatal("live configuration mismatch")
+		}
+		var body struct {
+			Settings struct {
+				Allow bool `json:"allow_invalid_server_certificate_date"`
+			} `json:"settings"`
+		}
+		if err := json.Unmarshal(call("GET", "").Body.Bytes(), &body); err != nil || body.Settings.Allow != tc.want {
+			t.Fatal("GET mismatch", err)
+		}
+		saved, err := config.Load(rt.path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		restarted := &Module{}
+		rt2 := *rt
+		rt2.mux = http.NewServeMux()
+		rt2.settings = saved.ModuleSettings("siui")
+		if err := restarted.Init(&rt2); err != nil {
+			t.Fatal(err)
+		}
+		if restarted.cfg.AllowInvalidServerCertificateDate != tc.want {
+			t.Fatal("persisted configuration mismatch")
 		}
 	}
 }

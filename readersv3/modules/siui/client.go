@@ -14,7 +14,10 @@ type backend interface {
 	Do(context.Context, string, string, http.Header, []byte) (int, http.Header, []byte, error)
 	Validate(context.Context, string, []byte) error
 }
-type settings struct{ Username, Licence, Thumbprint, Store, BaseURL, Database string }
+type settings struct {
+	Username, Licence, Thumbprint, Store, BaseURL, Database string
+	AllowInvalidServerCertificateDate                       bool
+}
 type client struct {
 	cfg     settings
 	backend backend

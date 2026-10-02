@@ -208,5 +208,16 @@ prezenta certificatul *.siui.ro emis de certSIGN Web CA, valabil până la
 9 aprilie 2026 08:20:01 UTC. Aceasta este o observație la acel moment, nu o valoare
 fixată în cod. Verifică data Windows și certificatul endpointului folosit.
 Vechiul C# folosea o politică ce accepta orice certificat de server; noul transport
-păstrează verificarea TLS. Un certificat expirat la server trebuie reînnoit de
+păstrează implicit verificarea TLS. Un certificat expirat la server trebuie reînnoit de
 operatorul endpointului; instalarea autorității HTTPS locale nu remediază acest caz.
+
+Pentru compatibilitate cu endpointul CNAS care raportează `flags=0x00000020`,
+activează în Setări → CNAS **Permite certificatul CNAS expirat / încă nevalabil**
+și salvează. Opțiunea `modules.siui.allow_invalid_server_certificate_date` este
+implicit `false`, se aplică imediat și se păstrează în `deployments/config.yaml`.
+Este disponibilă și prin `GET/PUT /api/siui/settings` (HTTP/HTTPS și WSM).
+Ignoră exclusiv perioada de valabilitate a certificatului serverului pentru
+cererile CNAS (OCSP și PIAS); numele, autoritatea și utilizarea TLS rămân verificate.
+Certificatul tokenului trebuie să fie în continuare valabil. Debifează excepția
+și salvează după reînnoirea certificatului serverului. Nu afectează HTTPS local,
+WSM sau update serverul și nu exportă certificatul tokenului.

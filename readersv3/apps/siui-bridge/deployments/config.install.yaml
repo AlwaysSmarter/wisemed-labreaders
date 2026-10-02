@@ -60,6 +60,7 @@ modules:
     reconnect_delay_ms: 30000
   siui:
     base_url: https://www.siui.ro
+    allow_invalid_server_certificate_date: false
     username: ""
     licence: ""
     certificate_store: CurrentUser

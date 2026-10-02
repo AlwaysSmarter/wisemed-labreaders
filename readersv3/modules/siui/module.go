@@ -68,7 +68,7 @@ func (m *Module) Init(rt module.Runtime) error {
 	if database == "" {
 		database = "./siui-jobs.db"
 	}
-	m.cfg = settings{Username: value(s["username"]), Licence: value(s["licence"]), Thumbprint: value(s["certificate_thumbprint"]), Store: store, BaseURL: base, Database: rt.ResolvePath(database)}
+	m.cfg = settings{Username: value(s["username"]), Licence: value(s["licence"]), Thumbprint: value(s["certificate_thumbprint"]), Store: store, BaseURL: base, Database: rt.ResolvePath(database), AllowInvalidServerCertificateDate: value(s["allow_invalid_server_certificate_date"]) == "true"}
 	svc, ok := rt.Service("local-http-control")
 	m.guard, _ = svc.(sessionGuard)
 	if !ok || m.guard == nil {
@@ -345,7 +345,7 @@ func (m *Module) settingsHTTP(w http.ResponseWriter, r *http.Request) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if r.Method == "GET" {
-		respond(w, 200, map[string]any{"ok": true, "settings": map[string]any{"licence_configured": m.cfg.Licence != "", "licence_hint": licenceHint(m.cfg.Licence), "username": m.cfg.Username, "base_url": m.cfg.BaseURL, "certificate_store": m.cfg.Store, "certificate_thumbprint": m.cfg.Thumbprint}})
+		respond(w, 200, map[string]any{"ok": true, "settings": map[string]any{"licence_configured": m.cfg.Licence != "", "licence_hint": licenceHint(m.cfg.Licence), "username": m.cfg.Username, "base_url": m.cfg.BaseURL, "allow_invalid_server_certificate_date": m.cfg.AllowInvalidServerCertificateDate, "certificate_store": m.cfg.Store, "certificate_thumbprint": m.cfg.Thumbprint}})
 		return
 	}
 	if r.Method != "PUT" {
@@ -357,11 +357,12 @@ func (m *Module) settingsHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var in struct {
-		Username   string  `json:"username"`
-		Licence    *string `json:"licence"`
-		BaseURL    string  `json:"base_url"`
-		Store      string  `json:"certificate_store"`
-		Thumbprint string  `json:"certificate_thumbprint"`
+		AllowInvalidServerCertificateDate *bool   `json:"allow_invalid_server_certificate_date"`
+		Username                          string  `json:"username"`
+		Licence                           *string `json:"licence"`
+		BaseURL                           string  `json:"base_url"`
+		Store                             string  `json:"certificate_store"`
+		Thumbprint                        string  `json:"certificate_thumbprint"`
 	}
 	if e := decode(w, r, &in); e != nil {
 		fail(w, 400, e.Error())
@@ -422,6 +423,11 @@ func (m *Module) settingsHTTP(w http.ResponseWriter, r *http.Request) {
 	s["username"] = in.Username
 	s["licence"] = licence
 	delete(s, "licence_file")
+	allowInvalidDate := m.cfg.AllowInvalidServerCertificateDate
+	if in.AllowInvalidServerCertificateDate != nil {
+		allowInvalidDate = *in.AllowInvalidServerCertificateDate
+	}
+	s["allow_invalid_server_certificate_date"] = allowInvalidDate
 	s["base_url"] = in.BaseURL
 	s["certificate_store"] = in.Store
 	s["certificate_thumbprint"] = in.Thumbprint
@@ -436,9 +442,10 @@ func (m *Module) settingsHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	m.cfg.Username = in.Username
 	m.cfg.Licence = licence
+	m.cfg.AllowInvalidServerCertificateDate = allowInvalidDate
 	m.cfg.BaseURL = in.BaseURL
 	m.cfg.Store = in.Store
 	m.cfg.Thumbprint = in.Thumbprint
-	m.rt.Logf("SIUI configuration updated; certificate reference saved without export")
+	m.rt.Logf("SIUI configuration updated; allow_invalid_server_certificate_date=%t; certificate reference saved without export", allowInvalidDate)
 	respond(w, 200, map[string]any{"ok": true, "licence_hint": licenceHint(m.cfg.Licence)})
 }
