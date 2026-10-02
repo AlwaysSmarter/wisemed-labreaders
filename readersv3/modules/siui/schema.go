@@ -38,7 +38,7 @@ try {
 `
 
 func validateSchema(ctx context.Context, schema string, data []byte) error {
-	if schema != "ParaclinicServicesValidateRequest.xsd" && schema != "ParaclinicServicesValidateResponse.xsd" {
+	if schema != "ParaclinicServicesValidateRequest.xsd" && schema != "ParaclinicServicesValidateResponse.xsd" && schema != "GetInsuredResponse.xsd" {
 		return errors.New("unsupported schema")
 	}
 	if _, e := parseXML(data); e != nil {

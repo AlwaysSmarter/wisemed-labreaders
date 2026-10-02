@@ -51,27 +51,11 @@ func (c *client) validate(ctx context.Context, report string) (result Validation
 	if e = c.backend.Validate(ctx, "ParaclinicServicesValidateRequest.xsd", []byte(report)); e != nil {
 		return result, false, e
 	}
-	h, e := c.credentials()
+	h, e := c.sessionHeaders(ctx)
 	if e != nil {
 		return result, false, e
 	}
 	base := strings.TrimRight(c.cfg.BaseURL, "/")
-	// Obtain a fresh session for each batch; its expiry is not documented.
-	status, headers, _, e := c.backend.Do(ctx, "GET", base+"/OCSP/validator?username="+url.QueryEscape(c.cfg.Username), h, nil)
-	if e != nil {
-		return result, false, e
-	}
-	if status != 200 {
-		return result, false, fmt.Errorf("CNAS authentication HTTP %d", status)
-	}
-	token := headers.Get("OSCP_RESPONSE") // Protocol spelling, deliberately not OCSP.
-	if token == "" || len(token) > 8192 || strings.ContainsAny(token, "\r\n") {
-		return result, false, errors.New("CNAS did not return a valid OSCP_RESPONSE session")
-	}
-	h.Set("OSCP_RESPONSE", token)
-	h.Set("SessionID", token)
-	h.Set("Content-Type", "text/xml; charset=utf-8")
-	h.Set("SOAPAction", `""`)
 	if e = ctx.Err(); e != nil {
 		return result, false, e
 	}
@@ -94,4 +78,30 @@ func (c *client) validate(ctx context.Context, report string) (result Validation
 	}
 	result, e = parseResult(raw, ids)
 	return result, true, e
+}
+
+func (c *client) sessionHeaders(ctx context.Context) (http.Header, error) {
+	h, e := c.credentials()
+	if e != nil {
+		return nil, e
+	}
+	base := strings.TrimRight(c.cfg.BaseURL, "/")
+	// Obtain a fresh session for each batch; its expiry is not documented.
+	status, headers, _, e := c.backend.Do(ctx, "GET", base+"/OCSP/validator?username="+url.QueryEscape(c.cfg.Username), h, nil)
+	if e != nil {
+		return nil, e
+	}
+	if status != 200 {
+		return nil, fmt.Errorf("CNAS authentication HTTP %d", status)
+	}
+	token := headers.Get("OSCP_RESPONSE") // Protocol spelling, deliberately not OCSP.
+	if token == "" || len(token) > 8192 || strings.ContainsAny(token, "\r\n") {
+		return nil, errors.New("CNAS did not return a valid OSCP_RESPONSE session")
+	}
+	h.Set("OSCP_RESPONSE", token)
+	h.Set("SessionID", token)
+	h.Set("Content-Type", "text/xml; charset=utf-8")
+	h.Set("SOAPAction", `""`)
+
+	return h, nil
 }

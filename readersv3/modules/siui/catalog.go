@@ -115,6 +115,9 @@ func envelope(report string) []byte {
 	return b.Bytes()
 }
 func decodeSOAP(b []byte) (string, error) {
+	return decodeOperationSOAP(b, "validateReport", validateNS)
+}
+func decodeOperationSOAP(b []byte, operation, namespace string) (string, error) {
 	r, e := parseXML(b)
 	if e != nil {
 		return "", e
@@ -131,13 +134,13 @@ func decodeSOAP(b []byte) (string, error) {
 			return "", errors.New("CNAS SOAP fault")
 		}
 	}
-	response := body.child("validateReportResponse")
-	if response.XMLName.Space != validateNS {
+	response := body.child(operation + "Response")
+	if response.XMLName.Space != namespace {
 		return "", errors.New("unexpected SOAP operation")
 	}
 	var values []node
 	for _, n := range response.Children {
-		if n.XMLName.Local == "validateReportReturn" {
+		if n.XMLName.Local == operation+"Return" {
 			values = append(values, n)
 		}
 	}

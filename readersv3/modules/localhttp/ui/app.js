@@ -7003,8 +7003,8 @@ async function loadSIUIPanel() {
   const status=await api("/api/siui/status");
   const admin=(Number(state.session?.user_type)||0)<=0;
   const settings=admin ? (await api("/api/siui/settings")).settings : {};
-  panel.innerHTML=`<h2>CNAS - validare 72h</h2>
-   <p>Trimite serviciile paraclinice spre validare imediat. Răspunsul CNAS stabilește validitatea fiecărui serviciu.</p>
+  panel.innerHTML=`<h2>CNAS — conectare și verificări</h2>
+   <p>Testează conectarea OCSP, verifică un CNP sau descarcă personalizarea. Validarea serviciilor este în secțiunea separată de mai jos.</p>
    <p>${status.native_supported ? "Certificatul este folosit direct din Windows. PIN-ul se introduce local, în dialogul driverului." : "Conectarea cu tokenul USB este disponibilă pe Windows. Pe această platformă poți verifica interfața și configurația."}</p>
    ${admin ? `<form id="siui-settings-form"><h3>Conectare CNAS</h3>
     <label>Utilizator CNAS <input name="username" value="${escapeHtml(settings.username||"")}" required></label>
@@ -7015,12 +7015,28 @@ async function loadSIUIPanel() {
     <label>Certificat / token USB <select name="certificate_thumbprint"><option value="${escapeHtml(settings.certificate_thumbprint||"")}">${escapeHtml(settings.certificate_thumbprint||"Selectează un certificat")}</option></select></label>
     <button type="button" id="siui-certificates">Reîncarcă certificatele</button><button type="submit">Salvează configurarea</button>
     <p>Nu se exportă și nu se salvează fișiere .cer. Licența se salvează în configurația utilitarului și nu este returnată de API. Poți salva configurarea înainte de alegerea tokenului pe Windows.</p><p id="siui-cert-info"></p></form>` : ""}
-   <form id="siui-validation-form"><h3>Test validare paraclinice</h3>
+   <h3>Verificări fără raportare de servicii</h3>
+   <p>OCSP testează autentificarea. Verificarea CNP consultă starea de asigurat. Personalizarea descarcă datele furnizorului. Aceste operații nu trimit servicii la validare.</p>
+   <button type="button" id="siui-test-local">Test local fără CNAS</button>
+   <button type="button" id="siui-test-ocsp">Testează autentificarea OCSP</button>
+   <p id="siui-connection-result" role="status"></p>
+   <form id="siui-insured-form"><h3>Verificare calitate de asigurat</h3>
+    <label>CNP <input name="cnp" inputmode="numeric" pattern="[0-9]{13}" minlength="13" maxlength="13" autocomplete="off" required></label>
+    <label>La data <input name="date" type="date" value="${new Date().toLocaleDateString('sv-SE')}" required></label>
+    <button type="submit">Verifică la CNAS</button>
+   </form><pre id="siui-insured-result" style="white-space:pre-wrap;overflow-wrap:anywhere" role="status"></pre>
+   ${admin ? `<form id="siui-personalization-form"><h3>Descarcă personalizare PARA</h3>
+    <label>De la <input name="start" type="date" value="${new Date().toLocaleDateString('sv-SE').slice(0,7)}-01" required></label>
+    <label>Până la <input name="stop" type="date" value="${new Date().toLocaleDateString('sv-SE')}" required></label>
+    <button type="submit">Descarcă de la CNAS</button><p id="siui-personalization-result" role="status"></p>
+   </form>` : ""}
+   <details><summary>Validare servicii paraclinice — trimite date către CNAS</summary>
+   <form id="siui-validation-form"><h3>Validare paraclinice</h3>
     <label>ID operație <input name="operation_id" value="${escapeHtml(crypto.randomUUID())}" required></label>
     <label>XML PIAS <textarea name="xml" rows="12" style="width:100%" spellcheck="false" required></textarea></label>
     <button type="submit">Trimite pentru validare</button><button type="button" id="siui-new-id">ID pentru o cerere nouă</button>
     <p>Păstrează același ID dacă verifici o trimitere întreruptă. La corectarea datelor, folosește un ID de operație nou și păstrează AppID-urile serviciilor.</p>
-   </form><h3>Validări recente</h3><button id="siui-refresh" type="button">Actualizează istoricul</button><div id="siui-history"></div><pre id="siui-result" style="white-space:pre-wrap;overflow-wrap:anywhere"></pre>`;
+   </form><h3>Validări recente</h3><button id="siui-refresh" type="button">Actualizează istoricul</button><div id="siui-history"></div><pre id="siui-result" style="white-space:pre-wrap;overflow-wrap:anywhere"></pre></details>`;
   if(admin) {
    const form=panel.querySelector("#siui-settings-form"); form.elements.certificate_store.value=settings.certificate_store||"CurrentUser";
    const reload=async()=>{
@@ -7035,6 +7051,30 @@ async function loadSIUIPanel() {
    form.elements.certificate_store.addEventListener("change",()=>{form.elements.certificate_thumbprint.replaceChildren(new Option("Selectează un certificat", ""));reload().catch(e=>showToast(e.message,"error"));});
    bindAsyncSubmit(form,async event=>{event.preventDefault();const saved=await api("/api/siui/settings",{method:"PUT",body:JSON.stringify(Object.fromEntries(new FormData(form)))});panel.querySelector("#siui-licence-info").textContent=saved.licence_hint ? "Licență salvată: "+saved.licence_hint : "Licență neconfigurată";form.elements.licence.value="";form.elements.licence.placeholder="Licență salvată; lasă gol pentru a o păstra";showToast("Configurarea CNAS a fost salvată.","success");});
   }
+  bindAsyncClick(panel.querySelector("#siui-test-local"),async()=>{
+   const result=panel.querySelector("#siui-connection-result");result.textContent="Test local în curs…";
+   try {const data=await api("/api/siui/insured",{method:"POST",body:JSON.stringify({mode:"local"})});result.textContent=data.message;}catch(e){result.textContent=e.message;throw e;}
+  });
+  bindAsyncClick(panel.querySelector("#siui-test-ocsp"),async()=>{
+   const result=panel.querySelector("#siui-connection-result");result.textContent="Autentificare OCSP în curs…";
+   try {const data=await api("/api/siui/ocsp-test",{method:"POST",body:"{}"});result.textContent=data.message;}catch(e){result.textContent=e.message;throw e;}
+  });
+  const insured=panel.querySelector("#siui-insured-form");
+  bindAsyncSubmit(insured,async event=>{
+   event.preventDefault();const result=panel.querySelector("#siui-insured-result");result.textContent="Verificare CNAS în curs…";
+   try {const data=await api("/api/siui/insured",{method:"POST",body:JSON.stringify({...Object.fromEntries(new FormData(insured)),mode:"cnas"})});result.textContent=`${data.result.label} — la data ${data.date}\n${data.result.xml}`;}catch(e){result.textContent=e.message;throw e;}
+  });
+  const personalization=panel.querySelector("#siui-personalization-form");
+  if(personalization) bindAsyncSubmit(personalization,async event=>{
+   event.preventDefault();const result=panel.querySelector("#siui-personalization-result");result.textContent="Descărcare de la CNAS în curs…";
+   try {
+    const data=await api("/api/siui/personalization",{method:"POST",body:JSON.stringify(Object.fromEntries(new FormData(personalization)))});
+    const bytes=Uint8Array.from(atob(data.file.data_base64),c=>c.charCodeAt(0));
+    const url=URL.createObjectURL(new Blob([bytes],{type:data.file.content_type}));
+    const link=document.createElement("a");link.href=url;link.download=data.file.filename;document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),10000);
+    result.textContent=`Personalizarea a fost descărcată: ${data.file.filename} (${data.file.size} bytes).`;
+   }catch(e){result.textContent=e.message;throw e;}
+  });
   const validation=panel.querySelector("#siui-validation-form");
   panel.querySelector("#siui-new-id").onclick=()=>{validation.elements.operation_id.value=crypto.randomUUID();};
   bindAsyncSubmit(validation,async event=>{event.preventDefault();const response=await api("/api/siui/validations",{method:"POST",body:JSON.stringify(Object.fromEntries(new FormData(validation)))});await showSIUIJob(response.job.id);await loadSIUIHistory();});

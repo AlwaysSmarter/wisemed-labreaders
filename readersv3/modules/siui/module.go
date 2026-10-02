@@ -26,15 +26,17 @@ type sessionGuard interface {
 	SessionIdentity(*http.Request) (string, bool, bool)
 }
 type Module struct {
-	ready   chan struct{}
-	rt      module.Runtime
-	guard   sessionGuard
-	db      *sql.DB
-	mu      sync.Mutex
-	cfg     settings
-	pending int
-	queue   chan work
-	factory func(settings) backend
+	ready           chan struct{}
+	rt              module.Runtime
+	guard           sessionGuard
+	db              *sql.DB
+	mu              sync.Mutex
+	cfg             settings
+	pending         int
+	checking        bool
+	nativeSupported bool
+	queue           chan work
+	factory         func(settings) backend
 }
 
 func New() module.Module     { return &Module{} }
@@ -76,6 +78,7 @@ func (m *Module) Init(rt module.Runtime) error {
 	m.queue = make(chan work, 20)
 	if m.factory == nil {
 		m.factory = func(s settings) backend { return nativeBackend{cfg: s} }
+		m.nativeSupported = runtime.GOOS == "windows"
 	}
 	rt.Handle("/api/siui/", m.guard.RequireSession(http.HandlerFunc(m.handle)))
 	rt.AddMenu(module.MenuEntry{ID: "siui", Group: "settings", Label: "CNAS - validare 72h", Path: "/settings/siui", Order: 35})
@@ -212,6 +215,16 @@ func (m *Module) handle(w http.ResponseWriter, r *http.Request) {
 		cfg, pending := m.cfg, m.pending
 		m.mu.Unlock()
 		respond(w, 200, map[string]any{"ok": true, "platform": runtime.GOOS, "native_supported": runtime.GOOS == "windows", "configured": cfg.Username != "" && cfg.Thumbprint != "" && cfg.Licence != "", "pending": pending, "report_type": "PARA", "request_type": "RQ_PARA_SRV"})
+	case route == "ocsp-test" && r.Method == "POST":
+		m.ocspHTTP(w, r)
+	case route == "personalization" && r.Method == "POST":
+		if !admin {
+			fail(w, 403, "administrator required")
+			return
+		}
+		m.personalizationHTTP(w, r)
+	case route == "insured" && r.Method == "POST":
+		m.insuredHTTP(w, r)
 	case route == "settings":
 		if !admin {
 			fail(w, 403, "administrator required")
@@ -252,6 +265,10 @@ func (m *Module) handle(w http.ResponseWriter, r *http.Request) {
 		defer m.mu.Unlock()
 		if m.cfg.Username == "" || m.cfg.Thumbprint == "" || m.cfg.Licence == "" {
 			fail(w, 409, "select the CNAS certificate and configure username and licence first")
+			return
+		}
+		if m.checking {
+			fail(w, 409, "an insured lookup is using the token; retry after it completes")
 			return
 		}
 		// Reservation and queue admission share a lock with configuration changes.

@@ -17,7 +17,7 @@ furnizat de WiseMED; utilitarul nu le generează sau modifică.
 Referințe locale: Anexa 001 v3.7.32, Anexa 008 v3.7.31 și documentul principal
 PIAS v3.7.32, secțiunile 5.1 și 5.10. XSD-urile de cerere/răspuns și tipurile comune
 sunt incluse în binar, copiate din documentația furnizată. WSDL-ul este păstrat
-pentru trasabilitate; numai `validateReport` este expus de acest utilitar.
+pentru trasabilitate. Verificările pasive folosesc și SiuiInsuredWS/SiuiWS.
 
 OCSP: GET `/OCSP/validator?username=...` cu certificat client și Basic
 (utilizator/cheie de activare). Antetul **OSCP_RESPONSE** este numele literal din
@@ -123,3 +123,37 @@ timeout 90 secunde pentru procesarea unui job. Depășirea cozii refuză trimite
 Asincronia evită depășirea timeoutului de 30s al adaptorului WSM. Păstrează setarea
 WSM `max_message_bytes: 8388608` din configurația de producție pentru payloaduri
 mari. Baza de date este locală; la mutarea echipamentului trebuie mutată și ea.
+
+## Verificări pasive: fără validateReport
+
+Aceleași rute sunt disponibile prin HTTP/HTTPS și WSM `api.request`, folosind POST
+cu JSON (CNP nu apare în URL). Autentificarea utilizatorului este obligatorie.
+
+| Rută | Corp | Rol |
+|---|---|---|
+| `/api/siui/ocsp-test` | `{}` | autentificat |
+| `/api/siui/insured` | `{"mode":"local"}` | autentificat; test fictiv fără rețea |
+| `/api/siui/insured` | `{"mode":"cnas","cnp":"CNP_13_CIFRE","date":"2026-10-03"}` | autentificat |
+| `/api/siui/personalization` | `{"start":"2026-10-01","stop":"2026-10-03"}` | admin / api:admin |
+
+OCSP: HTTP 200 cu `authenticated:true` numai după primirea sesiunii valide, fără
+expunerea ei. Fiecare operație reală obține propria sesiune OCSP înainte de SOAP.
+Eșecul OCSP oprește operația. Nu este necesar un test OCSP manual înainte de CNP.
+
+Insured: `result.state` este -1=eroare, 0=inexistent, 1=asigurat, 2=neasigurat,
+3=decedat. `result.insured` este true doar pentru 1, false doar pentru 2, null pentru
+celelalte; `result.xml` păstrează răspunsul verificat XSD. `mode:local` returnează
+`simulated:true,cnas_contacted:false` și o etichetă explicită; nu contactează CNAS și
+folosește exclusiv o înregistrare fictivă, indiferent de un CNP furnizat.
+
+Personalizare: SOAP document/literal `getProviderInfo(partnerCategory=PARA,start,
+stop,uic)` conform SiuiWS.wsdl; CUI derivat din utilizator. Se verifică URL-ul de
+răspuns (aceeași origine HTTPS), apoi se descarcă fișierul fără redirecturi.
+Răspunsul JSON conține `file.filename,content_type,size,data_base64`. Nu se scrie
+pe server; browserul salvează conținutul original ZIP/XML. XML-ul trebuie să aibă
+rădăcina PIAS `provider`; nu se afirmă validarea completă a personalizării prin XSD.
+Limita este 1 MiB (comprimat și decomprimat). Acest format încape în limita WSM.
+
+Operațiile au timeout 25s, returnează 409 dacă tokenul este ocupat, 503 pe platforme
+fără transport nativ, 502 la eșec upstream. Timeoutul este o eroare, nu un rezultat
+medical. Nu există retry automat și nici persistența CNP-ului/răspunsului în SQLite.

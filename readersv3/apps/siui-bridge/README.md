@@ -1,8 +1,9 @@
-# WiseMED SIUI Bridge - validare paraclinice 72h
+# WiseMED SIUI Bridge - verificări CNAS și validare paraclinice 72h
 
 Utilitar Go din readersv3, cu aceeași infrastructură ca barcodeprinter: HTTP/HTTPS,
 login WiseMED, WSM, loguri zilnice, configurare, reconfigurare, serviciu/daemon,
-update și installer. Funcționalitatea CNAS activă este exclusiv
+update și installer. Include autentificare OCSP, verificare CNP (`getInsured`),
+descărcare personalizare PARA (`getProviderInfo`) și validarea paraclinicelor
 `SiuiValidateWS.validateReport(reportXml, "PARA", "RQ_PARA_SRV")`.
 
 Trimite imediat cererea primită. „72h” denumește fluxul operațional solicitat, nu
@@ -49,6 +50,34 @@ Validarea XSD folosește `System.Xml` prin Windows PowerShell existent în siste
 scriptul este fix, XML-ul este transmis ca date pe stdin. Nu este necesar un
 proiect/runtime .NET nou. Pe macOS/Linux, interfața și WSM rulează; XSD folosește
 `xmllint`, iar conectarea reală cu tokenul este disponibilă doar pe Windows.
+
+## Testare fără validare de servicii
+
+În Setări → CNAS, secțiunea **Verificări fără raportare de servicii**:
+
+1. **Test local fără CNAS** merge și pe Mac, fără token/licență/CNP. Verifică schema
+   și interpretarea unui răspuns fictiv fix, marcat explicit TEST LOCAL. Nu testează
+   conexiunea sau autentificarea OCSP și nu indică asigurarea reală a unei persoane.
+2. **Testează autentificarea OCSP** (Windows cu token configurat) face numai GET
+   la `/OCSP/validator` și verifică prezența sesiunii OSCP_RESPONSE. Sesiunea nu
+   apare în răspuns, în loguri sau în baza de date. Nu introduce CNP sau XML.
+3. **Verificare calitate de asigurat** primește CNP și data consultării. Obține
+   automat o sesiune OCSP nouă, apoi apelează `SiuiInsuredWS.getInsured`. Stările
+   sunt distincte: Eroare CNAS, Inexistent, Asigurat, Neasigurat, Decedat.
+4. **Descarcă personalizare PARA** (administrator) primește intervalul de date,
+   extrage CUI din utilizatorul `CUI_CAS-CODE`, autentifică OCSP, apelează
+   `SiuiWS.getProviderInfo` și descarcă XML/ZIP-ul returnat, numai de pe aceeași
+   origine HTTPS CNAS. Fișierul ajunge în descărcările browserului, inclusiv prin WSM.
+
+Niciunul dintre aceste butoane nu apelează validateReport. Operațiile reale se
+execută pe Windows; pot fi controlate din browserul Mac prin WSM. Nu se rulează
+simultan cu alte operații pe token. Timeout-ul este de 25 secunde; la expirare nu
+se afișează „neasigurat”, ci o eroare. Nu există retry automat. Rezultatele/CNP-urile
+nu se persistă în istoricul validărilor. Personalizarea este limitată la 1 MiB,
+atât arhiva cât și XML-ul decomprimat; fișierele mai mari sunt refuzate explicit.
+
+Formularul de **validare a serviciilor** este separat, într-o secțiune închisă
+implicit; deschiderea lui nu trimite date. Trimiterea cere apăsarea propriului buton.
 
 ## Comenzi și instalare
 
