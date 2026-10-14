@@ -1,0 +1,65 @@
+reader:
+  id: html-print-formatter
+  label: HTML Print Formatter
+  analyzer_name: WiseMED HTML Print Formatter
+  analyzer_code: html-print-formatter
+  db_name: html-print-formatter.db
+logging:
+  verbose_level: 0
+local_http:
+  enabled: true
+  address: 127.0.0.1:19113
+  language: ro
+  tls: false
+wisemed_ws:
+  enabled: false
+  url: wss://wslocal.wisemed.eu/ws
+  heartbeat_ms: 15000
+  reconnect_delay_ms: 30000
+analyzer:
+  comm_type: utility
+  protocol: html-print-formatter
+modules:
+  local-http:
+    enabled: true
+    address: 127.0.0.1:19113
+    language: ro
+    tls: false
+    cors_allowed_origins: ""
+  events:
+    enabled: true
+  help:
+    help_dir: ./help
+  app-updates:
+    enabled: true
+    app_id: html-print-formatter
+    channel: stable
+    base_url: http://127.0.0.1:19090
+    auto_download: true
+    download_dir: ./updates
+  wisemed-api:
+    cfg_wisemed_protocol: https
+    cfg_wisemed_ip: ""
+    cfg_wisemed_port: "443"
+    cfg_wisemed_path: /wisemed-api/apiv2
+    cfg_wisemed_key: ""
+  wisemed-ws:
+    enabled: false
+    url: wss://wslocal.wisemed.eu/ws
+    auth_mode: device_key
+    tenant_id: ""
+    key_id: ""
+    issuer: ""
+    audience: wsm-server
+    subject: ""
+    secret_file: ""
+    token_file: ""
+    token_path: ""
+    ca_file: ""
+    heartbeat_ms: 15000
+    reconnect_delay_ms: 30000
+  html-print-formatter:
+    chrome_path: "" # Auto-detect Chrome/Chromium; CHROME_PATH overrides this value.
+    max_concurrent_renders: 2
+    max_body_bytes: 4194304
+    default_render_timeout_ms: 120000

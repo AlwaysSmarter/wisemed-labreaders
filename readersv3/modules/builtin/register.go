@@ -12,6 +12,7 @@ import (
 	"wisemed-labreaders/readersv3/modules/dashboard"
 	"wisemed-labreaders/readersv3/modules/events"
 	"wisemed-labreaders/readersv3/modules/help"
+	"wisemed-labreaders/readersv3/modules/htmlprintformatter"
 	"wisemed-labreaders/readersv3/modules/localhttp"
 	"wisemed-labreaders/readersv3/modules/login"
 	"wisemed-labreaders/readersv3/modules/protocols/anafdocsmart"
@@ -55,6 +56,7 @@ func RegisterAll(reg *module.Registry) {
 	reg.Register("wisemed-api", wisemedapi.New)
 	reg.Register("login", login.New)
 	reg.Register("help", help.New)
+	reg.Register("html-print-formatter", htmlprintformatter.New)
 	reg.Register("dashboard", dashboard.New)
 	reg.Register("analytes", analytes.New)
 	reg.Register("analyte-management", analytemanagement.New)

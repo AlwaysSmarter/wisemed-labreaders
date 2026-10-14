@@ -16,9 +16,9 @@ import (
 	"time"
 )
 
-func (m *Module) passiveClient(w http.ResponseWriter) (*client, func(), bool) {
+func (m *Module) passiveClient(w http.ResponseWriter, operation string) (*client, func(), bool) {
 	if !m.nativeSupported {
-		fail(w, 503, "Conectarea reală CNAS necesită utilitarul Windows cu token. Pe Mac poți folosi Test local fără CNAS; acesta nu verifică OCSP sau calitatea reală de asigurat.")
+		fail(w, 503, "Conectarea reală CNAS necesită Windows, macOS sau Linux cu driverul tokenului instalat.")
 		return nil, nil, false
 	}
 	m.mu.Lock()
@@ -34,7 +34,7 @@ func (m *Module) passiveClient(w http.ResponseWriter) (*client, func(), bool) {
 	}
 	m.checking = true
 	m.pending++
-	return &client{cfg: cfg, backend: m.factory(cfg)}, func() { m.mu.Lock(); m.checking = false; m.pending--; m.mu.Unlock() }, true
+	return &client{cfg: cfg, backend: m.factory(cfg), logf: m.rt.Logf, session: &m.ocspSession, operation: operation}, func() { m.mu.Lock(); m.checking = false; m.pending--; m.mu.Unlock() }, true
 }
 func (m *Module) ocspHTTP(w http.ResponseWriter, r *http.Request) {
 	var in struct{}
@@ -42,12 +42,12 @@ func (m *Module) ocspHTTP(w http.ResponseWriter, r *http.Request) {
 		fail(w, 400, err.Error())
 		return
 	}
-	c, release, ok := m.passiveClient(w)
+	c, release, ok := m.passiveClient(w, "ocsp-test")
 	if !ok {
 		return
 	}
 	defer release()
-	ctx, cancel := context.WithTimeout(r.Context(), 25*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), ocspTimeout)
 	defer cancel()
 	if _, err := c.sessionHeaders(ctx); err != nil {
 		fail(w, 502, err.Error())
@@ -158,7 +158,9 @@ func checkPersonalizationFile(data []byte) (string, string, error) {
 	}
 	return "personalizare-PARA.xml", "application/xml", nil
 }
-func (c *client) personalization(ctx context.Context, start, stop string) (map[string]any, error) {
+func (c *client) personalization(ctx context.Context, start, stop string) (result map[string]any, err error) {
+	target := ""
+	defer func() { err = withConnectionError(target, err) }()
 	uic, _, ok := strings.Cut(c.cfg.Username, "_")
 	if !ok || uic == "" {
 		return nil, errors.New("CNAS username must be CUI_CAS-CODE")
@@ -168,7 +170,8 @@ func (c *client) personalization(ctx context.Context, start, stop string) (map[s
 		return nil, err
 	}
 	base := strings.TrimRight(c.cfg.BaseURL, "/")
-	status, _, body, err := c.backend.Do(ctx, "POST", base+"/svapntws/services/SiuiWS", h, providerEnvelope(uic, start, stop))
+	target = base + "/svapntws/services/SiuiWS"
+	status, _, body, err := c.backend.Do(ctx, "POST", target, h, providerEnvelope(uic, start, stop))
 	if err != nil {
 		return nil, err
 	}
@@ -181,6 +184,7 @@ func (c *client) personalization(ctx context.Context, start, stop string) (map[s
 	}
 	h.Del("SOAPAction")
 	h.Del("Content-Type")
+	target = address
 	status, _, data, err := c.backend.Do(ctx, "GET", address, h, nil)
 	if err != nil {
 		return nil, err
@@ -209,7 +213,7 @@ func (m *Module) personalizationHTTP(w http.ResponseWriter, r *http.Request) {
 		fail(w, 400, "select a valid start/stop date range (YYYY-MM-DD)")
 		return
 	}
-	c, release, ok := m.passiveClient(w)
+	c, release, ok := m.passiveClient(w, "getProviderInfo")
 	if !ok {
 		return
 	}

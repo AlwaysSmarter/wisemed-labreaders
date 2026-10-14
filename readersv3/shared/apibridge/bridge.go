@@ -91,7 +91,13 @@ func Invoke(ctx context.Context, handler http.Handler, p Principal, in Request) 
 	if strings.ContainsAny(ct, "\r\n") {
 		return out, errors.New("invalid content type")
 	}
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	timeout := 30 * time.Second
+	// The formatter's JSON data endpoint enforces its own overall deadline
+	// (at most ten minutes). Preserve cancellation from the WSS session.
+	if (u.Path == "/api/html-print-formatter/render" || u.Path == "/api/html-print-formatter/pdf") && method == "POST" {
+		timeout = 610 * time.Second
+	}
+	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	ctx = context.WithValue(ctx, principalKey{}, p)
 	req, e := http.NewRequestWithContext(ctx, method, in.Path, bytes.NewReader(body))

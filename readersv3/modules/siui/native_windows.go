@@ -20,7 +20,10 @@ import (
 	"unsafe"
 )
 
-type nativeBackend struct{ cfg settings }
+type nativeBackend struct {
+	cfg  settings
+	logf func(string, ...interface{})
+}
 
 var winhttp = windows.NewLazySystemDLL("winhttp.dll")
 var whOpen = winhttp.NewProc("WinHttpOpen")
@@ -74,6 +77,13 @@ func (n nativeBackend) certificate() (*windows.CertContext, error) {
 	return cert, nil
 }
 func (n nativeBackend) Do(ctx context.Context, method, raw string, headers http.Header, body []byte) (int, http.Header, []byte, error) {
+	if cert, release, active, err := n.pinCertificate(); active {
+		if err != nil {
+			return 0, nil, nil, err
+		}
+		defer release()
+		return tokenHTTP(ctx, n.cfg, cert, method, raw, headers, body, n.logf)
+	}
 	if e := ctx.Err(); e != nil {
 		return 0, nil, nil, e
 	}
@@ -196,6 +206,10 @@ func (n nativeBackend) Do(ctx context.Context, method, raw string, headers http.
 			responseHeaders.Add(strings.TrimSpace(k), strings.TrimSpace(v))
 		}
 	}
+	responseLimit := maxData
+	if method == "GET" && !strings.HasPrefix(u.Path, "/OCSP/") {
+		responseLimit = maxDownload
+	}
 	var data []byte
 	chunk := make([]byte, 16384)
 	for {
@@ -207,7 +221,7 @@ func (n nativeBackend) Do(ctx context.Context, method, raw string, headers http.
 		if count == 0 {
 			break
 		}
-		if len(data)+int(count) > maxData {
+		if len(data)+int(count) > responseLimit {
 			return 0, nil, nil, errors.New("CNAS response too large")
 		}
 		data = append(data, chunk[:count]...)

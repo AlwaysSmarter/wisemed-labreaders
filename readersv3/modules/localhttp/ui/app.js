@@ -1,3 +1,4 @@
+import {renderInvoiceDashboard} from "/siui-invoice.js";
 const translations = {
   ro: {
     language: "Limba",
@@ -854,6 +855,8 @@ const state = {
   barcodeMode: false,
  signatureSocket: null,
   utilityMode: false,
+  formatterMode: false,
+  formatterPDFURL: null,
   barcodeSettings: {},
   barcodePrinters: [],
   readerSettings: { repeat_mode: "individual", available_comm_types: [], available_protocols: [], available_tcpip_modes: [] },
@@ -1339,6 +1342,85 @@ function setButtonLoading(button, loading) {
   button.removeAttribute("aria-busy");
 }
 
+function applyHTMLFormatterUI() {
+  for (const name of ["orders", "qc", "daily-details"]) {
+    const link = barcodeNavButton(name); if (link) link.hidden = true;
+  }
+  for (const id of ["analyzer-pill", "result-sync-pill", "daily-analysis-filter-pill", "debug-communication-link"]) {
+    const node = document.getElementById(id); if (node) node.hidden = true;
+  }
+  document.querySelectorAll("#settings-panel-reader .settings-section-transport, #settings-panel-reader .settings-section-results").forEach(node => node.hidden = true);
+  // Keep server identity and update controls, without unused analyzer/database fields.
+  for (const name of ["analyzer_name", "analyzer_code", "db_name", "sqlite_path"]) {
+    const field = els.readerSettingsForm?.elements.namedItem(name); if (field) field.closest("label").hidden = true;
+  }
+  for (const id of ["today-donut", "qc-summary", "line-chart"]) {
+    const node = document.getElementById(id); if (node) node.closest("article").hidden = true;
+  }
+  if (els.settingsSubmenu) els.settingsSubmenu.hidden = false;
+  els.navSublinks.forEach(link => {
+    if (link.dataset.settingsSubview) link.hidden = !["reader", "wss"].includes(link.dataset.settingsSubview);
+    if (link.dataset.settingsSubview === "reader") link.textContent = "Server și actualizări";
+  });
+  for (const [id, label] of [["reader-eyebrow", "UTILITAR"], ["reader-summary-title", "HTML Print Formatter"], ["reader-settings-title", "Server și actualizări"]]) {
+    const node = document.getElementById(id); if (node) node.textContent = label;
+  }
+  const overview = barcodeNavButton("overview"); if (overview) overview.textContent = "HTML Print Formatter";
+  if (!document.getElementById("formatter-workspace")) {
+    const panel = document.createElement("article");
+    panel.id = "formatter-workspace"; panel.className = "panel full-span";
+    panel.innerHTML = `<h3>Randare HTML</h3><p>Completați fie documentul HTML, fie linkul HTML. „Randează” așteaptă window.printReady = true și exportă DOM-ul procesat. „HTML → PDF direct” nu cere acest semnal.</p>
+      <label>HTML<textarea id="formatter-html" rows="10" style="width:100%" spellcheck="false" placeholder="Lipiți documentul HTML complet aici"></textarea></label>
+      <label>Link HTML<input id="formatter-html-link" type="url" style="width:100%" placeholder="https://exemplu.ro/raport.html"></label>
+      <label>Timeout (ms)<input id="formatter-timeout" type="number" min="1" max="600000" step="1" value="120000" required></label>
+      <button id="formatter-render" type="button">Randează → PDF</button>
+      <button id="formatter-pdf-direct" type="button">HTML → PDF direct</button>
+      <p id="formatter-notice" role="status"></p>
+      <p><a id="formatter-pdf-download" hidden download="rendered.pdf">Descarcă PDF</a></p>
+      <label>DOM rezultat<textarea id="formatter-output" rows="12" readonly style="width:100%"></textarea></label>`;
+    els.views.overview.insertBefore(panel, els.logsPanel);
+    document.getElementById("formatter-render").onclick = () => renderHTMLFormatter();
+    document.getElementById("formatter-pdf-direct").onclick = () => renderHTMLFormatter(false);
+  }
+}
+
+function clearHTMLFormatterPDF() {
+  if (state.formatterPDFURL) URL.revokeObjectURL(state.formatterPDFURL);
+  state.formatterPDFURL = null;
+  const download = document.getElementById("formatter-pdf-download");
+  if (download) { download.hidden = true; download.removeAttribute("href"); }
+}
+
+async function renderHTMLFormatter(waitForPrintReady = true) {
+  const button = document.getElementById(waitForPrintReady ? "formatter-render" : "formatter-pdf-direct");
+  const otherButton = document.getElementById(waitForPrintReady ? "formatter-pdf-direct" : "formatter-render");
+  otherButton.disabled = true;
+  const notice = document.getElementById("formatter-notice");
+  const output = document.getElementById("formatter-output");
+  clearHTMLFormatterPDF();
+  setButtonLoading(button, true); output.value = ""; notice.textContent = "Randare HTML și generare PDF în curs…";
+  try {
+    const html = document.getElementById("formatter-html").value;
+    const htmlLink = document.getElementById("formatter-html-link").value.trim();
+    const timeoutMS = Number(document.getElementById("formatter-timeout").value);
+    if (!!html.trim() === !!htmlLink) {
+      throw new Error("Completați un singur câmp: HTML sau Link HTML.");
+    }
+    if (!Number.isInteger(timeoutMS) || timeoutMS < 1 || timeoutMS > 600000) {
+      throw new Error("Timeout-ul trebuie să fie un număr întreg între 1 și 600000 ms.");
+    }
+    const body = JSON.stringify({ ...(htmlLink ? {html_link: htmlLink} : {html}), timeout_ms: timeoutMS, wait_for_print_ready: waitForPrintReady });
+    const response = await api("/api/html-print-formatter/pdf", {method:"POST", body});
+    output.value = response.html;
+    const bytes = Uint8Array.from(atob(response.pdf_base64), char => char.charCodeAt(0));
+    state.formatterPDFURL = URL.createObjectURL(new Blob([bytes], {type: "application/pdf"}));
+    const download = document.getElementById("formatter-pdf-download");
+    download.href = state.formatterPDFURL; download.hidden = false;
+    notice.textContent = "Finalizat · request_id: " + response.request_id;
+  } catch (error) { notice.textContent = error.message; }
+  finally { setButtonLoading(button, false); otherButton.disabled = false; }
+}
+
 function isSIUIMode() { return state.readerInfo?.protocol === "siui"; }
 
 function isESignatureMode() {
@@ -1367,8 +1449,14 @@ function barcodeNavButton(viewName) {
 }
 
 function applyBarcodeModeUI() {
+ if (state.readerInfo?.protocol === "html-print-formatter") {
+  state.formatterMode = true; state.utilityMode = true; state.barcodeMode = false;
+  applyHTMLFormatterUI(); return;
+ }
  if (isSIUIMode()) {
   state.utilityMode = true; state.barcodeMode = false;
+ document.querySelectorAll("#settings-panel-reader .settings-section-transport, #settings-panel-reader .settings-section-results").forEach(node=>node.hidden=true);
+ const debugLabel=document.getElementById("debug-communication-link");if(debugLabel)debugLabel.textContent="GENERAL / CLINICE";
   for(const id of ["analyzer-pill","result-sync-pill"]) {const node=document.getElementById(id);if(node)node.hidden=true;}
   for (const name of ["orders", "qc", "daily-details"]) { const link=barcodeNavButton(name); if(link) link.hidden=true; }
   if(els.settingsSubmenu) els.settingsSubmenu.hidden=false;
@@ -1424,7 +1512,9 @@ async function onLanguageChange(event) {
   syncLanguageControls();
   applyLanguage();
   if (!els.dashboardView.hidden) {
-    if (isSIUIMode()) {
+    if (state.formatterMode) {
+      await Promise.all([loadStatus(), loadLogs(), loadReaderSettings()]);
+    } else if (isSIUIMode()) {
       await Promise.all([loadStatus(), loadLogs(), loadReaderSettings()]);
     } else if (isESignatureMode()) {
       applyESignatureUI(); await Promise.all([loadStatus(), loadLogs(), loadDashboard()]);
@@ -1480,7 +1570,10 @@ async function onLogin(event) {
 }
 
 async function onLogout() {
+  if (state.formatterMode) clearHTMLFormatterPDF();
   siuiPollGeneration++;
+  siuiDebugGeneration++;
+  document.getElementById("siui-debug-panel")?.remove();
   const siuiPanel=document.getElementById("settings-panel-siui");
   if(siuiPanel) {siuiPanel.replaceChildren();delete siuiPanel.dataset.loaded;}
   if (window.WSM_REMOTE) {
@@ -1633,12 +1726,20 @@ async function renderLoginSetupPanel() {
   }
 }
 
+async function refreshSIUICertificatesAfterLogin() {
+  try {
+    await api("/api/siui/certificates/refresh", {method:"POST", body:"{}"});
+  } catch (error) {
+    showToast("Reîncărcarea certificatelor: " + error.message, "error");
+  }
+}
 async function mountDashboard(sessionResp) {
   loadWSSStatus().catch(() => {});
   els.loginView.hidden = true;
   els.dashboardView.hidden = false;
   state.readerInfo = { ...(sessionResp.reader || {}) };
   state.appUpdateSettings = { ...(sessionResp.app_update || state.appUpdateSettings || {}) };
+  state.formatterMode = state.readerInfo?.protocol === "html-print-formatter";
   state.settingsSubView = settingsSubViewFromLocation();
   applyBarcodeModeUI();
   els.readerTitle.textContent = formatReaderPrimaryLabel(sessionResp.reader);
@@ -1658,7 +1759,10 @@ async function mountDashboard(sessionResp) {
   }
   renderRoundSelect();
   activateView(viewFromLocation(), false);
-  if (isSIUIMode()) {
+  if (state.formatterMode) {
+    await Promise.all([loadStatus(), loadLogs(), loadReaderSettings()]);
+  } else if (isSIUIMode()) {
+    await refreshSIUICertificatesAfterLogin();
     await Promise.all([loadStatus(), loadLogs(), loadReaderSettings()]);
   } else if (isESignatureMode()) {
     await Promise.all([loadStatus(), loadLogs(), loadDashboard()]);
@@ -1707,7 +1811,7 @@ async function refreshAppUpdateStatus(force = false) {
 
 function syncDebugNavVisibility() {
   if (!els.debugNavLink) return;
-  const enabled = !!state.debugEnabled && (Number(state.session?.user_type) || 0) <= 0;
+  const enabled = (isSIUIMode() || !!state.debugEnabled) && (Number(state.session?.user_type) || 0) <= 0;
   const admin = (Number(state.session?.user_type) || 0) <= 0;
   els.debugNavLink.hidden = !admin;
   document.getElementById("debug-submenu").hidden = !admin;
@@ -1719,6 +1823,8 @@ function syncDebugNavVisibility() {
 }
 
 async function loadDebugTests() {
+ if(state.formatterMode){state.debugEnabled=false;syncDebugNavVisibility();return;}
+ if(isSIUIMode()){state.debugEnabled=true;syncDebugNavVisibility();await loadSIUIDebug();return;}
   if ((Number(state.session?.user_type) || 0) > 0) {
     state.debugEnabled = false;
     state.debugFiles = [];
@@ -1864,6 +1970,7 @@ function onAppUpdateIndicatorClick(event) {
 }
 
 function activateView(name, pushHistory = true) {
+ if(state.formatterMode && ["orders","qc","daily-details","debug"].includes(name)) name="overview";
  if (isESignatureMode() && name !== "analytes") closeESignatureDemo();
   if (name === "help") {
     if (window.WSM_REMOTE) { showRemoteHelp(); return; }
@@ -1871,7 +1978,7 @@ function activateView(name, pushHistory = true) {
     if (helpTab) helpTab.opener = null;
     return;
   }
-  if (name === "debug" && (!state.debugEnabled || (Number(state.session?.user_type) || 0) > 0)) {
+  if (name === "debug" && ((!isSIUIMode() && !state.debugEnabled) || (Number(state.session?.user_type) || 0) > 0)) {
     name = "overview";
   }
   if (state.utilityMode && name === "qc") {
@@ -1896,6 +2003,7 @@ function activateView(name, pushHistory = true) {
     }
   }
   if (name === "analytes") {
+    if (state.formatterMode) {activateSettingsSubView(state.settingsSubView);if(state.settingsSubView==="reader")loadReaderSettings().catch(error=>showToast(error.message,"error"));return;}
     if (isSIUIMode()) {activateSettingsSubView(state.settingsSubView);if(state.settingsSubView==="reader")loadReaderSettings().catch(error=>showToast(error.message,"error"));return;}
     if (isESignatureMode()) {activateSettingsSubView(state.settingsSubView); return;}
     if (state.settingsSubView === "wss") { activateSettingsSubView("wss"); return; }
@@ -1933,6 +2041,7 @@ function activateView(name, pushHistory = true) {
 }
 
 function renderTopbarTitle() {
+ if(state.formatterMode){document.getElementById("dashboard-title").textContent=state.currentView==="analytes" ? (state.settingsSubView==="wss" ? "Debug WSS" : "Server și actualizări") : "HTML Print Formatter";return;}
   if (state.currentView === "analytes" && state.settingsSubView === "wss") { document.getElementById("dashboard-title").textContent = "Debug WSS"; return; }
  if(isESignatureMode()) {
  const title=document.getElementById("dashboard-title");
@@ -1985,6 +2094,7 @@ function renderTopbarTitle() {
 }
 
 function viewFromLocation() {
+ if(state.formatterMode) return currentUIPath().startsWith("/settings") ? "analytes" : "overview";
  if(isSIUIMode()) return currentUIPath()==="/debug" ? "debug" : "analytes";
   if (currentUIPath() === "/settings/wss") return "analytes";
  if(isESignatureMode() && currentUIPath().startsWith("/settings")) return "analytes";
@@ -2007,6 +2117,7 @@ function viewFromLocation() {
 }
 
 function settingsSubViewFromLocation() {
+ if(state.formatterMode) return currentUIPath()==="/settings/wss" ? "wss" : "reader";
  if(isSIUIMode()) return currentUIPath()==="/settings/wss" ? "wss" : currentUIPath()==="/settings/reader" ? "reader" : "siui";
   if (currentUIPath() === "/settings/wss") return "wss";
  if(isESignatureMode()) {return currentUIPath()==="/settings/demo" ? "demo" : currentUIPath()==="/settings/reader" ? "reader" : "pad";}
@@ -2020,6 +2131,7 @@ function settingsSubViewFromLocation() {
 }
 
 function pathForView(name) {
+ if(state.formatterMode) return name==="analytes" ? (state.settingsSubView==="wss" ? "/settings/wss" : "/settings/reader") : "/";
  if(isSIUIMode() && name==="analytes" && state.settingsSubView==="siui") return "/settings/siui";
   if (name === "analytes" && state.settingsSubView === "wss") return "/settings/wss";
  if(isESignatureMode() && name==="analytes") return "/settings/"+(["pad","demo","reader"].includes(state.settingsSubView)?state.settingsSubView:"pad");
@@ -2048,6 +2160,7 @@ function pathForView(name) {
 }
 
 function activateSettingsSubView(name) {
+ if(state.formatterMode && !["reader","wss"].includes(name)) name="reader";
  const siuiPanel=document.getElementById("settings-panel-siui");
  if(siuiPanel) siuiPanel.hidden=name!=="siui";
  if(name==="siui" && isSIUIMode()) {
@@ -2253,7 +2366,7 @@ async function loadStatus() {
   const connections = data.connections || {};
   updateConnectionPills(connections);
  if(isESignatureMode()) applyESignatureUI();
-  const cards = isESignatureMode() ? [{label:"Utilitar",value:"eSignature server"},{label:"Comunicare",value:"HTTP / WSS"}] : state.barcodeMode ? [
+  const cards = state.formatterMode ? [{label:"Utilitar",value:"HTML Print Formatter"},{label:"Comunicare",value:"HTTP / WSS"}] : isESignatureMode() ? [{label:"Utilitar",value:"eSignature server"},{label:"Comunicare",value:"HTTP / WSS"}] : state.barcodeMode ? [
     { label: "Tipariri", value: stats.orders ?? 0 },
     { label: "Etichete", value: stats.results ?? 0 },
     { label: t("events"), value: stats.events ?? 0 },
@@ -2275,6 +2388,7 @@ async function loadStatus() {
 }
 
 async function loadDashboard() {
+ if(state.formatterMode) return;
  if(isSIUIMode()) return;
  if(isESignatureMode()) {
  const data=await api("/api/esignature/stats/daily");
@@ -3339,7 +3453,7 @@ async function loadLogs() {
   const resp = await api("/api/logs?limit=40");
   els.logsList.innerHTML = (resp.logs || []).map((item) => {
     const payload = formatLogPayload(item.payload);
-    return `<div class="log-item"><div class="meta"><span>${escapeHtml(item.level.toUpperCase())} · ${escapeHtml(item.event_type)}</span><span>${escapeHtml(formatDate(item.created_at))}</span></div><div>${escapeHtml(item.message)}</div>${payload ? `<pre class="log-payload">${escapeHtml(payload)}</pre>` : ""}</div>`;
+    return `<div class="log-item ${["error","fatal","critical"].includes(String(item.level).toLowerCase())||item.message.includes("[ERROR]")?"siui-error":""}"><div class="meta"><span>${escapeHtml(item.level.toUpperCase())} · ${escapeHtml(item.event_type)}</span><span>${escapeHtml(formatDate(item.created_at))}</span></div><div>${escapeHtml(item.message)}</div>${payload ? `<pre class="log-payload">${escapeHtml(payload)}</pre>` : ""}</div>`;
   }).join("") || `<div class="log-item">${escapeHtml(t("noLogs"))}</div>`;
 }
 
@@ -4051,7 +4165,7 @@ async function onOrdersImportFileChange() {
     });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok || payload.ok === false) {
-      throw new Error(payload.error || payload.message || `Request failed with ${response.status}`);
+      throw new Error(payload.error?.message || payload.error || payload.message || `Request failed with ${response.status}`);
     }
     showToast(buildImportMessage(payload, file.name), "success");
     await Promise.all([
@@ -6142,7 +6256,7 @@ async function api(url, options = {}) {
   });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok || payload.ok === false) {
-    throw new Error(payload.error || payload.message || `Request failed with ${response.status}`);
+    throw new Error(payload.error?.message || payload.error || payload.message || `Request failed with ${response.status}`);
   }
   return payload;
 }
@@ -6356,6 +6470,7 @@ function applyLanguage() {
   applyBarcodeOverviewLabels();
   renderDebugTests();
   renderDebugResult();
+  if(state.formatterMode) applyHTMLFormatterUI();
 }
 
 function applyBarcodeOverviewLabels() {
@@ -6377,6 +6492,7 @@ function toggleLogsAccess(canViewLogs) {
 }
 
 function updateConnectionPills(connections) {
+  if (state.formatterMode) { els.analyzerPill.hidden = true; return; }
   const analyzerConnected = !!connections.analyzer_connected;
   const analyzerLastPacketAt = String(connections.analyzer_last_packet_at || "").trim();
   if (state.barcodeMode) {
@@ -6457,6 +6573,10 @@ function formatReaderSecondaryLabel(readerInfo = {}) {
 }
 
 function renderReaderSidebar() {
+ if(state.formatterMode){
+  els.readerIdentityIcon.textContent="HTML";els.readerIdentityTitle.textContent="Utilitar";els.readerIdentitySubtitle.textContent="HTML Print Formatter";
+  els.readerSummaryList.textContent="Chromium headless · HTTP / WSS";return;
+ }
   const reader = state.readerInfo || {};
   const category = inferReaderCategory(reader);
   const isShimadzuGeneric = isShimadzuGenericReader(reader);
@@ -6997,106 +7117,145 @@ function renderRemotePrintDocument(doc, data, print) {
 
 // CNAS data calls use the same fetch/api adapter locally and in the WSM control UI.
 async function loadSIUIPanel() {
- const panel=document.getElementById("settings-panel-siui");
- if(panel.dataset.loaded) return;
- panel.dataset.loaded="loading";
+ const panel=document.getElementById("settings-panel-siui");if(!panel)return;
+ panel.classList.remove("siui-error");panel.innerHTML="<p>Se încarcă setările CNAS…</p>";
  try {
-  const status=await api("/api/siui/status");
   const admin=(Number(state.session?.user_type)||0)<=0;
-  const settings=admin ? (await api("/api/siui/settings")).settings : {};
-  panel.innerHTML=`<h2>CNAS — conectare și verificări</h2>
-   <p><button type="button" id="siui-update-settings">Server și actualizări</button> <button type="button" id="siui-update-check">Verifică actualizări</button></p>
-   <p id="siui-update-result" role="status"></p>
-   <p>Testează conectarea OCSP, verifică un CNP sau descarcă personalizarea. Validarea serviciilor este în secțiunea separată de mai jos.</p>
-   <p>${status.native_supported ? "Certificatul este folosit direct din Windows. PIN-ul se introduce local, în dialogul driverului." : "Conectarea cu tokenul USB este disponibilă pe Windows. Pe această platformă poți verifica interfața și configurația."}</p>
-   ${admin ? `<form id="siui-settings-form"><h3>Conectare CNAS</h3>
-    <label>Utilizator CNAS <input name="username" value="${escapeHtml(settings.username||"")}" required></label>
-    <label>Seria de licență CNAS <input name="licence" type="password" autocomplete="new-password" maxlength="4096" placeholder="${settings.licence_configured ? "Lasă gol pentru a păstra licența" : "Introdu seria de licență CNAS"}"></label>
-    <p id="siui-licence-info">${settings.licence_configured ? "Licență salvată: " + escapeHtml(settings.licence_hint||"••••••") : "Licență neconfigurată"}</p>
-    <label>Adresa CNAS <input name="base_url" value="${escapeHtml(settings.base_url||"")}" type="url" required></label>
-    <label>Port SIUI <input id="siui-port" type="number" min="1" max="65535" value="${escapeHtml(new URL(settings.base_url||"https://www.siui.ro").port||"443")}" required></label>
-    <p>Implicit 443. Folosește 444 numai pentru endpointul CNAS corespunzător. Portul se salvează în adresa CNAS.</p>
-    <label><input id="siui-allow-invalid-date" type="checkbox" ${settings.allow_invalid_server_certificate_date ? "checked" : ""}> Permite certificatul CNAS expirat / încă nevalabil</label>
-    <p class="muted">Excepție TLS doar pentru perioada de valabilitate a certificatului serverului CNAS. Activează pentru eroarea flags=0x00000020. Numele serverului și autoritatea emitentă rămân verificate.</p>
-    <label>Certificatele contului <select name="certificate_store"><option value="CurrentUser">Utilizator curent</option><option value="LocalMachine">Calculator local</option></select></label>
-    <label>Certificat / token USB <select name="certificate_thumbprint"><option value="${escapeHtml(settings.certificate_thumbprint||"")}">${escapeHtml(settings.certificate_thumbprint||"Selectează un certificat")}</option></select></label>
-    <button type="button" id="siui-certificates">Reîncarcă certificatele</button><button type="submit">Salvează configurarea</button>
-    <p>Nu se exportă și nu se salvează fișiere .cer. Licența se salvează în configurația utilitarului și nu este returnată de API. Poți salva configurarea înainte de alegerea tokenului pe Windows.</p><p id="siui-cert-info"></p></form>` : ""}
-   <h3>Verificări fără raportare de servicii</h3>
-   <p>OCSP testează autentificarea. Verificarea CNP consultă starea de asigurat. Personalizarea descarcă datele furnizorului. Aceste operații nu trimit servicii la validare.</p>
-   <button type="button" id="siui-test-local">Test local fără CNAS</button>
-   <button type="button" id="siui-test-ocsp">Testează autentificarea OCSP</button>
-   <p id="siui-connection-result" role="status"></p>
-   <form id="siui-insured-form"><h3>Verificare calitate de asigurat</h3>
-    <label>CNP <input name="cnp" inputmode="numeric" pattern="[0-9]{13}" minlength="13" maxlength="13" autocomplete="off" required></label>
-    <label>La data <input name="date" type="date" value="${new Date().toLocaleDateString('sv-SE')}" required></label>
-    <button type="submit">Verifică la CNAS</button>
-   </form><pre id="siui-insured-result" style="white-space:pre-wrap;overflow-wrap:anywhere" role="status"></pre>
-   ${admin ? `<form id="siui-personalization-form"><h3>Descarcă personalizare PARA</h3>
-    <label>De la <input name="start" type="date" value="${new Date().toLocaleDateString('sv-SE').slice(0,7)}-01" required></label>
-    <label>Până la <input name="stop" type="date" value="${new Date().toLocaleDateString('sv-SE')}" required></label>
-    <button type="submit">Descarcă de la CNAS</button><p id="siui-personalization-result" role="status"></p>
-   </form>` : ""}
-   <details><summary>Validare servicii paraclinice — trimite date către CNAS</summary>
-   <form id="siui-validation-form"><h3>Validare paraclinice</h3>
-    <label>ID operație <input name="operation_id" value="${escapeHtml(crypto.randomUUID())}" required></label>
-    <label>XML PIAS <textarea name="xml" rows="12" style="width:100%" spellcheck="false" required></textarea></label>
-    <button type="submit">Trimite pentru validare</button><button type="button" id="siui-new-id">ID pentru o cerere nouă</button>
-    <p>Păstrează același ID dacă verifici o trimitere întreruptă. La corectarea datelor, folosește un ID de operație nou și păstrează AppID-urile serviciilor.</p>
-   </form><h3>Validări recente</h3><button id="siui-refresh" type="button">Actualizează istoricul</button><div id="siui-history"></div><pre id="siui-result" style="white-space:pre-wrap;overflow-wrap:anywhere"></pre></details>`;
-  bindAsyncClick(panel.querySelector("#siui-update-settings"),async()=>{activateSettingsSubView("reader");await loadReaderSettings();});
-  bindAsyncClick(panel.querySelector("#siui-update-check"),async()=>{
-   const result=panel.querySelector("#siui-update-result");result.textContent="Verificare actualizări în curs…";
-   try {const status=await refreshAppUpdateStatus(true);result.textContent=status.message||"Verificare finalizată.";}catch(e){result.textContent=e.message;throw e;}
-  });
-  if(admin) {
-   const form=panel.querySelector("#siui-settings-form"); form.elements.certificate_store.value=settings.certificate_store||"CurrentUser";
-   const port=panel.querySelector("#siui-port");
-   form.elements.base_url.addEventListener("change",()=>{try{port.value=new URL(form.elements.base_url.value).port||"443";}catch{}});
-   port.addEventListener("change",()=>{if(port.checkValidity()){try{const url=new URL(form.elements.base_url.value);url.port=port.value;form.elements.base_url.value=url.origin;}catch{}}});
-   const reload=async()=>{
-    const data=await api("/api/siui/certificates?store="+encodeURIComponent(form.elements.certificate_store.value));
-    const select=form.elements.certificate_thumbprint; const selected=select.value;
-    select.replaceChildren(new Option("Selectează un certificat", ""));
-    for(const cert of data.certificates||[]) {const option=new Option(`${cert.subject} | ${cert.issuer} | expiră ${cert.not_after.slice(0,10)} | ${cert.thumbprint.slice(-8)}`,cert.thumbprint);option.disabled=!cert.valid||!cert.has_private_key;select.add(option);}
-    select.value=selected;
-    panel.querySelector("#siui-cert-info").textContent="Lista reflectă certificatele înregistrate pentru contul care rulează utilitarul. Driverul verifică prezența tokenului la conectare.";
-   };
-   bindAsyncClick(panel.querySelector("#siui-certificates"),reload);
-   form.elements.certificate_store.addEventListener("change",()=>{form.elements.certificate_thumbprint.replaceChildren(new Option("Selectează un certificat", ""));reload().catch(e=>showToast(e.message,"error"));});
-   bindAsyncSubmit(form,async event=>{event.preventDefault();const saved=await api("/api/siui/settings",{method:"PUT",body:JSON.stringify({...Object.fromEntries(new FormData(form)),allow_invalid_server_certificate_date:panel.querySelector("#siui-allow-invalid-date").checked})});panel.querySelector("#siui-licence-info").textContent=saved.licence_hint ? "Licență salvată: "+saved.licence_hint : "Licență neconfigurată";form.elements.licence.value="";form.elements.licence.placeholder="Licență salvată; lasă gol pentru a o păstra";showToast("Configurarea CNAS a fost salvată.","success");});
+  if(!admin){panel.textContent="Configurarea CNAS necesită administrator. Serviciile sunt disponibile în Debug și prin API.";return;}
+  const [{settings},catalog]=await Promise.all([api("/api/siui/settings"),api("/api/siui/catalog")]);
+  let profiles=settings.certificate_profiles||[];
+  panel.innerHTML=`<h2>CNAS</h2><form id="siui-settings-form">
+   <div class="two-col"><label>Cod fiscal<input name="fiscal_code" value="${escapeHtml(settings.fiscal_code||"")}" pattern="[0-9]+" required></label>
+   <label>Cod CAS<select name="cas_code" required><option value="">Selectează CAS</option>${catalog.insurance_houses.map(h=>`<option value="${escapeHtml(h.code)}">${escapeHtml(h.code)} — ${escapeHtml(h.name)}</option>`).join("")}</select></label></div>
+   <p id="siui-username-preview"></p>
+   <label>Seria de licență<input name="licence" type="password" autocomplete="new-password" placeholder="Lasă gol pentru a păstra licența"></label>
+   <p id="siui-licence-info">${settings.licence_configured?"Licență salvată: "+escapeHtml(settings.licence_hint):"Licență neconfigurată"}</p>
+   <label>Certificatele contului<select name="certificate_store"><option value="CurrentUser">Utilizator curent / macOS Keychain</option><option value="LocalMachine">Calculator local (Windows)</option></select></label>
+   <label>Certificat / token USB<select name="certificate_thumbprint"><option value="">Selectează un certificat</option></select></label>
+   <button type="button" id="siui-certificates">Reîncarcă certificatele</button><p id="siui-cert-info"></p>
+   <fieldset id="siui-token-pin-section"><legend>PIN / parola tokenului</legend>
+   <p id="siui-token-pin-state" role="status">Se verifică starea PIN-ului…</p>
+   <label>PIN nou<input id="siui-token-pin-value" type="password" autocomplete="new-password" maxlength="256" placeholder="Lasă gol pentru a păstra PIN-ul salvat"></label>
+   <button type="button" id="siui-token-pin-save">Salvează PIN-ul criptat</button>
+   <button type="button" id="siui-token-pin-forget">Șterge PIN-ul salvat</button>
+   <button type="button" id="siui-token-pin-manual">Folosește PIN-ul temporar (150 secunde)</button>
+   <p>După o încercare nereușită, PIN-ul salvat nu mai este folosit automat până îl actualizezi. Câmpul gol păstrează parola. Salvează mai întâi certificatul selectat.</p>
+   <p id="siui-pkcs11-info"></p></fieldset>
+   <fieldset><legend>Conexiune pentru certificatul selectat</legend>
+   <label>Adresa CNAS<input name="base_url" type="url" value="${escapeHtml(settings.base_url)}" required></label>
+   <label>Port SIUI<input id="siui-port" type="number" min="1" max="65535" required></label>
+   <label>Adresa prescripție electronică (PE)<input name="pe_base_url" type="url" value="${escapeHtml(settings.pe_base_url||"https://sipe.siui.ro")}" required></label>
+   <fieldset><legend>Factură electronică CNAS (eFactura)</legend>
+   <label>URL eFactura<input name="einvoice_base_url" type="url" value="${escapeHtml(settings.einvoice_base_url||settings.base_url)}" required></label>
+   <label>Port eFactura<input id="siui-einvoice-port" type="number" min="1" max="65535" required></label></fieldset>
+   <label class="siui-checkbox"><input id="siui-allow-invalid-date" type="checkbox" ${settings.allow_invalid_server_certificate_date?"checked":""}> Permite certificatul CNAS expirat / încă nevalabil</label>
+   <label class="siui-checkbox"><input id="siui-allow-revoked" type="checkbox" ${settings.allow_revoked_server_certificate?"checked":""}> Permite certificatul serverului CNAS revocat (macOS)</label>
+   <p>Excepția pentru revocare păstrează verificarea numelui și lanțului CA.</p>
+   <p>Adresele, portul și excepția TLS se păstrează separat pentru fiecare certificat. Excepția ignoră numai perioada de valabilitate a certificatului serverului.</p></fieldset>
+   <button type="submit">Salvează configurarea CNAS</button>
+   <p>Nu se exportă fișiere CER. Licența se păstrează în deployments/config.yaml. Serviciile și testele sunt în Debug → GENERAL / CLINICE.</p>
+  </form>`;
+  const form=panel.querySelector("form"),port=panel.querySelector("#siui-port"),select=form.elements.certificate_thumbprint;
+  form.elements.cas_code.value=settings.cas_code||"";form.elements.certificate_store.value=settings.certificate_store||"CurrentUser";
+  const username=()=>{panel.querySelector("#siui-username-preview").textContent="Utilizator CNAS: "+form.elements.fiscal_code.value+"_"+form.elements.cas_code.value;};
+  form.elements.fiscal_code.addEventListener("input",username);form.elements.cas_code.addEventListener("change",username);username();
+  const syncPort=()=>{try{port.value=new URL(form.elements.base_url.value).port||"443";}catch{port.value="443";}};syncPort();
+  form.elements.base_url.addEventListener("change",syncPort);port.addEventListener("change",()=>{if(port.checkValidity()){const u=new URL(form.elements.base_url.value);u.port=port.value;form.elements.base_url.value=u.origin;}});
+  const invoicePort=panel.querySelector("#siui-einvoice-port");
+  const syncInvoicePort=()=>{try{invoicePort.value=new URL(form.elements.einvoice_base_url.value).port||"443";}catch{invoicePort.value="443";}};syncInvoicePort();
+  form.elements.einvoice_base_url.addEventListener("change",syncInvoicePort);invoicePort.addEventListener("change",()=>{if(invoicePort.checkValidity()){const u=new URL(form.elements.einvoice_base_url.value);u.port=invoicePort.value;form.elements.einvoice_base_url.value=u.origin;}});
+  const applyProfile=()=>{
+   const profile=profiles.find(p=>p.certificate_store===form.elements.certificate_store.value&&p.certificate_thumbprint.toUpperCase()===select.value.toUpperCase());
+   form.elements.base_url.value=profile?.base_url||"https://www.siui.ro";form.elements.pe_base_url.value=profile?.pe_base_url||"https://sipe.siui.ro";
+   form.elements.einvoice_base_url.value=profile?.einvoice_base_url||profile?.base_url||"https://www.siui.ro";syncInvoicePort();
+   panel.querySelector("#siui-allow-invalid-date").checked=!!profile?.allow_invalid_server_certificate_date;panel.querySelector("#siui-allow-revoked").checked=!!profile?.allow_revoked_server_certificate;syncPort();
+  };
+  const savedOptions=()=>{select.replaceChildren(new Option("Selectează un certificat",""));for(const p of profiles.filter(p=>p.certificate_store===form.elements.certificate_store.value)){select.add(new Option(p.certificate_thumbprint+" (profil salvat)",p.certificate_thumbprint));}};
+  savedOptions();select.value=settings.certificate_thumbprint||"";
+  select.addEventListener("change",applyProfile);
+  await setupSIUITokenPIN(panel,form,settings);
+  const reload=async()=>{const previous=select.value;const data=await api("/api/siui/certificates?store="+encodeURIComponent(form.elements.certificate_store.value));savedOptions();for(const c of data.certificates){let option=Array.from(select.options).find(o=>o.value===c.thumbprint);if(!option){option=new Option("",c.thumbprint);select.add(option);}option.textContent=(c.subject||c.thumbprint)+(c.valid&&c.has_private_key?"":" — indisponibil/expirat");option.disabled=!c.valid||!c.has_private_key;}select.value=previous;setSIUIResult(panel.querySelector("#siui-cert-info"),"Certificatele contului au fost reîncărcate.");};
+  bindAsyncClick(panel.querySelector("#siui-certificates"),reload);
+  reload().catch(e=>setSIUIResult(panel.querySelector("#siui-cert-info"),e.message,true));
+  form.elements.certificate_store.addEventListener("change",()=>{savedOptions();applyProfile();reload().catch(e=>showToast(e.message,"error"));});
+  bindAsyncSubmit(form,async event=>{event.preventDefault();await api("/api/siui/settings",{method:"PUT",body:JSON.stringify({...Object.fromEntries(new FormData(form)),allow_revoked_server_certificate:panel.querySelector("#siui-allow-revoked").checked,allow_invalid_server_certificate_date:panel.querySelector("#siui-allow-invalid-date").checked})});showToast("Configurarea CNAS a fost salvată.","success");await loadSIUIPanel();});
+ }catch(e){setSIUIResult(panel,e.message,true);throw e;}
+}
+async function setupSIUITokenPIN(panel,form,settings) {
+ const fieldset=panel.querySelector("#siui-token-pin-section"),input=panel.querySelector("#siui-token-pin-value"),output=panel.querySelector("#siui-token-pin-state");
+ const current=()=>!!settings.certificate_thumbprint&&form.elements.certificate_thumbprint.value===settings.certificate_thumbprint&&form.elements.certificate_store.value===settings.certificate_store;
+ const sync=()=>{fieldset.disabled=!current();input.value="";};
+ form.elements.certificate_thumbprint.addEventListener("change",sync);form.elements.certificate_store.addEventListener("change",sync);sync();
+ const refresh=async()=>{const data=await api("/api/siui/token-pin");setSIUIResult(output,data.configured?"PIN salvat: <hidden>"+(data.blocked?" — autentificare automată suspendată; folosește introducerea manuală sau actualizează PIN-ul.":""):"PIN nesalvat — introducere manuală.",!!data.blocked);panel.querySelector("#siui-pkcs11-info").textContent=data.manual_required?("Linux: "+(data.pkcs11_module||"configurează local pkcs11_module pentru driverul tokenului")+". PIN-ul temporar permite introducerea manuală fără salvare pe disc."):"";};
+ const update=async(mode)=>{if(!current())return;const pin=input.value;if(mode!=="forget"&&!pin){showToast("Introdu PIN-ul nou.","error");return;}try{await api("/api/siui/token-pin",{method:"PUT",body:JSON.stringify({pin:mode==="forget"?"":pin,forget:mode==="forget",manual:mode==="manual"})});await refresh();if(mode==="manual")setSIUIResult(output,"PIN temporar disponibil pentru 150 secunde; la primul eșec este eliminat.");}catch(e){setSIUIResult(output,e.message,true);throw e;}finally{input.value="";}};
+ bindAsyncClick(panel.querySelector("#siui-token-pin-save"),()=>update("save"));bindAsyncClick(panel.querySelector("#siui-token-pin-forget"),()=>update("forget"));bindAsyncClick(panel.querySelector("#siui-token-pin-manual"),()=>update("manual"));
+ try{await refresh();}catch(e){setSIUIResult(output,e.message,true);}
+}
+function setSIUIResult(element,text,error=false) {
+ element.textContent=text;
+ element.classList.toggle("siui-error",error);
+ element.setAttribute("role",error?"alert":"status");
+}
+let siuiDebugGeneration=0;
+async function loadSIUIDebug() {
+ const generation=++siuiDebugGeneration;let callGeneration=0;
+ const view=document.getElementById("view-debug");let panel=document.getElementById("siui-debug-panel");
+ if(!panel){panel=document.createElement("article");panel.id="siui-debug-panel";panel.className="panel full-span";view.append(panel);}
+ for(const child of view.children)child.hidden=child!==panel;
+ const catalog=await api("/api/siui/catalog");if(generation!==siuiDebugGeneration)return;
+ panel.innerHTML=`<h2>Servicii CNAS</h2><p>GENERAL și CLINICE — aceleași operații sunt disponibile prin HTTPS cu JWT și WSM.</p>
+  <div><button id="siui-debug-general" type="button">GENERAL</button> <button id="siui-debug-clinice" type="button">CLINICE</button> <button id="siui-debug-facturare" type="button">FACTURĂ ELECTRONICĂ</button></div>
+  <details><summary>Autentificare API HTTPS (JWT)</summary><button id="siui-issue-jwt" type="button">Generează JWT pentru 15 minute</button><pre id="siui-jwt-result" style="white-space:pre-wrap;overflow-wrap:anywhere"></pre><p>Tokenul API este diferit de sesiunea OCSP. Nu se salvează în browser.</p></details>
+  <details><summary>Documentație OpenAPI</summary><button id="siui-openapi" type="button">Descarcă OpenAPI JSON</button></details>
+  <div id="siui-operation-area"></div><pre id="siui-debug-result" style="white-space:pre-wrap;overflow-wrap:anywhere" role="status"></pre><div id="siui-download-area"></div>`;
+ const output=panel.querySelector("#siui-debug-result");
+ bindAsyncClick(panel.querySelector("#siui-issue-jwt"),async()=>{const data=await api("/api/siui/auth/token",{method:"POST",body:"{}"});panel.querySelector("#siui-jwt-result").textContent=data.access_token;});
+ bindAsyncClick(panel.querySelector("#siui-openapi"),async()=>{const data=await api("/api/siui/openapi.json");downloadSIUIBlob(new Blob([JSON.stringify(data,null,2)],{type:"application/json"}),"siui-openapi.json");});
+ const renderGroup=group=>{
+  callGeneration++;setSIUIResult(output,"");panel.querySelector("#siui-download-area").replaceChildren();
+  const ops=catalog.operations.filter(op=>op.group===group);const area=panel.querySelector("#siui-operation-area");
+  area.innerHTML=`<h3>${group.toUpperCase()}</h3>${group==="general"?`<button type="button" id="siui-ocsp-connect">Obține / reutilizează token OCSP</button> <button type="button" id="siui-local-test">Test local fără CNAS</button><p>Tokenul este reutilizat maximum 150 de secunde. După acest interval se obține unul nou; rezultatul arată vechimea tokenului.</p>`:""}<label>Operație<select id="siui-operation">${ops.map(op=>`<option value="${op.name}">${escapeHtml(op.label||op.name)} — ${op.name}</option>`).join("")}</select></label><div id="siui-operation-form"></div>`;
+  if(group==="general"){
+   bindAsyncClick(area.querySelector("#siui-ocsp-connect"),async()=>{setSIUIResult(output,"Autentificare OCSP…");try{const connection=await api("/api/siui/general/ocsp");setSIUIResult(output,"Parametri OCSP:\n"+JSON.stringify(connection.debug,null,2)+"\nConectare…");const session=await api("/api/siui/general/ocsp",{method:"POST",body:"{}"});setSIUIResult(output,JSON.stringify(session,null,2));}catch(e){setSIUIResult(output,output.textContent+"\n"+e.message,true);throw e;}});
+   bindAsyncClick(area.querySelector("#siui-local-test"),async()=>{output.textContent=JSON.stringify(await api("/api/siui/insured",{method:"POST",body:JSON.stringify({mode:"local"})}),null,2);});
   }
-  bindAsyncClick(panel.querySelector("#siui-test-local"),async()=>{
-   const result=panel.querySelector("#siui-connection-result");result.textContent="Test local în curs…";
-   try {const data=await api("/api/siui/insured",{method:"POST",body:JSON.stringify({mode:"local"})});result.textContent=data.message;}catch(e){result.textContent=e.message;throw e;}
-  });
-  bindAsyncClick(panel.querySelector("#siui-test-ocsp"),async()=>{
-   const result=panel.querySelector("#siui-connection-result");result.textContent="Autentificare OCSP în curs…";
-   try {const data=await api("/api/siui/ocsp-test",{method:"POST",body:"{}"});result.textContent=data.message;}catch(e){result.textContent=e.message;throw e;}
-  });
-  const insured=panel.querySelector("#siui-insured-form");
-  bindAsyncSubmit(insured,async event=>{
-   event.preventDefault();const result=panel.querySelector("#siui-insured-result");result.textContent="Verificare CNAS în curs…";
-   try {const data=await api("/api/siui/insured",{method:"POST",body:JSON.stringify({...Object.fromEntries(new FormData(insured)),mode:"cnas"})});result.textContent=`${data.result.label} — la data ${data.date}\n${data.result.xml}`;}catch(e){result.textContent=e.message;throw e;}
-  });
-  const personalization=panel.querySelector("#siui-personalization-form");
-  if(personalization) bindAsyncSubmit(personalization,async event=>{
-   event.preventDefault();const result=panel.querySelector("#siui-personalization-result");result.textContent="Descărcare de la CNAS în curs…";
-   try {
-    const data=await api("/api/siui/personalization",{method:"POST",body:JSON.stringify(Object.fromEntries(new FormData(personalization)))});
-    const bytes=Uint8Array.from(atob(data.file.data_base64),c=>c.charCodeAt(0));
-    const url=URL.createObjectURL(new Blob([bytes],{type:data.file.content_type}));
-    const link=document.createElement("a");link.href=url;link.download=data.file.filename;document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),10000);
-    result.textContent=`Personalizarea a fost descărcată: ${data.file.filename} (${data.file.size} bytes).`;
-   }catch(e){result.textContent=e.message;throw e;}
-  });
-  const validation=panel.querySelector("#siui-validation-form");
-  panel.querySelector("#siui-new-id").onclick=()=>{validation.elements.operation_id.value=crypto.randomUUID();};
-  bindAsyncSubmit(validation,async event=>{event.preventDefault();const response=await api("/api/siui/validations",{method:"POST",body:JSON.stringify(Object.fromEntries(new FormData(validation)))});await showSIUIJob(response.job.id);await loadSIUIHistory();});
-  bindAsyncClick(panel.querySelector("#siui-refresh"),loadSIUIHistory);
-  panel.dataset.loaded="true";
-  await loadSIUIHistory();
- } catch(error) {delete panel.dataset.loaded;throw error;}
+  const renderOperation=()=>{
+   callGeneration++;setSIUIResult(output,"");panel.querySelector("#siui-download-area").replaceChildren();
+   const op=ops.find(o=>o.name===area.querySelector("#siui-operation").value);
+   const fields=op.parameters.map(p=>{
+    const name=escapeHtml(p.name);let control;
+    if(/xml$/i.test(p.name))control=`<textarea name="${name}" rows="9" required spellcheck="false" placeholder="XML conform specificației CNAS"></textarea>`;
+    else if(p.name==="partnerCategory")control=`<select name="${name}">${["MF","PHM","CLIN","PARA","STOM","AMB","MD","HC","REC","SPT","NHP","DIA","SICK","CBRET"].map(c=>`<option>${c}</option>`).join("")}</select>`;
+    else if(p.name==="reportType")control=`<select name="${name}"><option value="CLIN">CLIN</option><option value="PARA">PARA</option></select>`;
+    else if(p.name==="requestType")control=`<select name="${name}"><option>RQ_CLIN_SRV</option><option>RQ_PARA_SRV</option></select>`;
+    else control=`<input name="${name}" type="text" value="${p.type==="dateTime"?new Date().toISOString().slice(0,19)+"Z":p.type==="int"?"0":""}" ${p.type==="dateTime"||p.type==="int"?"required":""}>`;
+    return `<label>${name} <span class="muted">(${escapeHtml(p.type)})</span>${control}</label>`;
+   }).join("");
+   area.querySelector("#siui-operation-form").innerHTML=`<p><code>POST /api/siui/${op.group}/${op.name}</code></p><p>${escapeHtml(op.service)} — ${op.mutating?"Trimite / validează / modifică date în CNAS. Verifică parametrii înainte de executare.":"Operație de preluare date."}</p><form><label>ID operație<input name="operation_id" value="${crypto.randomUUID()}" required></label>${fields}<button type="submit">${op.mutating?"Trimite la CNAS":"Execută"} — ${escapeHtml(op.name)}</button><button id="siui-next-operation" type="button">Cerere nouă (alt ID)</button></form><p>O repetare cu același ID urmărește execuția existentă. Starea completed indică primirea răspunsului; verifică rezultatul CNAS.</p>`;
+   const form=area.querySelector("form");
+   form.querySelector("#siui-next-operation").onclick=()=>{form.elements.operation_id.value=crypto.randomUUID();};
+   if(op.name==="validateReport")form.elements.reportType.addEventListener("change",()=>{form.elements.requestType.value="RQ_"+form.elements.reportType.value+"_SRV";});
+   bindAsyncSubmit(form,async event=>{
+    event.preventDefault();const activeCall=++callGeneration;const data=Object.fromEntries(new FormData(form));const id=data.operation_id;delete data.operation_id;
+    setSIUIResult(output,"Trimitere cerere…");panel.querySelector("#siui-download-area").replaceChildren();
+    try{const response=await api("/api/siui/"+op.group+"/"+op.name,{method:"POST",body:JSON.stringify({operation_id:id,parameters:data})});
+     const poll=async()=>{if(generation!==siuiDebugGeneration||activeCall!==callGeneration||state.currentView!=="debug")return;const result=await api("/api/siui/calls/"+encodeURIComponent(response.call.id));if(generation!==siuiDebugGeneration||activeCall!==callGeneration)return;setSIUIResult(output,(result.call.error?result.call.error+"\n\n":"")+JSON.stringify(result.call,null,2),["failed","unknown"].includes(result.call.status));
+      if(["queued","running"].includes(result.call.status)){setTimeout(()=>poll().catch(e=>{setSIUIResult(output,e.message,true);}),1500);}
+      else if(result.call.result?.file){const button=document.createElement("button");button.textContent="Descarcă fișierul CNAS";panel.querySelector("#siui-download-area").replaceChildren(button);bindAsyncClick(button,async()=>{await downloadSIUIFile(result.call.result.file);});}
+     };await poll();
+    }catch(e){setSIUIResult(output,e.message,true);throw e;}
+   });
+  };
+  area.querySelector("#siui-operation").addEventListener("change",renderOperation);renderOperation();
+ };
+ panel.querySelector("#siui-debug-facturare").onclick=()=>{const activeCall=++callGeneration;setSIUIResult(output,"");panel.querySelector("#siui-download-area").replaceChildren();renderInvoiceDashboard(panel.querySelector("#siui-operation-area"),{api,escapeHtml,downloadSIUIBlob,downloadSIUIFile,setButtonLoading,alive:()=>generation===siuiDebugGeneration&&activeCall===callGeneration&&state.currentView==="debug"}).catch(e=>{setSIUIResult(output,e.message,true)})};
+ panel.querySelector("#siui-debug-general").onclick=()=>renderGroup("general");panel.querySelector("#siui-debug-clinice").onclick=()=>renderGroup("clinice");renderGroup("general");
+}
+function downloadSIUIBlob(blob,name) {const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
+async function downloadSIUIFile(file) {
+ const chunks=[];let offset=0;
+ while(offset<file.size){const data=await api(file.path+"?offset="+offset);const bytes=Uint8Array.from(atob(data.data_base64),c=>c.charCodeAt(0));if(!bytes.length||data.next_offset!==offset+bytes.length)throw new Error("Fragment descărcare invalid");chunks.push(bytes);offset=data.next_offset;}
+ downloadSIUIBlob(new Blob(chunks,{type:file.content_type}),file.filename);
 }
 async function loadSIUIHistory() {
  const data=await api("/api/siui/validations"); const list=document.getElementById("siui-history");if(!list)return;
@@ -7109,7 +7268,7 @@ async function showSIUIJob(id) {
  const poll=async()=>{
   const data=await api("/api/siui/validations/"+encodeURIComponent(id));
   if(generation!==siuiPollGeneration)return;
-  document.getElementById("siui-result").textContent=JSON.stringify(data.job,null,2);
+  setSIUIResult(document.getElementById("siui-result"),(data.job.error?data.job.error+"\n\n":"")+JSON.stringify(data.job,null,2),["failed","unknown"].includes(data.job.status));
   if(["queued","running"].includes(data.job.status)&&state.settingsSubView==="siui"&&state.currentView==="analytes")setTimeout(()=>poll().catch(e=>showToast(e.message,"error")),2000);
  };
  await poll();

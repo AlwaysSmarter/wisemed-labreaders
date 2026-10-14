@@ -1507,14 +1507,22 @@ func renderSystemdService(manifest runtimeManifest) string {
 		"__BINARY__":            manifest.App.BinaryName,
 		"__SERVICE_ARGUMENTS__": serviceArguments(manifest.App, "linux"),
 	}
-	return replaceAll(systemdTemplate, replacements)
+	out := replaceAll(systemdTemplate, replacements)
+	if manifest.App.ID == "html-print-formatter" {
+		out = strings.Replace(out, "User=root", "User=html-print-formatter\nEnvironment=HOME=/opt/html-print-formatter", 1)
+	}
+	return out
 }
 
 func renderLinuxInstallHelper(app appInfo) string {
-	return replaceAll(linuxInstallHelperTemplate, map[string]string{
+	out := replaceAll(linuxInstallHelperTemplate, map[string]string{
 		"__APP_ID__":       app.ID,
 		"__SERVICE_NAME__": app.ServiceName,
 	})
+	if app.ID == "html-print-formatter" {
+		out = strings.Replace(out, "sudo systemctl daemon-reload", "id html-print-formatter >/dev/null 2>&1 || sudo useradd --system --user-group --home-dir /opt/html-print-formatter --shell /usr/sbin/nologin html-print-formatter\nsudo chown -R html-print-formatter:html-print-formatter \"$INSTALL_DIR\"\nsudo systemctl daemon-reload", 1)
+	}
+	return out
 }
 
 func renderLinuxUninstallHelper(app appInfo) string {
@@ -1525,12 +1533,18 @@ func renderLinuxUninstallHelper(app appInfo) string {
 }
 
 func renderLinuxPostInstall(manifest runtimeManifest) string {
-	return replaceAll(linuxPostInstallTemplate, map[string]string{
+	out := replaceAll(linuxPostInstallTemplate, map[string]string{
 		"__APP_ID__":       manifest.App.ID,
 		"__SERVICE_NAME__": manifest.App.ServiceName,
 		"__BINARY__":       manifest.App.BinaryName,
 	})
+	if manifest.App.ID == "html-print-formatter" {
+		out = strings.Replace(out, "systemctl daemon-reload", formatterLinuxAccount+"systemctl daemon-reload", 1)
+	}
+	return out
 }
+
+const formatterLinuxAccount = "id html-print-formatter >/dev/null 2>&1 || useradd --system --user-group --home-dir /opt/html-print-formatter --shell /usr/sbin/nologin html-print-formatter\nchown -R html-print-formatter:html-print-formatter /opt/html-print-formatter\n"
 
 func renderLinuxPreRemove(manifest runtimeManifest) string {
 	return replaceAll(linuxPreRemoveTemplate, map[string]string{
@@ -1586,12 +1600,16 @@ func renderMacUninstallScript(manifest runtimeManifest) string {
 }
 
 func renderRPMSpec(manifest runtimeManifest) string {
-	return replaceAll(rpmSpecTemplate, map[string]string{
+	out := replaceAll(rpmSpecTemplate, map[string]string{
 		"__APP_ID__":          manifest.App.ID,
 		"__PACKAGE_VERSION__": manifest.PackageVersion,
 		"__DESCRIPTION__":     manifest.App.Description,
 		"__SERVICE_NAME__":    manifest.App.ServiceName,
 	})
+	if manifest.App.ID == "html-print-formatter" {
+		out = strings.Replace(out, "%post\n", "%post\n"+formatterLinuxAccount, 1)
+	}
+	return out
 }
 
 func prettyTitle(primary, fallback string) string {
@@ -1692,7 +1710,7 @@ func serviceArguments(app appInfo, goos string) string {
 	default:
 		args = append(args, "deployments/config.yaml")
 	}
-	if app.SupportsHeadless {
+	if app.SupportsHeadless && app.ID != "html-print-formatter" {
 		args = append(args, "-headless")
 	}
 	return strings.Join(args, " ")

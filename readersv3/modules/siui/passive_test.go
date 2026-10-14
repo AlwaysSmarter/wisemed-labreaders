@@ -112,11 +112,11 @@ func TestPassiveAPIsAuthenticateBeforeReadOnlyCalls(t *testing.T) {
 		t.Fatal("secret exposed")
 	}
 	res = invoke("insured", `{"mode":"cnas","cnp":"0000000000000","date":"2026-10-03"}`)
-	if res.Status != 200 || ocsp != 2 || insured != 1 {
+	if res.Status != 200 || ocsp != 1 || insured != 1 {
 		t.Fatalf("insured: %+v", res)
 	}
 	res = invoke("personalization", `{"start":"2026-10-01","stop":"2026-10-03"}`)
-	if res.Status != 200 || ocsp != 3 || provider != 1 || download != 1 {
+	if res.Status != 200 || ocsp != 1 || provider != 1 || download != 1 {
 		t.Fatalf("personalization: %+v", res)
 	}
 	principal.Admin = false
@@ -126,7 +126,7 @@ func TestPassiveAPIsAuthenticateBeforeReadOnlyCalls(t *testing.T) {
 	if res = invoke("insured", `{"mode":"cnas","cnp":"bad","date":"2026-10-03"}`); res.Status != 400 {
 		t.Fatal("bad CNP accepted")
 	}
-	if ocsp != 3 {
+	if ocsp != 1 {
 		t.Fatal("invalid or forbidden request contacted CNAS")
 	}
 }

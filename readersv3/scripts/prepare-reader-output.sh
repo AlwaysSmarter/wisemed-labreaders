@@ -17,7 +17,16 @@ for binary in "$RUNTIME"/*; do
   cp "$binary" "$DEST/"
 done
 # Source deployments contain static assets only; preserve all existing local files.
-cp -Rn "$RUNTIME/deployments/." "$DEST/deployments/"
+# BSD cp -n reports a failure when it skips an existing file. Copy missing
+# files explicitly so refreshing an existing workspace remains successful.
+while IFS= read -r -d '' asset; do
+  relative="${asset#"$RUNTIME/deployments/"}"
+  target="$DEST/deployments/$relative"
+  if [[ ! -e "$target" ]]; then
+    mkdir -p "$(dirname "$target")"
+    cp "$asset" "$target"
+  fi
+done < <(find "$RUNTIME/deployments" -type f -print0)
 if [[ ! -f "$DEST/deployments/config.yaml" ]]; then
   cp "$DEST/deployments/config.install.yaml" "$DEST/deployments/config.yaml"
 fi

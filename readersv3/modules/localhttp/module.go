@@ -44,19 +44,20 @@ const legacySessionCookieName = "wmr_local_session"
 type Module struct {
 	rt module.Runtime
 
-	mu          sync.RWMutex
-	server      *http.Server
-	address     string
-	tlsEnabled  bool
-	cors        string
-	restartCh   chan localHTTPRestart
-	sessions    map[string]session
-	sessionAuth map[string]sessionAuth
-	language    string
-	repeatMode  string
-	analytes    []coremodel.Analyte
-	qcTargets   []coremodel.QCTarget
-	updateInfo  map[string]interface{}
+	mu                sync.RWMutex
+	server            *http.Server
+	address           string
+	tlsEnabled        bool
+	cors              string
+	restartCh         chan localHTTPRestart
+	sessions          map[string]session
+	sessionAuth       map[string]sessionAuth
+	utilitySessionKey []byte
+	language          string
+	repeatMode        string
+	analytes          []coremodel.Analyte
+	qcTargets         []coremodel.QCTarget
+	updateInfo        map[string]interface{}
 }
 
 type localHTTPRestart struct {
@@ -198,6 +199,10 @@ func (m *Module) ID() string { return "local-http" }
 
 func (m *Module) Init(rt module.Runtime) error {
 	m.rt = rt
+	m.utilitySessionKey = make([]byte, 32)
+	if _, err := rand.Read(m.utilitySessionKey); err != nil {
+		return err
+	}
 	m.sessions = map[string]session{}
 	m.sessionAuth = map[string]sessionAuth{}
 	m.restartCh = make(chan localHTTPRestart, 1)
@@ -220,6 +225,7 @@ func (m *Module) Init(rt module.Runtime) error {
 	m.rt.Handle("/qc", m.withNoCache(http.HandlerFunc(m.handleIndex)))
 	m.rt.Handle("/debug", m.withNoCache(http.HandlerFunc(m.handleIndex)))
 	m.rt.Handle("/wss-remote.js", m.withNoCache(http.HandlerFunc(m.handleStaticAsset("ui/wss-remote.js", "application/javascript; charset=utf-8"))))
+	m.rt.Handle("/siui-invoice.js", m.withNoCache(http.HandlerFunc(m.handleStaticAsset("ui/siui-invoice.js", "application/javascript; charset=utf-8"))))
 	m.rt.Handle("/app.js", m.withNoCache(http.HandlerFunc(m.handleStaticAsset("ui/app.js", "application/javascript; charset=utf-8"))))
 	m.rt.Handle("/styles.css", m.withNoCache(http.HandlerFunc(m.handleStaticAsset("ui/styles.css", "text/css; charset=utf-8"))))
 	m.rt.Handle("/api/session", m.withNoCache(http.HandlerFunc(m.handleSessionStatus)))
@@ -312,6 +318,12 @@ func (m *Module) Start(ctx context.Context) error {
 			Addr:              addr,
 			Handler:           m.rt.Mux(),
 			ReadHeaderTimeout: 10 * time.Second,
+		}
+		if options, ok := m.rt.Service("http-server-options"); ok {
+			if configure, ok := options.(func(*http.Server)); ok {
+				configure(server)
+				addr = server.Addr
+			}
 		}
 		m.mu.Lock()
 		m.server = server
@@ -2608,6 +2620,9 @@ func (m *Module) appendAuditLog(r *http.Request, eventType, message string, meta
 }
 
 func (m *Module) sessionSecret() []byte {
+	if m.analyzerSetting("protocol", "") == "siui" {
+		return m.utilitySessionKey
+	}
 	return []byte("wisemed-local-session:" + m.rt.ReaderID())
 }
 
@@ -3754,7 +3769,7 @@ func (m *Module) supportedCommTypes() []string {
 			add("serial")
 		case "seegene-excel", "beosl-csv", "cfx96-quantitation", "cary60-uvvis", "analytikjena-plasmaquantms-elite", "shimatzu-tocl", "shimatzu-generic", "biosan-hipo-mpp96", "gammavision", "tricarb-5110-tr", "anatolia-geneworks", "generic-file":
 			add("file")
-		case "barcodeprinter", "anaf-docsmart", "signing-pad":
+		case "barcodeprinter", "anaf-docsmart", "signing-pad", "html-print-formatter":
 			add("utility")
 		}
 	}

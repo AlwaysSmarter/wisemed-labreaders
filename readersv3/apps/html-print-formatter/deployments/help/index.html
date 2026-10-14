@@ -1,0 +1,191 @@
+<!DOCTYPE html><html lang="ro"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WiseMED • HTML Print Formatter • Ajutor</title>
+<style>
+body{font:16px/1.65 system-ui,sans-serif;color:#173448;background:#f1f5f9;margin:0}
+main{max-width:1000px;margin:auto;padding:32px;background:white}
+h1,h2{line-height:1.25;color:#075985}h2{margin-top:2.3em}
+code,pre,textarea{font:14px/1.6 ui-monospace,monospace}pre{background:#edf4f8;padding:18px;overflow:auto;border-radius:8px}
+td,th{border-bottom:1px solid #d6e3ec;text-align:left;padding:10px;vertical-align:top}table{border-collapse:collapse;width:100%}.table{overflow:auto}
+a{color:#075985}nav{display:flex;gap:20px;flex-wrap:wrap}textarea{width:100%;box-sizing:border-box;min-height:160px;padding:12px}
+button{font:inherit;background:#075985;color:white;border:0;padding:9px 16px;border-radius:6px;margin:12px 12px 12px 0;cursor:pointer}button:disabled{opacity:.5}
+details{padding:18px;border:1px solid #d6e3ec;border-radius:8px;margin-top:24px}#status{white-space:pre-wrap}
+</style></head><body><main><nav><a href="/">Administrare WiseMED</a><a href="/health">Health</a><a href="example.html" download>Exemplu jQuery</a><a href="request.json" download>request.json pentru curl</a></nav>
+<details><summary>Test local HTML și PDF</summary><p>Completați HTML sau Link HTML. Randează așteaptă window.printReady; PDF direct nu cere acest semnal.</p>
+<label>HTML<textarea id="request" aria-label="HTML" spellcheck="false"></textarea></label>
+<label>Link HTML<input id="html-link" type="url" placeholder="https://exemplu.ro/raport.html"></label>
+<label>Timeout (ms)<input id="timeout" type="number" min="1" max="600000" value="120000"></label>
+<button id="example">Încarcă exemplul</button><button id="render">Randează → PDF</button><button id="pdf">HTML → PDF direct</button>
+<p id="status" role="status"></p><textarea id="result" readonly aria-label="DOM rezultat"></textarea><a id="download" hidden download="rendered.pdf">Descarcă PDF</a></details>
+<h1>HTML Print Formatter — ghid de utilizare</h1>
+<p>Utilitar intern WiseMED pentru documente de încredere. Returnează DOM-ul final serializat sau generează PDF folosind Chromium, cu endpointuri separate.</p>
+<h2>Pornire și configurare</h2>
+<p>Instalați Google Chrome sau Chromium pe calculatorul serviciului. Chromium nu este inclus în binar sau în update. Pe Linux sunt necesare bibliotecile sistemului, fonturile raportului și suportul sandbox al distribuției. Nu rulați Chromium ca root și nu dezactivați sandbox-ul. Pe Windows instalați Chrome pentru contul serviciului sau setați calea absolută către instalarea pentru toți utilizatorii.</p>
+<p>Din rădăcina <code>readersv3</code>:</p>
+<pre><code>scripts/prepare-reader-output.sh html-print-formatter
+cd output/html-print-formatter
+./html-print-formatter -showlog</code></pre>
+<p>Pe Windows, executabilul este <code>html-print-formatter.exe</code>. Flags comune: <code>-config deployments/config.yaml</code>, <code>-showlog</code>, <code>-version</code>, <code>-headless</code>, <code>-installservice</code>, <code>-reconfigure</code>. Pornirea simplă nu cere configurarea unui echipament WiseMED; <code>-reconfigure</code> deschide wizard-ul comun când doriți integrarea. <code>-headless</code> detașează utilitarul ca daemon; Chromium este headless în ambele moduri.</p>
+<p>La prima pornire, runner-ul creează <code>deployments/config.yaml</code> din <code>deployments/config.install.yaml</code>. Actualizările completează doar cheile lipsă; valorile operatorului se păstrează. <code>modules.html-print-formatter</code> conține:</p>
+<pre><code>chrome_path: &quot;&quot;
+max_concurrent_renders: 2
+max_body_bytes: 4194304
+default_render_timeout_ms: 120000</code></pre>
+<p>Variabilele de mediu au prioritate față de YAML și nu sunt salvate în acesta:</p>
+<div class="table"><table><tbody>
+<tr><th>Variabilă</th><th>Implicit</th><th>Semnificație</th></tr>
+<tr><td>PORT</td><td>19113 în configul livrat</td><td>Înlocuiește portul listenerului comun; păstrează adresa de bind și TLS din YAML. 1–65535.</td></tr>
+<tr><td>CHROME_PATH</td><td>autodetecție</td><td>Calea executabilului Chrome/Chromium.</td></tr>
+<tr><td>MAX_CONCURRENT_RENDERS</td><td>2</td><td>1–64; număr maxim de randări active.</td></tr>
+<tr><td>MAX_BODY_BYTES</td><td>4194304</td><td>Corp JSON HTTP maxim, 1–67108864 bytes.</td></tr>
+<tr><td>DEFAULT_RENDER_TIMEOUT_MS</td><td>120000</td><td>1–600000 ms; timeout general implicit.</td></tr>
+</tbody></table></div>
+<p>Reporniți utilitarul după modificarea acestor setări. Pentru o altă adresă de bind folosiți <code>local_http.address</code> și <code>modules.local-http.address</code> în config. Implicit serviciul ascultă numai pe <code>127.0.0.1</code>, fără TLS. HTTP/HTTPS și setările WSS rămân cele comune WiseMED. Timeout-urile HTTP sunt 10s pentru headers, 30s pentru citirea cererii, 660s pentru scriere și 60s idle. Timeout-ul de randare începe după decodarea/validarea cererii și include așteptarea semaforului, încărcarea, JavaScript, fonturile, imaginile, cadrele și extragerea.</p>
+<p>Actualizările sunt activate implicit: app_id <code>html-print-formatter</code>, canal <code>stable</code>, server <code>http://127.0.0.1:19090</code>, auto_download <code>true</code>. Configurați serverul real în Setări; controalele de stare/verificare sunt cele comune WiseMED.</p>
+<h2>API HTTP</h2>
+<div class="table"><table><tbody>
+<tr><th>Metodă și rută</th><th>Funcție</th></tr>
+<tr><td>POST /render</td><td>Acceptă exact unul dintre <code>html</code> și <code>html_link</code>; răspuns HTML.</td></tr>
+<tr><td>POST /render/html</td><td>Același contract, dar cere <code>html</code>.</td></tr>
+<tr><td>POST /render/url</td><td>Același contract, dar cere <code>html_link</code>.</td></tr>
+<tr><td>POST /api/html-print-formatter/render</td><td>Același renderer; răspuns JSON cu <code>html</code>, pentru HTTP și adaptorul WSS.</td></tr>
+<tr><td>POST /pdf</td><td>HTML2PDF direct: acceptă <code>html</code> sau <code>html_link</code>, fără printReady implicit; răspuns application/pdf.</td></tr>
+<tr><td>POST /api/html-print-formatter/pdf</td><td>Aceeași conversie PDF; JSON cu <code>html</code> și <code>pdf_base64</code>, disponibil și prin WSS.</td></tr>
+<tr><td>GET /health</td><td>200 când Chromium este disponibil; 503 la pornire/oprire sau dacă a căzut.</td></tr>
+<tr><td>GET /api/html-print-formatter/health</td><td>Echivalent disponibil prin WSS.</td></tr>
+</tbody></table></div>
+<p>POST cere <code>Content-Type: application/json</code>. Corpul poate fi:</p>
+<pre><code>{
+  &quot;html&quot;: &quot;&lt;!DOCTYPE html&gt;&lt;html&gt;&lt;body&gt;&lt;script&gt;document.body.id=&#x27;ready&#x27;;window.printReady=true;&lt;/script&gt;&lt;/body&gt;&lt;/html&gt;&quot;,
+  &quot;base_url&quot;: &quot;https://app.wisemed.eu/&quot;,
+  &quot;timeout_ms&quot;: 120000,
+  &quot;viewport_width&quot;: 1280,
+  &quot;viewport_height&quot;: 900
+}</code></pre>
+<p>Sau înlocuiți <code>html</code> cu <code>&quot;html_link&quot;: &quot;https://example.org/report.html&quot;</code>. Nu trimiteți ambele. <code>base_url</code> lipsește implicit. Pentru HTML inline, fără un <code>base</code> sau <code>base_url</code>, URL-urile relative se rezolvă pe serverul intern loopback și de regulă vor eșua. Pentru link se rezolvă față de URL-ul paginii finale după redirecturi. <code>html_link</code> și <code>base_url</code> acceptă numai HTTP(S) absolut, fără user/parolă. Documentele trebuie să fie HTML complet; pentru inserarea unui base în pagini legate folosiți UTF-8 (nu HTML UTF-16). Câmpurile necunoscute sunt respinse.</p>
+<p>Valorile lipsă sau zero folosesc timeout-ul configurat, viewport 1280×900. Dimensiunile explicite sunt 1–8192 px; timeout explicit 1–600000 ms.</p>
+<p>La succes <code>/render*</code> returnează documentul direct cu <code>Content-Type: text/html; charset=utf-8</code>, <code>Cache-Control: no-store</code> și <code>X-Request-ID</code>. Nu este învelit în JSON. Ruta <code>/api/.../render</code> returnează:</p>
+<pre><code>{&quot;ok&quot;:true,&quot;request_id&quot;:&quot;UUID&quot;,&quot;html&quot;:&quot;&lt;!DOCTYPE html&gt;\n&lt;html&gt;...&lt;/html&gt;&quot;}</code></pre>
+<p>Exemplu cu fișierul demonstrativ jQuery livrat în helper:</p>
+<pre><code>curl --fail-with-body -sS http://127.0.0.1:19113/help/request.json -o request.json
+curl --fail-with-body -sS http://127.0.0.1:19113/render \
+  -H &#x27;Content-Type: application/json&#x27; \
+  --data-binary @request.json -o rendered.html</code></pre>
+<p>Dacă schimbați portul, adaptați <code>base_url</code> în <code>request.json</code>. Pentru un HTML propriu, fără a scăpa manual ghilimelele:</p>
+<pre><code>python3 -c &#x27;import json,pathlib; print(json.dumps({&quot;html&quot;:pathlib.Path(&quot;report.html&quot;).read_text(),&quot;base_url&quot;:&quot;https://app.wisemed.eu/&quot;}))&#x27; &gt; request.json
+curl --fail-with-body -sS http://127.0.0.1:19113/render \
+  -H &#x27;Content-Type: application/json&#x27; --data-binary @request.json -o rendered.html</code></pre>
+<p>Exemplu link (înlocuiți adresa raportului):</p>
+<pre><code>curl --fail-with-body -sS http://127.0.0.1:19113/render/url \
+  -H &#x27;Content-Type: application/json&#x27; \
+  --data &#x27;{&quot;html_link&quot;:&quot;https://example.org/report.html&quot;,&quot;timeout_ms&quot;:120000}&#x27; \
+  -o rendered.html</code></pre>
+<p>La eroare răspunsul este JSON, chiar și pe <code>/render</code>:</p>
+<pre><code>{&quot;ok&quot;:false,&quot;request_id&quot;:&quot;UUID&quot;,&quot;error&quot;:{&quot;code&quot;:&quot;page_error&quot;,&quot;message&quot;:&quot;Mesajul paginii&quot;}}</code></pre>
+<div class="table"><table><tbody>
+<tr><th>Cod stabil</th><th>HTTP</th><th>Explicație</th></tr>
+<tr><td>invalid_json</td><td>400</td><td>JSON invalid, câmp necunoscut sau mai multe obiecte.</td></tr>
+<tr><td>invalid_request</td><td>400</td><td>Sursă absentă/ambiguă, URL sau parametri nevalizi.</td></tr>
+<tr><td>method_not_allowed</td><td>405</td><td>Metodă nepotrivită.</td></tr>
+<tr><td>unsupported_media_type</td><td>415</td><td>Lipsește application/json.</td></tr>
+<tr><td>body_too_large</td><td>413</td><td>Corp peste limită; și documentul legat atunci când se injectează base.</td></tr>
+<tr><td>page_error</td><td>422</td><td><code>window.printError</code> are o valoare diferită de null/undefined, inclusiv șir gol sau false.</td></tr>
+<tr><td>render_timeout</td><td>504</td><td>Deadline general depășit; <code>printReady</code> lipsă sau resurse nefinalizate.</td></tr>
+<tr><td>render_canceled</td><td>408</td><td>Client deconectat, context anulat sau shutdown; clientul închis nu mai poate primi răspunsul.</td></tr>
+<tr><td>source_load_failed</td><td>502</td><td>Documentul legat a răspuns cu status HTTP de eroare.</td></tr>
+<tr><td>render_failed</td><td>502</td><td>Navigare, CDP, JavaScript de extragere sau browser eșuat.</td></tr>
+<tr><td>pdf_failed</td><td>502</td><td>Comanda Chromium PrintToPDF a eșuat.</td></tr>
+<tr><td>browser_unavailable</td><td>503</td><td>Browser nepornit/oprit; verificați health și logurile.</td></tr>
+</tbody></table></div>
+<h2>HTML2PDF separat: POST /pdf</h2>
+<p><code>/pdf</code> acceptă aceleași câmpuri de sursă, base_url, viewport și timeout ca <code>/render</code>, dar <strong>nu așteaptă window.printReady implicit</strong>. Este potrivit și pentru HTML static sau pagini HTTP(S) obișnuite. Scripturile paginii se execută normal; serviciul așteaptă document.readyState complete, fonturile, imaginile și două cadre. Nu așteaptă automat operații AJAX/timere care continuă după încărcare. Pentru acestea, pagina trebuie să semnalizeze explicit finalizarea.</p>
+<p>Opțional, <code>wait_for_print_ready: true</code> activează așteptarea obligatorie a <code>window.printReady === true</code> pentru PDF. Valoarea implicită este false, numai pentru endpointurile PDF. Endpointurile <code>/render</code> cer întotdeauna printReady, indiferent de acest câmp. <code>window.printError</code> produce eroare în ambele moduri.</p>
+<pre><code>curl --fail-with-body -sS http://127.0.0.1:19113/pdf \
+  -H &#x27;Content-Type: application/json&#x27; \
+  --data &#x27;{&quot;html&quot;:&quot;&lt;!DOCTYPE html&gt;&lt;html&gt;&lt;body&gt;&lt;h1&gt;Raport PDF&lt;/h1&gt;&lt;/body&gt;&lt;/html&gt;&quot;,&quot;timeout_ms&quot;:120000}&#x27; \
+  -o rendered.pdf
+
+curl --fail-with-body -sS http://127.0.0.1:19113/pdf \
+  -H &#x27;Content-Type: application/json&#x27; \
+  --data &#x27;{&quot;html_link&quot;:&quot;https://example.org/&quot;,&quot;timeout_ms&quot;:120000}&#x27; \
+  -o rendered.pdf</code></pre>
+<p>Pentru fișiere HTML cu ghilimele, apostrofuri și rânduri noi, folosiți un encoder:</p>
+<pre><code>python3 -c &#x27;import json,pathlib; print(json.dumps({&quot;html&quot;:pathlib.Path(&quot;report.html&quot;).read_text()}))&#x27; &gt; pdf-request.json
+curl --fail-with-body -sS http://127.0.0.1:19113/pdf \
+  -H &#x27;Content-Type: application/json&#x27; --data-binary @pdf-request.json -o rendered.pdf</code></pre>
+<p>Răspunsul de succes are Content-Type application/pdf, Content-Disposition attachment; filename=&quot;rendered.pdf&quot;, X-Request-ID și Cache-Control no-store. Erorile rămân JSON, cu aceleași coduri ca randarea; <code>pdf_failed</code> (502) indică un eșec al comenzii de imprimare Chromium. Timeout-ul include generarea PDF.</p>
+<p>Varianta HTTP/WSS <code>/api/html-print-formatter/pdf</code> întoarce:</p>
+<pre><code>{&quot;ok&quot;:true,&quot;request_id&quot;:&quot;UUID&quot;,&quot;html&quot;:&quot;&lt;html&gt;...&lt;/html&gt;&quot;,&quot;pdf_base64&quot;:&quot;JVBERi0...&quot;,&quot;filename&quot;:&quot;rendered.pdf&quot;}</code></pre>
+<p>Clientul decodează pdf_base64 în bytes application/pdf. Limita comună WSS este 4 MiB pentru răspunsul JSON complet (DOM + PDF în Base64, care adaugă aproximativ 33%); pentru rapoarte mari folosiți direct <code>/pdf</code> prin HTTP. Timeout-ul adaptorului și al clientului de control WSS este 610 secunde pentru rutele formatterului; limita efectivă a lucrării rămâne timeout_ms, cel mult 600000.</p>
+<p>În pagina principală și în helper există câmpuri separate HTML, Link HTML și Timeout (implicit 120000). Butonul <strong>Randează → PDF</strong> așteaptă printReady și produce DOM-ul final plus linkul Descarcă PDF. Butonul <strong>HTML → PDF direct</strong> folosește același endpoint PDF cu wait_for_print_ready false. Se completează exact una dintre surse. JSON-ul este construit automat, fără escapare manuală.</p>
+<p>PDF-ul se generează cu chromedp/Page.printToPDF din aceeași pagină vie după stabilizarea resurselor. DOM-ul nu este încărcat din nou; scripturile documentului nu sunt reexecutate printr-o a doua navigare. Chromium poate declanșa evenimentele standard beforeprint/afterprint; acestea și timerele paginii pot modifica DOM-ul, așa că raportul trebuie să rămână stabil după semnalul de finalizare.</p>
+<p>Implicit se folosește A4 portret, margini 0, fundaluri incluse, fără antet/subsol Chromium. CSS <code>@page { size: A4; margin: 12mm; }</code> poate stabili formatul și marginile (preferCSSPageSize activ). Încărcarea și procesarea inițială folosesc media <strong>screen</strong>. Înainte de exportul PDF se activează explicit media <strong>print</strong>: regulile <code>@media print</code> se aplică, iar elementele ascunse pentru imprimare nu apar în PDF. Se așteaptă reacția la schimbarea media, fonturile, imaginile și cadrele necesare stabilizării, în limita aceluiași timeout. <code>/render</code> rămâne în screen. Calculele de paginare făcute anterior în JavaScript nu sunt refăcute automat. Pentru paginare folosiți @page și break-before / break-after / break-inside. PDF-ul păstrează aspectul randat, inclusiv canvas, nu codul JavaScript interactiv. Nu este automat PDF/A sau document semnat.</p>
+<h3>Alegerea motorului</h3>
+<p>Pentru acest utilitar alegem Chromium + chromedp: browserul există deja în procesul de randare, execută jQuery și suportă CSS-ul browserului; PrintToPDF exportă direct pagina procesată. Nu este necesar un al doilea serviciu. Gotenberg oferă API-uri HTML/URL → PDF tot prin Chromium, util când se dorește un serviciu separat. wkhtmltopdf folosește un motor QtWebKit învechit, nepotrivit pentru a înlocui Chromium în aceste rapoarte. Surse consultate: https://chromedevtools.github.io/devtools-protocol/tot/Page/#method-printToPDF https://gotenberg.dev/docs/convert-with-chromium/convert-html-to-pdf https://wkhtmltopdf.org/status</p>
+<h2>WiseMED WebSocket</h2>
+<p>Se folosește transportul standard WSM, comanda <code>api.request</code>, fără un WebSocket suplimentar. Configurați în Setări integrarea API de echipament și WSS, activați <code>modules.wisemed-ws.enabled</code>, provisionați identitatea/cheia echipamentului pe WSM. WSS este oprit în template până sunt disponibile credențiale valide. Nu există chei hardcodate. Clientul trebuie să aibă scope <code>api:invoke</code> și drepturi asupra echipamentului. Vezi și documentația comună <code>readersv3/docs/wss-control.md</code>.</p>
+<p>Comanda trimisă de client după autentificare și hello_ack (înlocuiți equipment_id):</p>
+<pre><code>{
+  &quot;type&quot;: &quot;command&quot;,
+  &quot;request_id&quot;: &quot;render-001&quot;,
+  &quot;target&quot;: {&quot;mode&quot;: &quot;equipment&quot;, &quot;equipment_id&quot;: &quot;ID-ECHIPAMENT&quot;},
+  &quot;payload&quot;: {
+    &quot;command&quot;: &quot;api.request&quot;,
+    &quot;args&quot;: {
+      &quot;method&quot;: &quot;POST&quot;,
+      &quot;path&quot;: &quot;/api/html-print-formatter/render&quot;,
+      &quot;body&quot;: {
+        &quot;html&quot;: &quot;&lt;!DOCTYPE html&gt;&lt;html&gt;&lt;body&gt;&lt;script&gt;document.body.id=&#x27;done&#x27;;window.printReady=true&lt;/script&gt;&lt;/body&gt;&lt;/html&gt;&quot;,
+        &quot;timeout_ms&quot;: 120000
+      }
+    }
+  }
+}</code></pre>
+<p>Reply-ul standard are <code>correlation_id: &quot;render-001&quot;</code>, iar în payload: <code>kind: &quot;api.response&quot;</code>, <code>status: 200</code>, <code>content_type: &quot;application/json; charset=utf-8&quot;</code> și <code>body: {&quot;ok&quot;:true,&quot;request_id&quot;:&quot;UUID&quot;,&quot;html&quot;:&quot;...&quot;}</code>. La eroare se păstrează statusul HTTP și obiectul <code>error</code> în <code>payload.body</code>. Erorile transportului apar în envelope-ul standard WSM, separat de erorile rendererului.</p>
+<p>Ruta JSON folosește exact același renderer și aceleași validări; adaptorul WSS permite pentru această rută până la 610s, fără limita generică de 30s. Clientul trebuie să aibă un timeout propriu suficient. Anularea sesiunii WSS a utilitarului anulează cererea în curs; protocolul comun nu oferă anulare individuală a unui render la simpla închidere a ferestrei clientului remote. Deadline-ul rămâne activ. Comenzile WSS ale unei sesiuni sunt executate secvențial de transportul comun.</p>
+<p>Adaptorul are limita proprie de 4 MiB pentru request și response JSON; HTML-ul escapat și envelope-ul consumă spațiu suplimentar. Readerul acceptă frame-uri până la 8 MiB, iar WSM are implicit <code>server.max_message_bytes: 1048576</code>. Configurați limitele WSM pentru documentele utilizate, fără a depăși limita adaptorului. Pentru documente mari folosiți HTTP direct. Ruta <code>/render</code> cu răspuns text/html nu se transportă prin adaptor; folosiți ruta JSON de mai sus.</p>
+<h2>Încărcare, procesare și serializare</h2>
+<p>HTML-ul inline este servit ca răspuns HTTP real pe un listener intern <code>127.0.0.1:&lt;port-aleator&gt;/documents/&lt;UUID&gt;</code>. Chromium navighează la acel document; parserul HTML execută normal scripturile inline/externe și jQuery document.ready. Documentul temporar este ținut numai în memorie și eliminat la finalul cererii. Nu încărcăm sursa prin <code>innerHTML</code>, nu înlocuim scripturile și nu folosim <code>eval</code> pentru a reexecuta scripturile furnizate.</p>
+<p>Pentru <code>html_link</code>, Chromium navighează direct, cu redirecturi, cookies și politicile browserului în contextul izolat. Când este dat <code>base_url</code>, răspunsul documentului este interceptat prin CDP Fetch înainte de parsare și este inserat un <code>&lt;base&gt;</code> numai dacă documentul nu are deja unul. Se păstrează restul sursei, scripturile și headers precum CSP. Pentru inline se face aceeași inserare înainte de a servi documentul. Un tokenizer localizează punctul de inserție, fără reserializarea documentului sursă; textele <code>&lt;base&gt;</code> din scripturi/comentarii nu sunt confundate cu elemente. Un base existent are prioritate.</p>
+<p>Viewport-ul este setat înaintea navigării, deviceScaleFactor=1, media <strong>screen</strong>. Pentru <code>/render</code> și PDF cu <code>wait_for_print_ready: true</code>, finalizarea cere strict <code>window.printReady === true</code>. PDF direct folosește document.readyState complete. O valoare în <code>window.printError</code> are prioritate și devine <code>page_error</code> cu mesajul paginii. Interogarea periodică de 20ms verifică semnalul; nu este un timp fix după care se presupune succes. Erorile JavaScript neinterceptate sunt logate, dar numai <code>printError</code> este semnalul explicit de eșec al raportului; fără <code>printReady</code>, cererea expiră. Nu folosiți <code>window.print()</code>, dialoguri sau interacțiune manuală.</p>
+<p>După semnal se așteaptă <code>document.fonts.ready</code>, toate elementele <code>document.images</code> din acel moment (load sau error) și două cadre <code>requestAnimationFrame</code>, în același deadline. Imaginile lazy sunt activate pentru încărcare. O imagine stricată este considerată terminată, nu generează automat page_error. Așteptarea nu include imagini CSS background, iframe-uri separate, video sau cereri AJAX arbitrare. Raportul trebuie să termine propriile operații asincrone înainte de printReady.</p>
+<p><strong>Raportul trebuie să aștepte fonturile și imaginile înainte de propriile calcule de paginare dacă influențează dimensiunile. Așteptarea de la final nu repară calculele făcute deja cu dimensiuni greșite.</strong> Exemplul <code>example.html</code> din helper arată explicit această ordine, apoi rulează sincron <code>compact_sections()</code>, <code>normalize_content()</code> și <code>move_content()</code>, înainte de a seta printReady.</p>
+<p>Rezultatul este <code>document.documentElement.outerHTML</code>, precedat de DOCTYPE dacă există (serializat cu XMLSerializer). Include elementele mutate/generate și atributele/stilurile inline. Nu include stilurile calculate, ascultătorii de evenimente, starea JavaScript, DOM-ul intern al iframe-urilor/shadow roots sau bitmap-urile canvas. Nu este o arhivă autonomă: resursele externe nu sunt inline.</p>
+<p>Scripturile rămân în HTML. Serviciul nu le reexecută după extragere, dar ele se pot executa din nou dacă deschideți rezultatul în browser. Pentru a vedea sursa exactă salvați fișierul și inspectați-l ca text. Pentru un raport legat fără base, URL-urile relative din rezultat necesită publicarea la URL-ul original sau un base potrivit; serializarea nu le transformă automat în URL-uri absolute.</p>
+<h2>Origine, securitate și operare</h2>
+<p><code>&lt;base&gt;</code> schimbă rezolvarea URL-urilor, <strong>nu originea documentului și nu CORS</strong>. Originea unui document inline este listenerul loopback intern, indiferent de base_url. AJAX/fetch către aplicația WiseMED rămâne cross-origin și are nevoie de permisiunile CORS, de autentificare și de regulile cookies/SameSite corespunzătoare. Pentru link, originea este URL-ul paginii navigate. Restricțiile CSP, mixed content și Local Network Access rămân active; nu dezactivăm securitatea browserului.</p>
+<p>Un singur proces Chromium este reutilizat. Fiecare cerere primește un browser context incognito separat și un tab propriu. Cookies/localStorage/cache de context nu sunt partajate între cereri. Contextul este închis inclusiv după eșec la crearea tabului, timeout și anulare. Dacă anularea apare în timpul alocării contextului, se recuperează întâi ID-ul acestuia pentru închidere (buget separat de cel mult 5s). Eliberarea contextului are cel mult 3s; o alocare/închidere CDP eșuată oprește browserul pentru a nu lăsa contexte active și necesită restartul utilitarului. Aceste bugete sunt pentru cleanup, fără continuarea procesării documentului. Procesul browser este oprit la shutdown; runtime-ul așteaptă închiderea modulelor. Un crash al procesului afectează randările active; health devine 503, iar serviciul trebuie repornit. Nu reîncercăm automat rapoartele.</p>
+<p>Chromium rulează sandboxed; inclusiv comportamentul chromedp care ar adăuga automat <code>--no-sandbox</code> pentru root este dezactivat. Restricțiile sistemului privind sandbox-ul trebuie rezolvate în instalare, nu prin dezactivarea protecției.</p>
+<p>Endpointurile de randare HTTP sunt interne, fără autentificare proprie, conform contractului curl. Login-ul WiseMED protejează administrarea și WSS cere identitate verificată. Nu publicați serviciul direct pe internet: HTML-ul execută JavaScript cu acces la rețeaua serverului, inclusiv servicii interne. Limita de corp și semaforul nu sunt limite de memorie/CPU pentru Chromium și nu fac sigur codul neîncredere. Linkurile și subresursele pot descărca date suplimentare; limita MAX_BODY_BYTES nu limitează totalul traficului browserului.</p>
+<p>Mesajele consolei, erorile JavaScript și mesajele de rețea sunt în logurile standard WiseMED, cu <code>request_id</code> (același din răspuns). Conținutul logat de pagina însăși poate include date sensibile; protejați accesul la logurile serviciului.</p>
+<h2>Build, distribuție și teste</h2>
+<pre><code>go build ./apps/html-print-formatter
+REQUIRE_CHROME_TESTS=1 go test -race ./modules/htmlprintformatter
+go test ./core/runtime ./core/config ./shared/apibridge ./modules/localhttp ./modules/ws ./apps/runner ./tools/releasectl
+make build APP=html-print-formatter TARGET=windows-amd64
+make update APP=html-print-formatter TARGET=windows-amd64
+make installer APP=html-print-formatter TARGET=linux-amd64</code></pre>
+<p>Wrapper-ele sunt în <code>apps/html-print-formatter/build/</code>, pentru Windows, Linux și macOS. PNG și ICO multi-rezoluție sunt în <code>resources/app-icons</code>. Installerul Linux folosește un cont dedicat <code>html-print-formatter</code>, nu root, pentru sandbox-ul Chrome; are nevoie de <code>useradd</code>/<code>chown</code>. Contul poate scrie în directorul instalării pentru config/loguri/update. Serviciile acestui utilitar rulează în foreground sub managerul de servicii, fără flagul de detașare <code>-headless</code>. Pe Linux, <code>-installservice</code> creează același cont și setează proprietarul directorului aplicației; copiați executabilul într-un director dedicat instalării înainte de a folosi flagul. Installer-ele native cer uneltele platformei (<code>makensis</code>, <code>pkgbuild</code> etc.); compilarea unui executabil nu testează instalarea serviciului.</p>
+<p>Testele includ browser real pentru succes jQuery, CSS screen/viewport, păstrarea base, link/redirect, timeout obligatoriu, printError, anulare, izolarea storage, concurență, logging, parity HTTP/WS și eliberarea contextelor. Fără Chromium, testele de integrare sunt skip; <code>REQUIRE_CHROME_TESTS=1</code> le face obligatorii. Fixtures folosesc jQuery 3.7.1 livrat local (licența MIT în fișier), fără dependență de CDN în timpul testării.</p>
+<p>Referințe tehnice: https://pkg.go.dev/github.com/chromedp/chromedp și https://chromedevtools.github.io/devtools-protocol/tot/Fetch/. Crearea tabului omite explicit parametrul CDP <code>newWindow</code> pentru compatibilitate cu Chromium headless: https://issues.chromium.org/issues/454825274.</p><script>
+let downloadURL;
+const input=document.getElementById('request'),output=document.getElementById('result'),status=document.getElementById('status'),button=document.getElementById('render'),direct=document.getElementById('pdf'),download=document.getElementById('download'),link=document.getElementById('html-link'),timeout=document.getElementById('timeout');
+document.getElementById('example').onclick=async()=>{try{const response=await fetch('example.html');if(!response.ok)throw Error('Exemplu indisponibil');input.value=(await response.text()).replace('<head>','<head><base href="'+location.origin+'/help/">');link.value=''}catch(error){status.textContent=error.message}};
+async function renderPDF(waitForPrintReady){
+  button.disabled=true;direct.disabled=true;download.hidden=true;output.value='';status.textContent='Generare PDF în curs…';
+  if(downloadURL){URL.revokeObjectURL(downloadURL);downloadURL=null;download.removeAttribute('href')}
+  try{
+    const html=input.value,html_link=link.value.trim(),timeout_ms=Number(timeout.value);
+    if(!!html.trim()===!!html_link)throw Error('Completați exact una dintre surse: HTML sau Link HTML.');
+    if(!Number.isInteger(timeout_ms)||timeout_ms<1||timeout_ms>600000)throw Error('Timeout: număr întreg între 1 și 600000 ms.');
+    const body=JSON.stringify({...html_link?{html_link}:{html},timeout_ms,wait_for_print_ready:waitForPrintReady});
+    const response=await fetch('/api/html-print-formatter/pdf',{method:'POST',headers:{'Content-Type':'application/json'},body});
+    const result=await response.json();if(!response.ok)throw Error(result.error?.message||'Generarea PDF a eșuat');
+    output.value=result.html;const bytes=Uint8Array.from(atob(result.pdf_base64),c=>c.charCodeAt(0));
+    downloadURL=URL.createObjectURL(new Blob([bytes],{type:'application/pdf'}));download.href=downloadURL;download.hidden=false;
+    status.textContent='PDF generat • request_id: '+result.request_id;
+  }catch(error){status.textContent=error.message}finally{button.disabled=false;direct.disabled=false}
+}
+button.onclick=()=>renderPDF(true);direct.onclick=()=>renderPDF(false);
+window.addEventListener('pagehide',()=>{if(downloadURL)URL.revokeObjectURL(downloadURL)});
+</script></main></body></html>

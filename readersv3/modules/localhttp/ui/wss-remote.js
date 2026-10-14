@@ -42,7 +42,7 @@
       };
       options.onState?.('connecting');
     }
-    function wait(signal, register, awaitingInitialAuth = false) {
+    function wait(signal, register, awaitingInitialAuth = false, requestTimeout = timeout) {
       return new Promise((resolve, reject) => {
         let timer;
         const abort = () => entry.finish(signal.reason || new DOMException('Aborted', 'AbortError'));
@@ -55,7 +55,7 @@
         signal?.addEventListener('abort', abort, {once:true});
         // Startup waits for the user/opener to authorize. No API command exists yet.
         // Once authenticated, both reconnect waits and actual commands are bounded.
-        if (!awaitingInitialAuth) timer = setTimeout(() => entry.finish(error('WSS request timed out')), timeout);
+        if (!awaitingInitialAuth) timer = setTimeout(() => entry.finish(error('WSS request timed out')), requestTimeout);
         register(entry);
       });
     }
@@ -71,11 +71,12 @@
         let binary = ''; for (let i = 0; i < bytes.length; i += 8192) binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
         args.body_base64 = btoa(binary);
       }
+      const renderRequest = request.method === 'POST' && ['/api/html-print-formatter/render', '/api/html-print-formatter/pdf'].includes(url.pathname);
       const payload = await wait(request.signal, entry => {
         entry.id = 'control-' + (++sequence); pending.set(entry.id, entry);
         try { socket.send(JSON.stringify({type:'command',request_id:entry.id,target:{mode:'equipment',equipment_id:options.equipmentID},payload:{command:'api.request',args}})); }
         catch (cause) { entry.finish(cause); }
-      });
+      }, false, renderRequest ? 610000 : timeout);
       if (payload?.kind !== 'api.response') throw error(payload?.error?.message || payload?.error || 'Invalid WSS API response');
       const headers = new Headers(payload.headers || {});
       if (payload.content_type) headers.set('content-type', payload.content_type);

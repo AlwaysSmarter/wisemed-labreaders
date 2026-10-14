@@ -10,7 +10,7 @@ import (
 	"strings"
 )
 
-//go:embed assets/wsdl/*.wsdl assets/schemas/validation/*.xsd
+//go:embed assets/wsdl/*.wsdl assets/schemas/validation/*.xsd assets/*.json
 var assets embed.FS
 
 const soapNS = "http://schemas.xmlsoap.org/soap/envelope/"

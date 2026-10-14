@@ -122,23 +122,30 @@ func (a *App) InitModules(moduleIDs []string) error {
 }
 
 func (a *App) Start(ctx context.Context) error {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	errCh := make(chan error, len(a.modules))
+	var running sync.WaitGroup
 	for _, item := range a.modules {
 		starter, ok := item.(module.Starter)
 		if !ok {
 			continue
 		}
+		running.Add(1)
 		go func(st module.Starter) {
+			defer running.Done()
 			errCh <- st.Start(ctx)
 		}(starter)
 	}
 
+	var err error
 	select {
 	case <-ctx.Done():
-		return nil
-	case err := <-errCh:
-		return err
+	case err = <-errCh:
 	}
+	cancel()
+	running.Wait()
+	return err
 }
 
 func (a *App) handleHealth(w http.ResponseWriter, _ *http.Request) {

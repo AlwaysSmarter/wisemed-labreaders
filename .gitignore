@@ -9,6 +9,7 @@
 /output/sysmex-xn550/certs/
 /old-src/
 /common/output/certs/
+/tmp/
 *.log
 readersv3/dist/
 readersv3/release/

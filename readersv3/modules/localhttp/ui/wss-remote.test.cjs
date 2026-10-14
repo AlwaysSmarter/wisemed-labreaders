@@ -125,3 +125,14 @@ test('disconnection countdown requests fresh tickets every 30 seconds and logout
   window.WSM_REMOTE.close();now+=30000;periodic();assert.equal(posted.length,3);
   listeners.message({source:opener,origin:'https://wisemed',data:{type:'wsm-control-auth',ticket:'late'}});assert.equal(Socket.latest,ws);
 });
+test('formatter PDF command can exceed the normal WSS request timeout',async()=>{
+  const {transport,ws,ready}=setup(15);ready();
+  try {
+    const result=transport.fetch('https://central/api/html-print-formatter/pdf',{method:'POST',body:'{}'});
+    await tick();
+    await new Promise(resolve=>setTimeout(resolve,40));
+    const command=ws.sent[1];
+    ws.receive('reply',{kind:'api.response',status:200,content_type:'application/json',body:{ok:true,pdf_base64:'JVBERi0='}},command.request_id);
+    assert.equal((await (await result).json()).ok,true);
+  } finally {transport.close();}
+});

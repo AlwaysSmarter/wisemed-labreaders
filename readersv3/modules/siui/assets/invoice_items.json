@@ -1,0 +1,240 @@
+[
+  {
+    "code": "DRG",
+    "description": "DRG",
+    "providerCategory": "SPT",
+    "contractType": "SPT",
+    "validFrom": "2013-01-01"
+  },
+  {
+    "code": "CRONICI",
+    "description": "Tarif pe zi de spitalizare",
+    "providerCategory": "SPT",
+    "contractType": "SPT",
+    "validFrom": "2013-01-01"
+  },
+  {
+    "code": "ACUTI",
+    "description": "Tarif mediu pe caz",
+    "providerCategory": "SPT",
+    "contractType": "SPT",
+    "validFrom": "2013-01-01"
+  },
+  {
+    "code": "SPZISRV",
+    "description": "Servicii in spitalizarea de zi",
+    "providerCategory": "SPT",
+    "contractType": "SPT",
+    "validFrom": "2013-01-01"
+  },
+  {
+    "code": "SPZICAZ",
+    "description": "Cazuri in spitalizarea de zi",
+    "providerCategory": "SPT",
+    "contractType": "SPT",
+    "validFrom": "2013-01-01"
+  },
+  {
+    "code": "SPZIPAL",
+    "description": "Spitalizare cazuri paleative",
+    "providerCategory": "SPT",
+    "contractType": "SPT",
+    "validFrom": "2013-01-01"
+  },
+  {
+    "code": "AMBS",
+    "description": "Asistenta medicala ambulatorie spital",
+    "providerCategory": "CLIN",
+    "contractType": "SPT",
+    "validFrom": "2013-01-01"
+  },
+  {
+    "code": "PARACLECO",
+    "description": "Asistenta medicala paraclinica ECO",
+    "providerCategory": "PARA",
+    "contractType": "PAR",
+    "validFrom": "2013-01-01"
+  },
+  {
+    "code": "PARACLLAB",
+    "description": "Asistenta medicala paraclinica LAB.",
+    "providerCategory": "PARA",
+    "contractType": "PAR",
+    "validFrom": "2013-01-01"
+  },
+  {
+    "code": "PARACSPLAB",
+    "description": "Asistenta medicala paracl. SPITAL LABORA",
+    "providerCategory": "PARA",
+    "contractType": "SPT",
+    "validFrom": "2013-01-01"
+  },
+  {
+    "code": "PARAPRRAD",
+    "description": "Paraclinice privat radiologie",
+    "providerCategory": "PARA",
+    "contractType": "PAR",
+    "validFrom": "2013-01-01"
+  },
+  {
+    "code": "PARASPRAD",
+    "description": "Paraclinice spital radiologii",
+    "providerCategory": "PARA",
+    "contractType": "SPT",
+    "validFrom": "2013-01-01"
+  },
+  {
+    "code": "PARAPREXP",
+    "description": "Paraclinice privat explorari functionale",
+    "providerCategory": "PARA",
+    "contractType": "PAR",
+    "validFrom": "2013-01-01"
+  },
+  {
+    "code": "HEMOGAMB",
+    "description": "Hemoglobina glicozilata AMBULATOR",
+    "providerCategory": "PARA",
+    "contractType": "PPS",
+    "validFrom": "2013-01-01"
+  },
+  {
+    "code": "HEMOGAMB",
+    "description": "Hemoglobina glicozilata AMBULATOR",
+    "providerCategory": "PARA",
+    "contractType": "PAR",
+    "validFrom": "2013-01-01"
+  },
+  {
+    "code": "RECA_SPT",
+    "description": "Aditionale de reca pe contract de spital",
+    "providerCategory": "RECA",
+    "contractType": "SPT",
+    "validFrom": "2013-01-01"
+  },
+  {
+    "code": "PETAMB",
+    "description": "Serviciu PET/CT in ambulator",
+    "providerCategory": "PARA",
+    "contractType": "PPS",
+    "validFrom": "2013-01-01"
+  },
+  {
+    "code": "PETAMB",
+    "description": "Serviciu PET/CT in ambulator",
+    "providerCategory": "PARA",
+    "contractType": "PAR",
+    "validFrom": "2013-01-01"
+  },
+  {
+    "code": "PETSP",
+    "description": "Serviciu PET/CT in spital",
+    "providerCategory": "PARA",
+    "contractType": "PAR",
+    "validFrom": "2013-01-01"
+  },
+  {
+    "code": "EWING",
+    "description": "Testare genetica pentru sarcom EWING",
+    "providerCategory": "PARA",
+    "contractType": "PPS",
+    "validFrom": "2017-01-01"
+  },
+  {
+    "code": "NEUROBLASTOM",
+    "description": "Testare genetica pentru NEUROBLASTOM-3 testari",
+    "providerCategory": "PARA",
+    "contractType": "PPS",
+    "validFrom": "2017-01-01"
+  },
+  {
+    "code": "PARAPRAP",
+    "description": "Paraclinice privat anatomie patologica",
+    "providerCategory": "PARA",
+    "contractType": "PAR",
+    "validFrom": "2017-01-01"
+  },
+  {
+    "code": "PARASPAP",
+    "description": "Paraclinice spital anatomie patologica",
+    "providerCategory": "PARA",
+    "contractType": "SPT",
+    "validFrom": "2017-01-01"
+  },
+  {
+    "code": "SPZI",
+    "description": "spitalizare zi",
+    "providerCategory": "SPT",
+    "contractType": "SPT",
+    "validFrom": "2014-01-01"
+  },
+  {
+    "code": "DRGF",
+    "description": "DRG hrana",
+    "providerCategory": "SPT",
+    "contractType": "SPT",
+    "validFrom": "2022-06-01"
+  },
+  {
+    "code": "ACUTIF",
+    "description": "Acuti hrana",
+    "providerCategory": "SPT",
+    "contractType": "SPT",
+    "validFrom": "2022-06-01"
+  },
+  {
+    "code": "CRONICIF",
+    "description": "Cronici hrana",
+    "providerCategory": "SPT",
+    "contractType": "SPT",
+    "validFrom": "2022-06-01"
+  },
+  {
+    "code": "PALF",
+    "description": "Paliative hrana",
+    "providerCategory": "SPT",
+    "contractType": "SPT",
+    "validFrom": "2022-06-01"
+  },
+  {
+    "code": "DRGP",
+    "description": "DRG PNCC",
+    "providerCategory": "SPT",
+    "contractType": "SPT",
+    "validFrom": "2024-07-01"
+  },
+  {
+    "code": "ACUTIP",
+    "description": "Acuti PNCC",
+    "providerCategory": "SPT",
+    "contractType": "SPT",
+    "validFrom": "2024-07-01"
+  },
+  {
+    "code": "CRONICIP",
+    "description": "Cronici PNCC",
+    "providerCategory": "SPT",
+    "contractType": "SPT",
+    "validFrom": "2024-07-01"
+  },
+  {
+    "code": "PALP",
+    "description": "Paliative PNCC",
+    "providerCategory": "SPT",
+    "contractType": "SPT",
+    "validFrom": "2024-07-01"
+  },
+  {
+    "code": "SPZIP",
+    "description": "spitalizare zi PNCC",
+    "providerCategory": "SPT",
+    "contractType": "SPT",
+    "validFrom": "2024-07-01"
+  },
+  {
+    "code": "SPZIPNS",
+    "description": "spitalizare zi PNS",
+    "providerCategory": "SPT",
+    "contractType": "SPT",
+    "validFrom": "2026-01-01"
+  }
+]

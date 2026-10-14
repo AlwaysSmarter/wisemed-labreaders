@@ -170,6 +170,16 @@
     "supportsHeadless": true
   },
   {
+    "id": "html-print-formatter",
+    "title": "Html Print Formatter",
+    "binaryName": "html-print-formatter",
+    "serviceName": "wisemed-html-print-formatter",
+    "displayName": "WiseMED Html Print Formatter",
+    "description": "WiseMED readersv3 Html Print Formatter background service",
+    "bundleId": "eu.wisemed.readersv3.html.print.formatter",
+    "supportsHeadless": true
+  },
+  {
     "id": "labnovation-ld-560",
     "title": "Labnovation Ld 560",
     "binaryName": "labnovation-ld-560",

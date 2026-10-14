@@ -22,7 +22,7 @@ try {
  $p=[Console]::In.ReadToEnd()|ConvertFrom-Json
  $set=New-Object System.Xml.Schema.XmlSchemaSet
  $set.XmlResolver=New-Object System.Xml.XmlUrlResolver
- [void]$set.Add('http://www.cnas.ro/siui/2.0',[string]$p.schema)
+ [void]$set.Add([string]$p.namespace,[string]$p.schema)
  $set.Compile()
  $settings=New-Object System.Xml.XmlReaderSettings
  $settings.DtdProcessing=[System.Xml.DtdProcessing]::Prohibit
@@ -38,7 +38,7 @@ try {
 `
 
 func validateSchema(ctx context.Context, schema string, data []byte) error {
-	if schema != "ParaclinicServicesValidateRequest.xsd" && schema != "ParaclinicServicesValidateResponse.xsd" && schema != "GetInsuredResponse.xsd" {
+	if _, err := assets.ReadFile("assets/schemas/validation/" + schema); err != nil || filepath.Base(schema) != schema {
 		return errors.New("unsupported schema")
 	}
 	if _, e := parseXML(data); e != nil {
@@ -49,7 +49,7 @@ func validateSchema(ctx context.Context, schema string, data []byte) error {
 		return e
 	}
 	defer os.RemoveAll(dir)
-	for _, name := range []string{schema, "CommonReportingTypes.xsd"} {
+	for _, name := range []string{schema, "CommonReportingTypes.xsd", "CommonReportingTypesPE.xsd"} {
 		b, e := assets.ReadFile("assets/schemas/validation/" + name)
 		if e != nil {
 			return e
@@ -67,7 +67,12 @@ func validateSchema(ctx context.Context, schema string, data []byte) error {
 		}
 		exe := filepath.Join(os.Getenv("SystemRoot"), "System32", "WindowsPowerShell", "v1.0", "powershell.exe")
 		cmd = exec.CommandContext(ctx, exe, "-NoProfile", "-NonInteractive", "-EncodedCommand", base64.StdEncoding.EncodeToString(b))
-		payload, _ := json.Marshal(map[string]string{"schema": filepath.Join(dir, schema), "data": base64.StdEncoding.EncodeToString(data)})
+		schemaData, _ := assets.ReadFile("assets/schemas/validation/" + schema)
+		ns := piasNS
+		if bytes.Contains(schemaData, []byte(`targetNamespace="http://www.cnas.ro/pel/1.0"`)) {
+			ns = "http://www.cnas.ro/pel/1.0"
+		}
+		payload, _ := json.Marshal(map[string]string{"namespace": ns, "schema": filepath.Join(dir, schema), "data": base64.StdEncoding.EncodeToString(data)})
 		cmd.Stdin = bytes.NewReader(payload)
 	} else {
 		cmd = exec.CommandContext(ctx, "xmllint", "--nonet", "--noout", "--schema", filepath.Join(dir, schema), "-")

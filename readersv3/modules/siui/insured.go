@@ -68,7 +68,9 @@ func parseInsured(raw, cnp string) (InsuredResult, error) {
 	}
 	return result, nil
 }
-func (c *client) getInsured(ctx context.Context, cnp, date string) (InsuredResult, error) {
+func (c *client) getInsured(ctx context.Context, cnp, date string) (result InsuredResult, err error) {
+	address := ""
+	defer func() { err = withConnectionError(address, err) }()
 	if err := checkInsuredInput(cnp, date); err != nil {
 		return InsuredResult{}, err
 	}
@@ -76,7 +78,8 @@ func (c *client) getInsured(ctx context.Context, cnp, date string) (InsuredResul
 	if err != nil {
 		return InsuredResult{}, err
 	}
-	status, _, body, err := c.backend.Do(ctx, "POST", strings.TrimRight(c.cfg.BaseURL, "/")+"/svapntws/services/SiuiInsuredWS", h, insuredEnvelope(cnp, date+"T00:00:00"))
+	address = strings.TrimRight(c.cfg.BaseURL, "/") + "/svapntws/services/SiuiInsuredWS"
+	status, _, body, err := c.backend.Do(ctx, "POST", address, h, insuredEnvelope(cnp, date+"T00:00:00"))
 	if err != nil {
 		return InsuredResult{}, err
 	}
@@ -130,7 +133,7 @@ func (m *Module) insuredHTTP(w http.ResponseWriter, r *http.Request) {
 		fail(w, 400, err.Error())
 		return
 	}
-	c, release, ok := m.passiveClient(w)
+	c, release, ok := m.passiveClient(w, "getInsured")
 	if !ok {
 		return
 	}

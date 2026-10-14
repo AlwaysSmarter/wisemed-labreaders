@@ -1,4 +1,4 @@
-//go:build !windows
+//go:build !windows && !darwin && !linux
 
 package siui
 
@@ -8,7 +8,10 @@ import (
 	"net/http"
 )
 
-type nativeBackend struct{ cfg settings }
+type nativeBackend struct {
+	cfg  settings
+	logf func(string, ...interface{})
+}
 
 func (n nativeBackend) Do(context.Context, string, string, http.Header, []byte) (int, http.Header, []byte, error) {
 	return 0, nil, nil, errors.New("CNAS USB certificate transport requires Windows and the token driver")

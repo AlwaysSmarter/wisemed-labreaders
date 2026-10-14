@@ -1,3 +1,16 @@
+# SIUI Bridge — GENERAL și CLINICE
+
+Configurarea este în **Setări → CNAS**; serviciile sunt în **Debug → GENERAL / CLINICE**.
+Documentația completă, parametrii tuturor operațiilor, exemplele HTTP/JWT și WSM,
+profilurile certificatelor și interpretarea rezultatelor sunt în [docs/API.md](docs/API.md).
+Pe **macOS 12+**, tokenurile expuse de driver prin CryptoTokenKit sunt acceptate nativ: Setări → CNAS → Utilizator curent / macOS Keychain → Reîncarcă certificatele → selectează și salvează. PIN-ul poate fi furnizat criptat din Setări → CNAS; după eșec, rămâne introducerea manuală. Vezi secțiunea „Token USB pe macOS” din documentația API pentru testarea OCSP și limitările serviciilor fără sesiune desktop.
+
+Referința este disponibilă și în Help; OpenAPI este la `/api/siui/openapi.json`.
+
+## Implementarea inițială și compatibilitate
+
+Notele următoare descriu rutele inițiale; pentru operațiile noi și noua interfață folosește documentația de mai sus.
+
 # WiseMED SIUI Bridge - verificări CNAS și validare paraclinice 72h
 
 Utilitar Go din readersv3, cu aceeași infrastructură ca barcodeprinter: HTTP/HTTPS,
@@ -42,14 +55,14 @@ pacient, rețete sau facturi.
 7. Configurează WSM în **Debug → WSS**: cheie de echipament, tenant, issuer și URL,
    apoi activează conexiunea. Vezi `../../docs/wss-control.md`.
 
-PIN-ul tokenului este gestionat de driverul Windows. Nu există câmp PIN în WSM,
+PIN-ul tokenului este gestionat de driverul platformei. Nu există câmp PIN în WSM,
 API, YAML sau baza de date. Transportul CNAS folosește WinHTTP/Schannel și
 certificatul selectat, cu validarea certificatului serverului și TLS 1.2.
 Nu se urmează redirecturi și nu se retransmit automat cereri de validare.
 Validarea XSD folosește `System.Xml` prin Windows PowerShell existent în sistem;
 scriptul este fix, XML-ul este transmis ca date pe stdin. Nu este necesar un
 proiect/runtime .NET nou. Pe macOS/Linux, interfața și WSM rulează; XSD folosește
-`xmllint`, iar conectarea reală cu tokenul este disponibilă doar pe Windows.
+`xmllint`, iar conectarea reală cu tokenul este disponibilă pe Windows, macOS 12+ (CryptoTokenKit) și Linux amd64/arm64 (PKCS#11).
 
 ## Testare fără validare de servicii
 
@@ -58,7 +71,7 @@ proiect/runtime .NET nou. Pe macOS/Linux, interfața și WSM rulează; XSD folos
 1. **Test local fără CNAS** merge și pe Mac, fără token/licență/CNP. Verifică schema
    și interpretarea unui răspuns fictiv fix, marcat explicit TEST LOCAL. Nu testează
    conexiunea sau autentificarea OCSP și nu indică asigurarea reală a unei persoane.
-2. **Testează autentificarea OCSP** (Windows cu token configurat) face numai GET
+2. **Testează autentificarea OCSP** (Windows/macOS cu token configurat) face numai GET
    la `/OCSP/validator` și verifică prezența sesiunii OSCP_RESPONSE. Sesiunea nu
    apare în răspuns, în loguri sau în baza de date. Nu introduce CNP sau XML.
 3. **Verificare calitate de asigurat** primește CNP și data consultării. Obține
@@ -70,7 +83,7 @@ proiect/runtime .NET nou. Pe macOS/Linux, interfața și WSM rulează; XSD folos
    origine HTTPS CNAS. Fișierul ajunge în descărcările browserului, inclusiv prin WSM.
 
 Niciunul dintre aceste butoane nu apelează validateReport. Operațiile reale se
-execută pe Windows; pot fi controlate din browserul Mac prin WSM. Nu se rulează
+execută pe Windows/macOS; pot fi controlate din browserul Mac prin WSM. Nu se rulează
 simultan cu alte operații pe token. Timeout-ul este de 25 secunde; la expirare nu
 se afișează „neasigurat”, ci o eroare. Nu există retry automat. Rezultatele/CNP-urile
 nu se persistă în istoricul validărilor. Personalizarea este limitată la 1 MiB,
@@ -116,8 +129,8 @@ go run ./tools/releasectl release --app siui-bridge --target windows-amd64
 ```
 
 Sunt incluse wrapper-ele standard pentru build/install/service pe platformele
-comune. Windows amd64 este ținta pentru token; suportul macOS/Linux este pentru
-UI/WSM/test, nu reprezintă un driver USB multiplatformă.
+comune. Windows amd64 și macOS 12+ acceptă tokenul prin driverul nativ instalat.
+Linux amd64/arm64 oferă și TLS/CMS cu token prin biblioteca PKCS#11 configurată local în `modules.siui.pkcs11_module`.
 
 ## API și verificare
 
@@ -221,3 +234,9 @@ cererile CNAS (OCSP și PIAS); numele, autoritatea și utilizarea TLS rămân ve
 Certificatul tokenului trebuie să fie în continuare valabil. Debifează excepția
 și salvează după reînnoirea certificatului serverului. Nu afectează HTTPS local,
 WSM sau update serverul și nu exportă certificatul tokenului.
+
+## Factură electronică — dashboard de test
+
+Debug → FACTURĂ ELECTRONICĂ oferă câmpurile XSD, toate cele 14 categorii, articole multiple, totaluri exacte, XML și DataMatrix ZIP, previzualizare/tipărire, semnare CMS cu token și trimitere explicită. Consultarea facturii, ID-ului pentru ANAF și notei de refuz folosește același API HTTPS/JWT și WSM. Vezi secțiunea dedicată din [API.md](docs/API.md). Exemplul fictiv este pentru test local; nu se transmite automat la CNAS. Numerotarea „formular 13” nu a fost confirmată în documentația furnizată.
+
+PIN-ul se configurează separat în Setări → CNAS și este afișat numai ca `<hidden>`. Windows folosește DPAPI; macOS/Linux AES-256-GCM cu cheia de instalare protejată 0600. După primul eșec, autentificarea automată rămâne suspendată până la actualizarea PIN-ului. Introducerea manuală temporară este disponibilă pentru maximum 150 secunde. Detalii și limite în docs/API.md, secțiunea „PIN criptat și autentificare prin driver”.

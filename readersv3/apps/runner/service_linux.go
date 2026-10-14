@@ -34,6 +34,17 @@ StandardError=journal
 [Install]
 WantedBy=multi-user.target
 `, info.Description, shellEscape(info.WorkDir), shellEscape(info.Executable), shellEscape(info.ConfigPath))
+	if cfg.Analyzer.Protocol == "html-print-formatter" {
+		if err := exec.Command("id", "html-print-formatter").Run(); err != nil {
+			if out, err := exec.Command("useradd", "--system", "--user-group", "--home-dir", info.WorkDir, "--shell", "/usr/sbin/nologin", "html-print-formatter").CombinedOutput(); err != nil {
+				return fmt.Errorf("create Chromium service account: %w: %s", err, out)
+			}
+		}
+		if out, err := exec.Command("chown", "-R", "html-print-formatter:html-print-formatter", info.WorkDir).CombinedOutput(); err != nil {
+			return fmt.Errorf("set Chromium service ownership: %w: %s", err, out)
+		}
+		body = strings.Replace(body, "Type=simple", "Type=simple\nUser=html-print-formatter\nEnvironment="+shellEscape("HOME="+info.WorkDir), 1)
+	}
 	if err := os.WriteFile(unitPath, []byte(body), 0o644); err != nil {
 		return fmt.Errorf("write %s: %w. Run as root", unitPath, err)
 	}

@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="utf-8">
+  <title>WiseMED — exemplu HTML Print Formatter</title>
+  <script src="jquery-3.7.1.min.js"></script>
+  <style>
+    body { font: 16px Arial, sans-serif; margin: 32px; }
+    #report { width: 800px; border: 1px solid #075985; padding: 20px; }
+    section { padding: 16px; }
+  </style>
+</head>
+<body>
+  <h1>Raport WiseMED</h1>
+  <main id="report"><section id="destination"><h2>Rezultate</h2></section></main>
+  <section id="source"><p class="result">Hemoglobină: 14 g/dL</p></section>
+  <script>
+    function compact_sections() { $('section').css('padding', '8px'); }
+    function normalize_content() { $('.result').css('line-height', '20px'); }
+    function move_content() { $('#source .result').appendTo('#destination'); $('#source').remove(); }
+    $(document).ready(async function () {
+      try {
+        // Raportul trebuie să aștepte resursele ÎNAINTE de măsurători/paginare.
+        if (document.fonts) await document.fonts.ready;
+        await Promise.all(Array.from(document.images, image => image.complete ? Promise.resolve() : new Promise(resolve => {
+          image.addEventListener('load', resolve, { once: true });
+          image.addEventListener('error', resolve, { once: true });
+        })));
+        compact_sections();
+        normalize_content();
+        move_content();
+        $('#report').attr('data-measured-width', $('#report').outerWidth());
+        $('<p class="generated">DOM procesat de jQuery.</p>').appendTo('#report');
+        console.log('WiseMED: procesarea raportului s-a terminat');
+        window.printReady = true;
+      } catch (error) {
+        window.printError = error.message || String(error);
+      }
+    });
+  </script>
+</body>
+</html>

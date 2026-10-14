@@ -1,0 +1,267 @@
+{
+  "header": [
+    {
+      "name": "serialCode",
+      "type": "string",
+      "required": false,
+      "label": "Seria facturii (dacă e cazul)",
+      "maxLength": "20"
+    },
+    {
+      "name": "serialNumber",
+      "type": "string",
+      "required": true,
+      "label": "Numărul de identificare al facturii (exclude seria)",
+      "maxLength": "20"
+    },
+    {
+      "name": "issueDate",
+      "type": "date",
+      "required": true,
+      "label": "Data de emitere a facturii"
+    },
+    {
+      "name": "dueDate",
+      "type": "date",
+      "required": false,
+      "label": "Data scadenţei"
+    },
+    {
+      "name": "startDate",
+      "type": "date",
+      "required": true,
+      "label": "Data de început a perioadei de facturare"
+    },
+    {
+      "name": "endDate",
+      "type": "date",
+      "required": true,
+      "label": "Data de sfârşit a perioadei de facturare"
+    },
+    {
+      "name": "orgUnitCode",
+      "type": "string",
+      "required": true,
+      "label": "Codul case de asigurări (Valoarea codului din nomenclatorul de case de asigurări)",
+      "maxLength": "30"
+    },
+    {
+      "name": "providerCode",
+      "type": "string",
+      "required": true,
+      "label": "Identificatorul unic al furnizorului emitent al facturii (codul de partener din SIUI)",
+      "maxLength": "20"
+    },
+    {
+      "name": "providerCategory",
+      "type": "string",
+      "required": true,
+      "label": "Categoria furnizorului emitent al facturii",
+      "maxLength": "20"
+    },
+    {
+      "name": "contractNumber",
+      "type": "string",
+      "required": true,
+      "label": "Numărul de contract al furnizorului",
+      "maxLength": "40"
+    },
+    {
+      "name": "contractType",
+      "type": "string",
+      "required": true,
+      "label": "Tipul de contract al furnizorului",
+      "maxLength": "20"
+    },
+    {
+      "name": "contractDate",
+      "type": "date",
+      "required": true,
+      "label": "Data încheierii contractului furnizorului"
+    },
+    {
+      "name": "totalAmmount",
+      "type": "decimal",
+      "required": true,
+      "label": "Valoarea totală a facturii (fără TVA)"
+    },
+    {
+      "name": "vatAmmount",
+      "type": "decimal",
+      "required": true,
+      "label": "Valoarea TVA aferentă facturii"
+    },
+    {
+      "name": "isFinal",
+      "type": "boolean",
+      "required": false,
+      "label": "Factura este finală (nu se mai poate modifica)"
+    },
+    {
+      "name": "isSigned",
+      "type": "boolean",
+      "required": false,
+      "label": "Factura este semnată electronic (se foloseşte doar pe răspuns)"
+    },
+    {
+      "name": "cancellationDate",
+      "type": "date",
+      "required": false,
+      "label": "Data anulării facturii electronice"
+    },
+    {
+      "name": "cancellationReason",
+      "type": "string",
+      "required": false,
+      "label": "Motivul anulării facturii electronice",
+      "maxLength": "255"
+    },
+    {
+      "name": "isRegularization",
+      "type": "boolean",
+      "required": false,
+      "label": "Specifică dacă este factură de regularizare"
+    }
+  ],
+  "provider": [
+    {
+      "name": "fiscalCode",
+      "type": "string",
+      "required": true,
+      "label": "Codul fiscal al persoanei juridice",
+      "maxLength": "20"
+    },
+    {
+      "name": "companyName",
+      "type": "string",
+      "required": true,
+      "label": "Denumirea persoanei juridice (aşa cum apare pe factură)",
+      "maxLength": "100"
+    },
+    {
+      "name": "registerNo",
+      "type": "string",
+      "required": false,
+      "label": "Numărul de înregistrare în Registrul Comerţului",
+      "maxLength": "20"
+    },
+    {
+      "name": "bankName",
+      "type": "string",
+      "required": false,
+      "label": "Denumirea băncii",
+      "maxLength": "40"
+    },
+    {
+      "name": "bankAccount",
+      "type": "string",
+      "required": false,
+      "label": "Contul bancar (IBAN)",
+      "maxLength": "24"
+    },
+    {
+      "name": "capital",
+      "type": "decimal",
+      "required": true,
+      "label": "Capitalul social al furnizorului"
+    },
+    {
+      "name": "signature",
+      "type": "string",
+      "required": true,
+      "label": "Numele reprezentantului legal al furnizorului",
+      "maxLength": "100"
+    },
+    {
+      "name": "stencilNo",
+      "type": "string",
+      "required": false,
+      "label": "Codul de parafă al medicului",
+      "pattern": "[0-9A-Z]{5,6}"
+    }
+  ],
+  "insurer": [
+    {
+      "name": "fiscalCode",
+      "type": "string",
+      "required": true,
+      "label": "Codul fiscal al persoanei juridice",
+      "maxLength": "20"
+    },
+    {
+      "name": "companyName",
+      "type": "string",
+      "required": true,
+      "label": "Denumirea persoanei juridice (aşa cum apare pe factură)",
+      "maxLength": "100"
+    },
+    {
+      "name": "registerNo",
+      "type": "string",
+      "required": false,
+      "label": "Numărul de înregistrare în Registrul Comerţului",
+      "maxLength": "20"
+    },
+    {
+      "name": "bankName",
+      "type": "string",
+      "required": false,
+      "label": "Denumirea băncii",
+      "maxLength": "40"
+    },
+    {
+      "name": "bankAccount",
+      "type": "string",
+      "required": false,
+      "label": "Contul bancar (IBAN)",
+      "maxLength": "24"
+    }
+  ],
+  "items": [
+    {
+      "name": "code",
+      "type": "string",
+      "required": true,
+      "label": "Codul articolului facturat (valoare din nomenclatorul COM_ITEMS)",
+      "maxLength": "20"
+    },
+    {
+      "name": "description",
+      "type": "string",
+      "required": true,
+      "label": "Descrierea articolului facturat (aşa cum apare pe factură)",
+      "maxLength": "200"
+    },
+    {
+      "name": "unitName",
+      "type": "string",
+      "required": true,
+      "label": "Unitatea de măsură a articolului",
+      "maxLength": "20"
+    },
+    {
+      "name": "unitPrice",
+      "type": "decimal",
+      "required": true,
+      "label": "Preţul unitar al articolului facturat"
+    },
+    {
+      "name": "quantity",
+      "type": "decimal",
+      "required": true,
+      "label": "Cantitatea facturată"
+    },
+    {
+      "name": "ammount",
+      "type": "decimal",
+      "required": true,
+      "label": "Valoarea articolului facturat (fără TVA)"
+    },
+    {
+      "name": "vat",
+      "type": "decimal",
+      "required": true,
+      "label": "TVA aferent articolului facturat"
+    }
+  ]
+}

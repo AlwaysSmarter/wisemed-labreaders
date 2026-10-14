@@ -1,0 +1,18 @@
+[Unit]
+Description=WiseMED readersv3 Html Print Formatter background service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=html-print-formatter
+Environment=HOME=/opt/html-print-formatter
+WorkingDirectory=/opt/html-print-formatter
+ExecStart=/opt/html-print-formatter/html-print-formatter -config deployments/config.yaml
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

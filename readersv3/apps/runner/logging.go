@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mattn/go-isatty"
 	"wisemed-labreaders/readersv3/core/config"
 )
 
@@ -35,7 +36,11 @@ func setupLogging(cfg *config.Config, showLog bool) (string, func(), error) {
 
 	var writer io.Writer = fh
 	if showLog {
-		writer = io.MultiWriter(os.Stdout, fh)
+		var console io.Writer = os.Stdout
+		if isatty.IsTerminal(os.Stdout.Fd()) && os.Getenv("NO_COLOR") == "" {
+			console = errorConsoleWriter{os.Stdout}
+		}
+		writer = io.MultiWriter(console, fh)
 	}
 	log.SetOutput(writer)
 	return logPath, func() { _ = fh.Close() }, nil
@@ -180,4 +185,23 @@ func removeFiles(items []datedLogFile) error {
 		}
 	}
 	return nil
+}
+
+// ANSI is confined to the interactive console; daily logs remain plain text.
+type errorConsoleWriter struct{ writer io.Writer }
+
+func (w errorConsoleWriter) Write(p []byte) (int, error) {
+	if !strings.Contains(string(p), "[ERROR]") {
+		return w.writer.Write(p)
+	}
+	colored := append([]byte("\x1b[31m"), p...)
+	colored = append(colored, []byte("\x1b[0m")...)
+	n, err := w.writer.Write(colored)
+	if err != nil {
+		return 0, err
+	}
+	if n != len(colored) {
+		return 0, io.ErrShortWrite
+	}
+	return len(p), nil
 }

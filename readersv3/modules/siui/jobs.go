@@ -52,6 +52,10 @@ func openJobs(path string) (*sql.DB, error) {
 		db.Close()
 		return nil, e
 	}
+	if err := initializeServiceJobs(db); err != nil {
+		db.Close()
+		return nil, err
+	}
 	return db, nil
 }
 func readJob(db *sql.DB, owner, id string) (Job, error) {

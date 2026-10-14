@@ -116,6 +116,7 @@ Exemplu de diferențiere:
 - `gemini-reader`: tcp/ip transport + astm protocol
 - `snibe-maglumi-x3`: tcp/ip transport + astm protocol
 - `barcodeprinter`: utilitar de tipărire etichete, compatibil `GET/POST /barcode/print`, plus control prin WS (`barcode.print`)
+- `html-print-formatter`: utilitar Chromium headless pentru DOM-ul final al rapoartelor HTML, cu API `/render`, WSS prin `api.request`, configurare și [helper/API](apps/html-print-formatter/docs/API.md).
 
 ## Stadiu
 

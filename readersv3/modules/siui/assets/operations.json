@@ -1,0 +1,869 @@
+[
+  {
+    "name": "getCatalogues",
+    "group": "general",
+    "service": "SiuiWS",
+    "namespace": "http://webservices.utils.svapnt.siveco.ro",
+    "style": "document",
+    "parameters": [
+      {
+        "name": "partnerCategory",
+        "type": "string"
+      },
+      {
+        "name": "start",
+        "type": "dateTime"
+      }
+    ],
+    "mutating": false,
+    "download": true,
+    "label": "Nomenclatoare generale"
+  },
+  {
+    "name": "getProviderInfo",
+    "group": "general",
+    "service": "SiuiWS",
+    "namespace": "http://webservices.utils.svapnt.siveco.ro",
+    "style": "document",
+    "parameters": [
+      {
+        "name": "partnerCategory",
+        "type": "string"
+      },
+      {
+        "name": "start",
+        "type": "dateTime"
+      },
+      {
+        "name": "stop",
+        "type": "dateTime"
+      },
+      {
+        "name": "uic",
+        "type": "string"
+      }
+    ],
+    "mutating": false,
+    "download": true,
+    "label": "Personalizare furnizor"
+  },
+  {
+    "name": "getProviderInfoForPhysician",
+    "group": "general",
+    "service": "SiuiWS",
+    "namespace": "http://webservices.utils.svapnt.siveco.ro",
+    "style": "document",
+    "parameters": [
+      {
+        "name": "partnerCategory",
+        "type": "string"
+      },
+      {
+        "name": "start",
+        "type": "dateTime"
+      },
+      {
+        "name": "stop",
+        "type": "dateTime"
+      },
+      {
+        "name": "uic",
+        "type": "string"
+      },
+      {
+        "name": "stencilNo",
+        "type": "string"
+      }
+    ],
+    "mutating": false,
+    "download": true,
+    "label": "Personalizare medic"
+  },
+  {
+    "name": "sendReport",
+    "group": "general",
+    "service": "SiuiWS",
+    "namespace": "http://webservices.utils.svapnt.siveco.ro",
+    "style": "document",
+    "parameters": [
+      {
+        "name": "reportType",
+        "type": "string"
+      },
+      {
+        "name": "reportXML",
+        "type": "string"
+      }
+    ],
+    "mutating": true,
+    "download": false,
+    "label": "Trimitere raport"
+  },
+  {
+    "name": "getReportFeedback",
+    "group": "general",
+    "service": "SiuiWS",
+    "namespace": "http://webservices.utils.svapnt.siveco.ro",
+    "style": "document",
+    "parameters": [
+      {
+        "name": "fileName",
+        "type": "string"
+      }
+    ],
+    "mutating": false,
+    "download": true,
+    "label": "Răspuns raport"
+  },
+  {
+    "name": "getRefund",
+    "group": "general",
+    "service": "SiuiWS",
+    "namespace": "http://webservices.utils.svapnt.siveco.ro",
+    "style": "document",
+    "parameters": [
+      {
+        "name": "partnerCategory",
+        "type": "string"
+      },
+      {
+        "name": "start",
+        "type": "dateTime"
+      },
+      {
+        "name": "stop",
+        "type": "dateTime"
+      },
+      {
+        "name": "uic",
+        "type": "string"
+      }
+    ],
+    "mutating": false,
+    "download": true,
+    "label": "Rambursare furnizor"
+  },
+  {
+    "name": "getRefundForPhysician",
+    "group": "general",
+    "service": "SiuiWS",
+    "namespace": "http://webservices.utils.svapnt.siveco.ro",
+    "style": "document",
+    "parameters": [
+      {
+        "name": "partnerCategory",
+        "type": "string"
+      },
+      {
+        "name": "start",
+        "type": "dateTime"
+      },
+      {
+        "name": "stop",
+        "type": "dateTime"
+      },
+      {
+        "name": "uic",
+        "type": "string"
+      },
+      {
+        "name": "stencil",
+        "type": "string"
+      }
+    ],
+    "mutating": false,
+    "download": true,
+    "label": "Rambursare medic"
+  },
+  {
+    "name": "getRefundForInvoice",
+    "group": "general",
+    "service": "SiuiWS",
+    "namespace": "http://webservices.utils.svapnt.siveco.ro",
+    "style": "document",
+    "parameters": [
+      {
+        "name": "partnerCategory",
+        "type": "string"
+      },
+      {
+        "name": "invoiceNumber",
+        "type": "string"
+      },
+      {
+        "name": "invoiceDate",
+        "type": "dateTime"
+      },
+      {
+        "name": "uic",
+        "type": "string"
+      }
+    ],
+    "mutating": false,
+    "download": true,
+    "label": "Rambursare factură"
+  },
+  {
+    "name": "getPhysicianCatalogues",
+    "group": "general",
+    "service": "SiuiWS",
+    "namespace": "http://webservices.utils.svapnt.siveco.ro",
+    "style": "document",
+    "parameters": [],
+    "mutating": false,
+    "download": true,
+    "label": "Nomenclator medici"
+  },
+  {
+    "name": "getInsured",
+    "group": "general",
+    "service": "SiuiInsuredWS",
+    "namespace": "http://webservices.utils.svapnt.siveco.ro",
+    "style": "rpc",
+    "parameters": [
+      {
+        "name": "pid",
+        "type": "string"
+      },
+      {
+        "name": "requestDate",
+        "type": "dateTime"
+      }
+    ],
+    "mutating": false,
+    "download": false,
+    "label": "Verificare asigurat după CNP"
+  },
+  {
+    "name": "getInsuredByCID",
+    "group": "general",
+    "service": "SiuiInsuredWS",
+    "namespace": "http://webservices.utils.svapnt.siveco.ro",
+    "style": "rpc",
+    "parameters": [
+      {
+        "name": "cid",
+        "type": "string"
+      },
+      {
+        "name": "requestDate",
+        "type": "dateTime"
+      }
+    ],
+    "mutating": false,
+    "download": false,
+    "label": "Verificare asigurat după CID"
+  },
+  {
+    "name": "getPersonInfo",
+    "group": "general",
+    "service": "SiuiInsuredWS",
+    "namespace": "http://webservices.utils.svapnt.siveco.ro",
+    "style": "rpc",
+    "parameters": [
+      {
+        "name": "pid",
+        "type": "string"
+      },
+      {
+        "name": "fromDate",
+        "type": "dateTime"
+      }
+    ],
+    "mutating": false,
+    "download": false,
+    "label": "Informații persoană"
+  },
+  {
+    "name": "getPrescription",
+    "group": "clinice",
+    "service": "SiuiValidateWS",
+    "namespace": "http://siuiValidate.webservices.utils.svapnt.siveco.ro",
+    "style": "rpc",
+    "parameters": [
+      {
+        "name": "serial",
+        "type": "string"
+      },
+      {
+        "name": "number",
+        "type": "string"
+      },
+      {
+        "name": "pid",
+        "type": "string"
+      },
+      {
+        "name": "stencil",
+        "type": "string"
+      }
+    ],
+    "mutating": false,
+    "download": false,
+    "label": "Preluare rețetă SIUI"
+  },
+  {
+    "name": "getClinicReferral",
+    "group": "clinice",
+    "service": "SiuiValidateWS",
+    "namespace": "http://siuiValidate.webservices.utils.svapnt.siveco.ro",
+    "style": "rpc",
+    "parameters": [
+      {
+        "name": "serial",
+        "type": "string"
+      },
+      {
+        "name": "number",
+        "type": "string"
+      },
+      {
+        "name": "pid",
+        "type": "string"
+      },
+      {
+        "name": "stencil",
+        "type": "string"
+      }
+    ],
+    "mutating": false,
+    "download": false,
+    "label": "Preluare bilet clinic"
+  },
+  {
+    "name": "getLabReferral",
+    "group": "clinice",
+    "service": "SiuiValidateWS",
+    "namespace": "http://siuiValidate.webservices.utils.svapnt.siveco.ro",
+    "style": "rpc",
+    "parameters": [
+      {
+        "name": "serial",
+        "type": "string"
+      },
+      {
+        "name": "number",
+        "type": "string"
+      },
+      {
+        "name": "pid",
+        "type": "string"
+      },
+      {
+        "name": "stencil",
+        "type": "string"
+      }
+    ],
+    "mutating": false,
+    "download": false,
+    "label": "Preluare bilet paraclinic"
+  },
+  {
+    "name": "validatePrescription",
+    "group": "clinice",
+    "service": "SiuiValidateWS",
+    "namespace": "http://siuiValidate.webservices.utils.svapnt.siveco.ro",
+    "style": "rpc",
+    "parameters": [
+      {
+        "name": "reportXml",
+        "type": "string"
+      },
+      {
+        "name": "reportType",
+        "type": "string"
+      }
+    ],
+    "mutating": true,
+    "download": false,
+    "label": "Validare rețetă SIUI (nu PE)"
+  },
+  {
+    "name": "validateClinicReferral",
+    "group": "clinice",
+    "service": "SiuiValidateWS",
+    "namespace": "http://siuiValidate.webservices.utils.svapnt.siveco.ro",
+    "style": "rpc",
+    "parameters": [
+      {
+        "name": "reportXml",
+        "type": "string"
+      },
+      {
+        "name": "reportType",
+        "type": "string"
+      }
+    ],
+    "mutating": true,
+    "download": false,
+    "label": "Validare bilet clinic"
+  },
+  {
+    "name": "validateLabReferral",
+    "group": "clinice",
+    "service": "SiuiValidateWS",
+    "namespace": "http://siuiValidate.webservices.utils.svapnt.siveco.ro",
+    "style": "rpc",
+    "parameters": [
+      {
+        "name": "reportXml",
+        "type": "string"
+      },
+      {
+        "name": "reportType",
+        "type": "string"
+      }
+    ],
+    "mutating": true,
+    "download": false,
+    "label": "Validare bilet paraclinic"
+  },
+  {
+    "name": "validateSickLeave",
+    "group": "clinice",
+    "service": "SiuiValidateWS",
+    "namespace": "http://siuiValidate.webservices.utils.svapnt.siveco.ro",
+    "style": "rpc",
+    "parameters": [
+      {
+        "name": "reportXml",
+        "type": "string"
+      }
+    ],
+    "mutating": true,
+    "download": false,
+    "label": "Validare concediu medical"
+  },
+  {
+    "name": "validateReport",
+    "group": "general",
+    "service": "SiuiValidateWS",
+    "namespace": "http://siuiValidate.webservices.utils.svapnt.siveco.ro",
+    "style": "rpc",
+    "parameters": [
+      {
+        "name": "reportXml",
+        "type": "string"
+      },
+      {
+        "name": "reportType",
+        "type": "string"
+      },
+      {
+        "name": "requestType",
+        "type": "string"
+      }
+    ],
+    "mutating": true,
+    "download": false,
+    "label": "Validare raport la 72h — CLIN / PARA"
+  },
+  {
+    "name": "processPrescribedPrescription",
+    "group": "clinice",
+    "service": "EPrescriptionWS",
+    "namespace": "http://processPrescription.webservices.utils.svapnt.siveco.ro",
+    "style": "rpc",
+    "parameters": [
+      {
+        "name": "reportXml",
+        "type": "string"
+      }
+    ],
+    "mutating": true,
+    "download": false,
+    "label": "Validare rețetă electronică prescrisă (PE)"
+  },
+  {
+    "name": "getPrescribedPrescription",
+    "group": "clinice",
+    "service": "EPrescriptionWS",
+    "namespace": "http://processPrescription.webservices.utils.svapnt.siveco.ro",
+    "style": "rpc",
+    "parameters": [
+      {
+        "name": "providerCode",
+        "type": "string"
+      },
+      {
+        "name": "physicianStencilNo",
+        "type": "string"
+      },
+      {
+        "name": "contractNo",
+        "type": "string"
+      },
+      {
+        "name": "contractType",
+        "type": "string"
+      },
+      {
+        "name": "insuranceHouseCode",
+        "type": "string"
+      },
+      {
+        "name": "series",
+        "type": "string"
+      },
+      {
+        "name": "no",
+        "type": "string"
+      },
+      {
+        "name": "prescriptionDate",
+        "type": "dateTime"
+      }
+    ],
+    "mutating": false,
+    "download": false,
+    "label": "Preluare rețetă electronică prescrisă"
+  },
+  {
+    "name": "cancelPrescribedPrescription",
+    "group": "clinice",
+    "service": "EPrescriptionWS",
+    "namespace": "http://processPrescription.webservices.utils.svapnt.siveco.ro",
+    "style": "rpc",
+    "parameters": [
+      {
+        "name": "providerCode",
+        "type": "string"
+      },
+      {
+        "name": "physicianStencilNo",
+        "type": "string"
+      },
+      {
+        "name": "contractNo",
+        "type": "string"
+      },
+      {
+        "name": "contractType",
+        "type": "string"
+      },
+      {
+        "name": "insuranceHouseCode",
+        "type": "string"
+      },
+      {
+        "name": "series",
+        "type": "string"
+      },
+      {
+        "name": "no",
+        "type": "string"
+      },
+      {
+        "name": "prescriptionDate",
+        "type": "dateTime"
+      },
+      {
+        "name": "cancellationReason",
+        "type": "string"
+      }
+    ],
+    "mutating": true,
+    "download": false,
+    "label": "Anulare rețetă electronică prescrisă"
+  },
+  {
+    "name": "downloadNotReportedPrescriptionsReport",
+    "group": "clinice",
+    "service": "EPrescriptionWS",
+    "namespace": "http://processPrescription.webservices.utils.svapnt.siveco.ro",
+    "style": "rpc",
+    "parameters": [
+      {
+        "name": "insuranceHouseCode",
+        "type": "string"
+      },
+      {
+        "name": "fromDate",
+        "type": "dateTime"
+      },
+      {
+        "name": "toDate",
+        "type": "dateTime"
+      },
+      {
+        "name": "providerCode",
+        "type": "string"
+      },
+      {
+        "name": "stencilNo",
+        "type": "string"
+      }
+    ],
+    "mutating": false,
+    "download": false,
+    "label": "Raport rețete neraportate"
+  },
+  {
+    "name": "getStatusForPrescriptions",
+    "group": "clinice",
+    "service": "EPrescriptionWS",
+    "namespace": "http://processPrescription.webservices.utils.svapnt.siveco.ro",
+    "style": "rpc",
+    "parameters": [
+      {
+        "name": "insuranceHouseCode",
+        "type": "string"
+      },
+      {
+        "name": "providerCode",
+        "type": "string"
+      },
+      {
+        "name": "contractNo",
+        "type": "string"
+      },
+      {
+        "name": "contractType",
+        "type": "string"
+      },
+      {
+        "name": "startFrom",
+        "type": "dateTime"
+      },
+      {
+        "name": "endTo",
+        "type": "dateTime"
+      },
+      {
+        "name": "workPlaceCode",
+        "type": "string"
+      }
+    ],
+    "mutating": false,
+    "download": false,
+    "label": "Stare rețete"
+  },
+  {
+    "name": "getPrescribedPrescriptionsForCid",
+    "group": "clinice",
+    "service": "EPrescriptionWS",
+    "namespace": "http://processPrescription.webservices.utils.svapnt.siveco.ro",
+    "style": "rpc",
+    "parameters": [
+      {
+        "name": "requestXml",
+        "type": "string"
+      }
+    ],
+    "mutating": false,
+    "download": false,
+    "label": "Rețete prescrise după CID"
+  },
+  {
+    "name": "processHospitalPrescription",
+    "group": "clinice",
+    "service": "EPrescriptionWS",
+    "namespace": "http://processPrescription.webservices.utils.svapnt.siveco.ro",
+    "style": "rpc",
+    "parameters": [
+      {
+        "name": "reportXml",
+        "type": "string"
+      }
+    ],
+    "mutating": true,
+    "download": false,
+    "label": "Validare rețetă în spitalizare"
+  },
+  {
+    "name": "cancelReleasedHospitalPrescription",
+    "group": "clinice",
+    "service": "EPrescriptionWS",
+    "namespace": "http://processPrescription.webservices.utils.svapnt.siveco.ro",
+    "style": "rpc",
+    "parameters": [
+      {
+        "name": "providerCode",
+        "type": "string"
+      },
+      {
+        "name": "workplaceCode",
+        "type": "string"
+      },
+      {
+        "name": "insuranceHouseCode",
+        "type": "string"
+      },
+      {
+        "name": "series",
+        "type": "string"
+      },
+      {
+        "name": "no",
+        "type": "string"
+      },
+      {
+        "name": "fractionNo",
+        "type": "int"
+      },
+      {
+        "name": "cancellationReason",
+        "type": "string"
+      }
+    ],
+    "mutating": true,
+    "download": false,
+    "label": "Anulare rețetă tipărită în spitalizare"
+  },
+  {
+    "name": "getReleasedHospitalPrescription",
+    "group": "clinice",
+    "service": "EPrescriptionWS",
+    "namespace": "http://processPrescription.webservices.utils.svapnt.siveco.ro",
+    "style": "rpc",
+    "parameters": [
+      {
+        "name": "providerCode",
+        "type": "string"
+      },
+      {
+        "name": "workplaceCode",
+        "type": "string"
+      },
+      {
+        "name": "insuranceHouseCode",
+        "type": "string"
+      },
+      {
+        "name": "series",
+        "type": "string"
+      },
+      {
+        "name": "no",
+        "type": "string"
+      },
+      {
+        "name": "fractionNo",
+        "type": "int"
+      }
+    ],
+    "mutating": false,
+    "download": false,
+    "label": "Preluare rețetă electronică în spitalizare"
+  },
+  {
+    "name": "sendEInvoice",
+    "label": "Transmitere factură semnată",
+    "group": "facturare",
+    "service": "SiuiEInvoiceWS",
+    "namespace": "http://webservices.utils.svapnt.siveco.ro",
+    "style": "document",
+    "parameters": [
+      {
+        "name": "invoiceFile",
+        "type": "string"
+      }
+    ],
+    "mutating": true,
+    "download": false
+  },
+  {
+    "name": "getEInvoice",
+    "label": "Preluare factură înregistrată",
+    "group": "facturare",
+    "service": "SiuiEInvoiceWS",
+    "namespace": "http://webservices.utils.svapnt.siveco.ro",
+    "style": "document",
+    "parameters": [
+      {
+        "name": "serialCode",
+        "type": "string"
+      },
+      {
+        "name": "serialNumber",
+        "type": "string"
+      },
+      {
+        "name": "providerFiscalCode",
+        "type": "string"
+      }
+    ],
+    "mutating": false,
+    "download": true
+  },
+  {
+    "name": "getEInvoiceId",
+    "label": "ID SIUI pentru e-Factura ANAF",
+    "group": "facturare",
+    "service": "SiuiEInvoiceWS",
+    "namespace": "http://webservices.utils.svapnt.siveco.ro",
+    "style": "document",
+    "parameters": [
+      {
+        "name": "serialCode",
+        "type": "string"
+      },
+      {
+        "name": "serialNumber",
+        "type": "string"
+      },
+      {
+        "name": "providerFiscalCode",
+        "type": "string"
+      }
+    ],
+    "mutating": false,
+    "download": false
+  },
+  {
+    "name": "getEInvoiceClearingNote",
+    "label": "Notă de refuz la plată",
+    "group": "facturare",
+    "service": "SiuiEInvoiceWS",
+    "namespace": "http://webservices.utils.svapnt.siveco.ro",
+    "style": "document",
+    "parameters": [
+      {
+        "name": "serialCode",
+        "type": "string"
+      },
+      {
+        "name": "serialNumber",
+        "type": "string"
+      },
+      {
+        "name": "providerFiscalCode",
+        "type": "string"
+      }
+    ],
+    "mutating": false,
+    "download": true
+  },
+  {
+    "name": "cancelEInvoice",
+    "label": "Anulare factură",
+    "group": "facturare",
+    "service": "SiuiEInvoiceWS",
+    "namespace": "http://webservices.utils.svapnt.siveco.ro",
+    "style": "document",
+    "parameters": [
+      {
+        "name": "serialCode",
+        "type": "string"
+      },
+      {
+        "name": "serialNumber",
+        "type": "string"
+      },
+      {
+        "name": "providerFiscalCode",
+        "type": "string"
+      },
+      {
+        "name": "cancellationDate",
+        "type": "dateTime"
+      },
+      {
+        "name": "cancellationReason",
+        "type": "string"
+      }
+    ],
+    "mutating": true,
+    "download": false
+  }
+]

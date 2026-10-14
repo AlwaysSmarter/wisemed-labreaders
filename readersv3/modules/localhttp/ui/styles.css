@@ -420,3 +420,44 @@ button.is-loading:hover{transform:none}
 .wss-table-wrap td button{margin:3px}
 .wss-error{color:var(--danger)}
 @media(max-width:760px){.wss-grid{grid-template-columns:1fr}}
+
+/* CNAS utility settings and operation console. */
+#siui-settings-form, #siui-operation-form form { display:grid; gap:14px; }
+#siui-settings-form fieldset { display:grid; gap:12px; border:1px solid var(--line, #cbdcd4); border-radius:12px; padding:16px; }
+#siui-settings-form .siui-checkbox { display:flex; align-items:center; gap:10px; }
+#siui-settings-form .siui-checkbox input { width:auto; margin:0; }
+#siui-debug-panel details { margin:12px 0; }
+#siui-debug-panel pre { max-height:560px; overflow:auto; padding:12px; }
+#siui-debug-panel button, #siui-settings-form button { justify-self:start; }
+
+.invoice-heading,.invoice-actions,.invoice-paper-top{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.invoice-kicker{font-size:11px;letter-spacing:.14em;color:#007d78;font-weight:700}
+.invoice-badge{background:#e3f4ef;color:#146b51;border-radius:30px;padding:8px 14px}
+.invoice-flow{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:20px 0}
+.invoice-flow>div{padding:16px;border:1px solid #d3e2e5;border-top:3px solid #188f88;border-radius:8px;background:#f8fbfc}
+.invoice-flow p,.invoice-note p{font-size:13px;line-height:1.6}
+.invoice-section,.invoice-note{margin:16px 0;padding:18px;border:1px solid #d3e2e5;border-radius:10px}
+.invoice-section summary,.invoice-note summary{font-weight:650;cursor:pointer}
+.invoice-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:16px 0}
+.invoice-grid label{display:flex;flex-direction:column;gap:5px;min-width:0;font-size:13px}
+.invoice-grid small,.invoice-paper small{display:block;color:#627783;font-size:11px}
+.invoice-grid input,.invoice-grid select{width:100%;box-sizing:border-box;min-width:0}
+.invoice-item{border-bottom:1px dashed #cadbdd;padding:8px 0 18px}
+.invoice-status{white-space:pre-wrap;padding:12px;border-left:3px solid #188f88}
+.invoice-paper{background:white;color:#173844;border:1px solid #cadbdd;border-radius:8px;padding:28px;margin:20px 0}
+.invoice-paper figure{margin:0;text-align:center;font-size:11px}
+.invoice-datamatrix{width:210px;height:210px;object-fit:contain;image-rendering:pixelated}
+.invoice-partners{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin:24px 0}
+.invoice-paper table{width:100%;border-collapse:collapse;font-size:13px}
+.invoice-paper td,.invoice-paper th{padding:10px 6px;text-align:left;border-bottom:1px solid #d3e2e5}
+.invoice-total{text-align:right;font-weight:700}
+.invoice-send{background:#f2f7f8;border-radius:10px;padding:20px}
+.invoice-send label{display:block;margin-bottom:14px}
+#invoice-remote-result,#inv-xml-text,#inv-barcode-text{white-space:pre-wrap;overflow-wrap:anywhere;max-height:420px;overflow:auto}
+@media(max-width:900px){.invoice-flow,.invoice-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:560px){.invoice-flow,.invoice-grid,.invoice-partners{grid-template-columns:1fr}.invoice-paper{padding:12px;overflow:auto}}
+#siui-print-root{display:none}
+@media print{html:has(body.printing-siui-invoice){zoom:1;background:white}body.printing-siui-invoice{margin:0;padding:0;background:white}body.printing-siui-invoice>:not(#siui-print-root){display:none!important}body.printing-siui-invoice>#siui-print-root{display:block!important}#siui-print-root .invoice-paper{border:0;margin:0;padding:12mm;overflow:visible}#siui-print-root .invoice-datamatrix{width:50mm;height:50mm}#siui-print-root tr{break-inside:avoid}}
+
+.siui-error{color:#a31621!important;background:#fff0f1!important;border:2px solid #c92335!important;border-radius:8px;padding:12px;font-weight:600;white-space:pre-wrap;overflow-wrap:anywhere}
+.siui-error .meta{color:#a31621}

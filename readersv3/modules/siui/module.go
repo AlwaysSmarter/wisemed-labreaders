@@ -2,6 +2,7 @@ package siui
 
 import (
 	"context"
+	"crypto/rand"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -26,7 +27,10 @@ type sessionGuard interface {
 	SessionIdentity(*http.Request) (string, bool, bool)
 }
 type Module struct {
+	ocspSession     ocspSession
 	ready           chan struct{}
+	jwtKey          []byte
+	calls           chan serviceWork
 	rt              module.Runtime
 	guard           sessionGuard
 	db              *sql.DB
@@ -68,7 +72,41 @@ func (m *Module) Init(rt module.Runtime) error {
 	if database == "" {
 		database = "./siui-jobs.db"
 	}
-	m.cfg = settings{Username: value(s["username"]), Licence: value(s["licence"]), Thumbprint: value(s["certificate_thumbprint"]), Store: store, BaseURL: base, Database: rt.ResolvePath(database), AllowInvalidServerCertificateDate: value(s["allow_invalid_server_certificate_date"]) == "true"}
+	m.cfg = settings{AllowRevokedServerCertificate: value(s["allow_revoked_server_certificate"]) == "true", Username: value(s["username"]), Licence: value(s["licence"]), Thumbprint: value(s["certificate_thumbprint"]), Store: store, BaseURL: base, Database: rt.ResolvePath(database), AllowInvalidServerCertificateDate: value(s["allow_invalid_server_certificate_date"]) == "true"}
+	if fiscal, cas := value(s["fiscal_code"]), value(s["cas_code"]); fiscal != "" && cas != "" {
+		username, err := cnasUsername(fiscal, cas)
+		if err != nil {
+			return err
+		}
+		m.cfg.Username = username
+	}
+	m.cfg.EInvoiceBaseURL = value(s["einvoice_base_url"])
+	if m.cfg.EInvoiceBaseURL == "" {
+		m.cfg.EInvoiceBaseURL = m.cfg.BaseURL
+	}
+	if err := validateBase(m.cfg.EInvoiceBaseURL); err != nil {
+		return err
+	}
+	m.cfg.PEBaseURL = value(s["pe_base_url"])
+	if m.cfg.PEBaseURL == "" {
+		m.cfg.PEBaseURL = "https://sipe.siui.ro"
+	}
+	if err := validateBase(m.cfg.PEBaseURL); err != nil {
+		return err
+	}
+	if b, err := json.Marshal(s["certificate_profiles"]); err == nil {
+		if err = json.Unmarshal(b, &m.cfg.Profiles); err != nil {
+			return errors.New("invalid certificate_profiles")
+		}
+	}
+	m.cfg.PKCS11Module = value(s["pkcs11_module"])
+	m.cfg.pin = &pinVault{path: filepath.Join(filepath.Dir(m.cfg.Database), "siui-token-pins.json"), logf: rt.Logf}
+	m.cfg.saveActiveProfile()
+	m.jwtKey = make([]byte, 32)
+	if _, err := rand.Read(m.jwtKey); err != nil {
+		return err
+	}
+	m.calls = make(chan serviceWork, 20)
 	svc, ok := rt.Service("local-http-control")
 	m.guard, _ = svc.(sessionGuard)
 	if !ok || m.guard == nil {
@@ -77,11 +115,11 @@ func (m *Module) Init(rt module.Runtime) error {
 	m.ready = make(chan struct{})
 	m.queue = make(chan work, 20)
 	if m.factory == nil {
-		m.factory = func(s settings) backend { return nativeBackend{cfg: s} }
-		m.nativeSupported = runtime.GOOS == "windows"
+		m.factory = func(s settings) backend { return nativeBackend{cfg: s, logf: rt.Logf} }
+		m.nativeSupported = (runtime.GOOS == "windows" || runtime.GOOS == "darwin" || runtime.GOOS == "linux")
 	}
-	rt.Handle("/api/siui/", m.guard.RequireSession(http.HandlerFunc(m.handle)))
-	rt.AddMenu(module.MenuEntry{ID: "siui", Group: "settings", Label: "CNAS - validare 72h", Path: "/settings/siui", Order: 35})
+	rt.Handle("/api/siui/", m.authenticate(http.HandlerFunc(m.handle)))
+	rt.AddMenu(module.MenuEntry{ID: "siui", Group: "settings", Label: "CNAS", Path: "/settings/siui", Order: 35})
 	return nil
 }
 func (m *Module) Start(ctx context.Context) error {
@@ -112,11 +150,15 @@ func (m *Module) Start(ctx context.Context) error {
 		return e
 	}
 	defer m.db.Close()
+	// A missing token must not prevent the application from starting.
+	_ = m.reloadCertificates("startup")
 	close(m.ready)
 	for {
 		select {
 		case <-ctx.Done():
 			return nil
+		case job := <-m.calls:
+			m.runServiceWork(ctx, job)
 		case job := <-m.queue:
 			if ctx.Err() != nil {
 				return nil
@@ -129,7 +171,7 @@ func (m *Module) Start(ctx context.Context) error {
 			}
 			m.rt.Logf("SIUI validation started job=%s", job.ID)
 			callCtx, cancel := context.WithTimeout(ctx, 90*time.Second)
-			c := client{cfg: job.Config, backend: m.factory(job.Config)}
+			c := client{cfg: job.Config, backend: m.factory(job.Config), logf: m.rt.Logf, session: &m.ocspSession, operation: "validate", callID: job.ID}
 			result, submitted, err := c.validate(callCtx, job.XML)
 			cancel()
 			state, message, encoded := "completed", "", ""
@@ -179,11 +221,17 @@ func decode(w http.ResponseWriter, r *http.Request, v any) error {
 }
 func (m *Module) handle(w http.ResponseWriter, r *http.Request) {
 	subject, admin, ok := m.guard.SessionIdentity(r)
+	if c, yes := r.Context().Value(apiIdentityKey{}).(apiClaims); yes {
+		subject, admin, ok = c.Subject, c.Admin, true
+	}
 	if !ok {
 		fail(w, 401, "authentication required")
 		return
 	}
 	owner := "local:" + subject
+	if c, ok := r.Context().Value(apiIdentityKey{}).(apiClaims); ok && c.Owner != "" {
+		owner = c.Owner
+	}
 	if p, remote := apibridge.PrincipalFrom(r.Context()); remote {
 		owner = "wsm:" + strconv.Quote(p.TenantID) + ":" + strconv.Quote(p.Subject)
 		admin = p.Admin
@@ -210,11 +258,21 @@ func (m *Module) handle(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	switch {
+	case route == "auth/token" && r.Method == "POST":
+		m.tokenHTTP(w, r, subject, owner, admin)
+	case route == "catalog" && r.Method == "GET":
+		respond(w, 200, map[string]any{"ok": true, "operations": operations(), "insurance_houses": insuranceHouses()})
+	case route == "openapi.json" && r.Method == "GET":
+		respond(w, 200, openAPIDocument(m.rt.ReaderID()))
+	case strings.HasPrefix(route, "invoice/"):
+		m.invoiceHTTP(w, r, route, admin)
+	case strings.HasPrefix(route, "facturare/") || strings.HasPrefix(route, "general/") || strings.HasPrefix(route, "clinice/") || strings.HasPrefix(route, "calls/"):
+		m.serviceHTTP(w, r, route, owner, admin)
 	case route == "status" && r.Method == "GET":
 		m.mu.Lock()
 		cfg, pending := m.cfg, m.pending
 		m.mu.Unlock()
-		respond(w, 200, map[string]any{"ok": true, "platform": runtime.GOOS, "native_supported": runtime.GOOS == "windows", "configured": cfg.Username != "" && cfg.Thumbprint != "" && cfg.Licence != "", "pending": pending, "report_type": "PARA", "request_type": "RQ_PARA_SRV"})
+		respond(w, 200, map[string]any{"ok": true, "platform": runtime.GOOS, "native_supported": (runtime.GOOS == "windows" || runtime.GOOS == "darwin" || runtime.GOOS == "linux"), "configured": cfg.Username != "" && cfg.Thumbprint != "" && cfg.Licence != "", "pending": pending, "report_types": []string{"CLIN", "PARA"}, "report_type": "PARA", "request_type": "RQ_PARA_SRV"})
 	case route == "ocsp-test" && r.Method == "POST":
 		m.ocspHTTP(w, r)
 	case route == "personalization" && r.Method == "POST":
@@ -225,12 +283,24 @@ func (m *Module) handle(w http.ResponseWriter, r *http.Request) {
 		m.personalizationHTTP(w, r)
 	case route == "insured" && r.Method == "POST":
 		m.insuredHTTP(w, r)
+	case route == "token-pin":
+		if !admin {
+			fail(w, 403, "administrator required")
+			return
+		}
+		m.tokenPINHTTP(w, r)
 	case route == "settings":
 		if !admin {
 			fail(w, 403, "administrator required")
 			return
 		}
 		m.settingsHTTP(w, r)
+	case route == "certificates/refresh" && r.Method == "POST":
+		if err := m.reloadCertificates("login"); err != nil {
+			fail(w, 503, err.Error())
+			return
+		}
+		respond(w, 200, map[string]any{"ok": true})
 	case route == "certificates" && r.Method == "GET":
 		if !admin {
 			fail(w, 403, "administrator required")
@@ -242,7 +312,11 @@ func (m *Module) handle(w http.ResponseWriter, r *http.Request) {
 			store = m.cfg.Store
 			m.mu.Unlock()
 		}
-		list, e := listCertificates(store)
+		m.mu.Lock()
+		certCfg := m.cfg
+		m.mu.Unlock()
+		certCfg.Store = store
+		list, e := configuredCertificates(certCfg)
 		if e != nil {
 			fail(w, 503, e.Error())
 			return
@@ -345,7 +419,8 @@ func (m *Module) settingsHTTP(w http.ResponseWriter, r *http.Request) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if r.Method == "GET" {
-		respond(w, 200, map[string]any{"ok": true, "settings": map[string]any{"licence_configured": m.cfg.Licence != "", "licence_hint": licenceHint(m.cfg.Licence), "username": m.cfg.Username, "base_url": m.cfg.BaseURL, "allow_invalid_server_certificate_date": m.cfg.AllowInvalidServerCertificateDate, "certificate_store": m.cfg.Store, "certificate_thumbprint": m.cfg.Thumbprint}})
+		fiscal, cas := splitUsername(m.cfg.Username)
+		respond(w, 200, map[string]any{"ok": true, "settings": map[string]any{"licence_configured": m.cfg.Licence != "", "licence_hint": licenceHint(m.cfg.Licence), "username": m.cfg.Username, "fiscal_code": fiscal, "cas_code": cas, "certificate_profiles": m.cfg.Profiles, "pe_base_url": m.cfg.PEBaseURL, "einvoice_base_url": m.cfg.EInvoiceBaseURL, "base_url": m.cfg.BaseURL, "allow_invalid_server_certificate_date": m.cfg.AllowInvalidServerCertificateDate, "allow_revoked_server_certificate": m.cfg.AllowRevokedServerCertificate, "certificate_store": m.cfg.Store, "certificate_thumbprint": m.cfg.Thumbprint}})
 		return
 	}
 	if r.Method != "PUT" {
@@ -357,6 +432,11 @@ func (m *Module) settingsHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var in struct {
+		EInvoiceBaseURL                   *string `json:"einvoice_base_url"`
+		AllowRevokedServerCertificate     *bool   `json:"allow_revoked_server_certificate"`
+		FiscalCode                        *string `json:"fiscal_code"`
+		CASCode                           *string `json:"cas_code"`
+		PEBaseURL                         *string `json:"pe_base_url"`
 		AllowInvalidServerCertificateDate *bool   `json:"allow_invalid_server_certificate_date"`
 		Username                          string  `json:"username"`
 		Licence                           *string `json:"licence"`
@@ -372,11 +452,36 @@ func (m *Module) settingsHTTP(w http.ResponseWriter, r *http.Request) {
 		fail(w, 400, e.Error())
 		return
 	}
-	current, _ := url.Parse(m.cfg.BaseURL)
-	requested, _ := url.Parse(in.BaseURL)
-	if requested.Host != current.Host && requested.Host != "www.siui.ro" && requested.Host != "www.siui.ro:444" && requested.Host != "testsiui.siui.ro" && requested.Host != "testsiui.siui.ro:444" {
+	peBase := m.cfg.PEBaseURL
+	if in.PEBaseURL != nil {
+		peBase = *in.PEBaseURL
+	}
+	invoiceBase := m.cfg.EInvoiceBaseURL
+	if invoiceBase == "" {
+		invoiceBase = m.cfg.BaseURL
+	}
+	if in.EInvoiceBaseURL != nil {
+		invoiceBase = *in.EInvoiceBaseURL
+	}
+	if validateBase(invoiceBase) != nil || !m.cfg.acceptsOrigin(invoiceBase) {
+		fail(w, 400, "configure a valid HTTPS eFactura origin locally in config.yaml")
+		return
+	}
+	if validateBase(peBase) != nil || !m.cfg.acceptsOrigin(in.BaseURL) || !m.cfg.acceptsOrigin(peBase) {
 		fail(w, 400, "configure custom CNAS origins locally in config.yaml")
 		return
+	}
+	if in.FiscalCode != nil || in.CASCode != nil {
+		if in.FiscalCode == nil || in.CASCode == nil {
+			fail(w, 400, "fiscal_code and cas_code must be supplied together")
+			return
+		}
+		var err error
+		in.Username, err = cnasUsername(*in.FiscalCode, *in.CASCode)
+		if err != nil {
+			fail(w, 400, err.Error())
+			return
+		}
 	}
 	if in.Username == "" || strings.ContainsAny(in.Username, ":\r\n") {
 		fail(w, 400, "invalid CNAS username")
@@ -396,7 +501,9 @@ func (m *Module) settingsHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	// Saving general settings is possible before a Windows token is selected.
 	if in.Thumbprint != "" && (in.Thumbprint != m.cfg.Thumbprint || in.Store != m.cfg.Store) {
-		certs, e := listCertificates(in.Store)
+		certCfg := m.cfg
+		certCfg.Store = in.Store
+		certs, e := configuredCertificates(certCfg)
 		if e != nil {
 			fail(w, 400, e.Error())
 			return
@@ -423,11 +530,37 @@ func (m *Module) settingsHTTP(w http.ResponseWriter, r *http.Request) {
 	s["username"] = in.Username
 	s["licence"] = licence
 	delete(s, "licence_file")
+	allowRevoked := m.cfg.AllowRevokedServerCertificate
+	if in.AllowRevokedServerCertificate != nil {
+		allowRevoked = *in.AllowRevokedServerCertificate
+	}
+	s["allow_revoked_server_certificate"] = allowRevoked
 	allowInvalidDate := m.cfg.AllowInvalidServerCertificateDate
 	if in.AllowInvalidServerCertificateDate != nil {
 		allowInvalidDate = *in.AllowInvalidServerCertificateDate
 	}
 	s["allow_invalid_server_certificate_date"] = allowInvalidDate
+	next := m.cfg
+	next.Profiles = append([]certificateProfile(nil), m.cfg.Profiles...)
+	next.Store = in.Store
+	next.Thumbprint = in.Thumbprint
+	next.BaseURL = in.BaseURL
+	next.PEBaseURL = peBase
+	next.EInvoiceBaseURL = invoiceBase
+	next.AllowInvalidServerCertificateDate = allowInvalidDate
+	next.AllowRevokedServerCertificate = allowRevoked
+	next.saveActiveProfile()
+	s["certificate_profiles"] = next.Profiles
+	s["pe_base_url"] = peBase
+	s["einvoice_base_url"] = invoiceBase
+	fiscal, cas := splitUsername(in.Username)
+	if _, err := cnasUsername(fiscal, cas); err == nil {
+		s["fiscal_code"] = fiscal
+		s["cas_code"] = cas
+	} else {
+		delete(s, "fiscal_code")
+		delete(s, "cas_code")
+	}
 	s["base_url"] = in.BaseURL
 	s["certificate_store"] = in.Store
 	s["certificate_thumbprint"] = in.Thumbprint
@@ -440,9 +573,13 @@ func (m *Module) settingsHTTP(w http.ResponseWriter, r *http.Request) {
 		fail(w, 500, "cannot save configuration")
 		return
 	}
+	m.cfg.Profiles = next.Profiles
+	m.cfg.PEBaseURL = peBase
+	m.cfg.EInvoiceBaseURL = invoiceBase
 	m.cfg.Username = in.Username
 	m.cfg.Licence = licence
 	m.cfg.AllowInvalidServerCertificateDate = allowInvalidDate
+	m.cfg.AllowRevokedServerCertificate = allowRevoked
 	m.cfg.BaseURL = in.BaseURL
 	m.cfg.Store = in.Store
 	m.cfg.Thumbprint = in.Thumbprint

@@ -59,10 +59,18 @@ modules:
     heartbeat_ms: 15000
     reconnect_delay_ms: 30000
   siui:
+    fiscal_code: ""
+    cas_code: ""
+    pe_base_url: https://sipe.siui.ro
+    einvoice_base_url: "" # Implicit folosește base_url; se poate salva separat din Setări CNAS.
+    certificate_profiles: []
     base_url: https://www.siui.ro
     allow_invalid_server_certificate_date: false
+    allow_revoked_server_certificate: false
     username: ""
     licence: ""
+    # Linux: absolute path to the vendor/OpenSC PKCS#11 library; loaded locally only.
+    pkcs11_module: ""
     certificate_store: CurrentUser
     certificate_thumbprint: ""
     database: ./siui-jobs.db

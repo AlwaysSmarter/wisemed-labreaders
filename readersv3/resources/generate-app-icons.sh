@@ -91,6 +91,7 @@ generate_icon() {
 generate_icon "erba-mannheim-laura-reader" "#176B57" "#2A8C73" "#176B57" "LAURA" "Urine analyzer" "UR"
 
 generate_icon "barcodeprinter"      "#0D3B66" "#F59E0B" "#184E77" "BARCODE" "Label print utility" "BC"
+generate_icon "html-print-formatter" "#075985" "#0284C7" "#075985" "HTML" "Print formatter" "HP"
 generate_icon "beosl-reader"        "#0F4C5C" "#14B8A6" "#1D7874" "BEOSL"   "CSV file reader"      "BE"
 generate_icon "cary60-uvvis-reader" "#352F6B" "#8B5CF6" "#4C1D95" "CARY60"  "UV-VIS workflow"      "UV"
 generate_icon "gemini-reader"       "#113A5D" "#06B6D4" "#0B7285" "GEMINI"  "ASTM TCP/IP reader"   "GM"

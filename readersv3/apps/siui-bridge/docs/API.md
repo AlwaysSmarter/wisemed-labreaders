@@ -1,0 +1,941 @@
+# SIUI Bridge — API GENERAL și CLINICE
+
+## Configurare și migrare
+
+Setări → CNAS este exclusiv pentru utilitarul `siui-bridge`. Introdu codul fiscal (numai cifre), alege codul CAS din nomenclator și completează seria de licență. Utilizatorul CNAS se formează automat: `7991962_CAS-DJ`. Sunt incluse cele 45 de coduri InsuranceHouse din nomenclatorul furnizat `NomenclatoareClinice_20261001.xml`, inclusiv AOPSNAJ și MLPTL. Lista este un snapshot al acestui fișier, nu o interogare live CNAS.
+
+Selectează CurrentUser/LocalMachine și certificatul/tokenul USB. Pentru fiecare pereche magazin + amprentă se păstrează adresa SIUI, portul (inclus în URL), adresa PE și excepția pentru valabilitatea certificatului serverului. La schimbarea certificatului, formularul încarcă profilul salvat; un certificat nou pornește cu adresele oficiale. Apasă Salvează înainte de executarea operațiilor.
+
+Configurația este în `deployments/config.yaml`, secțiunea `modules.siui`. `username` vechi rămâne compatibil; câmpurile `fiscal_code` și `cas_code` au prioritate când sunt ambele completate. Configurația veche creează automat profilul certificatului activ. O licență goală la salvare păstrează valoarea existentă. GET întoarce numai starea și indiciul primele/ultimele 3 caractere. Nu se exportă cheia sau certificatul tokenului în CER.
+
+```yaml
+modules:
+  siui:
+    fiscal_code: "7991962"
+    cas_code: CAS-DJ
+    username: "7991962_CAS-DJ"
+    licence: "LICENTA_CNАS"
+    certificate_store: CurrentUser
+    certificate_thumbprint: "AMPRENTA_SHA1_40_HEX"
+    base_url: https://www.siui.ro
+    pe_base_url: https://sipe.siui.ro
+    allow_invalid_server_certificate_date: false
+    database: ./siui-jobs.db
+    certificate_profiles: [] # gestionat la salvarea din Setări
+```
+
+`base_url` trebuie să fie o origine HTTPS fără cale/query. Portul poate fi 443 sau 444, conform configurației CNAS. Originile personalizate se configurează local, nu pot fi injectate arbitrar prin API. Excepția TLS opțională ignoră doar perioada de valabilitate a certificatului serverului; numele, CA și utilizarea certificatului rămân verificate. Certificatul tokenului trebuie să fie valid. PE utilizează separat `https://sipe.siui.ro/svapntws/services/EPrescriptionWS`; OCSP utilizează originea SIUI și `/OCSP/validator`.
+
+Setări → Server și actualizări păstrează serviciul, HTTP/HTTPS, logurile și actualizările. Secțiunile Comunicare analizor și Rezultate și WiseMED sunt ascunse numai pentru SIUI Bridge. Funcțiile comune de autentificare WiseMED și WSM rămân active.
+
+## Autentificare HTTPS cu JWT
+
+API-ul local al utilitarului folosește HTTPS și JWT HS256 pentru clienți direcți. Autentifică-te întâi prin mecanismul comun WiseMED (`POST /api/session/login`, aceleași date ca în interfața utilitarului). Cu cookie-ul de sesiune valid, cere `POST /api/siui/auth/token`, JSON `{}`. În Debug există butonul „Generează JWT pentru 15 minute”. WSM poate emite un JWT cu identitatea sa verificată.
+
+Răspuns: `{"ok":true,"access_token":"...","token_type":"Bearer","expires_in":900}`. Utilizează `Authorization: Bearer <access_token>` la toate rutele `/api/siui/*`. Tokenul are `iss=siui-bridge`, `aud=siui-api`, `sub`, `iat`, `exp`, proprietarul semnat `owner` și rolul `admin` preluat din sesiune, nu din cerere. Cheia este aleatorie și ținută în memoria procesului: restartul invalidează JWT-urile emise. Sesiunea de browser SIUI folosește, de asemenea, o cheie aleatorie de proces; după actualizare/restart autentifică-te din nou. Un JWT nu poate emite alt JWT. Tokenurile nu sunt returnate în GET settings și nu sunt scrise în log.
+
+Browserul folosește în continuare cookie-ul de sesiune. Un Bearer JWT direct este acceptat numai pe HTTPS, fără încredere implicită în X-Forwarded-Proto. Pentru reverse proxy, păstrează HTTPS până la utilitar. Importă CA locală pentru verificarea TLS; exemplele nu folosesc `curl -k`.
+
+```sh
+curl --cacert deployments/tls/wisemed-local-root-ca.pem \
+  -H "Authorization: Bearer $SIUI_JWT" \
+  https://localhost:19112/api/siui/catalog
+```
+
+Sesiunea OCSP CNAS este separată de JWT-ul API. Operațiile obțin automat o sesiune OCSP proaspătă folosind tokenul fizic, utilizatorul și licența CNAS. Antetul CNAS se numește intenționat `OSCP_RESPONSE`, iar SOAP folosește și `SessionID`.
+
+## WSM
+
+Aceleași metode și corpuri JSON sunt accesibile prin comanda comună `api.request`, cu identitatea atestată de WSM. Nu se trimite JWT-ul local în acest mesaj. Exemplu de payload pentru adaptorul comun:
+
+```json
+{"method":"POST","path":"/api/siui/general/getInsured","body":{"operation_id":"insured-20261005-001","parameters":{"pid":"CNP_REAL","requestDate":"2026-10-05T00:00:00+03:00"}}}
+```
+
+Folosește anvelopa de comandă `api.request` descrisă în documentația comună `readersv3/docs/wss-control.md`. Răspunsul adaptorului conține `status`, `body` și tipul conținutului. Polling-ul folosește tot `api.request`, metoda GET și calea `/api/siui/calls/<id>`. Execuțiile sunt izolate pe proprietar; identitatea locală și identitatea WSM au spații separate. Un JWT emis prin WSM păstrează proprietarul și tenantul WSM, astfel încât poate urmări aceleași execuții. Nici un antet furnizat de client nu poate impersona identitatea WSM.
+
+## Contractul comun al operațiilor
+
+Fiecare operație SOAP: `POST /api/siui/<grup>/<operație>`, Content-Type `application/json`:
+
+```json
+{"operation_id":"id-unic-stabil","parameters":{"parametruWSDL":"valoare"}}
+```
+
+Toți parametrii sunt șiruri JSON, inclusiv `int`. Numele sunt case-sensitive și coincid cu WSDL; trimite exact câmpurile listate pentru operație. Parametrii WSDL `string` pot fi goi când convenția CNAS o permite; nu omite câmpul. `dateTime` trebuie să fie `YYYY-MM-DDTHH:mm:ss` cu fus orar opțional, de exemplu `2026-10-05T00:00:00+03:00`. XML se trimite ca șir JSON, nu ca SOAP; bridge-ul îl escapează automat.
+
+Răspuns inițial: HTTP 202, `{"ok":true,"call":{"id":"...","operation_id":"...","operation":"getInsured","status":"queued"}}`. Citește `GET /api/siui/calls/<id>` până la o stare terminală:
+
+- `queued`, `running`: în curs;
+- `completed`: răspuns CNAS primit, în `call.result.values` (array de șiruri). NU înseamnă automat validare medicală sau administrativă reușită; interpretează XML-ul/starea CNAS;
+- `failed`: eroare înainte de trimiterea unei modificări sau eșec de citire;
+- `unknown`: o modificare ar fi putut ajunge la CNAS sau procesul s-a oprit înainte de finalizare. Reconciliază înainte de o nouă trimitere.
+
+`operation_id` este obligatoriu (1–128 caractere, litere/cifre/`_.:-`, primul caracter alfanumeric). Repetarea aceluiași ID, operație, parametri și configurație întoarce execuția existentă (HTTP 200), fără retrimitere. Refolosirea cu alt conținut întoarce 409. Nu există retry automat al scrierilor. Coada serializează accesul la token; setările nu se schimbă cât există operații active. La restart, lucrările neterminate devin `unknown` și nu se reiau.
+
+Operațiile care modifică datele și afișarea tokenului OCSP cer rol administrator. Citirile sunt disponibile utilizatorilor autentificați. Debug este interfața administratorului. HTTPS și WSM aplică aceleași reguli.
+
+Timeout: 120 secunde per execuție SOAP, 25 secunde pentru testul OCSP. Limite: 1 MiB XML/parametru și răspuns SOAP; 2 MiB corp JSON; 64 MiB fișier descărcat. Nomenclatoarele și personalizările întoarse ca URL + dimensiune sunt descărcate automat de pe aceeași origine HTTPS SIUI; nu se urmăresc redirecturi și nu se trimit credențiale către alte gazde. Un URL extern se raportează ca eroare, fără a fi accesat.
+
+Fișierele se păstrează în `siui-downloads` lângă baza SIUI, cu drepturi restrictive pe Unix. Metadatele apar în `call.result.file`. `GET /api/siui/calls/<id>/file?offset=0` întoarce `data_base64`, `next_offset`, `eof`, în fragmente de maximum 256 KiB. Repetă cu `next_offset` până la EOF. Funcționează identic prin WSM; butonul de descărcare din Debug reconstruiește fișierul. XML-urile/șirurile întoarse direct de PE sunt în `values`, fără transformarea lor în date fictive.
+
+Baza SQLite păstrează identitatea, digestul cererii, starea și răspunsul CNAS. XML-ul cererii, licența și sesiunea OCSP nu sunt păstrate în istoric. Răspunsurile și fișierele pot conține date medicale; administratorul gestionează păstrarea și ștergerea lor. Nu există ștergere automată a istoricului în această versiune. Logurile conțin doar operația, ID-ul și starea.
+
+## GENERAL — OCSP
+
+`POST /api/siui/general/ocsp`, corp `{}`. Necesită administrator. Reutilizează sesiunea de maximum 150 secunde pentru aceeași configurație; altfel obține una nouă. În Debug butonul „Obține / reutilizează token OCSP” afișează tokenul, vechimea și rezultatul. Răspunsul reușit include `token`, `authenticated:true`. Tokenul nu se salvează în istoric, fișier, localStorage sau log; răspunsul are `Cache-Control: no-store`. Nu există refresh periodic documentat de CNAS; celelalte operații obțin singure sesiunea.
+
+## Catalog de operații
+
+Exemplele de mai jos sunt șabloane de structură. Înlocuiește valorile cu datele reale autorizate. Un XML minimal demonstrativ NU este suficient pentru validare PIAS; folosește schema corespunzătoare și datele obligatorii ale raportului. Nu există trimitere automată din Debug la selectarea operației.
+
+### GENERAL
+
+#### getCatalogues — Nomenclatoare generale
+
+`POST /api/siui/general/getCatalogues` — SiuiWS (document). Preluare de date.
+
+| Parametru | Tip WSDL |
+|---|---|
+| `partnerCategory` | `string` |
+| `start` | `dateTime` |
+
+```json
+{
+  "operation_id": "getCatalogues-001",
+  "parameters": {
+    "partnerCategory": "CLIN",
+    "start": "2026-10-05T00:00:00+03:00"
+  }
+}
+```
+
+#### getProviderInfo — Personalizare furnizor
+
+`POST /api/siui/general/getProviderInfo` — SiuiWS (document). Preluare de date.
+
+| Parametru | Tip WSDL |
+|---|---|
+| `partnerCategory` | `string` |
+| `start` | `dateTime` |
+| `stop` | `dateTime` |
+| `uic` | `string` |
+
+```json
+{
+  "operation_id": "getProviderInfo-001",
+  "parameters": {
+    "partnerCategory": "CLIN",
+    "start": "2026-10-05T00:00:00+03:00",
+    "stop": "2026-10-05T00:00:00+03:00",
+    "uic": "7991962"
+  }
+}
+```
+
+#### getProviderInfoForPhysician — Personalizare medic
+
+`POST /api/siui/general/getProviderInfoForPhysician` — SiuiWS (document). Preluare de date.
+
+| Parametru | Tip WSDL |
+|---|---|
+| `partnerCategory` | `string` |
+| `start` | `dateTime` |
+| `stop` | `dateTime` |
+| `uic` | `string` |
+| `stencilNo` | `string` |
+
+```json
+{
+  "operation_id": "getProviderInfoForPhysician-001",
+  "parameters": {
+    "partnerCategory": "CLIN",
+    "start": "2026-10-05T00:00:00+03:00",
+    "stop": "2026-10-05T00:00:00+03:00",
+    "uic": "7991962",
+    "stencilNo": "VALOARE_stencilNo"
+  }
+}
+```
+
+#### sendReport — Trimitere raport
+
+`POST /api/siui/general/sendReport` — SiuiWS (document). Modifică/validează date; administrator obligatoriu.
+
+| Parametru | Tip WSDL |
+|---|---|
+| `reportType` | `string` |
+| `reportXML` | `string` |
+
+```json
+{
+  "operation_id": "sendReport-001",
+  "parameters": {
+    "reportType": "CLIN",
+    "reportXML": "XML_COMPLET_CONFORM_XSD"
+  }
+}
+```
+
+#### getReportFeedback — Răspuns raport
+
+`POST /api/siui/general/getReportFeedback` — SiuiWS (document). Preluare de date.
+
+| Parametru | Tip WSDL |
+|---|---|
+| `fileName` | `string` |
+
+```json
+{
+  "operation_id": "getReportFeedback-001",
+  "parameters": {
+    "fileName": "VALOARE_fileName"
+  }
+}
+```
+
+`fileName` este identificatorul/numele raportării conform convenției CNAS; păstrează rezultatul sendReport și datele raportării. Nu confunda ID-ul local call.id cu identificatorul raportării CNAS.
+
+#### getRefund — Rambursare furnizor
+
+`POST /api/siui/general/getRefund` — SiuiWS (document). Preluare de date.
+
+| Parametru | Tip WSDL |
+|---|---|
+| `partnerCategory` | `string` |
+| `start` | `dateTime` |
+| `stop` | `dateTime` |
+| `uic` | `string` |
+
+```json
+{
+  "operation_id": "getRefund-001",
+  "parameters": {
+    "partnerCategory": "CLIN",
+    "start": "2026-10-05T00:00:00+03:00",
+    "stop": "2026-10-05T00:00:00+03:00",
+    "uic": "7991962"
+  }
+}
+```
+
+#### getRefundForPhysician — Rambursare medic
+
+`POST /api/siui/general/getRefundForPhysician` — SiuiWS (document). Preluare de date.
+
+| Parametru | Tip WSDL |
+|---|---|
+| `partnerCategory` | `string` |
+| `start` | `dateTime` |
+| `stop` | `dateTime` |
+| `uic` | `string` |
+| `stencil` | `string` |
+
+```json
+{
+  "operation_id": "getRefundForPhysician-001",
+  "parameters": {
+    "partnerCategory": "CLIN",
+    "start": "2026-10-05T00:00:00+03:00",
+    "stop": "2026-10-05T00:00:00+03:00",
+    "uic": "7991962",
+    "stencil": "VALOARE_stencil"
+  }
+}
+```
+
+#### getRefundForInvoice — Rambursare factură
+
+`POST /api/siui/general/getRefundForInvoice` — SiuiWS (document). Preluare de date.
+
+| Parametru | Tip WSDL |
+|---|---|
+| `partnerCategory` | `string` |
+| `invoiceNumber` | `string` |
+| `invoiceDate` | `dateTime` |
+| `uic` | `string` |
+
+```json
+{
+  "operation_id": "getRefundForInvoice-001",
+  "parameters": {
+    "partnerCategory": "CLIN",
+    "invoiceNumber": "VALOARE_invoiceNumber",
+    "invoiceDate": "2026-10-05T00:00:00+03:00",
+    "uic": "7991962"
+  }
+}
+```
+
+#### getPhysicianCatalogues — Nomenclator medici
+
+`POST /api/siui/general/getPhysicianCatalogues` — SiuiWS (document). Preluare de date.
+
+Fără parametri: `parameters: {}`.
+
+```json
+{
+  "operation_id": "getPhysicianCatalogues-001",
+  "parameters": {}
+}
+```
+
+#### getInsured — Verificare asigurat după CNP
+
+`POST /api/siui/general/getInsured` — SiuiInsuredWS (rpc). Preluare de date.
+
+| Parametru | Tip WSDL |
+|---|---|
+| `pid` | `string` |
+| `requestDate` | `dateTime` |
+
+```json
+{
+  "operation_id": "getInsured-001",
+  "parameters": {
+    "pid": "VALOARE_pid",
+    "requestDate": "2026-10-05T00:00:00+03:00"
+  }
+}
+```
+
+#### getInsuredByCID — Verificare asigurat după CID
+
+`POST /api/siui/general/getInsuredByCID` — SiuiInsuredWS (rpc). Preluare de date.
+
+| Parametru | Tip WSDL |
+|---|---|
+| `cid` | `string` |
+| `requestDate` | `dateTime` |
+
+```json
+{
+  "operation_id": "getInsuredByCID-001",
+  "parameters": {
+    "cid": "VALOARE_cid",
+    "requestDate": "2026-10-05T00:00:00+03:00"
+  }
+}
+```
+
+#### getPersonInfo — Informații persoană
+
+`POST /api/siui/general/getPersonInfo` — SiuiInsuredWS (rpc). Preluare de date.
+
+| Parametru | Tip WSDL |
+|---|---|
+| `pid` | `string` |
+| `fromDate` | `dateTime` |
+
+```json
+{
+  "operation_id": "getPersonInfo-001",
+  "parameters": {
+    "pid": "VALOARE_pid",
+    "fromDate": "2026-10-05T00:00:00+03:00"
+  }
+}
+```
+
+#### validateReport — Validare raport la 72h — CLIN / PARA
+
+`POST /api/siui/general/validateReport` — SiuiValidateWS (rpc). Modifică/validează date; administrator obligatoriu.
+
+| Parametru | Tip WSDL |
+|---|---|
+| `reportXml` | `string` |
+| `reportType` | `string` |
+| `requestType` | `string` |
+
+```json
+{
+  "operation_id": "validateReport-001",
+  "parameters": {
+    "reportXml": "XML_COMPLET_CONFORM_XSD",
+    "reportType": "CLIN",
+    "requestType": "RQ_CLIN_SRV"
+  }
+}
+```
+
+Perechi acceptate: `CLIN` + `RQ_CLIN_SRV` cu ClinicSpecialityServicesValidateRequest.xsd; `PARA` + `RQ_PARA_SRV` cu ParaclinicServicesValidateRequest.xsd. Atributul XML reportType trebuie să coincidă. Trimiterea este imediată; bridge-ul nu așteaptă 72 de ore.
+
+### CLINICE
+
+#### getPrescription — Preluare rețetă SIUI
+
+`POST /api/siui/clinice/getPrescription` — SiuiValidateWS (rpc). Preluare de date.
+
+| Parametru | Tip WSDL |
+|---|---|
+| `serial` | `string` |
+| `number` | `string` |
+| `pid` | `string` |
+| `stencil` | `string` |
+
+```json
+{
+  "operation_id": "getPrescription-001",
+  "parameters": {
+    "serial": "VALOARE_serial",
+    "number": "VALOARE_number",
+    "pid": "VALOARE_pid",
+    "stencil": "VALOARE_stencil"
+  }
+}
+```
+
+#### getClinicReferral — Preluare bilet clinic
+
+`POST /api/siui/clinice/getClinicReferral` — SiuiValidateWS (rpc). Preluare de date.
+
+| Parametru | Tip WSDL |
+|---|---|
+| `serial` | `string` |
+| `number` | `string` |
+| `pid` | `string` |
+| `stencil` | `string` |
+
+```json
+{
+  "operation_id": "getClinicReferral-001",
+  "parameters": {
+    "serial": "VALOARE_serial",
+    "number": "VALOARE_number",
+    "pid": "VALOARE_pid",
+    "stencil": "VALOARE_stencil"
+  }
+}
+```
+
+#### getLabReferral — Preluare bilet paraclinic
+
+`POST /api/siui/clinice/getLabReferral` — SiuiValidateWS (rpc). Preluare de date.
+
+| Parametru | Tip WSDL |
+|---|---|
+| `serial` | `string` |
+| `number` | `string` |
+| `pid` | `string` |
+| `stencil` | `string` |
+
+```json
+{
+  "operation_id": "getLabReferral-001",
+  "parameters": {
+    "serial": "VALOARE_serial",
+    "number": "VALOARE_number",
+    "pid": "VALOARE_pid",
+    "stencil": "VALOARE_stencil"
+  }
+}
+```
+
+#### validatePrescription — Validare rețetă SIUI (nu PE)
+
+`POST /api/siui/clinice/validatePrescription` — SiuiValidateWS (rpc). Modifică/validează date; administrator obligatoriu.
+
+| Parametru | Tip WSDL |
+|---|---|
+| `reportXml` | `string` |
+| `reportType` | `string` |
+
+```json
+{
+  "operation_id": "validatePrescription-001",
+  "parameters": {
+    "reportXml": "XML_COMPLET_CONFORM_XSD",
+    "reportType": "CLIN"
+  }
+}
+```
+
+Operație SIUI pentru rețete, distinctă de processPrescribedPrescription din PE.
+
+#### validateClinicReferral — Validare bilet clinic
+
+`POST /api/siui/clinice/validateClinicReferral` — SiuiValidateWS (rpc). Modifică/validează date; administrator obligatoriu.
+
+| Parametru | Tip WSDL |
+|---|---|
+| `reportXml` | `string` |
+| `reportType` | `string` |
+
+```json
+{
+  "operation_id": "validateClinicReferral-001",
+  "parameters": {
+    "reportXml": "XML_COMPLET_CONFORM_XSD",
+    "reportType": "CLIN"
+  }
+}
+```
+
+#### validateLabReferral — Validare bilet paraclinic
+
+`POST /api/siui/clinice/validateLabReferral` — SiuiValidateWS (rpc). Modifică/validează date; administrator obligatoriu.
+
+| Parametru | Tip WSDL |
+|---|---|
+| `reportXml` | `string` |
+| `reportType` | `string` |
+
+```json
+{
+  "operation_id": "validateLabReferral-001",
+  "parameters": {
+    "reportXml": "XML_COMPLET_CONFORM_XSD",
+    "reportType": "CLIN"
+  }
+}
+```
+
+#### validateSickLeave — Validare concediu medical
+
+`POST /api/siui/clinice/validateSickLeave` — SiuiValidateWS (rpc). Modifică/validează date; administrator obligatoriu.
+
+| Parametru | Tip WSDL |
+|---|---|
+| `reportXml` | `string` |
+
+```json
+{
+  "operation_id": "validateSickLeave-001",
+  "parameters": {
+    "reportXml": "XML_COMPLET_CONFORM_XSD"
+  }
+}
+```
+
+#### processPrescribedPrescription — Validare rețetă electronică prescrisă (PE)
+
+`POST /api/siui/clinice/processPrescribedPrescription` — EPrescriptionWS (rpc). Modifică/validează date; administrator obligatoriu.
+
+| Parametru | Tip WSDL |
+|---|---|
+| `reportXml` | `string` |
+
+```json
+{
+  "operation_id": "processPrescribedPrescription-001",
+  "parameters": {
+    "reportXml": "XML_COMPLET_CONFORM_XSD"
+  }
+}
+```
+
+#### getPrescribedPrescription — Preluare rețetă electronică prescrisă
+
+`POST /api/siui/clinice/getPrescribedPrescription` — EPrescriptionWS (rpc). Preluare de date.
+
+| Parametru | Tip WSDL |
+|---|---|
+| `providerCode` | `string` |
+| `physicianStencilNo` | `string` |
+| `contractNo` | `string` |
+| `contractType` | `string` |
+| `insuranceHouseCode` | `string` |
+| `series` | `string` |
+| `no` | `string` |
+| `prescriptionDate` | `dateTime` |
+
+```json
+{
+  "operation_id": "getPrescribedPrescription-001",
+  "parameters": {
+    "providerCode": "7991962",
+    "physicianStencilNo": "VALOARE_physicianStencilNo",
+    "contractNo": "VALOARE_contractNo",
+    "contractType": "CLIN",
+    "insuranceHouseCode": "CAS-DJ",
+    "series": "VALOARE_series",
+    "no": "VALOARE_no",
+    "prescriptionDate": "2026-10-05T00:00:00+03:00"
+  }
+}
+```
+
+#### cancelPrescribedPrescription — Anulare rețetă electronică prescrisă
+
+`POST /api/siui/clinice/cancelPrescribedPrescription` — EPrescriptionWS (rpc). Modifică/validează date; administrator obligatoriu.
+
+| Parametru | Tip WSDL |
+|---|---|
+| `providerCode` | `string` |
+| `physicianStencilNo` | `string` |
+| `contractNo` | `string` |
+| `contractType` | `string` |
+| `insuranceHouseCode` | `string` |
+| `series` | `string` |
+| `no` | `string` |
+| `prescriptionDate` | `dateTime` |
+| `cancellationReason` | `string` |
+
+```json
+{
+  "operation_id": "cancelPrescribedPrescription-001",
+  "parameters": {
+    "providerCode": "7991962",
+    "physicianStencilNo": "VALOARE_physicianStencilNo",
+    "contractNo": "VALOARE_contractNo",
+    "contractType": "CLIN",
+    "insuranceHouseCode": "CAS-DJ",
+    "series": "VALOARE_series",
+    "no": "VALOARE_no",
+    "prescriptionDate": "2026-10-05T00:00:00+03:00",
+    "cancellationReason": "VALOARE_cancellationReason"
+  }
+}
+```
+
+#### downloadNotReportedPrescriptionsReport — Raport rețete neraportate
+
+`POST /api/siui/clinice/downloadNotReportedPrescriptionsReport` — EPrescriptionWS (rpc). Preluare de date.
+
+| Parametru | Tip WSDL |
+|---|---|
+| `insuranceHouseCode` | `string` |
+| `fromDate` | `dateTime` |
+| `toDate` | `dateTime` |
+| `providerCode` | `string` |
+| `stencilNo` | `string` |
+
+```json
+{
+  "operation_id": "downloadNotReportedPrescriptionsReport-001",
+  "parameters": {
+    "insuranceHouseCode": "CAS-DJ",
+    "fromDate": "2026-10-05T00:00:00+03:00",
+    "toDate": "2026-10-05T00:00:00+03:00",
+    "providerCode": "7991962",
+    "stencilNo": "VALOARE_stencilNo"
+  }
+}
+```
+
+#### getStatusForPrescriptions — Stare rețete
+
+`POST /api/siui/clinice/getStatusForPrescriptions` — EPrescriptionWS (rpc). Preluare de date.
+
+| Parametru | Tip WSDL |
+|---|---|
+| `insuranceHouseCode` | `string` |
+| `providerCode` | `string` |
+| `contractNo` | `string` |
+| `contractType` | `string` |
+| `startFrom` | `dateTime` |
+| `endTo` | `dateTime` |
+| `workPlaceCode` | `string` |
+
+```json
+{
+  "operation_id": "getStatusForPrescriptions-001",
+  "parameters": {
+    "insuranceHouseCode": "CAS-DJ",
+    "providerCode": "7991962",
+    "contractNo": "VALOARE_contractNo",
+    "contractType": "CLIN",
+    "startFrom": "2026-10-05T00:00:00+03:00",
+    "endTo": "2026-10-05T00:00:00+03:00",
+    "workPlaceCode": "VALOARE_workPlaceCode"
+  }
+}
+```
+
+#### getPrescribedPrescriptionsForCid — Rețete prescrise după CID
+
+`POST /api/siui/clinice/getPrescribedPrescriptionsForCid` — EPrescriptionWS (rpc). Preluare de date.
+
+| Parametru | Tip WSDL |
+|---|---|
+| `requestXml` | `string` |
+
+```json
+{
+  "operation_id": "getPrescribedPrescriptionsForCid-001",
+  "parameters": {
+    "requestXml": "XML_COMPLET_CONFORM_XSD"
+  }
+}
+```
+
+#### processHospitalPrescription — Validare rețetă în spitalizare
+
+`POST /api/siui/clinice/processHospitalPrescription` — EPrescriptionWS (rpc). Modifică/validează date; administrator obligatoriu.
+
+| Parametru | Tip WSDL |
+|---|---|
+| `reportXml` | `string` |
+
+```json
+{
+  "operation_id": "processHospitalPrescription-001",
+  "parameters": {
+    "reportXml": "XML_COMPLET_CONFORM_XSD"
+  }
+}
+```
+
+#### cancelReleasedHospitalPrescription — Anulare rețetă tipărită în spitalizare
+
+`POST /api/siui/clinice/cancelReleasedHospitalPrescription` — EPrescriptionWS (rpc). Modifică/validează date; administrator obligatoriu.
+
+| Parametru | Tip WSDL |
+|---|---|
+| `providerCode` | `string` |
+| `workplaceCode` | `string` |
+| `insuranceHouseCode` | `string` |
+| `series` | `string` |
+| `no` | `string` |
+| `fractionNo` | `int` |
+| `cancellationReason` | `string` |
+
+```json
+{
+  "operation_id": "cancelReleasedHospitalPrescription-001",
+  "parameters": {
+    "providerCode": "7991962",
+    "workplaceCode": "VALOARE_workplaceCode",
+    "insuranceHouseCode": "CAS-DJ",
+    "series": "VALOARE_series",
+    "no": "VALOARE_no",
+    "fractionNo": "0",
+    "cancellationReason": "VALOARE_cancellationReason"
+  }
+}
+```
+
+#### getReleasedHospitalPrescription — Preluare rețetă electronică în spitalizare
+
+`POST /api/siui/clinice/getReleasedHospitalPrescription` — EPrescriptionWS (rpc). Preluare de date.
+
+| Parametru | Tip WSDL |
+|---|---|
+| `providerCode` | `string` |
+| `workplaceCode` | `string` |
+| `insuranceHouseCode` | `string` |
+| `series` | `string` |
+| `no` | `string` |
+| `fractionNo` | `int` |
+
+```json
+{
+  "operation_id": "getReleasedHospitalPrescription-001",
+  "parameters": {
+    "providerCode": "7991962",
+    "workplaceCode": "VALOARE_workplaceCode",
+    "insuranceHouseCode": "CAS-DJ",
+    "series": "VALOARE_series",
+    "no": "VALOARE_no",
+    "fractionNo": "0"
+  }
+}
+```
+
+## Rute auxiliare și compatibilitate
+
+- `GET /api/siui/catalog`: operații și parametri WSDL, grupuri, caracterul de modificare și lista CAS.
+- `GET /api/siui/openapi.json`: document OpenAPI 3.0.3 generat din același catalog.
+- `GET /api/siui/status`: platformă, configurare și număr de lucrări active.
+- `GET /api/siui/settings`: administrator; configurare cu licență mascată și profiluri.
+- `PUT /api/siui/settings`: administrator; `fiscal_code`, `cas_code`, `licence` (opțional), `certificate_store`, `certificate_thumbprint`, `base_url`, `pe_base_url`, `allow_invalid_server_certificate_date`. Transmite configurația completă a profilului selectat. Salvarea fără token este permisă pentru pregătire pe Mac; selectarea unui certificat nou este validată în magazinul de certificate al platformei.
+- `GET /api/siui/certificates?store=CurrentUser`: administrator; inventarul tokenurilor/certificatelor. `LocalMachine` este alternativa.
+- Vechile rute `/insured`, `/ocsp-test`, `/personalization`, `/validations` rămân pentru compatibilitate. `/validations` rămâne PARA; noul `/general/validateReport` suportă CLIN și PARA. `/ocsp-test` nu divulgă tokenul, `/general/ocsp` îl întoarce administratorului.
+
+Excluse conform cerinței: validateEnlisted, validatePharmacyDrugs, processIssuedPrescription; nu sunt expuse în catalog, Debug sau dispatcher. Nu este implementat SDK-ul cardului pacientului.
+
+## Validare XML și interpretarea răspunsurilor
+
+Toate câmpurile XML sunt verificate sintactic: fără DTD/directive, fără entități externe, adâncime maximum 40 și limită 1 MiB. Validările SIUI folosesc XSD-urile locale pentru raport CLIN/PARA, prescripții, trimiteri și concedii. PE processPrescribedPrescription, processHospitalPrescription și getPrescribedPrescriptionsForCid verifică XSD-urile cererilor lor. sendReport verifică XML-ul sintactic; schema raportului și regulile de business depind de categoria CNAS și sunt evaluate de server. Celelalte șiruri respectă tipurile WSDL. Bridge-ul păstrează răspunsul SOAP ca valori exacte, inclusiv codurile numerice și XML-urile, pentru interpretare de către aplicația apelantă.
+
+## Diagnostic și testare
+
+Pe Windows și macOS 12+ sunt disponibile și operațiile CNAS reale, cu driverul tokenului și acces la cheia privată. Pe Linux amd64/arm64, accesul la token pentru TLS și CMS necesită biblioteca PKCS#11 configurată local; configurarea, JWT, catalogul, OpenAPI și testul simulat rămân disponibile. Testul local nu verifică un CNP real și nu comunică cu CNAS. Rulează întâi OCSP, apoi getInsured sau getProviderInfo. Operațiile de trimitere/anulare au efecte reale; folosește date autorizate și un ID stabil.
+
+401: autentificare invalidă/expirată; 403: rol insuficient; 400: parametri/date/XML incorecte; 409: configurație, token ocupat sau conflict ID; 503: worker/platformă indisponibilă. Erorile din execuție apar în `call.error`. Fault-urile SOAP sunt afișate în execuție, fără logarea XML-ului cererii. Un rezultat `unknown` nu se retrimite automat.
+
+TLS 12175 include flags WinHTTP: `0x20` valabilitate certificat server, `0x8` CA necunoscută, `0x10` nume incorect, `0x80000000` negociere Schannel. PIN-ul cerut de driver nu dovedește autentificarea CNAS. Excepția pentru data certificatului este opt-in și se salvează pe profil.
+
+## Surse
+
+- docs/CNAS/Specificatie Interfatare PIAS - Anexa 001 - Descriere_Servicii_WEB.pdf, versiunea 3.7.32 din 07.04.2026: servicii și adrese oficiale.
+- docs/CNAS/DefinitiiServiciiWeb/{SiuiWS,SiuiInsuredWS,SiuiValidateWS,EPrescriptionWS}.wsdl: nume, ordine, tipuri, namespace și binding SOAP.
+- docs/CNAS/StructuriValidare și StructuriPrescriptie: XSD-urile incluse în utilitar.
+- Anexele 007 (Clinice), 008 (Paraclinice), 010 (Concedii medicale), 017 (Prescripție electronică): structurile de raportare.
+- docs/CNAS/Nomenclatoare/NomenclatoareClinice_20261001.xml: lista CAS. Exemplele cu medici și celelalte specialități sunt referințe locale; nu sunt folosite ca răspunsuri fictive ale serviciilor reale.
+
+Testele automate folosesc simulatoare pentru toate operațiile; nu trimit date sau anulări către CNAS. Compatibilitatea efectivă a tokenului, contului și serviciilor CNAS se verifică pe calculatorul cu token, după instalarea buildului.
+
+
+## Token USB pe macOS
+
+Instalează driverul producătorului cu suport CryptoTokenKit. În Setări → CNAS alege **Utilizator curent / macOS Keychain** (valoarea API `CurrentUser`), apasă **Reîncarcă certificatele**, selectează certificatul valid al tokenului și salvează profilul. `LocalMachine` este exclusiv Windows. Enumerarea include identitățile Keychain, inclusiv cele furnizate de token; un certificat fără cheie privată nu este suficient.
+
+Bridge-ul accesează Security.framework direct, fără compilator, fără PKCS#11 configurat manual și fără fișiere CER sau export de cheie privată. Semnarea TLS se face prin driver; dialogul PIN/autorizare este afișat de macOS sau de driver. Pentru testare pornește utilitarul în sesiunea desktop a utilizatorului. Un serviciu de sistem fără sesiune grafică poate să nu poată afișa dialogul tokenului. Anularea cererii HTTP nu poate închide un dialog PIN deja deschis de driver.
+
+În Debug → GENERAL testează întâi OCSP. Apoi poți executa `getInsured` sau `getProviderInfo` prin aceeași interfață, API HTTPS/JWT sau WSM. PIN-ul poate fi configurat criptat prin endpointul administrativ token-pin, separat de configurația YAML; vezi secțiunea PIN criptat. Pentru validare XSD pe macOS este necesar `xmllint`.
+
+Transportul folosește TLS 1.2 și validarea nativă macOS a numelui și lanțului serverului. Opțiunea pentru certificatul CNAS expirat ignoră numai perioada de valabilitate; certificatele neîncredere și numele greșite rămân respinse. Intermediarii certificatului client sunt construiți în memorie din Keychain.
+
+Depanare: `security list-smartcards` verifică driverul CryptoTokenKit; `security find-identity -v -p ssl-client` verifică identitățile accesibile contului. Aceste comenzi pot afișa datele titularului: nu publica ieșirea integrală. Detectarea certificatului nu confirmă autentificarea CNAS; aceasta necesită testul OCSP cu contul și licența configurate.
+
+### Excepție explicită de revocare pe macOS
+
+Setări → CNAS → **Permite certificatul serverului CNAS revocat (macOS)** corespunde câmpului API/YAML `allow_revoked_server_certificate`, implicit `false`. Se salvează în profilul certificatului selectat. Opțiunea acceptă riscul folosirii unui certificat revocat de autoritatea emitentă și este separată de excepția pentru expirare.
+
+La eroarea nativă de revocare `-67820`, bridge-ul verifică din nou semnăturile lanțului, ancorele CA de sistem, numele DNS și utilizarea serverAuth, fără controlul de revocare. Expirarea rămâne verificată dacă opțiunea de valabilitate nu este activată. Un certificat necunoscut, un nume greșit sau o semnătură invalidă sunt respinse. Această opțiune nu schimbă transportul Windows.
+
+## Dashboard de test — factură electronică CNAS
+
+Acces: **Debug → FACTURĂ ELECTRONICĂ**. Datele HIT MED furnizate sunt încărcate implicit; previzualizarea locală nu necesită token sau conexiune CNAS. Formularul acoperă toate atributele din `ElectronicInvoice.xsd`: antet, contract, furnizor, CAS și articole multiple. `isSigned` este afișat numai informativ și nu poate fi setat în cererea de emitere. Sunt disponibile categoriile MF, PHM, CLIN, PARA, STOM, AMB, MD, HC, REC, SPT, NHP, DIA, SICK, CBRET și RECA din InvoiceItems furnizat. `providerCategory` din factură este distinct de `partnerCategory` al operațiilor generale. Codurile articolelor se selectează din InvoiceItems aplicabil categoriei și contractului.
+
+### Generare și test local
+
+`GET /api/siui/invoice/model` întoarce câmpurile, etichetele, caracterul obligatoriu, tipurile și lungimile din XSD, categoriile și nomenclatorul CAS.
+
+`POST /api/siui/invoice/preview` primește:
+
+```json
+{
+  "header": {
+    "serialCode":"TEST", "serialNumber":"1", "issueDate":"2026-10-12",
+    "startDate":"2026-10-01", "endDate":"2026-10-12", "orgUnitCode":"CAS-DJ",
+    "providerCode":"TEST-PARTNER", "providerCategory":"PARA",
+    "contractNumber":"TEST-CONTRACT", "contractType":"PARA", "contractDate":"2026-01-01"
+  },
+  "provider":{"fiscalCode":"00000000","companyName":"FURNIZOR FICTIV","capital":"0","signature":"REPREZENTANT TEST"},
+  "insurer":{"fiscalCode":"00000000","companyName":"CAS FICTIV"},
+  "items":[{"code":"TEST-COM-ITEM","description":"Exemplu fictiv","unitName":"serviciu","unitPrice":"10.25","quantity":"2","vat":"0.00"}],
+  "provider_address":"", "insurer_address":""
+}
+```
+
+Prețurile/cantitățile sunt șiruri zecimale, maximum 6 zecimale, cu punct. `vat` reprezintă **valoarea TVA**, nu cota procentuală, și acceptă cel mult două zecimale. Valorile articolelor sunt calculate exact și rotunjite la doi zecimale; totalurile sunt sumele lor, fără float. `ammount`, `totalAmmount`, `vatAmmount` se pot omite; dacă sunt furnizate, trebuie să corespundă calculelor. Ortografia `Ammount` este cea din schema CNAS. Valorile negative sunt păstrate pentru cazurile de corecție permise de CNAS, fără a presupune acceptarea lor contractuală.
+
+Răspunsul conține `data` normalizate, `invoice_xml`, `barcode_xml`, `barcode_zip_base64`, `barcode_png_base64`, `total_with_vat`, `barcode_format: DataMatrix`, `signed: false`, `cnas_contacted: false`. Ambele XML-uri sunt validate cu schemele CNAS locale. Nu se salvează datele introduse în browser sau în baza WiseMED. Schimbarea datelor invalidează previzualizarea.
+
+### Codul imprimabil
+
+Specificația PIAS 3.7.32, secțiunea 3.7.2, cere **DataMatrix**, nu QR. Anexa 008, secțiunea 2.4.2, precizează că datele sunt octeții XML-ului arhivat ZIP. Bridge-ul construiește `F`/`A` conform `InvoiceBarcode.xsd`, arhivează ca `invoice.xml` și codifică direct octeții ZIP în DataMatrix ECC200. Base64 este numai ambalajul JSON al răspunsului API, nu conținutul simbolului.
+
+PNG-ul are margine albă și se poate descărca sau tipări împreună cu previzualizarea. Nu se trunchiază datele dacă depășesc capacitatea codului; `barcode_warning` explică situația, iar PNG-ul nu este generat. Previzualizarea este marcată ca document de test, netrimis; nu constituie confirmare CNAS sau șablon fiscal certificat.
+
+### Semnare și trimitere efectivă
+
+`POST /api/siui/invoice/package`, administrator, corp `{"invoice_xml":"<invoice ...>...</invoice>"}`: validează XSD, semnează octeții XML prin CMS SignedData atașat (SHA-256), arhivează CMS în ZIP și întoarce `invoiceFile` Base64. Nu transmite către CNAS. macOS folosește cheia CryptoTokenKit; Windows folosește signerul CSP/KSP când este disponibil un PIN furnizat, altfel SignedCms din System.Security prin PowerShell. Linux folosește PKCS#11. PIN-ul poate fi furnizat criptat conform secțiunii PIN criptat. Cheia privată nu este exportată. Windows necesită sesiune/driver capabil să afișeze dialogul PIN.
+
+Butonul „Semnează cu tokenul și transmite” obține și afișează mai întâi un token OCSP în dashboardul de test, apoi semnează CMS și execută `sendEInvoice`, numai la acțiunea explicită a operatorului. Dacă verificarea OCSP eșuează, semnarea și transmiterea nu pornesc. Apelul SOAP reutilizează sesiunea verificată dacă are maximum 150 secunde și configurația coincide; altfel obține un token nou. Tokenul rămâne doar în pagina curentă, fără stocare pe disc. Endpointul este cel configurat la CNAS, inclusiv dacă este producție. Nu există retrimitere automată.
+
+| Endpoint POST `/api/siui/facturare/…` | Parametri `parameters` | Rezultat CNAS |
+|---|---|---|
+| `sendEInvoice` | `invoiceFile`: CMS → ZIP → Base64 | Număr de înregistrare 64 biți, păstrat ca șir în `values` |
+| `getEInvoice` | `serialCode`, `serialNumber`, `providerFiscalCode` | URL, dimensiune, număr de înregistrare; fișier descărcat prin bridge |
+| `getEInvoiceId` | aceleași trei câmpuri | ID SIUI destinat e-Factura ANAF și mesaj de eroare opțional; mesajul este pe poziția 2 în formatul cu două valori sau pe poziția 3 în formatul cu trei valori; dacă este nevid, apelul este marcat failed |
+| `getEInvoiceClearingNote` | aceleași trei câmpuri | URL și dimensiunea notei de refuz, dacă există |
+| `cancelEInvoice` | cele trei câmpuri + `cancellationDate` (dateTime), `cancellationReason` | Rezultatul anulării; administrator, operație cu efect real |
+
+Toate folosesc formatul comun `{"operation_id":"ID-stabil","parameters":{...}}`, execuție asincronă, JWT HTTPS / sesiune / WSM și urmărire prin `/api/siui/calls/{id}`. WSDL: `SiuiEInvoiceWS.wsdl`; endpoint SOAP: `/svapntws/services/SiuiEInvoiceWS`. Descărcarea pentru `getEInvoice` păstrează și al treilea element din răspuns. Anularea este disponibilă prin API/OpenAPI; dashboardul nu o execută automat.
+
+### Ce documente se așteaptă
+
+- `getReportFeedback`: răspunsul procesării raportării serviciilor.
+- `getRefund` / `getRefundForInvoice`: decontul/situația aferentă operației respective.
+- `getEInvoice`: factura înregistrată și numărul alocat; folosit inclusiv pentru reconciliere după timeout.
+- `getEInvoiceId`: identificatorul pentru asocierea cu e-Factura ANAF; trimiterea către ANAF este un flux separat.
+- `getEInvoiceClearingNote`: nota de refuz la plată, dacă a fost generată după procesare. Absența ei nu confirmă plata.
+
+Documentația furnizată nu identifică un „formular 13” și încă un formular cu numerotare universală obligatorie înainte de emitere. Nu este implementată o condiție bazată pe această presupunere. Denumirea completă și categoria/CAS trebuie confirmate pentru a stabili documentele exacte. Serviciile nu oferă în WSDL un termen fix de disponibilitate; dashboardul permite verificări explicite, fără buclă automată de retrimitere.
+
+Surse locale: `Specificatie Interfatare PIAS - Aplicatii_de_Raportare_pentru_Furnizori.pdf`, v3.7.32/07.04.2026, secțiunile 3.7 și 5.23–5.26; Anexa 001 (SiuiEInvoiceWS); Anexa 008 v3.7.31, secțiunile 2.4.1–2.4.2; `StructuriFacturare/ElectronicInvoice.xsd`, `InvoiceBarcode.xsd`; `DefinitiiServiciiWeb/SiuiEInvoiceWS.wsdl`.
+
+Validări automate: XSD pentru toate categoriile, aritmetică zecimală și totaluri, decodarea independentă a DataMatrix până la ZIP/XML identic, verificarea CMS prin OpenSSL cu certificat sintetic, contractele SOAP din WSDL și test vizual desktop/mobil. Aceste teste nu emit facturi reale și nu confirmă acceptarea contractului, a COM_ITEMS sau a semnăturii de către CNAS.
+
+
+### Actualizare debug factură și certificate — 13.10.2026
+
+Înainte de fiecare autentificare OCSP nativă se reenumeră certificatele prin aceeași funcție folosită de „Reîncarcă certificatele” din Setări → CNAS. Aceasta reia enumerarea identităților după conectarea/deconectarea tokenului pe macOS. Nu schimbă certificatul selectat sau profilul salvat. O eroare de enumerare oprește autentificarea; un timeout TCP către OCSP rămâne o eroare de conectivitate.
+
+`GET /api/siui/invoice/model` include `invoice_items`, snapshot cu cele 34 de intrări InvoiceItems furnizate de operator. Se păstrează variantele aceluiași cod pentru contracte diferite (HEMOGAMB, PETAMB). Comboboxul filtrează după providerCategory, contractType și validFrom raportat la issueDate; schimbarea articolului completează descrierea, care rămâne editabilă. Lista nu se actualizează automat din CNAS și nu certifică eligibilitatea contractuală.
+
+La deschiderea testului se încarcă factura HIT MED HIT24/0337, contract PAR 3131 din 30.06.2026, perioada septembrie 2026, emisă 13.10.2026, scadentă 30.10.2026, articol PARACLLAB, total 27937.65, TVA 0.00. Adresa implicită HIT MED este „Craiova str. Stefan cel Mare nr. 23”, iar adresa CAS este „Craiova Str. 1 Decembrie 1918”; acestea sunt folosite la tipărire și în DataMatrix. Butonul „Reîncarcă datele de test HIT MED” restaurează datele furnizate. Previzualizarea și încărcarea datelor nu transmit factura; transmiterea cere acțiunea operatorului și confirmarea existentă.
+
+
+### Logger OCSP, erori vizibile și adresă eFactura — 13.10.2026
+
+Fluxul comun OCSP scrie în loggerul runtime `SIUI OCSP: token obtinut cu succes`, înainte de apelul SOAP, cu operația și ID-ul apelului. Confirmarea este emisă numai după HTTP 200 și un antet OSCP_RESPONSE valid. Tokenul propriu-zis nu este scris în logger. La eșec apare `[ERROR] SIUI OCSP: autentificare esuata`, cu statusul HTTP când există și `token neobtinut`. HTTP 471 este păstrat ca răspuns de eroare; specificația PIAS locală v3.7.32 nu îi documentează semnificația.
+
+Erorile testelor GENERAL/CLINICE, facturii și validărilor apar cu text roșu, fundal și contur de alertă. Starea `unknown` este evidențiată la fel, deoarece necesită verificare înainte de retrimitere. În consola interactivă pornită cu `-showlog`, mesajele marcate `[ERROR]` sunt roșii (cu excepția NO_COLOR); fișierul zilnic păstrează text simplu.
+
+Setări → CNAS are secțiunea **Factură electronică CNAS (eFactura)**, cu URL și port separate de SIUI/PE. `einvoice_base_url` este originea HTTPS, fără calea serviciului; portul este salvat în URL, inclusiv în profilul certificatului. Configurațiile vechi fără această setare folosesc inițial `base_url`. După salvare, adresa eFactura este independentă. Toate operațiile SiuiEInvoiceWS și descărcările lor folosesc această origine. Autentificarea OCSP rămâne la adresa SIUI, iar PE folosește `pe_base_url`. Pentru domenii/porturi personalizate se păstrează regula existentă de configurare locală în config.yaml.
+
+
+### Parametri OCSP în debug — 13.10.2026
+
+`GET /api/siui/general/ocsp` (administrator) întoarce configurația efectivă de diagnostic fără să contacteze CNAS: metoda GET, URL-ul complet, portul, username, CUI/CAS extrase din username, magazinul și amprenta certificatului și existența licenței. Nu întoarce licența sau antetul Authorization. `POST` păstrează corpul `{}` și autentificarea existentă; răspunsul reușit include aceleași metadate și tokenul.
+
+Debug → GENERAL și verificarea dinaintea trimiterii facturii afișează parametrii înainte de conectare și îi păstrează la eroare. Loggerul scrie parametrii conexiunii înaintea fiecărei autentificări, pentru a identifica și tentativele care ajung la timeout. Datele providerCode/providerCategory/orgUnitCode din factură sunt afișate separat; nu suprascriu contul CNAS configurat. OCSP primește username=CUI_CODCAS, fără providerCategory. Selectorul partnerCategory aparține operațiilor SOAP precum getCatalogues; PARA selectează nomenclatoarele paraclinice.
+
+
+### Adresa conexiunii deasupra erorilor CNAS
+
+Erorile de autentificare, SOAP și descărcare includ primele linii `Server: https://.../cale` și `Port: ...`, urmate de mesajul erorii. Se folosește conexiunea din etapa care a eșuat: un eșec OCSP nu este etichetat cu adresa eFactura. Interfața afișează mesajul pe linii separate deasupra rezultatului JSON, cu evidențierea roșie existentă. Erorile locale din operații, înainte de conectare, indică faptul că nu a fost inițiată conexiunea. Parametrii query ai adreselor de descărcare nu sunt adăugați la antetul de diagnostic, deoarece pot conține tokenuri.
+
+
+### Loader și rezultat factură / limită OCSP — 13.10.2026
+
+Butonul de semnare folosește loaderul standard (`is-loading`, `aria-busy`) pe întreaga durată OCSP → CMS → transmitere → rezultat. Progresul și mesajul final sunt afișate și lângă buton, nu doar înaintea previzualizării. Erorile și rezultatele incerte rămân roșii după reactivarea butonului; clickurile repetate în timpul aceleiași operații sunt ignorate.
+
+Testul explicit OCSP și verificarea dinaintea semnării folosesc același endpoint `general/ocsp`. Limita sa și cea a `ocsp-test` au fost aliniate de la 25 la 120 secunde, cu păstrarea anulării cererii clientului. Debugul indică limita, iar loggerul arată timpul disponibil și durata efectivă. Un context deadline exceeded nu dovedește că serverul a respins categoria/factura; indică expirarea timpului înainte de finalizarea autentificării. Nu se retransmit automat facturi. Sesiunile OCSP se pot reutiliza între apeluri conform ferestrei de 150 secunde.
+
+Regresii DOM (jsdom opțional, instalat separat de aplicație): `NODE_PATH=/tmp/siui-ui-regression/node_modules node --test modules/localhttp/ui/siui-invoice-dom.test.cjs`. Scenarii: OCSP eșuat, CMS eșuat, polling eșuat, failed/unknown/completed, restaurarea butonului și ignorarea clickului duplicat. Toate folosesc API simulat, fără transmitere CNAS.
+
+
+### Reutilizare OCSP pentru maximum 150 secunde
+
+Sesiunea se păstrează exclusiv în memoria procesului, legată de configurația CNAS, inclusiv username (perechea CUI_CODCAS), licență, magazin/amprentă certificat și adrese/opțiuni TLS. Aceeași pereche CUI_CODCAS cu alt certificat sau altă configurație nu reutilizează sesiunea. La o vechime mai mare de 150 secunde se elimină tokenul și se obține unul nou. Un eșec de reautentificare nu readuce în uz tokenul expirat. Repornirea aplicației golește memoria.
+
+Răspunsul OCSP include `reused`, `age_seconds`, `token_id` și `message`. Debugul arată tokenul complet și vechimea; loggerul arată un identificator SHA-256 scurt, nu valoarea secretă. Rezultatul operației SOAP include metadatele `ocsp` pentru sesiunea folosită efectiv. Intervalul de 150 secunde este politica cerută de operator, nu o durată de valabilitate garantată de CNAS. Limita de așteptare pentru obținerea unui token nou rămâne 120 secunde.
+
+
+### Eșec de conectare înainte de transmiterea SOAP
+
+O eroare Go tipizată net.OpError cu Op=dial, inclusiv încapsulată în url.Error, este clasificată `failed`: conexiunea nu a fost stabilită pentru acel apel. Erorile în timpul scrierii/citirii și timeouturile fără dovada etapei rămân `unknown` pentru operațiile care modifică date. Clasificarea nu se bazează pe căutarea textului erorii. Nu se reexecută automat apelul și nu se modifică stările apelurilor anterioare din istoric.
+
+
+### Transport macOS: conexiuni TCP intermitente
+
+Transportul macOS folosește un DialContext cu maximum trei încercări de stabilire TCP, câte maximum 10 secunde, cu pauză de 500 ms între ele. Se repetă exclusiv o eroare tipizată de timeout la dial, înainte de TLS și înainte de transmiterea octeților HTTP. Nu se repetă POST-ul după trimitere, nici erorile TLS, read/write sau refuzurile de conectare. Limita totală a operației și anularea rămân active.
+
+Loggerul afișează server:port, numărul încercării, durata TCP și începutul/finalul negocierii TLS. Excepțiile configurate pentru certificatul serverului rămân aceleași; nu este introdusă o dezactivare globală a verificării TLS. Portul rămâne cel ales în Setări CNAS. Încercările TCP suplimentare atenuează conectivitatea intermitentă, fără să garanteze disponibilitatea serverului.
+
+
+### Reîncărcarea automată a certificatelor
+
+La pornirea SIUI Bridge și după autentificarea în interfață (inclusiv restaurarea unei sesiuni), se enumeră automat certificatele din magazinul configurat, folosind aceeași funcție nativă ca butonul „Reîncarcă certificate”. Deschiderea Setări → CNAS actualizează și lista vizibilă. Certificatul selectat și profilurile salvate se păstrează; nu se face autentificare OCSP în această etapă.
+
+`POST /api/siui/certificates/refresh` necesită autentificare, nu necesită configurarea credențialelor CNAS și nu expune lista certificatelor. Enumerarea nu interferează cu o operație activă pe token: în acel caz se afișează eroarea și se poate reîncerca din Setări → CNAS. Loggerul înregistrează rezultatul enumerării la pornire/autentificare; erorile nu blochează pornirea sau loginul și sunt afișate în interfață după login.
+
+SIUI poate returna pentru `getEInvoiceId` trei valori: `[număr înregistrare SIUI, BT-13, mesaj]`. A doua valoare este identificatorul BT-13 (corespondență confirmată de utilizator pe răspunsul SIUI), nu un mesaj de eroare; primele două valori se păstrează integral în `result.values` dacă mesajul final este gol. Exemplu: valoarea `1516712462512` de pe poziția 2 reprezintă BT-13. Mesajul „Factura are asociate raportări/deconturi dar nu a fost validată.” blochează folosirea ID-ului pentru e-Factura; bridge-ul îl tratează ca eroare și îl afișează prin fluxul existent de erori. Succesul transportului SOAP nu confirmă validarea CAS.
+
+
+### PIN criptat și autentificare prin driver
+
+În Setări → CNAS → PIN / parola tokenului se poate salva sau șterge PIN-ul certificatului activ. Interfața afișează numai `<hidden>` dacă există un PIN salvat. Câmpul de înlocuire este gol; salvarea setărilor generale nu modifică PIN-ul. Salvați mai întâi certificatul selectat. API-ul nu returnează nici PIN-ul, nici valoarea criptată.
+
+`GET /api/siui/token-pin` (administrator) întoarce `configured`, `hint`, `blocked`, `manual_required` și `pkcs11_module`. `PUT` acceptă `{ "pin": "..." }` pentru înlocuire, `{ "forget": true }` pentru ștergere, sau `{ "pin": "...", "manual": true }` pentru un PIN temporar, fără salvare pe disc. Nu introduceți valoarea literală `<hidden>` ca PIN. Câmpul gol din interfață nu trimite o modificare. Operațiile active pe token blochează schimbarea PIN-ului.
+
+PIN-ul temporar este disponibil în memorie timp de maximum 150 secunde, astfel încât aceeași acțiune să poată realiza OCSP, semnarea CMS și conexiunea SOAP. La prima eroare este eliminat. Folosirea lui suspendă PIN-ul salvat; succesul manual nu reactivează un PIN vechi care poate fi greșit.
+
+Stocarea folosește `siui-token-pins.json`, în directorul bazei de date SIUI, cu înregistrări legate de magazinul certificatului, amprentă și biblioteca PKCS#11. Pe Windows se folosește DPAPI în contextul contului aplicației. Pe macOS/Linux se folosește AES-256-GCM cu o cheie de instalare separată (`siui-token-pins.json.key`), accesibilă numai contului aplicației (0600). PIN-ul nu este scris în YAML, baza de date a operațiilor, loguri sau argumentele proceselor. Un backup care conține atât depozitul Unix, cât și cheia acestuia permite decriptarea și trebuie protejat. Schimbarea contului Windows necesită reconfigurarea PIN-ului DPAPI.
+
+Înainte ca un PIN salvat să fie predat driverului, depozitul este marcat persistent ca suspendat. Numai o semnătură reușită, verificată cu certificatul selectat, reactivează înregistrarea respectivă. La eroare, anulare înainte de confirmare sau oprirea procesului, suspendarea rămâne inclusiv după restart/reconectare. Nu există retry automat al PIN-ului prin alt backend și nu se retransmite automat factura. Eșecul poate fi de PIN, autorizare sau driver; mesajul nu pretinde că orice eroare este un PIN greșit. Pentru reactivare se salvează din nou PIN-ul corect.
+
+- macOS: `LAContext.setCredential` cu `smartCardPIN`, asociat identității CryptoTokenKit prin `kSecUseAuthenticationContext`. Încercarea automată interzice dialogurile interactive și elimină credentialul/invalidează contextul la încheiere. Fără PIN automat disponibil, operația următoare folosește fluxul clasic macOS. Suportul PIN-ului furnizat depinde de driver.
+- Windows: cheia certificatului este accesată prin CSP (`PP_SIGNATURE_PIN` / `PP_KEYEXCHANGE_PIN`) sau KSP (`NCRYPT_PIN_PROPERTY`), în mod silent pentru încercarea automată. Handle-urile partajate sunt refuzate pentru a evita păstrarea credentialului într-un context extern. În modul PIN furnizat, TLS și CMS folosesc signerul nativ în același proces; TLS folosește transportul Go cu verificarea CA/nume și excepția de dată configurată. Fără PIN disponibil, rămân WinHTTP și PowerShell/SignedCms pentru introducerea clasică. KSP suportă RSA/ECDSA; CSP suportă RSA.
+- Linux amd64/arm64: configurați **local** `modules.siui.pkcs11_module` cu calea absolută a bibliotecii producătorului sau OpenSC compatibile cu tokenul, apoi reporniți și reîncărcați certificatele. Calea nu poate fi modificată prin API-ul web, deoarece încărcarea unei biblioteci execută cod nativ. PKCS#11 este folosit atât pentru TLS client, cât și CMS (RSA PKCS#1 v1.5 / ECDSA, SHA-256/384/512). La `CKR_PIN_INCORRECT` nu se repetă loginul; un token blocat sau cu puține încercări rămase nu primește PIN salvat automat. Introducerea manuală se face prin PIN-ul temporar din setări; dispozitivele cu protected authentication path își gestionează interacțiunea. Cheile cu `CKA_ALWAYS_AUTHENTICATE` nu sunt încă suportate de această implementare. Pentru validarea XSD este necesar `xmllint`.
+
+Nu sunt implementate hook-uri în ferestre și nici un eveniment universal de solicitare PIN. Evenimentele de prezență (`SCardGetStatusChange`, `TKTokenWatcher`) sunt un mecanism separat; acest patch păstrează reenumerarea la pornire/login și la cerere.
+
+Verificări: teste pentru criptare, legarea de certificat, o singură încercare concurentă, suspendare după restart, expirarea PIN-ului temporar, răspunsuri API mascate și UI; test macOS al contextului LocalAuthentication fără accesarea unui token; compilare Windows; teste Linux cu SoftHSM izolat pentru semnare, TLS mutual, CMS, respingerea PIN-ului și recuperare manuală. Compatibilitatea cu fiecare middleware fizic Windows/macOS trebuie verificată separat. Nu s-a introdus un PIN pe tokenul fizic al utilizatorului și nu s-au transmis facturi către CNAS.
+
+Referințe: [Microsoft PIN property](https://learn.microsoft.com/en-us/windows/win32/seccng/key-storage-property-identifiers), [Microsoft smart card architecture](https://learn.microsoft.com/en-us/windows/security/identity-protection/smart-cards/smart-card-architecture), [Apple smartCardPIN](https://developer.apple.com/documentation/localauthentication/lacredentialtype/smartcardpin), [OASIS PKCS#11](https://docs.oasis-open.org/pkcs11/pkcs11-base/v2.40/cos01/pkcs11-base-v2.40-cos01.html).
