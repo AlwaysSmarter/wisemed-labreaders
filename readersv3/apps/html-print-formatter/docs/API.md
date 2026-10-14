@@ -22,7 +22,8 @@ cd output/html-print-formatter
 Pe Windows, executabilul este `html-print-formatter.exe`. Flags comune:
 `-config deployments/config.yaml`, `-showlog`, `-version`, `-headless`,
 `-installservice`, `-reconfigure`. Pornirea simplă nu cere configurarea unui
-echipament WiseMED; `-reconfigure` deschide wizard-ul comun când doriți integrarea.
+echipament WiseMED; `-reconfigure` permite configurarea serverului de login și a setărilor locale,
+fără înregistrare medicală.
 `-headless` detașează utilitarul ca daemon; Chromium este headless în ambele moduri.
 
 La prima pornire, runner-ul creează `deployments/config.yaml` din
@@ -57,6 +58,44 @@ JavaScript, fonturile, imaginile, cadrele și extragerea.
 Actualizările sunt activate implicit: app_id `html-print-formatter`, canal
 `stable`, server `http://127.0.0.1:19090`, auto_download `true`. Configurați serverul
 real în Setări; controalele de stare/verificare sunt cele comune WiseMED.
+
+## Utilitar independent și autentificare administrativă
+
+Conversiile HTTP (`/render`, `/pdf` și variantele JSON) și `/health` funcționează
+fără login, fără unitate medicală, fără tip de echipament și fără echipament ID.
+Utilitarul poate fi apelat de orice aplicație prin contractul HTTP documentat.
+Rămâne destinat documentelor de încredere și unei rețele interne controlate.
+
+Accesul la configurările administrative cere login valid la server. Configurați
+în `modules.wisemed-api` protocolul, hostul, portul, path-ul și cheia API a
+serverului de autentificare. Aceste date apar în formularul de inițializare;
+nu se mai cer unitate medicală, cod/serie/tip de echipament sau echipament ID.
+Serverul trebuie să implementeze contractul existent `PUT /administrative/login`
+cu username/password și să accepte autentificarea fără medical_unit_id, returnând
+login_token și datele utilizatorului. Nu este un adaptor OAuth/OIDC generic.
+
+Modul este activat automat de protocolul html-print-formatter, inclusiv pentru
+config.yaml existent. Nu se fac cereri pentru liste medicale sau înregistrarea
+`/administrative/analyzer` la pornire ori după login. Un login eșuat nu deschide
+accesul la setări. Sesiunile administrative sunt semnate cu o cheie aleatoare
+per proces și expiră la restart.
+
+Prima configurare a serverului este permisă din pagina de login cât timp
+conexiunea nu este complet configurată. După aceea, modificarea acestei conexiuni
+prin API cere o sesiune autentificată. Cheile și tokenul de login nu sunt expuse
+în răspunsurile publice. Pentru corectarea unei adrese greșite care împiedică
+loginul, editați config.yaml local și reporniți serviciul.
+
+**WSS rămâne disponibil și configurabil**, inclusiv transportul api.request pentru
+HTML și PDF. Activarea conexiunii este opțională și nu blochează funcționarea HTTP.
+Protocolul WSM existent cere o identitate de rutare (equipment_id) provisionată
+pe server și credențiale WSS; aceasta nu este o condiție pentru pornire/login.
+Pentru WSS setați `modules.wisemed-api.echipament_id` la identitatea provisionată
+și configurați URL-ul, cheia/tokenul, issuer, tenant și key_id în
+`modules.wisemed-ws`, apoi activați conexiunea. Nu este necesară o unitate medicală.
+Identitățile/cheile WSS existente sunt păstrate; formatterul nu încearcă să le
+reînregistreze prin endpointul medical. Fără identitate WSM, WSS raportează eroarea
+în status/loguri, iar conversiile HTTP și administrarea continuă să funcționeze.
 
 ## API HTTP
 
@@ -239,7 +278,7 @@ https://wkhtmltopdf.org/status
 ## WiseMED WebSocket
 
 Se folosește transportul standard WSM, comanda `api.request`, fără un WebSocket
-suplimentar. Configurați în Setări integrarea API de echipament și WSS, activați
+suplimentar. Configurați identitatea provisionată WSM și setările WSS, activați
 `modules.wisemed-ws.enabled`, provisionați identitatea/cheia echipamentului pe WSM.
 WSS este oprit în template până sunt disponibile credențiale valide. Nu există
 chei hardcodate. Clientul trebuie să aibă scope `api:invoke` și drepturi asupra

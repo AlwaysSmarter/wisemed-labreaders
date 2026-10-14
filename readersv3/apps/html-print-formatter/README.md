@@ -18,6 +18,10 @@ cd output/html-print-formatter
 ./html-print-formatter -showlog
 ```
 
+Pornirea și conversiile nu cer unitate medicală sau echipament ID. Administrarea
+folosește loginul la server; WSS rămâne disponibil opțional cu identitate WSM
+provisionată separat.
+
 Port implicit: `127.0.0.1:19113`. Verificare: `GET /health`.
 Descărcați `http://127.0.0.1:19113/help/request.json` și executați:
 

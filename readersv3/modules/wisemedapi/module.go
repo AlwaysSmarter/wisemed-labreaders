@@ -69,7 +69,7 @@ type wsRequester interface {
 type LoginRequest struct {
 	Username      string `json:"username"`
 	Password      string `json:"password"`
-	MedicalUnitID string `json:"medical_unit_id"`
+	MedicalUnitID string `json:"medical_unit_id,omitempty"`
 	DeviceID      string `json:"device_id"`
 	DeviceName    string `json:"device_name"`
 }
@@ -152,13 +152,18 @@ func (m *Module) Init(rt module.Runtime) error {
 	m.client = newWiseMEDHTTPClient(m.settings)
 	rt.RegisterService("wisemed-api", m)
 	rt.Handle("/api/wisemed/meta", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		features := []string{"administrative-login", "administrative-analyzer", "medicalunits", "wmanalyzertypes"}
+		if m.LoginOnly() {
+			features = []string{"administrative-login"}
+		}
 		writeJSON(w, http.StatusOK, map[string]interface{}{
 			"ok":                   true,
 			"module":               m.ID(),
 			"configured":           m.IsConfigured(),
 			"setup_complete":       m.SetupComplete(),
 			"equipment_registered": m.HasEquipmentID(),
-			"features":             []string{"administrative-login", "administrative-analyzer", "medicalunits", "wmanalyzertypes"},
+			"features":             features,
+			"login_only":           m.LoginOnly(),
 		})
 	}))
 	return nil
@@ -185,7 +190,27 @@ func (m *Module) Settings() map[string]string {
 }
 
 func (m *Module) PublicSettings() map[string]string {
-	return m.Settings()
+	settings := m.Settings()
+	if m.LoginOnly() {
+		for _, key := range []string{"cfg_wisemed_key", "login_token", "login_user_id", "api_key_echipament"} {
+			delete(settings, key)
+		}
+	}
+	return settings
+}
+
+// LoginOnly utilities use the server for administrative authentication, not
+// medical equipment registration. Detect the protocol for existing configs too.
+func (m *Module) LoginOnly() bool {
+	if m.rt == nil {
+		return false
+	}
+	service, ok := m.rt.Service("analyzer-config")
+	if !ok {
+		return false
+	}
+	settings, ok := service.(map[string]interface{})
+	return ok && strings.EqualFold(asString(settings["protocol"]), "html-print-formatter")
 }
 
 func (m *Module) IsConfigured() bool {
@@ -217,7 +242,7 @@ func (m *Module) SetupComplete() bool {
 }
 
 func (m *Module) HasEquipmentID() bool {
-	if m.skipSetupCompletion() {
+	if m.skipSetupCompletion() && !m.LoginOnly() {
 		return true
 	}
 	value := strings.TrimSpace(m.Settings()["echipament_id"])
@@ -249,7 +274,8 @@ func (m *Module) Bootstrap() (map[string]interface{}, error) {
 		"medical_units":        []map[string]interface{}{},
 		"analyzer_types":       []map[string]interface{}{},
 	}
-	if !m.IsConfigured() {
+	resp["login_only"] = m.LoginOnly()
+	if !m.IsConfigured() || m.LoginOnly() {
 		return resp, nil
 	}
 	medicalUnits, err := m.getJSONArray("/administrative/medicalunits")
@@ -272,6 +298,9 @@ func (m *Module) Login(req LoginRequest) (LoginResponse, error) {
 	settings := m.Settings()
 	if strings.TrimSpace(req.MedicalUnitID) == "" {
 		req.MedicalUnitID = settings["unitate_medicala_id"]
+	}
+	if m.LoginOnly() {
+		req.MedicalUnitID = ""
 	}
 	if strings.TrimSpace(req.DeviceID) == "" {
 		req.DeviceID = m.rt.ReaderID()
@@ -314,6 +343,9 @@ func (m *Module) EnsureEquipmentOnline(reader map[string]interface{}) (map[strin
 	return m.ensureEquipmentHTTP(reader)
 }
 func (m *Module) ensureEquipmentHTTP(reader map[string]interface{}) (map[string]interface{}, error) {
+	if m.LoginOnly() {
+		return map[string]interface{}{"registration_skipped": true, "echipament_id": m.Settings()["echipament_id"]}, nil
+	}
 	if !m.SetupComplete() {
 		return nil, errors.New("WiseMED setup is incomplete")
 	}
@@ -391,7 +423,7 @@ func (m *Module) FetchFileForAnalyzer(fileID, equipmentID string) (map[string]in
 }
 
 func (m *Module) skipSetupCompletion() bool {
-	return strings.EqualFold(strings.TrimSpace(m.Settings()["skip_setup_completion"]), "true")
+	return m.LoginOnly() || strings.EqualFold(strings.TrimSpace(m.Settings()["skip_setup_completion"]), "true")
 }
 
 func (c *OverrideClient) Settings() map[string]string {

@@ -1160,12 +1160,19 @@ func (m *Module) handleWiseMEDSetup(w http.ResponseWriter, r *http.Request) {
 	case http.MethodGet:
 		writeJSON(w, http.StatusOK, map[string]interface{}{
 			"ok":                   true,
+			"login_only":           m.loginOnlyUtility(),
 			"configured":           wiseMED.IsConfigured(),
 			"setup_complete":       wiseMED.SetupComplete(),
 			"equipment_registered": wiseMED.HasEquipmentID(),
 			"settings":             wiseMED.PublicSettings(),
 		})
 	case http.MethodPut:
+		if m.loginOnlyUtility() && wiseMED.IsConfigured() {
+			if _, ok := m.currentSession(r); !ok {
+				writeJSON(w, http.StatusUnauthorized, map[string]interface{}{"ok": false, "error": "Authentication required to change the login server"})
+				return
+			}
+		}
 		payload := map[string]interface{}{}
 		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]interface{}{"ok": false, "error": "invalid json body"})
@@ -1173,19 +1180,31 @@ func (m *Module) handleWiseMEDSetup(w http.ResponseWriter, r *http.Request) {
 		}
 		next := map[string]string{}
 		for key, value := range payload {
+			if m.loginOnlyUtility() {
+				switch key {
+				case "cfg_wisemed_protocol", "cfg_wisemed_ip", "cfg_wisemed_port", "cfg_wisemed_path", "cfg_wisemed_key":
+				default:
+					writeJSON(w, http.StatusBadRequest, map[string]interface{}{"ok": false, "error": "Unsupported login server setting"})
+					return
+				}
+				if key == "cfg_wisemed_key" && strings.TrimSpace(fmt.Sprint(value)) == "" {
+					continue
+				}
+			}
 			next[key] = fmt.Sprint(value)
 		}
-		settings, err := wiseMED.SaveSetup(next)
+		_, err := wiseMED.SaveSetup(next)
 		if err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]interface{}{"ok": false, "error": err.Error()})
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]interface{}{
 			"ok":                   true,
+			"login_only":           m.loginOnlyUtility(),
 			"configured":           wiseMED.IsConfigured(),
 			"setup_complete":       wiseMED.SetupComplete(),
 			"equipment_registered": wiseMED.HasEquipmentID(),
-			"settings":             settings,
+			"settings":             wiseMED.PublicSettings(),
 		})
 	default:
 		writeJSON(w, http.StatusMethodNotAllowed, map[string]interface{}{"ok": false, "error": "method not allowed"})
@@ -2620,7 +2639,7 @@ func (m *Module) appendAuditLog(r *http.Request, eventType, message string, meta
 }
 
 func (m *Module) sessionSecret() []byte {
-	if m.analyzerSetting("protocol", "") == "siui" {
+	if m.analyzerSetting("protocol", "") == "siui" || m.loginOnlyUtility() {
 		return m.utilitySessionKey
 	}
 	return []byte("wisemed-local-session:" + m.rt.ReaderID())
@@ -3124,6 +3143,10 @@ func (m *Module) analyzerSetting(key, fallback string) string {
 		}
 	}
 	return fallback
+}
+
+func (m *Module) loginOnlyUtility() bool {
+	return m.analyzerSetting("protocol", "") == "html-print-formatter"
 }
 
 func (m *Module) wiseMEDAPI() wiseMedAPIService {

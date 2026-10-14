@@ -101,3 +101,12 @@ test('formatter sends URL input and rejects ambiguous sources or invalid timeout
   assert.equal(calls[1].wait_for_print_ready,false);
   assert.equal(nodes['formatter-render'].disabled,false);
 });
+test('formatter login setup only asks for authentication server details', async () => {
+  const host={innerHTML:''};const calls=[];
+  const ctx=scope(['renderLoginSetupPanel'],{state:{},els:{loginSetupHost:host},escapeHtml:value=>value,document:{getElementById:()=>null},api:async path=>{calls.push(path);return {login_only:true,configured:true,setup_complete:false,settings:{}};}});
+  await ctx.renderLoginSetupPanel();
+  assert.deepEqual(calls,['/api/wisemed/setup']);
+  assert.match(host.innerHTML,/Server de autentificare/);
+  assert.match(host.innerHTML,/name="cfg_wisemed_ip"/);
+  for(const name of ['unitate_medicala_id','tip_de_echipament_id','cod_echipament','numar_serial_echipament']) assert.ok(!host.innerHTML.includes('name="'+name+'"'));
+});

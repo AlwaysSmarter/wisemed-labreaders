@@ -1637,7 +1637,7 @@ async function renderLoginSetupPanel() {
     return;
   }
   let bootstrap = { medical_units: [], analyzer_types: [] };
-  if (setupResp.configured) {
+  if (setupResp.configured && !setupResp.login_only) {
     try {
       bootstrap = await api("/api/wisemed/bootstrap");
     } catch (error) {
@@ -1663,7 +1663,7 @@ async function renderLoginSetupPanel() {
   els.loginSetupHost.innerHTML = `
     <section class="login-setup-panel">
       <div class="panel-head">
-        <h3>Initializare WiseMED</h3>
+        <h3>${setupResp.login_only ? "Server de autentificare" : "Initializare WiseMED"}</h3>
         <div class="inline-actions">
           <button id="wisemed-setup-refresh" type="button" class="ghost">Refresh</button>
         </div>
@@ -1678,8 +1678,8 @@ async function renderLoginSetupPanel() {
           <label><span>Port</span><input name="cfg_wisemed_port" value="${escapeHtml(settings.cfg_wisemed_port || "")}"></label>
           <label><span>Path</span><input name="cfg_wisemed_path" value="${escapeHtml(settings.cfg_wisemed_path || "/api")}"></label>
         </div>
-        <label><span>API key</span><input name="cfg_wisemed_key" value="${escapeHtml(settings.cfg_wisemed_key || "")}"></label>
-        <div class="two-col">
+        <label><span>API key</span><input type="password" name="cfg_wisemed_key" autocomplete="new-password" value="${escapeHtml(settings.cfg_wisemed_key || "")}"></label>
+        ${setupResp.login_only ? "" : `<div class="two-col">
           <label><span>Unitate medicala</span><select name="unitate_medicala_id">${muOptions}</select></label>
           <label><span>Tip echipament</span><select name="tip_de_echipament_id">${typeOptions}</select></label>
         </div>
@@ -1690,7 +1690,7 @@ async function renderLoginSetupPanel() {
         <div class="two-col">
           <label><span>Echipament ID</span><input value="${escapeHtml(settings.echipament_id || "")}" readonly></label>
           <label><span>API key echipament</span><input value="${escapeHtml(settings.api_key_echipament || "")}" readonly></label>
-        </div>
+        </div>`}
         <div class="orders-buttons">
           <button id="wisemed-setup-save" type="submit" class="ghost">Salveaza configurarea</button>
         </div>

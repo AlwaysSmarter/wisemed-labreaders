@@ -51,7 +51,7 @@ func ensureBootstrap(cfg *config.Config, reconfigure bool) (bool, error) {
 	}
 	apiClient := wisemedapi.NewBootstrapClient(stringSettings(settings), callerTypeForProtocol(cfg.Analyzer.Protocol))
 	apiClient.Tracef = startupConsolef
-	skipSetupCompletion := strings.EqualFold(strSetting(settings, "skip_setup_completion"), "true")
+	skipSetupCompletion := cfg.Analyzer.Protocol == "html-print-formatter" || strings.EqualFold(strSetting(settings, "skip_setup_completion"), "true")
 
 	if reconfigure || cfg.Reader.ID == "" {
 		promptTopLevelString(reader, "Reader ID", &cfg.Reader.ID, defaultReaderID(cfg))
@@ -275,7 +275,7 @@ func needsBootstrap(cfg *config.Config) bool {
 		"cfg_wisemed_path",
 		"cfg_wisemed_key",
 	}
-	if !strings.EqualFold(strSetting(ws, "skip_setup_completion"), "true") {
+	if cfg.Analyzer.Protocol != "html-print-formatter" && !strings.EqualFold(strSetting(ws, "skip_setup_completion"), "true") {
 		requiredSettings = append(requiredSettings,
 			"unitate_medicala_id",
 			"tip_de_echipament_id",
