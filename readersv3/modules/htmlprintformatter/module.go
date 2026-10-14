@@ -56,6 +56,7 @@ func (m *Module) Init(rt module.Runtime) error {
 	for _, path := range []string{"/render", "/render/html", "/render/url", "/api/html-print-formatter/render", "/pdf", "/api/html-print-formatter/pdf"} {
 		rt.Handle(path, http.HandlerFunc(m.handleRender))
 	}
+	rt.Handle("/api/html-print-formatter/token", http.HandlerFunc(m.handleToken))
 	rt.Handle("/health", http.HandlerFunc(m.handleHealth))
 	rt.Handle("/api/html-print-formatter/health", http.HandlerFunc(m.handleHealth))
 	rt.AddMenu(module.MenuEntry{ID: "html-print-formatter", Group: "primary", Label: "HTML Print Formatter", Path: "/help/", Order: 10})
@@ -102,6 +103,11 @@ func (m *Module) handleRender(w http.ResponseWriter, req *http.Request) {
 	if req.Method != http.MethodPost {
 		w.Header().Set("Allow", "POST")
 		writeError(w, failure("method_not_allowed", "Use POST", 405), id)
+		return
+	}
+	if err := m.authorize(req); err != nil {
+		w.Header().Set("WWW-Authenticate", `Bearer realm="html-print-formatter"`)
+		writeError(w, err, id)
 		return
 	}
 	ct, _, err := mime.ParseMediaType(req.Header.Get("Content-Type"))

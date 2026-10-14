@@ -1410,7 +1410,12 @@ async function renderHTMLFormatter(waitForPrintReady = true) {
       throw new Error("Timeout-ul trebuie să fie un număr întreg între 1 și 600000 ms.");
     }
     const body = JSON.stringify({ ...(htmlLink ? {html_link: htmlLink} : {html}), timeout_ms: timeoutMS, wait_for_print_ready: waitForPrintReady });
-    const response = await api("/api/html-print-formatter/pdf", {method:"POST", body});
+    const headers = {};
+    if (!window.WSM_REMOTE) {
+      const auth = await api("/api/html-print-formatter/token", {method:"POST", body:"{}"});
+      headers.Authorization = "Bearer " + auth.token;
+    }
+    const response = await api("/api/html-print-formatter/pdf", {method:"POST", body, headers});
     output.value = response.html;
     const bytes = Uint8Array.from(atob(response.pdf_base64), char => char.charCodeAt(0));
     state.formatterPDFURL = URL.createObjectURL(new Blob([bytes], {type: "application/pdf"}));

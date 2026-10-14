@@ -55,7 +55,9 @@ test('formatter mount loads only utility data', async () => {
 test('formatter rendering returns HTML as text through the shared API', async () => {
   const html = "<html>\n<p title=\"quoted\">'single' `backticks` \\ text</p>\n</html>";
   const nodes = {'formatter-html':{value:html},'formatter-html-link':{value:''},'formatter-timeout':{value:'120000'},'formatter-render':{},'formatter-pdf-direct':{},'formatter-notice':{},'formatter-output':{},'formatter-pdf-download':{removeAttribute(){}}};
-  const ctx = scope(['renderHTMLFormatter','clearHTMLFormatterPDF'], {state:{},URL:{createObjectURL:()=> 'blob:pdf',revokeObjectURL(){}},Blob,Uint8Array,atob,document:{getElementById:id=>nodes[id]},setButtonLoading(){},api:async(path, options)=>{
+  const ctx = scope(['renderHTMLFormatter','clearHTMLFormatterPDF'], {window:{WSM_REMOTE:null},state:{},URL:{createObjectURL:()=> 'blob:pdf',revokeObjectURL(){}},Blob,Uint8Array,atob,document:{getElementById:id=>nodes[id]},setButtonLoading(){},api:async(path, options)=>{
+    if(path.endsWith('/token')) return {token:'signed-test'};
+    assert.equal(options.headers.Authorization,'Bearer signed-test');
     assert.equal(path,'/api/html-print-formatter/pdf');assert.equal(options.method,'POST');
     assert.deepEqual(JSON.parse(options.body),{html,timeout_ms:120000,wait_for_print_ready:true});return {html:'<script>test()</script>',pdf_base64:btoa('%PDF-test'),request_id:'test'};
   }});
@@ -79,7 +81,7 @@ test('page errors retain their readable message in the utility UI', async () => 
 test('formatter sends URL input and rejects ambiguous sources or invalid timeouts', async () => {
   const nodes = {'formatter-html':{value:''},'formatter-html-link':{value:' https://example.org/report.html '},'formatter-timeout':{value:'45000'},'formatter-render':{},'formatter-pdf-direct':{},'formatter-notice':{},'formatter-output':{},'formatter-pdf-download':{removeAttribute(){}}};
   const calls = [];
-  const ctx = scope(['renderHTMLFormatter','clearHTMLFormatterPDF'], {state:{},URL:{createObjectURL:()=> 'blob:pdf',revokeObjectURL(){}},Blob,Uint8Array,atob,document:{getElementById:id=>nodes[id]},setButtonLoading(){},api:async(path,options)=>{calls.push(JSON.parse(options.body));return {html:'done',pdf_base64:btoa('%PDF-test'),request_id:'test'};}});
+  const ctx = scope(['renderHTMLFormatter','clearHTMLFormatterPDF'], {window:{WSM_REMOTE:null},state:{},URL:{createObjectURL:()=> 'blob:pdf',revokeObjectURL(){}},Blob,Uint8Array,atob,document:{getElementById:id=>nodes[id]},setButtonLoading(){},api:async(path,options)=>{if(path.endsWith('/token')) return {token:'signed-test'};calls.push(JSON.parse(options.body));return {html:'done',pdf_base64:btoa('%PDF-test'),request_id:'test'};}});
   await ctx.renderHTMLFormatter();
   assert.deepEqual(calls,[{html_link:'https://example.org/report.html',timeout_ms:45000,wait_for_print_ready:true}]);
   nodes['formatter-html'].value = '<html></html>';
@@ -109,4 +111,15 @@ test('formatter login setup only asks for authentication server details', async 
   assert.match(host.innerHTML,/Server de autentificare/);
   assert.match(host.innerHTML,/name="cfg_wisemed_ip"/);
   for(const name of ['unitate_medicala_id','tip_de_echipament_id','cod_echipament','numar_serial_echipament']) assert.ok(!host.innerHTML.includes('name="'+name+'"'));
+});
+
+test('formatter WSS relies on authenticated bridge without HTTP token issuance', async () => {
+  const nodes = {'formatter-html':{value:'<html>remote</html>'},'formatter-html-link':{value:''},'formatter-timeout':{value:'120000'},'formatter-render':{},'formatter-pdf-direct':{},'formatter-notice':{},'formatter-output':{},'formatter-pdf-download':{removeAttribute(){}}};
+  let count = 0;
+  const ctx = scope(['renderHTMLFormatter','clearHTMLFormatterPDF'], {window:{WSM_REMOTE:{}},state:{},URL:{createObjectURL:()=> 'blob:pdf',revokeObjectURL(){}},Blob,Uint8Array,atob,document:{getElementById:id=>nodes[id]},setButtonLoading(){},api:async(path,options)=>{
+    count++;assert.equal(path,'/api/html-print-formatter/pdf');assert.equal(options.headers.Authorization,undefined);
+    return {html:'remote',pdf_base64:btoa('%PDF-test'),request_id:'wss'};
+  }});
+  await ctx.renderHTMLFormatter(false);
+  assert.equal(count,1);assert.equal(nodes['formatter-output'].value,'remote');
 });

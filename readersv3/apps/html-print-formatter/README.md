@@ -22,11 +22,16 @@ Pornirea și conversiile nu cer unitate medicală sau echipament ID. Administrar
 folosește loginul la server; WSS rămâne disponibil opțional cu identitate WSM
 provisionată separat.
 
+Configurați `modules.html-print-formatter.jwt_keys` și `jwt_signing_key_id` în
+`deployments/config.yaml` înainte de conversii. API-ul cere JWT HS256 Bearer; fără
+chei accesul este blocat. Contractul JWT și exemplele PHP/Postman sunt în ghid.
+
 Port implicit: `127.0.0.1:19113`. Verificare: `GET /health`.
 Descărcați `http://127.0.0.1:19113/help/request.json` și executați:
 
 ```sh
 curl --fail-with-body -sS http://127.0.0.1:19113/render \
+  -H "Authorization: Bearer $JWT_TOKEN" \
   -H 'Content-Type: application/json' \
   --data-binary @request.json -o rendered.html
 ```

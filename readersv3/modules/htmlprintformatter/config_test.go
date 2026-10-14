@@ -46,6 +46,7 @@ func TestBasePreservesSource(t *testing.T) {
 
 func TestHTTPValidation(t *testing.T) {
 	s := Settings{MaxConcurrent: 1, MaxBodyBytes: 128, DefaultTimeoutMS: 1000}
+	s = testAuthSettings(s)
 	m := &Module{settings: s}
 	for _, tc := range []struct {
 		method, ct, body string
@@ -63,6 +64,7 @@ func TestHTTPValidation(t *testing.T) {
 	} {
 		req := httptest.NewRequest(tc.method, "/render", strings.NewReader(tc.body))
 		req.Header.Set("Content-Type", tc.ct)
+		req.Header.Set("Authorization", testBearer(t, s))
 		w := httptest.NewRecorder()
 		m.handleRender(w, req)
 		if w.Code != tc.status || !strings.Contains(w.Body.String(), `"code":"`+tc.code+`"`) || w.Header().Get("X-Request-ID") == "" {

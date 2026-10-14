@@ -1,0 +1,167 @@
+{
+  "info": {
+    "name": "HTML Print Formatter — JWT",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Set base_url, jwt_key_id and jwt_secret locally. Secrets must match modules.html-print-formatter.jwt_keys in config.yaml. Set html_link to use a public URL; otherwise html is sent. /render requires printReady; /pdf does not. Use Send and Download to save output. Requires Postman with Web Crypto support. Do not share populated secrets."
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{jwt_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://127.0.0.1:19113",
+      "type": "string"
+    },
+    {
+      "key": "jwt_key_id",
+      "value": "app-one",
+      "type": "string"
+    },
+    {
+      "key": "jwt_secret",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "html",
+      "value": "<!DOCTYPE html><html><head><meta charset=\"utf-8\"></head><body><h1>Raport</h1><script>document.querySelector(\"h1\").textContent=\"Raport final\";window.printReady=true;</script></body></html>",
+      "type": "string"
+    },
+    {
+      "key": "html_link",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "const keyId = pm.variables.get('jwt_key_id');",
+          "const secret = pm.variables.get('jwt_secret');",
+          "if (!keyId || !secret || new TextEncoder().encode(secret).length < 32) {",
+          "    throw new Error('Set jwt_key_id and jwt_secret to a configured config.yaml key (secret >= 32 bytes).');",
+          "}",
+          "const encode = bytes => btoa(String.fromCharCode(...bytes)).replace(/=/g, '').replace(/\\+/g, '-').replace(/\\//g, '_');",
+          "const json64 = value => encode(new TextEncoder().encode(JSON.stringify(value)));",
+          "const now = Math.floor(Date.now() / 1000);",
+          "const input = json64({alg:'HS256', typ:'JWT', kid:keyId}) + '.' + json64({",
+          "    iss:'html-print-formatter', aud:'html-print-formatter', sub:'postman', iat:now, exp:now + 300",
+          "});",
+          "const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), {name:'HMAC', hash:'SHA-256'}, false, ['sign']);",
+          "const signature = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(input));",
+          "pm.variables.set('jwt_token', input + '.' + encode(new Uint8Array(signature)));",
+          "const link = String(pm.variables.get('html_link') || '').trim();",
+          "pm.variables.set('request_body', JSON.stringify({",
+          "    ...(link ? {html_link:link} : {html:pm.variables.get('html')}),",
+          "    timeout_ms:120000",
+          "}));"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "HTML → DOM final",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Accept",
+            "value": "text/html"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{{request_body}}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/render",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "render"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Success\", () => pm.response.to.have.status(200));",
+              "pm.test(\"Content type\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"text/html\"));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "HTML → PDF direct",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Accept",
+            "value": "application/pdf"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{{request_body}}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/pdf",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "pdf"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Success\", () => pm.response.to.have.status(200));",
+              "pm.test(\"Content type\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/pdf\"));"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -27,6 +27,7 @@ import (
 
 func TestBrowserIntegration(t *testing.T) {
 	s, _ := ReadSettings(nil)
+	s = testAuthSettings(s)
 	if s.ChromePath == "" {
 		for _, p := range []string{"chromium", "chromium-browser", "google-chrome", "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"} {
 			if path, err := exec.LookPath(p); err == nil {
@@ -195,6 +196,7 @@ func TestBrowserIntegration(t *testing.T) {
 		body := json.RawMessage(`{"html":"<!DOCTYPE html><html><body><script>document.body.id='done';window.printReady=true</script></body></html>"}`)
 		req := httptest.NewRequest("POST", "/render", bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", testBearer(t, s))
 		w := httptest.NewRecorder()
 		mux.ServeHTTP(w, req)
 		if w.Code != 200 || w.Header().Get("Content-Type") != "text/html; charset=utf-8" {
@@ -293,10 +295,12 @@ requestAnimationFrame(()=>requestAnimationFrame(()=>document.body.dataset.frames
 		mux := http.NewServeMux()
 		mux.HandleFunc("/pdf", m.handleRender)
 		mux.HandleFunc("/api/html-print-formatter/pdf", m.handleRender)
+		mux.HandleFunc("/api/html-print-formatter/token", m.handleToken)
 		for _, in := range []Request{{HTML: `<!DOCTYPE html><html><body><h1>STATIC PDF</h1></body></html>`, TimeoutMS: 5000}, {HTMLLink: fixture.URL + "/static", TimeoutMS: 5000}} {
 			body, _ := json.Marshal(in)
 			req := httptest.NewRequest("POST", "/pdf", bytes.NewReader(body))
 			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("Authorization", testBearer(t, s))
 			w := httptest.NewRecorder()
 			mux.ServeHTTP(w, req)
 			if w.Code != 200 || w.Header().Get("Content-Type") != "application/pdf" || !bytes.HasPrefix(w.Body.Bytes(), []byte("%PDF-")) || w.Header().Get("Content-Disposition") != `attachment; filename="rendered.pdf"` {
@@ -324,9 +328,10 @@ requestAnimationFrame(()=>requestAnimationFrame(()=>document.body.dataset.frames
 		requireCode(t, err, "render_canceled")
 	})
 	t.Run("helper-browser-download", func(t *testing.T) {
-		m := &Module{settings: s, renderer: r}
+		m := &Module{settings: s, renderer: r, rt: sessionRuntime{authenticated: true}}
 		mux := http.NewServeMux()
 		mux.HandleFunc("/api/html-print-formatter/pdf", m.handleRender)
+		mux.HandleFunc("/api/html-print-formatter/token", m.handleToken)
 		mux.Handle("/help/", http.StripPrefix("/help/", http.FileServer(http.Dir("../../apps/html-print-formatter/deployments/help"))))
 		server := httptest.NewServer(mux)
 		defer server.Close()

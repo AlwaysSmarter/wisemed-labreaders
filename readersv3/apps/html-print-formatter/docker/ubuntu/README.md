@@ -101,6 +101,7 @@ No printReady signal is required by `/pdf`:
 
 ```sh
 curl --fail-with-body -sS http://127.0.0.1:19113/pdf \
+  -H "Authorization: Bearer $JWT_TOKEN" \
   -H 'Content-Type: application/json' \
   --data '{"html":"<!DOCTYPE html><html><body><h1>Linux PDF</h1></body></html>"}' \
   -o rendered.pdf
@@ -117,3 +118,13 @@ docker stop --time 30 html-print-formatter
 
 References: [Chrome Linux installation](https://support.google.com/chrome/answer/95346)
 and [Chromium sandbox/container troubleshooting](https://pptr.dev/troubleshooting).
+
+## JWT API authentication
+
+Edit the persistent `/app/deployments/config.yaml`: set
+`modules.html-print-formatter.jwt_keys` (key ID to secret mapping) and
+`jwt_signing_key_id` (browser signing key ID), then restart the container.
+Generate each secret using `openssl rand -hex 32`; do not bake secrets into the image.
+Existing config.yaml is preserved across updates. HTTP conversion returns 503 until
+keys are configured, and 401 without a valid Bearer JWT. See ../../docs/API.md and
+../../examples/html-print-formatter.postman_collection.json for the token contract.

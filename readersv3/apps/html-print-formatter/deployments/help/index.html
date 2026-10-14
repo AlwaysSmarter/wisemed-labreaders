@@ -10,8 +10,8 @@ td,th{border-bottom:1px solid #d6e3ec;text-align:left;padding:10px;vertical-alig
 a{color:#075985}nav{display:flex;gap:20px;flex-wrap:wrap}textarea{width:100%;box-sizing:border-box;min-height:160px;padding:12px}
 button{font:inherit;background:#075985;color:white;border:0;padding:9px 16px;border-radius:6px;margin:12px 12px 12px 0;cursor:pointer}button:disabled{opacity:.5}
 details{padding:18px;border:1px solid #d6e3ec;border-radius:8px;margin-top:24px}#status{white-space:pre-wrap}
-</style></head><body><main><nav><a href="/">Administrare WiseMED</a><a href="/health">Health</a><a href="example.html" download>Exemplu jQuery</a><a href="request.json" download>request.json pentru curl</a></nav>
-<details><summary>Test local HTML și PDF</summary><p>Completați HTML sau Link HTML. Randează așteaptă window.printReady; PDF direct nu cere acest semnal.</p>
+</style></head><body><main><nav><a href="/">Administrare WiseMED</a><a href="/health">Health</a><a href="example.html" download>Exemplu jQuery</a><a href="request.json" download>request.json pentru curl</a><a href="html-print-formatter.postman_collection.json" download>Colecție Postman</a><a href="pdf.php" download>Exemplu PHP</a></nav>
+<details><summary>Test local HTML și PDF</summary><p>Autentificați-vă mai întâi în Administrare WiseMED. Completați HTML sau Link HTML. Randează așteaptă window.printReady; PDF direct nu cere acest semnal.</p>
 <label>HTML<textarea id="request" aria-label="HTML" spellcheck="false"></textarea></label>
 <label>Link HTML<input id="html-link" type="url" placeholder="https://exemplu.ro/raport.html"></label>
 <label>Timeout (ms)<input id="timeout" type="number" min="1" max="600000" value="120000"></label>
@@ -42,8 +42,22 @@ default_render_timeout_ms: 120000</code></pre>
 </tbody></table></div>
 <p>Reporniți utilitarul după modificarea acestor setări. Pentru o altă adresă de bind folosiți <code>local_http.address</code> și <code>modules.local-http.address</code> în config. Implicit serviciul ascultă numai pe <code>127.0.0.1</code>, fără TLS. HTTP/HTTPS și setările WSS rămân cele comune WiseMED. Timeout-urile HTTP sunt 10s pentru headers, 30s pentru citirea cererii, 660s pentru scriere și 60s idle. Timeout-ul de randare începe după decodarea/validarea cererii și include așteptarea semaforului, încărcarea, JavaScript, fonturile, imaginile, cadrele și extragerea.</p>
 <p>Actualizările sunt activate implicit: app_id <code>html-print-formatter</code>, canal <code>stable</code>, server <code>http://127.0.0.1:19090</code>, auto_download <code>true</code>. Configurați serverul real în Setări; controalele de stare/verificare sunt cele comune WiseMED.</p>
+<h2>JWT pentru API și chei multiple</h2>
+<p>În <code>deployments/config.yaml</code>, configurați secrete independente. Generați fiecare secret cu <code>openssl rand -hex 32</code>; copiați rezultatul ca text, fără decodare hex. Nu folosiți textele demonstrative de mai jos ca secrete reale.</p>
+<pre><code>modules:
+  html-print-formatter:
+    jwt_keys:
+      app-one: &quot;&lt;secret aleator unic de minimum 32 bytes&gt;&quot;
+      app-two: &quot;&lt;alt secret aleator unic de minimum 32 bytes&gt;&quot;
+    jwt_signing_key_id: app-one</code></pre>
+<p>Secretele sunt citite numai din YAML, nu din variabile de mediu. Protejați accesul la fișier. Reporniți serviciul după adăugarea/eliminarea unei chei. Eliminarea unei chei invalidează tokenurile ei după restart. Toate cheile permit ambele operații; nu reprezintă roluri diferite. Nu există secret implicit în distribuție.</p>
+<p>Trimiteți <code>Authorization: Bearer &lt;JWT&gt;</code>. Header JWT obligatoriu: <code>alg=HS256</code>, <code>kid</code> identic cu un ID din <code>jwt_keys</code>. Claims obligatorii: <code>iss</code> și <code>aud</code> egale cu <code>html-print-formatter</code>, <code>sub</code> nevid (identificator client), <code>iat</code> și <code>exp</code> ca timestamp Unix în secunde. <code>exp</code> trebuie să fie în viitor; <code>iat</code> nu poate fi în viitor. <code>nbf</code> este verificat dacă există. Recomandăm tokenuri de 5 minute și ceasuri sincronizate. Tokenul este verificat la începutul cererii; expirarea nu întrerupe o conversie în curs.</p>
+<p>JWT absent/invalid/expirat produce HTTP 401, cod <code>unauthorized</code>. Lipsa cheilor produce HTTP 503, cod <code>auth_not_configured</code>. Sunt protejate și <code>/render/html</code>, <code>/render/url</code>, <code>/api/html-print-formatter/render</code>, <code>/api/html-print-formatter/pdf</code>.</p>
+<p>Interfața și testul din helper cer login administrativ și obțin un JWT valabil 5 minute prin <code>POST /api/html-print-formatter/token</code> (JSON, sesiune obligatorie). <code>jwt_signing_key_id</code> alege cheia folosită; lipsa ei blochează emiterea tokenurilor pentru browser, dar nu verificarea tokenurilor externe. Secretul nu este trimis în browser. Folosiți HTTPS pentru acces în rețea. WSS păstrează identitatea verificată de puntea WSM și nu cere acest Bearer suplimentar; un header HTTP nu poate simula identitatea WSS.</p>
+<h2>Postman și PHP</h2>
+<p>Importați <code>examples/html-print-formatter.postman_collection.json</code> în Postman. Colecția conține exact două cereri: <code>/render</code> (HTML final) și <code>/pdf</code> (PDF direct). Completați local <code>base_url</code>, <code>jwt_key_id</code> și <code>jwt_secret</code> cu cheia din config.yaml. Scriptul pre-request semnează automat HS256, cu Web Crypto, și generează corpul JSON. Variabila <code>html</code> acceptă HTML cu ghilimele și linii multiple; pentru un link completați <code>html_link</code> (are prioritate). Linkul folosit pentru <code>/render</code> trebuie să seteze <code>printReady</code>. Folosiți Send and Download pentru salvarea răspunsului. Nu distribuiți colecția cu secrete completate. Exemplul PHP complet este <code>examples/pdf.php</code>: setați <code>HTML_PRINT_JWT_SECRET</code>, <code>HTML_PRINT_JWT_KEY_ID</code>, opțional <code>HTML_PRINT_URL</code>, apoi rulați <code>php examples/pdf.php report.html</code>. Variabilele acestea sunt ale clientului PHP. Pentru comenzile curl de mai jos, setați <code>JWT_TOKEN</code> la un token semnat conform acestui contract.</p>
 <h2>Utilitar independent și autentificare administrativă</h2>
-<p>Conversiile HTTP (<code>/render</code>, <code>/pdf</code> și variantele JSON) și <code>/health</code> funcționează fără login, fără unitate medicală, fără tip de echipament și fără echipament ID. Utilitarul poate fi apelat de orice aplicație prin contractul HTTP documentat. Rămâne destinat documentelor de încredere și unei rețele interne controlate.</p>
+<p>Conversiile HTTP (<code>/render</code>, <code>/pdf</code> și variantele JSON) cer JWT Bearer. <code>/health</code> rămâne public. Nu sunt necesare unitate medicală, tip de echipament sau echipament ID. Utilitarul poate fi apelat de orice aplicație prin contractul HTTP documentat. Rămâne destinat documentelor de încredere și unei rețele interne controlate.</p>
 <p>Accesul la configurările administrative cere login valid la server. Configurați în <code>modules.wisemed-api</code> protocolul, hostul, portul, path-ul și cheia API a serverului de autentificare. Aceste date apar în formularul de inițializare; nu se mai cer unitate medicală, cod/serie/tip de echipament sau echipament ID. Serverul trebuie să implementeze contractul existent <code>PUT /administrative/login</code> cu username/password și să accepte autentificarea fără medical_unit_id, returnând login_token și datele utilizatorului. Nu este un adaptor OAuth/OIDC generic.</p>
 <p>Modul este activat automat de protocolul html-print-formatter, inclusiv pentru config.yaml existent. Nu se fac cereri pentru liste medicale sau înregistrarea <code>/administrative/analyzer</code> la pornire ori după login. Un login eșuat nu deschide accesul la setări. Sesiunile administrative sunt semnate cu o cheie aleatoare per proces și expiră la restart.</p>
 <p>Prima configurare a serverului este permisă din pagina de login cât timp conexiunea nu este complet configurată. După aceea, modificarea acestei conexiuni prin API cere o sesiune autentificată. Cheile și tokenul de login nu sunt expuse în răspunsurile publice. Pentru corectarea unei adrese greșite care împiedică loginul, editați config.yaml local și reporniți serviciul.</p>
@@ -75,14 +89,17 @@ default_render_timeout_ms: 120000</code></pre>
 <p>Exemplu cu fișierul demonstrativ jQuery livrat în helper:</p>
 <pre><code>curl --fail-with-body -sS http://127.0.0.1:19113/help/request.json -o request.json
 curl --fail-with-body -sS http://127.0.0.1:19113/render \
+  -H &quot;Authorization: Bearer $JWT_TOKEN&quot; \
   -H &#x27;Content-Type: application/json&#x27; \
   --data-binary @request.json -o rendered.html</code></pre>
 <p>Dacă schimbați portul, adaptați <code>base_url</code> în <code>request.json</code>. Pentru un HTML propriu, fără a scăpa manual ghilimelele:</p>
 <pre><code>python3 -c &#x27;import json,pathlib; print(json.dumps({&quot;html&quot;:pathlib.Path(&quot;report.html&quot;).read_text(),&quot;base_url&quot;:&quot;https://app.wisemed.eu/&quot;}))&#x27; &gt; request.json
 curl --fail-with-body -sS http://127.0.0.1:19113/render \
+  -H &quot;Authorization: Bearer $JWT_TOKEN&quot; \
   -H &#x27;Content-Type: application/json&#x27; --data-binary @request.json -o rendered.html</code></pre>
 <p>Exemplu link (înlocuiți adresa raportului):</p>
 <pre><code>curl --fail-with-body -sS http://127.0.0.1:19113/render/url \
+  -H &quot;Authorization: Bearer $JWT_TOKEN&quot; \
   -H &#x27;Content-Type: application/json&#x27; \
   --data &#x27;{&quot;html_link&quot;:&quot;https://example.org/report.html&quot;,&quot;timeout_ms&quot;:120000}&#x27; \
   -o rendered.html</code></pre>
@@ -107,17 +124,20 @@ curl --fail-with-body -sS http://127.0.0.1:19113/render \
 <p><code>/pdf</code> acceptă aceleași câmpuri de sursă, base_url, viewport și timeout ca <code>/render</code>, dar <strong>nu așteaptă window.printReady implicit</strong>. Este potrivit și pentru HTML static sau pagini HTTP(S) obișnuite. Scripturile paginii se execută normal; serviciul așteaptă document.readyState complete, fonturile, imaginile și două cadre. Nu așteaptă automat operații AJAX/timere care continuă după încărcare. Pentru acestea, pagina trebuie să semnalizeze explicit finalizarea.</p>
 <p>Opțional, <code>wait_for_print_ready: true</code> activează așteptarea obligatorie a <code>window.printReady === true</code> pentru PDF. Valoarea implicită este false, numai pentru endpointurile PDF. Endpointurile <code>/render</code> cer întotdeauna printReady, indiferent de acest câmp. <code>window.printError</code> produce eroare în ambele moduri.</p>
 <pre><code>curl --fail-with-body -sS http://127.0.0.1:19113/pdf \
+  -H &quot;Authorization: Bearer $JWT_TOKEN&quot; \
   -H &#x27;Content-Type: application/json&#x27; \
   --data &#x27;{&quot;html&quot;:&quot;&lt;!DOCTYPE html&gt;&lt;html&gt;&lt;body&gt;&lt;h1&gt;Raport PDF&lt;/h1&gt;&lt;/body&gt;&lt;/html&gt;&quot;,&quot;timeout_ms&quot;:120000}&#x27; \
   -o rendered.pdf
 
 curl --fail-with-body -sS http://127.0.0.1:19113/pdf \
+  -H &quot;Authorization: Bearer $JWT_TOKEN&quot; \
   -H &#x27;Content-Type: application/json&#x27; \
   --data &#x27;{&quot;html_link&quot;:&quot;https://example.org/&quot;,&quot;timeout_ms&quot;:120000}&#x27; \
   -o rendered.pdf</code></pre>
 <p>Pentru fișiere HTML cu ghilimele, apostrofuri și rânduri noi, folosiți un encoder:</p>
 <pre><code>python3 -c &#x27;import json,pathlib; print(json.dumps({&quot;html&quot;:pathlib.Path(&quot;report.html&quot;).read_text()}))&#x27; &gt; pdf-request.json
 curl --fail-with-body -sS http://127.0.0.1:19113/pdf \
+  -H &quot;Authorization: Bearer $JWT_TOKEN&quot; \
   -H &#x27;Content-Type: application/json&#x27; --data-binary @pdf-request.json -o rendered.pdf</code></pre>
 <p>Răspunsul de succes are Content-Type application/pdf, Content-Disposition attachment; filename=&quot;rendered.pdf&quot;, X-Request-ID și Cache-Control no-store. Erorile rămân JSON, cu aceleași coduri ca randarea; <code>pdf_failed</code> (502) indică un eșec al comenzii de imprimare Chromium. Timeout-ul include generarea PDF.</p>
 <p>Varianta HTTP/WSS <code>/api/html-print-formatter/pdf</code> întoarce:</p>
@@ -162,7 +182,7 @@ curl --fail-with-body -sS http://127.0.0.1:19113/pdf \
 <p><code>&lt;base&gt;</code> schimbă rezolvarea URL-urilor, <strong>nu originea documentului și nu CORS</strong>. Originea unui document inline este listenerul loopback intern, indiferent de base_url. AJAX/fetch către aplicația WiseMED rămâne cross-origin și are nevoie de permisiunile CORS, de autentificare și de regulile cookies/SameSite corespunzătoare. Pentru link, originea este URL-ul paginii navigate. Restricțiile CSP, mixed content și Local Network Access rămân active; nu dezactivăm securitatea browserului.</p>
 <p>Un singur proces Chromium este reutilizat. Fiecare cerere primește un browser context incognito separat și un tab propriu. Cookies/localStorage/cache de context nu sunt partajate între cereri. Contextul este închis inclusiv după eșec la crearea tabului, timeout și anulare. Dacă anularea apare în timpul alocării contextului, se recuperează întâi ID-ul acestuia pentru închidere (buget separat de cel mult 5s). Eliberarea contextului are cel mult 3s; o alocare/închidere CDP eșuată oprește browserul pentru a nu lăsa contexte active și necesită restartul utilitarului. Aceste bugete sunt pentru cleanup, fără continuarea procesării documentului. Procesul browser este oprit la shutdown; runtime-ul așteaptă închiderea modulelor. Un crash al procesului afectează randările active; health devine 503, iar serviciul trebuie repornit. Nu reîncercăm automat rapoartele.</p>
 <p>Chromium rulează sandboxed; inclusiv comportamentul chromedp care ar adăuga automat <code>--no-sandbox</code> pentru root este dezactivat. Restricțiile sistemului privind sandbox-ul trebuie rezolvate în instalare, nu prin dezactivarea protecției.</p>
-<p>Endpointurile de randare HTTP sunt interne, fără autentificare proprie, conform contractului curl. Login-ul WiseMED protejează administrarea și WSS cere identitate verificată. Nu publicați serviciul direct pe internet: HTML-ul execută JavaScript cu acces la rețeaua serverului, inclusiv servicii interne. Limita de corp și semaforul nu sunt limite de memorie/CPU pentru Chromium și nu fac sigur codul neîncredere. Linkurile și subresursele pot descărca date suplimentare; limita MAX_BODY_BYTES nu limitează totalul traficului browserului.</p>
+<p>Endpointurile de randare HTTP sunt interne și protejate prin JWT HS256. Login-ul WiseMED protejează administrarea și WSS cere identitate verificată. Nu publicați serviciul direct pe internet: HTML-ul execută JavaScript cu acces la rețeaua serverului, inclusiv servicii interne. Limita de corp și semaforul nu sunt limite de memorie/CPU pentru Chromium și nu fac sigur codul neîncredere. Linkurile și subresursele pot descărca date suplimentare; limita MAX_BODY_BYTES nu limitează totalul traficului browserului.</p>
 <p>Mesajele consolei, erorile JavaScript și mesajele de rețea sunt în logurile standard WiseMED, cu <code>request_id</code> (același din răspuns). Conținutul logat de pagina însăși poate include date sensibile; protejați accesul la logurile serviciului.</p>
 <h2>Build, distribuție și teste</h2>
 <pre><code>go build ./apps/html-print-formatter
@@ -185,7 +205,9 @@ async function renderPDF(waitForPrintReady){
     if(!!html.trim()===!!html_link)throw Error('Completați exact una dintre surse: HTML sau Link HTML.');
     if(!Number.isInteger(timeout_ms)||timeout_ms<1||timeout_ms>600000)throw Error('Timeout: număr întreg între 1 și 600000 ms.');
     const body=JSON.stringify({...html_link?{html_link}:{html},timeout_ms,wait_for_print_ready:waitForPrintReady});
-    const response=await fetch('/api/html-print-formatter/pdf',{method:'POST',headers:{'Content-Type':'application/json'},body});
+    const authResponse=await fetch('/api/html-print-formatter/token',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
+    const auth=await authResponse.json();if(!authResponse.ok)throw Error(auth.error?.message || 'Autentifică-te în interfața principală pentru a continua.');
+    const response=await fetch('/api/html-print-formatter/pdf',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+auth.token},body});
     const result=await response.json();if(!response.ok)throw Error(result.error?.message||'Generarea PDF a eșuat');
     output.value=result.html;const bytes=Uint8Array.from(atob(result.pdf_base64),c=>c.charCodeAt(0));
     downloadURL=URL.createObjectURL(new Blob([bytes],{type:'application/pdf'}));download.href=downloadURL;download.hidden=false;

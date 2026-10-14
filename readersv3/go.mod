@@ -3,6 +3,7 @@ module wisemed-labreaders/readersv3
 go 1.24.0
 
 require (
+	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/extrame/xls v0.0.1
 	github.com/gorilla/websocket v1.5.3
 	go.bug.st/serial v1.6.2
@@ -10,6 +11,7 @@ require (
 	gopkg.in/yaml.v3 v3.0.1
 	modernc.org/sqlite v1.46.1
 )
+
 
 require (
 	github.com/chromedp/cdproto v0.0.0-20250724212937-08a3db8b4327

@@ -3,6 +3,7 @@
 import html
 import json
 import re
+import shutil
 from pathlib import Path
 
 root = Path(__file__).resolve().parent
@@ -71,8 +72,8 @@ td,th{border-bottom:1px solid #d6e3ec;text-align:left;padding:10px;vertical-alig
 a{color:#075985}nav{display:flex;gap:20px;flex-wrap:wrap}textarea{width:100%;box-sizing:border-box;min-height:160px;padding:12px}
 button{font:inherit;background:#075985;color:white;border:0;padding:9px 16px;border-radius:6px;margin:12px 12px 12px 0;cursor:pointer}button:disabled{opacity:.5}
 details{padding:18px;border:1px solid #d6e3ec;border-radius:8px;margin-top:24px}#status{white-space:pre-wrap}
-</style></head><body><main><nav><a href="/">Administrare WiseMED</a><a href="/health">Health</a><a href="example.html" download>Exemplu jQuery</a><a href="request.json" download>request.json pentru curl</a></nav>
-<details><summary>Test local HTML și PDF</summary><p>Completați HTML sau Link HTML. Randează așteaptă window.printReady; PDF direct nu cere acest semnal.</p>
+</style></head><body><main><nav><a href="/">Administrare WiseMED</a><a href="/health">Health</a><a href="example.html" download>Exemplu jQuery</a><a href="request.json" download>request.json pentru curl</a><a href="html-print-formatter.postman_collection.json" download>Colecție Postman</a><a href="pdf.php" download>Exemplu PHP</a></nav>
+<details><summary>Test local HTML și PDF</summary><p>Autentificați-vă mai întâi în Administrare WiseMED. Completați HTML sau Link HTML. Randează așteaptă window.printReady; PDF direct nu cere acest semnal.</p>
 <label>HTML<textarea id="request" aria-label="HTML" spellcheck="false"></textarea></label>
 <label>Link HTML<input id="html-link" type="url" placeholder="https://exemplu.ro/raport.html"></label>
 <label>Timeout (ms)<input id="timeout" type="number" min="1" max="600000" value="120000"></label>
@@ -92,7 +93,9 @@ async function renderPDF(waitForPrintReady){
     if(!!html.trim()===!!html_link)throw Error('Completați exact una dintre surse: HTML sau Link HTML.');
     if(!Number.isInteger(timeout_ms)||timeout_ms<1||timeout_ms>600000)throw Error('Timeout: număr întreg între 1 și 600000 ms.');
     const body=JSON.stringify({...html_link?{html_link}:{html},timeout_ms,wait_for_print_ready:waitForPrintReady});
-    const response=await fetch('/api/html-print-formatter/pdf',{method:'POST',headers:{'Content-Type':'application/json'},body});
+    const authResponse=await fetch('/api/html-print-formatter/token',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
+    const auth=await authResponse.json();if(!authResponse.ok)throw Error(auth.error?.message || 'Autentifică-te în interfața principală pentru a continua.');
+    const response=await fetch('/api/html-print-formatter/pdf',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+auth.token},body});
     const result=await response.json();if(!response.ok)throw Error(result.error?.message||'Generarea PDF a eșuat');
     output.value=result.html;const bytes=Uint8Array.from(atob(result.pdf_base64),c=>c.charCodeAt(0));
     downloadURL=URL.createObjectURL(new Blob([bytes],{type:'application/pdf'}));download.href=downloadURL;download.hidden=false;
@@ -110,3 +113,6 @@ window.addEventListener('pagehide',()=>{if(downloadURL)URL.revokeObjectURL(downl
     "viewport_width": 1280,
     "viewport_height": 900,
 }, ensure_ascii=False, indent=2) + "\n")
+
+for name in ("html-print-formatter.postman_collection.json", "pdf.php"):
+    shutil.copyfile(root / "examples" / name, help_dir / name)

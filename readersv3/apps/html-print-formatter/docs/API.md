@@ -59,10 +59,62 @@ Actualizările sunt activate implicit: app_id `html-print-formatter`, canal
 `stable`, server `http://127.0.0.1:19090`, auto_download `true`. Configurați serverul
 real în Setări; controalele de stare/verificare sunt cele comune WiseMED.
 
+## JWT pentru API și chei multiple
+
+În `deployments/config.yaml`, configurați secrete independente. Generați fiecare
+secret cu `openssl rand -hex 32`; copiați rezultatul ca text, fără decodare hex.
+Nu folosiți textele demonstrative de mai jos ca secrete reale.
+
+```yaml
+modules:
+  html-print-formatter:
+    jwt_keys:
+      app-one: "<secret aleator unic de minimum 32 bytes>"
+      app-two: "<alt secret aleator unic de minimum 32 bytes>"
+    jwt_signing_key_id: app-one
+```
+
+Secretele sunt citite numai din YAML, nu din variabile de mediu. Protejați accesul
+la fișier. Reporniți serviciul după adăugarea/eliminarea unei chei. Eliminarea unei
+chei invalidează tokenurile ei după restart. Toate cheile permit ambele operații;
+nu reprezintă roluri diferite. Nu există secret implicit în distribuție.
+
+Trimiteți `Authorization: Bearer <JWT>`. Header JWT obligatoriu: `alg=HS256`,
+`kid` identic cu un ID din `jwt_keys`. Claims obligatorii: `iss` și `aud` egale cu
+`html-print-formatter`, `sub` nevid (identificator client), `iat` și `exp` ca timestamp
+Unix în secunde. `exp` trebuie să fie în viitor; `iat` nu poate fi în viitor.
+`nbf` este verificat dacă există. Recomandăm tokenuri de 5 minute și ceasuri sincronizate.
+Tokenul este verificat la începutul cererii; expirarea nu întrerupe o conversie în curs.
+
+JWT absent/invalid/expirat produce HTTP 401, cod `unauthorized`. Lipsa cheilor produce
+HTTP 503, cod `auth_not_configured`. Sunt protejate și `/render/html`, `/render/url`,
+`/api/html-print-formatter/render`, `/api/html-print-formatter/pdf`.
+
+Interfața și testul din helper cer login administrativ și obțin un JWT valabil 5 minute
+prin `POST /api/html-print-formatter/token` (JSON, sesiune obligatorie). `jwt_signing_key_id`
+alege cheia folosită; lipsa ei blochează emiterea tokenurilor pentru browser, dar nu
+verificarea tokenurilor externe. Secretul nu este trimis în browser. Folosiți HTTPS
+pentru acces în rețea. WSS păstrează identitatea verificată de puntea WSM și nu cere
+acest Bearer suplimentar; un header HTTP nu poate simula identitatea WSS.
+
+## Postman și PHP
+
+Importați `examples/html-print-formatter.postman_collection.json` în Postman.
+Colecția conține exact două cereri: `/render` (HTML final) și `/pdf` (PDF direct).
+Completați local `base_url`, `jwt_key_id` și `jwt_secret` cu cheia din config.yaml.
+Scriptul pre-request semnează automat HS256, cu Web Crypto, și generează corpul JSON.
+Variabila `html` acceptă HTML cu ghilimele și linii multiple; pentru un link completați
+`html_link` (are prioritate). Linkul folosit pentru `/render` trebuie să seteze `printReady`.
+Folosiți Send and Download pentru salvarea răspunsului. Nu distribuiți colecția cu
+secrete completate. Exemplul PHP complet este `examples/pdf.php`: setați
+`HTML_PRINT_JWT_SECRET`, `HTML_PRINT_JWT_KEY_ID`, opțional `HTML_PRINT_URL`, apoi
+rulați `php examples/pdf.php report.html`. Variabilele acestea sunt ale clientului PHP.
+Pentru comenzile curl de mai jos, setați `JWT_TOKEN` la un token semnat conform acestui contract.
+
 ## Utilitar independent și autentificare administrativă
 
-Conversiile HTTP (`/render`, `/pdf` și variantele JSON) și `/health` funcționează
-fără login, fără unitate medicală, fără tip de echipament și fără echipament ID.
+Conversiile HTTP (`/render`, `/pdf` și variantele JSON) cer JWT Bearer. `/health`
+rămâne public. Nu sunt necesare unitate medicală, tip de echipament sau echipament ID.
 Utilitarul poate fi apelat de orice aplicație prin contractul HTTP documentat.
 Rămâne destinat documentelor de încredere și unei rețele interne controlate.
 
@@ -146,6 +198,7 @@ Exemplu cu fișierul demonstrativ jQuery livrat în helper:
 ```sh
 curl --fail-with-body -sS http://127.0.0.1:19113/help/request.json -o request.json
 curl --fail-with-body -sS http://127.0.0.1:19113/render \
+  -H "Authorization: Bearer $JWT_TOKEN" \
   -H 'Content-Type: application/json' \
   --data-binary @request.json -o rendered.html
 ```
@@ -156,6 +209,7 @@ Pentru un HTML propriu, fără a scăpa manual ghilimelele:
 ```sh
 python3 -c 'import json,pathlib; print(json.dumps({"html":pathlib.Path("report.html").read_text(),"base_url":"https://app.wisemed.eu/"}))' > request.json
 curl --fail-with-body -sS http://127.0.0.1:19113/render \
+  -H "Authorization: Bearer $JWT_TOKEN" \
   -H 'Content-Type: application/json' --data-binary @request.json -o rendered.html
 ```
 
@@ -163,6 +217,7 @@ Exemplu link (înlocuiți adresa raportului):
 
 ```sh
 curl --fail-with-body -sS http://127.0.0.1:19113/render/url \
+  -H "Authorization: Bearer $JWT_TOKEN" \
   -H 'Content-Type: application/json' \
   --data '{"html_link":"https://example.org/report.html","timeout_ms":120000}' \
   -o rendered.html
@@ -205,11 +260,13 @@ indiferent de acest câmp. `window.printError` produce eroare în ambele moduri.
 
 ```sh
 curl --fail-with-body -sS http://127.0.0.1:19113/pdf \
+  -H "Authorization: Bearer $JWT_TOKEN" \
   -H 'Content-Type: application/json' \
   --data '{"html":"<!DOCTYPE html><html><body><h1>Raport PDF</h1></body></html>","timeout_ms":120000}' \
   -o rendered.pdf
 
 curl --fail-with-body -sS http://127.0.0.1:19113/pdf \
+  -H "Authorization: Bearer $JWT_TOKEN" \
   -H 'Content-Type: application/json' \
   --data '{"html_link":"https://example.org/","timeout_ms":120000}' \
   -o rendered.pdf
@@ -220,6 +277,7 @@ Pentru fișiere HTML cu ghilimele, apostrofuri și rânduri noi, folosiți un en
 ```sh
 python3 -c 'import json,pathlib; print(json.dumps({"html":pathlib.Path("report.html").read_text()}))' > pdf-request.json
 curl --fail-with-body -sS http://127.0.0.1:19113/pdf \
+  -H "Authorization: Bearer $JWT_TOKEN" \
   -H 'Content-Type: application/json' --data-binary @pdf-request.json -o rendered.pdf
 ```
 
@@ -402,8 +460,7 @@ Chromium rulează sandboxed; inclusiv comportamentul chromedp care ar adăuga
 automat `--no-sandbox` pentru root este dezactivat. Restricțiile sistemului privind
 sandbox-ul trebuie rezolvate în instalare, nu prin dezactivarea protecției.
 
-Endpointurile de randare HTTP sunt interne, fără autentificare proprie, conform
-contractului curl. Login-ul WiseMED protejează administrarea și WSS cere identitate
+Endpointurile de randare HTTP sunt interne și protejate prin JWT HS256. Login-ul WiseMED protejează administrarea și WSS cere identitate
 verificată. Nu publicați serviciul direct pe internet: HTML-ul execută JavaScript
 cu acces la rețeaua serverului, inclusiv servicii interne. Limita de corp și
 semaforul nu sunt limite de memorie/CPU pentru Chromium și nu fac sigur codul

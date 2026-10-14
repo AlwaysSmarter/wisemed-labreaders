@@ -59,6 +59,12 @@ modules:
     heartbeat_ms: 15000
     reconnect_delay_ms: 30000
   html-print-formatter:
+    # Required for HTTP render/PDF. Generate each secret with: openssl rand -hex 32
+    # jwt_keys:
+    #   app-one: "<unique random secret, minimum 32 bytes>"
+    #   app-two: "<another unique random secret, minimum 32 bytes>"
+    jwt_keys: {}
+    jwt_signing_key_id: "" # Key ID used for short-lived browser tokens after login.
     chrome_path: "" # Auto-detect Chrome/Chromium; CHROME_PATH overrides this value.
     max_concurrent_renders: 2
     max_body_bytes: 4194304

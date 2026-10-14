@@ -1,6 +1,7 @@
 package htmlprintformatter
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"os"
@@ -11,6 +12,8 @@ import (
 const MaxTimeoutMS = 600000
 
 type Settings struct {
+	JWTKeys          map[string]string
+	JWTSigningKeyID  string
 	ChromePath       string
 	MaxConcurrent    int
 	MaxBodyBytes     int64
@@ -27,6 +30,30 @@ func ReadSettings(raw map[string]interface{}) (Settings, error) {
 			return fmt.Sprint(v)
 		}
 		return ""
+	}
+	if raw["jwt_keys"] != nil {
+		data, err := json.Marshal(raw["jwt_keys"])
+		if err != nil {
+			return s, fmt.Errorf("jwt_keys must be a mapping of key IDs to secrets")
+		}
+		if err = json.Unmarshal(data, &s.JWTKeys); err != nil {
+			return s, fmt.Errorf("jwt_keys must be a mapping of key IDs to secrets")
+		}
+		for id, secret := range s.JWTKeys {
+			if strings.TrimSpace(id) == "" || len(id) > 128 || strings.TrimSpace(id) != id || len(strings.TrimSpace(secret)) < 32 {
+				return s, fmt.Errorf("jwt_keys requires nonempty IDs (max 128 characters) and secrets of at least 32 bytes")
+			}
+		}
+	}
+	if v, exists := raw["jwt_signing_key_id"]; exists {
+		id, ok := v.(string)
+		if !ok {
+			return s, fmt.Errorf("jwt_signing_key_id must be a string")
+		}
+		s.JWTSigningKeyID = id
+	}
+	if s.JWTSigningKeyID != "" && s.JWTKeys[s.JWTSigningKeyID] == "" {
+		return s, fmt.Errorf("jwt_signing_key_id must reference jwt_keys")
 	}
 	s.ChromePath = value("chrome_path", "CHROME_PATH")
 	for _, item := range []struct {
