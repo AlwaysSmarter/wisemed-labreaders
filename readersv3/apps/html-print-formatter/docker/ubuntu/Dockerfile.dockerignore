@@ -1,0 +1,21 @@
+# Allow only the application and shared source; exclude local deployments/secrets.
+**
+!go.mod
+!go.sum
+!apps/
+!apps/runner/
+!apps/runner/**
+!apps/html-print-formatter/
+!apps/html-print-formatter/**
+!core/
+!core/**
+!modules/
+!modules/**
+!shared/
+!shared/**
+**/config.yaml
+**/*.log
+**/*.db
+**/*.db-shm
+**/*.db-wal
+**/.DS_Store

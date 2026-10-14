@@ -1,0 +1,26 @@
+services:
+  html-print-formatter:
+    platform: ${WMLR_PLATFORM:-linux/amd64}
+    build:
+      context: ../../../../
+      dockerfile: apps/html-print-formatter/docker/ubuntu/Dockerfile
+      args:
+        VERSION: ${VERSION:-0.0.0-dev}
+    image: wisemed-html-print-formatter:local
+    restart: unless-stopped
+    cap_add:
+      - SYS_ADMIN
+    shm_size: 512m
+    stop_grace_period: 30s
+    ports:
+      - "${WMLR_BIND:-127.0.0.1}:${WMLR_PORT:-19113}:19113"
+    environment:
+      PORT: "19113"
+      MAX_CONCURRENT_RENDERS: ${MAX_CONCURRENT_RENDERS:-2}
+      MAX_BODY_BYTES: ${MAX_BODY_BYTES:-4194304}
+      DEFAULT_RENDER_TIMEOUT_MS: ${DEFAULT_RENDER_TIMEOUT_MS:-120000}
+    volumes:
+      - html-print-formatter-data:/app/deployments
+
+volumes:
+  html-print-formatter-data:

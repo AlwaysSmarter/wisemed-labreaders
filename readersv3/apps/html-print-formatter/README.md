@@ -34,3 +34,10 @@ REQUIRE_CHROME_TESTS=1 go test -race ./modules/htmlprintformatter
 go test ./core/runtime ./core/config ./shared/apibridge ./modules/localhttp ./modules/ws ./apps/runner ./tools/releasectl
 go build ./apps/html-print-formatter
 ```
+
+## Ubuntu Linux / Docker
+
+The multi-stage [Dockerfile](docker/ubuntu/Dockerfile) compiles the Linux binary from Go sources
+and copies it into an Ubuntu 24.04 image with Chrome and fonts. See
+[docker/ubuntu/README.md](docker/ubuntu/README.md) for amd64/arm64 build commands, persistent
+configuration, sandbox requirements, and PDF examples.
