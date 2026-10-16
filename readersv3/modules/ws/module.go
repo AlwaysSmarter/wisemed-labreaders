@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/url"
@@ -321,6 +322,9 @@ func (m *Module) Start(ctx context.Context) error {
 			m.lastError = err.Error()
 		}
 		m.mu.Unlock()
+		if err != nil && ctx.Err() == nil && !errors.Is(err, context.Canceled) {
+			m.rt.Logf("WSS connection failed: %s", err)
+		}
 		m.failPending()
 		// A manual reconnect can interrupt both an active session and a retry wait.
 		select {
@@ -380,7 +384,7 @@ func (m *Module) runSession(ctx context.Context, settings map[string]interface{}
 	conn, resp, e := dialer.DialContext(ctx, rawURL, http.Header{"Authorization": []string{"Bearer " + token}})
 	if e != nil {
 		if resp != nil {
-			return fmt.Errorf("WSS handshake rejected: HTTP %d", resp.StatusCode)
+			return handshakeError(resp)
 		}
 		return connectionError(e)
 	}
@@ -390,7 +394,7 @@ func (m *Module) runSession(ctx context.Context, settings map[string]interface{}
 	conn.SetReadLimit(8 * 1024 * 1024)
 	conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
 	conn.SetReadDeadline(time.Now().Add(10 * time.Second))
-	hello := Envelope{Type: "hello", Payload: map[string]interface{}{"client_type": "reader", "client_id": m.clientID(), "reader_id": m.rt.ReaderID(), "equipment_id": equipment}}
+	hello := Envelope{Type: "hello", Payload: map[string]interface{}{"client_type": m.clientType(), "client_id": m.clientID(), "reader_id": m.rt.ReaderID(), "equipment_id": equipment}}
 	if e = conn.WriteJSON(hello); e != nil {
 		return errors.New("WSS hello send failed")
 	}
@@ -664,6 +668,43 @@ func (m *Module) Trace() []Trace {
 func (m *Module) nextRequestID() string {
 	return fmt.Sprintf("ws-%s-%d", m.nonce, atomic.AddUint64(&m.seq, 1))
 }
+
+// Only consume bounded structured WSM diagnostics; proxy HTML never enters status/logs.
+func handshakeError(resp *http.Response) error {
+	base := fmt.Sprintf("WSS handshake rejected: HTTP %d", resp.StatusCode)
+	if resp.Body != nil {
+		defer resp.Body.Close()
+		var detail struct {
+			Code    string `json:"error"`
+			Message string `json:"message"`
+		}
+		data, err := io.ReadAll(io.LimitReader(resp.Body, 4097))
+		if err == nil && len(data) <= 4096 && json.Unmarshal(data, &detail) == nil && strings.HasPrefix(detail.Code, "wsm_") && len(detail.Code) <= 64 && detail.Message != "" && !strings.ContainsAny(detail.Code+detail.Message, "\r\n") {
+			return fmt.Errorf("%s [%s]: %s", base, detail.Code, detail.Message)
+		}
+	}
+	if resp.StatusCode == http.StatusUnauthorized {
+		return fmt.Errorf("%s: WSM/proxy nu a furnizat un diagnostic. Verifică logul WSM, key <equipment-id> și rights <equipment-id> în consola WSM; verifică rolul JWT (service pentru SIUI), tenant, issuer, scopes și expirarea tokenului. Dacă WSM raportează alt rezultat, verifică autentificarea proxy/Nginx.", base)
+	}
+	return errors.New(base)
+}
+
+func (m *Module) clientType() string {
+	if service, ok := m.rt.Service("analyzer-config"); ok {
+		if settings, ok := service.(map[string]interface{}); ok && strings.EqualFold(strings.TrimSpace(asString(settings["protocol"])), "siui") {
+			return "siui-bridge"
+		}
+	}
+	return "reader"
+}
+
+func (m *Module) clientRole() string {
+	if m.clientType() == "siui-bridge" {
+		return "service"
+	}
+	return "reader"
+}
+
 func (m *Module) clientID() string {
 	return firstNonEmpty(asString(m.settingsSnapshot()["client_id"]), m.rt.ReaderID())
 }
@@ -680,7 +721,7 @@ func (m *Module) accessToken(ctx context.Context, settings map[string]interface{
 		if !ok {
 			return "", errors.New("WSS token provider unavailable")
 		}
-		return provider.WSSAccessToken(ctx, asString(settings["token_path"]), map[string]interface{}{"reader_id": m.rt.ReaderID(), "client_id": m.clientID(), "equipment_id": equipment})
+		return provider.WSSAccessToken(ctx, asString(settings["token_path"]), map[string]interface{}{"reader_id": m.rt.ReaderID(), "client_id": m.clientID(), "equipment_id": equipment, "role": m.clientRole(), "client_type": m.clientType()})
 	case "device_key":
 		secret := strings.TrimSpace(asString(settings["device_secret"]))
 		if path := asString(settings["secret_file"]); secret == "" && path != "" {
@@ -704,7 +745,7 @@ func (m *Module) accessToken(ctx context.Context, settings map[string]interface{
 		}
 		now := time.Now()
 		header, _ := json.Marshal(map[string]string{"alg": "HS256", "typ": "JWT", "kid": kid})
-		claims, _ := json.Marshal(map[string]interface{}{"tenant_id": tenant, "iss": issuer, "aud": firstNonEmpty(asString(settings["audience"]), "wsm-server"), "sub": firstNonEmpty(asString(settings["subject"]), m.rt.ReaderID()), "client_id": m.clientID(), "reader_id": m.rt.ReaderID(), "equipment_id": equipment, "role": "reader", "scopes": strings.FieldsFunc(firstNonEmpty(asString(settings["scopes"]), "route:reply,route:event,route:command,devices:debug,connections:read,server:status"), func(r rune) bool { return r == ',' || r == ' ' }), "iat": now.Unix(), "exp": now.Add(5 * time.Minute).Unix()})
+		claims, _ := json.Marshal(map[string]interface{}{"tenant_id": tenant, "iss": issuer, "aud": firstNonEmpty(asString(settings["audience"]), "wsm-server"), "sub": firstNonEmpty(asString(settings["subject"]), m.rt.ReaderID()), "client_id": m.clientID(), "reader_id": m.rt.ReaderID(), "equipment_id": equipment, "role": m.clientRole(), "scopes": strings.FieldsFunc(firstNonEmpty(asString(settings["scopes"]), "route:reply,route:event,route:command,devices:debug,connections:read,server:status"), func(r rune) bool { return r == ',' || r == ' ' }), "iat": now.Unix(), "exp": now.Add(5 * time.Minute).Unix()})
 		unsigned := base64.RawURLEncoding.EncodeToString(header) + "." + base64.RawURLEncoding.EncodeToString(claims)
 		mac := hmac.New(sha256.New, []byte(secret))
 		mac.Write([]byte(unsigned))

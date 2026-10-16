@@ -24,10 +24,62 @@ tokenul de login WiseMED. Sesiunea locală este temporară și are cookie HttpOn
 | `edit 1 --remove-reader` | Elimină restricția reader-id; tenantul și equipment_id rămân obligatorii. |
 | `delete 1` | Șterge înregistrarea WSS și revocă cheia aparatului. |
 | `rights 1` | Afișează drepturile numerotate, cu explicații și bife. |
+| `info 3 7` | Afișează explicația extinsă și exemplul pentru unul sau mai multe numere din lista `rights`, fără a modifica selecția. |
 | `toggle 7` | Bifează/debifează dreptul 7 în selecția curentă. Acceptă mai multe numere. |
 | `save` / `cancel` | Salvează / abandonează selecția drepturilor. |
-| `clear` | Curăță afișajul consolei, nu șterge aparatele. |
+| `history` | Afișează istoricul comenzilor, numerotat cronologic. |
+| `clear` | Curăță afișajul consolei; păstrează istoricul comenzilor și aparatele. |
 | `logout` | Închide sesiunea de administrator. |
+
+### Chei pentru SIUI/service
+
+În consola WSM din `/admin/`, comenzile sunt aceleași pentru un reader și un
+service de echipament. WSM actualizat permite rolurile JWT `reader` și `service`
+pentru fiecare cheie generată; rolul efectiv este trimis de aplicație (`service`
+pentru SIUI Bridge). Nu există o comandă separată `add-service`.
+
+```text
+add 18 siui-bridge
+```
+
+Dacă echipamentul 18 există deja, nu îl ștergeți și nu regenerați cheia:
+
+```text
+key 18
+rights 18
+```
+
+Rezultatul `key` afișează și rolurile JWT permise. O cheie creată înaintea
+actualizării primește suportul `service` la încărcarea registrului în WSM nou;
+secretul și drepturile rămân aceleași. Cheile statice din configurație necesită
+`service` în `security.keys.<key-id>.roles` și reload/restart.
+
+### Diagnostic din CLI și loguri
+
+Porniți WSM și bridge-ul cu `--showlog` pentru afișarea logurilor în terminal.
+Refuzurile JWT au HTTP 401, corp JSON cu `error` și `message`, iar logul WSM
+conține același cod și instrucțiunile de remediere. Bridge-ul actualizat le afișează
+în log și `last_error`; este necesară actualizarea ambelor binare. Pentru un
+WSM/proxy vechi care întoarce doar `unauthorized`, bridge-ul afișează pașii generali.
+
+| Cod | Acțiune |
+| --- | --- |
+| `wsm_role_denied` | SIUI necesită service; actualizați WSM pentru chei generate sau corectați roles la cheia statică. |
+| `wsm_scope_denied` | Mesajul numește permisiunea lipsă. Verificați rights 18; eliminați-o din bridge sau acordați-o prin toggle și save, apoi copiați scopes salvate. |
+| `wsm_tenant_mismatch` / `wsm_issuer_mismatch` / `wsm_audience_mismatch` | Copiați valorile din key 18 în bridge/emitentul JWT. |
+| `wsm_subject_mismatch` / `wsm_reader_id_mismatch` / `wsm_equipment_id_mismatch` | Corectați câmpul indicat; edit 18 siui-bridge modifică restricția reader-id, păstrând cheia. |
+| `wsm_token_expired` / `wsm_token_not_yet_valid` | Reînnoiți JWT-ul și verificați sincronizarea ceasurilor. |
+| `wsm_invalid_credentials` | Verificați key_id, secretul, cheia activă și formatul JWT. |
+
+Identitatea și drepturile sunt diagnosticate numai după verificarea semnăturii.
+Pentru un secret greșit sau key_id necunoscut, răspunsul nu confirmă existența
+cheii. Logurile și răspunsurile nu includ JWT-uri sau secrete.
+
+Comenzile `add`, `key`, `rights`, `toggle` și `save` aparțin consolei WSM din
+browser, nu executabilului `wsmctl`. `wsmctl keygen -out FILE` generează offline
+un secret pentru o cheie statică; operatorul trebuie să configureze separat
+cheia, tenantul, rolurile, identitatea și drepturile în WSM. Nu înregistrează
+un echipament prin API și nu modifică registrul consolei.
 
 ID-ul echipamentului este cel din WiseMED. Comanda `add` configurează autorizarea
 WSS; nu creează un echipament medical în baza de date WiseMED. Readerul efectuează
@@ -113,7 +165,7 @@ Schimbările sunt persistate înainte de aplicare și nu necesită restart WSM.
 ## Drepturile cheii
 
 `rights 1` citește drepturile reale ale cheii, nu doar valorile implicite ale
-readerului. Fiecare rând are număr, `[x]` sau `[ ]`, numele dreptului și explicație.
+readerului. Fiecare rând are număr, `[x]` sau `[ ]`, numele dreptului și titlul. După `rights`, comanda `info 3 7` afișează explicațiile extinse și exemplele pentru numerele selectate; acceptă unul sau mai multe numere și nu modifică selecția.
 `toggle 1 2` inversează selecția pentru numerele respective. Nimic nu se modifică
 pe server până la `save`; `cancel` abandonează selecția.
 
@@ -130,6 +182,8 @@ Catalogul este:
 8. `api:admin`: și operațiile administrative ale API-urilor remote; necesită 3 și 7.
    Nu acordă acces la consola admin WSM.
 9. `route:broadcast`: destinatari multipli; se combină cu dreptul pentru tipul mesajului.
+10. `topics:subscribe`: abonare și dezabonare la topicuri și primirea mesajelor adresate acestora, în același tenant. Se acordă explicit, nu implicit.
+11. `wisemed:proxy`: comenzi WiseMED prin API-ul configurat pentru tenant; necesită upstream WiseMED configurat.
 
 Pentru o cheie nouă implicită, exemplu de activare „Deschide”:
 
@@ -151,3 +205,18 @@ Persistă în `security.device_keys_file`. Înregistrările vechi fără scopes 
 setul implicit. Modificarea închide conexiunile și invalidează tichetele emise din
 acea identitate; alte chei rămân neafectate. Drepturile nu sunt limitate automat la
 propriul aparat: api:invoke permite control în tenant, conform regulilor de rutare.
+
+## Istoricul comenzilor
+
+Săgețile ↑ și ↓ din câmpul de comandă navighează prin istoricul comenzilor.
+La revenirea după cea mai recentă comandă se restaurează textul neterminat.
+Comanda `history` afișează comenzile cronologic, inclusiv comanda `history` curentă.
+Sunt păstrate ultimele 1.000 de comenzi cu sintaxă validă, inclusiv cele pentru
+care serverul a raportat o eroare. Parolele, răspunsurile și cheile afișate nu se
+salvează în istoric. Reamintirea unei comenzi nu o execută; este necesar Enter.
+
+Persistența este în localStorage, pe același browser/profil și aceeași origine,
+separat după tenant și utilizator. Istoricul rezistă la refresh, logout, închiderea
+browserului și repornirea WSM; nu se sincronizează între browsere/calculatoare.
+Ștergerea datelor site-ului îl elimină. Dacă stocarea nu este disponibilă, consola
+anunță acest lucru și păstrează istoricul doar în sesiunea curentă.

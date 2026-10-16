@@ -123,3 +123,30 @@ test('formatter WSS relies on authenticated bridge without HTTP token issuance',
   await ctx.renderHTMLFormatter(false);
   assert.equal(count,1);assert.equal(nodes['formatter-output'].value,'remote');
 });
+
+test('formatter real API wrapper preserves JSON content type with JWT and WSS headers', async () => {
+  for (const remote of [false, true]) {
+    const nodes = {'formatter-html':{value:'<html>test</html>'},'formatter-html-link':{value:''},'formatter-timeout':{value:'120000'},'formatter-render':{},'formatter-pdf-direct':{},'formatter-notice':{},'formatter-output':{},'formatter-pdf-download':{removeAttribute(){}}};
+    const calls = [];
+    const ctx = scope(['renderHTMLFormatter','clearHTMLFormatterPDF','api'], {
+      window:{WSM_REMOTE:remote?{}:null},state:{},URL:{createObjectURL:()=> 'blob:pdf',revokeObjectURL(){}},Blob,Uint8Array,atob,
+      document:{getElementById:id=>nodes[id]},setButtonLoading(){},
+      fetch:async(path, options)=>{
+        calls.push(path);
+        assert.equal(options.headers['Content-Type'],'application/json');
+        assert.equal(options.credentials,'same-origin');
+        assert.equal(options.method,'POST');
+        if(path.endsWith('/token')) return {ok:true,json:async()=>({token:'test-jwt'})};
+        assert.equal(options.headers.Authorization,remote?undefined:'Bearer test-jwt');
+        assert.equal(JSON.parse(options.body).html,'<html>test</html>');
+        return {ok:true,json:async()=>({html:'rendered',pdf_base64:btoa('%PDF-test'),request_id:'test'})};
+      }
+    });
+    for (const wait of [true,false]) {
+      await ctx.renderHTMLFormatter(wait);
+      assert.equal(nodes['formatter-output'].value,'rendered');
+      assert.equal(nodes['formatter-pdf-download'].hidden,false);
+    }
+    assert.equal(calls.length,remote?2:4);
+  }
+});

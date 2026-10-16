@@ -1085,6 +1085,7 @@ const els = {
     orders: document.getElementById("view-orders"),
     qc: document.getElementById("view-qc"),
     debug: document.getElementById("view-debug"),
+    wsm: document.getElementById("view-wsm"),
     help: document.getElementById("view-help"),
   },
 };
@@ -1240,10 +1241,11 @@ function bindEvents() {
       if(isESignatureMode()) window.history.replaceState({},"","/settings/pad");
     }
     if (link.dataset.view === "debug" && !state.debugEnabled) {
-      activateSettingsSubView("wss"); activateView("analytes"); return;
+      activateView("wsm"); return;
     }
     activateView(link.dataset.view);
   }));
+  document.getElementById("debug-wsm-link").addEventListener("click", () => activateView("wsm"));
   document.getElementById("debug-communication-link").addEventListener("click", () => activateView("debug"));
   els.navSublinks.forEach((link) => link.addEventListener("click", () => {
     activateSettingsSubView(link.dataset.settingsSubview || "reader");
@@ -1598,10 +1600,14 @@ async function onLogout() {
  closeESignatureDemo();
   await api("/api/session/logout", { method: "POST" });
   state.wss.snapshot = null;
+  state.wss.reconnectPending = null;
+  state.wss.controlInFlight = null;
+  state.wss.controlRevision = (state.wss.controlRevision || 0) + 1;
   state.wss.windows.clear();
   const wssPanel = document.getElementById("settings-panel-wss");
   wssPanel.replaceChildren();
   delete wssPanel.dataset.ready;
+  document.getElementById("wsm-debug-panel").replaceChildren();
   state.session = null;
   state.orders = [];
   state.selectedOrderId = null;
@@ -1992,9 +1998,10 @@ function activateView(name, pushHistory = true) {
   if (name === "analytes" && !isESignatureMode()) {
     state.settingsSubView = settingsSubViewFromLocation();
   }
+  if (name === "wsm" && (Number(state.session?.user_type) || 0) > 0) name = "overview";
   state.currentView = name;
-  const wssActive = name === "analytes" && state.settingsSubView === "wss";
-  els.navLinks.forEach((link) => link.classList.toggle("active", wssActive ? link.dataset.view === "debug" : link.dataset.view === name));
+  els.navLinks.forEach((link) => link.classList.toggle("active", link.dataset.view === (name === "wsm" ? "debug" : name)));
+  document.getElementById("debug-wsm-link").classList.toggle("active", name === "wsm");
   document.getElementById("debug-communication-link").classList.toggle("active", name === "debug");
   if(name !== "analytes") els.navSublinks.forEach(link => link.classList.remove("active"));
   Object.entries(els.views).forEach(([key, view]) => {
@@ -2006,6 +2013,11 @@ function activateView(name, pushHistory = true) {
     if (currentUIPath() !== path) {
       window.history.pushState({ view: name }, "", path);
     }
+  }
+  if (name === "wsm") {
+    renderWSSPanel();
+    loadWSSStatus().catch(error => wssNotice(error.message));
+    return;
   }
   if (name === "analytes") {
     if (state.formatterMode) {activateSettingsSubView(state.settingsSubView);if(state.settingsSubView==="reader")loadReaderSettings().catch(error=>showToast(error.message,"error"));return;}
@@ -2046,8 +2058,9 @@ function activateView(name, pushHistory = true) {
 }
 
 function renderTopbarTitle() {
- if(state.formatterMode){document.getElementById("dashboard-title").textContent=state.currentView==="analytes" ? (state.settingsSubView==="wss" ? "Debug WSS" : "Server și actualizări") : "HTML Print Formatter";return;}
-  if (state.currentView === "analytes" && state.settingsSubView === "wss") { document.getElementById("dashboard-title").textContent = "Debug WSS"; return; }
+ if(state.currentView === "wsm"){document.getElementById("dashboard-title").textContent="Debug · WSM";return;}
+ if(state.formatterMode){document.getElementById("dashboard-title").textContent=state.currentView==="analytes" ? (state.settingsSubView==="wss" ? "WSS" : "Server și actualizări") : "HTML Print Formatter";return;}
+  if (state.currentView === "analytes" && state.settingsSubView === "wss") { document.getElementById("dashboard-title").textContent = "WSS"; return; }
  if(isESignatureMode()) {
  const title=document.getElementById("dashboard-title");
  if(title) title.textContent=state.currentView==="analytes" ? ({pad:"Setări PAD",demo:"Demo",reader:"Server și update-uri"}[state.settingsSubView] || "Settings") : state.currentView==="orders" ? "Istoric semnături" : "eSignature server";
@@ -2099,6 +2112,7 @@ function renderTopbarTitle() {
 }
 
 function viewFromLocation() {
+ if(currentUIPath() === "/debug/wsm") return "wsm";
  if(state.formatterMode) return currentUIPath().startsWith("/settings") ? "analytes" : "overview";
  if(isSIUIMode()) return currentUIPath()==="/debug" ? "debug" : "analytes";
   if (currentUIPath() === "/settings/wss") return "analytes";
@@ -2136,6 +2150,7 @@ function settingsSubViewFromLocation() {
 }
 
 function pathForView(name) {
+ if(name === "wsm") return "/debug/wsm";
  if(state.formatterMode) return name==="analytes" ? (state.settingsSubView==="wss" ? "/settings/wss" : "/settings/reader") : "/";
  if(isSIUIMode() && name==="analytes" && state.settingsSubView==="siui") return "/settings/siui";
   if (name === "analytes" && state.settingsSubView === "wss") return "/settings/wss";
@@ -6256,8 +6271,8 @@ function inferLayoutKind() {
 async function api(url, options = {}) {
   const response = await fetch(url, {
     credentials: "same-origin",
-    headers: { "Content-Type": "application/json", ...(options.headers || {}) },
     ...options,
+    headers: { "Content-Type": "application/json", ...(options.headers || {}) },
   });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok || payload.ok === false) {
@@ -6859,11 +6874,14 @@ function renderWSSBadge() {
 async function loadWSSStatus() {
   if (state.wss.loading) return;
   state.wss.loading = true;
+  const revision = state.wss.controlRevision || 0;
   try {
     const snapshot = await api("/api/wss/status");
+    if (revision !== (state.wss.controlRevision || 0)) return;
     state.wss.snapshot = snapshot;
     state.wss.statusError = "";
     state.wss.receivedAt = Date.now();
+    updateWSSReconnect(snapshot.status);
     renderWSSBadge();
     const form = document.getElementById("wss-settings-form");
     if (form && !form.dataset.loaded) {
@@ -6876,6 +6894,8 @@ async function loadWSSStatus() {
         secretField.value = "";
         secretField.placeholder = snapshot.settings?.device_secret_configured ? "Cheie salvată · lasă gol pentru a o păstra" : "Lipește cheia generată în consola WSM";
       }
+      loadWSSScopes(form, snapshot.settings?.scopes);
+      syncWSSAuthFields(form);
       form.dataset.loaded = "true";
     }
     const trace = document.getElementById("wss-trace");
@@ -6890,16 +6910,151 @@ async function loadWSSStatus() {
 }
 
 function wssNotice(text, success = false) {
-  const notice = document.getElementById("wss-notice");
+  const notice = document.getElementById(state.currentView === "wsm" ? "wsm-notice" : "wss-notice");
   if (notice) { notice.textContent = text; notice.classList.toggle("wss-error", !success); }
   else showToast(text, success ? "success" : "error");
 }
 
+function wssReconnectBusy() {
+  const status = state.wss.snapshot?.status;
+  return state.wss.controlInFlight === "reconnect" || !!state.wss.reconnectPending ||
+    !!(status?.enabled && !status.connected && !status.paused);
+}
+
+function renderWSSReconnectButtons() {
+  const busy = wssReconnectBusy();
+  document.querySelectorAll('[data-wss-control="reconnect"]').forEach(button => {
+    if (busy && button.getAttribute("aria-busy") !== "true") setButtonLoading(button, true);
+    else if (!busy && button.getAttribute("aria-busy") === "true") setButtonLoading(button, false);
+  });
+}
+
+function updateWSSReconnect(status) {
+  const pending = state.wss.reconnectPending;
+  if (!state.wss.controlInFlight && pending && status &&
+      (status.paused || !status.enabled ||
+       (status.connected && (!pending.connectionID || status.connection_id !== pending.connectionID)))) {
+    state.wss.reconnectPending = null;
+  }
+  renderWSSReconnectButtons();
+}
+
 async function wssControl(action) {
   if (window.WSM_REMOTE && action === "disconnect") throw new Error("Deconectarea permanentă a echipamentului nu este disponibilă din consola la distanță.");
-  await api("/api/wss/control", {method:"POST", body:JSON.stringify({action})});
-  await loadWSSStatus();
-  wssNotice(action === "disconnect" ? "Conexiune oprită manual. Folosește Reconectare pentru reluare." : "Reconectare solicitată.", true);
+  if (action === "reconnect" && wssReconnectBusy()) return;
+  const revision = (state.wss.controlRevision || 0) + 1;
+  state.wss.controlRevision = revision;
+  state.wss.controlInFlight = action;
+  if (action === "reconnect") {
+    state.wss.reconnectPending = {connectionID: state.wss.snapshot?.status?.connection_id || ""};
+  }
+  renderWSSReconnectButtons();
+  try {
+    await api("/api/wss/control", {method:"POST", body:JSON.stringify({action})});
+    if (state.wss.controlRevision !== revision) return;
+    state.wss.controlRevision++;
+    state.wss.controlInFlight = null;
+    if (action === "disconnect") {
+      state.wss.reconnectPending = null;
+      if (state.wss.snapshot?.status) state.wss.snapshot.status = {...state.wss.snapshot.status, paused:true};
+    }
+    renderWSSReconnectButtons();
+    await loadWSSStatus();
+    wssNotice(action === "disconnect" ? "Conexiune oprită manual. Folosește Reconectare pentru reluare." : "Reconectare în curs…", true);
+  } catch (error) {
+    if (state.wss.controlRevision === revision) {
+      state.wss.controlRevision++;
+      state.wss.controlInFlight = null;
+      if (action === "reconnect") state.wss.reconnectPending = null;
+      renderWSSReconnectButtons();
+    }
+    throw error;
+  }
+}
+
+function wssScopeOptions() {
+  return [
+    [
+        "route:reply",
+        "Trimite răspunsuri la comenzile primite; necesar pentru controlul remote al aparatului.",
+        "Permite răspunsul la o comandă primită, folosind identificatorul de corelare al acesteia. Un reader răspunde către conexiunea solicitantului.",
+        "După device.ping, echipamentul trimite solicitantului rezultatul printr-un mesaj reply."
+    ],
+    [
+        "route:event",
+        "Trimite evenimente către alți clienți din tenant.",
+        "Permite publicarea evenimentelor fără o comandă prealabilă. Readerele pot publica numai pe propriile topicuri results:<reader_id> și logs:<reader_id>. Serviciile respectă regulile destinației, inclusiv route:broadcast pentru topicuri.",
+        "Readerul reader-1 publică un rezultat pe topicul results:reader-1."
+    ],
+    [
+        "route:command",
+        "Trimite comenzi; necesar împreună cu api:invoke pentru Deschide.",
+        "Permite trimiterea comenzilor către alți clienți din aceeași instanță WiseMED. Apelurile API cer și api:invoke; pentru un reader, comenzile de diagnostic cer și devices:debug.",
+        "Cu route:command și devices:debug, un reader poate cere ws.reconnect unui echipament selectat."
+    ],
+    [
+        "devices:debug",
+        "Trimite ping, reconnect și mesaje de diagnostic altor echipamente.",
+        "Permite unui reader să trimită device.ping, ws.reconnect și debug.message către un echipament, reader sau o conexiune. Necesită și route:command. Nu acordă acces general la API.",
+        "Cu route:command, butonul Ping client verifică răspunsul echipamentului selectat."
+    ],
+    [
+        "connections:read",
+        "Vede lista și starea online a echipamentelor din tenant.",
+        "Permite listarea conexiunilor și consultarea stării echipamentelor din propria instanță, prin list_connections, equipment.list sau equipment.status. Nu permite controlul lor.",
+        "Butonul Actualizează lista clienților afișează echipamentele conectate."
+    ],
+    [
+        "server:status",
+        "Citește starea serverului WSM.",
+        "Permite comanda server.status: identificarea serviciului WSM, instanța curentă, numărul de conexiuni din aceasta și ora serverului. Nu acordă acces la configurarea serverului.",
+        "O comandă server.status arată câte conexiuni sunt active în instanța ta."
+    ],
+    [
+        "api:invoke",
+        "Deschide console remote și apelează API-ul altor echipamente din același tenant, inclusiv operații care modifică date; necesită route:command.",
+        "Împreună cu route:command, permite api.request către API-ul unui echipament și obținerea unui tichet pentru consola remote. Include operații care pot modifica date; se aplică și regulile API-ului destinatar.",
+        "Deschide consola unui echipament sau apelează GET /api/status prin WSM."
+    ],
+    [
+        "api:admin",
+        "Permite și operațiile API administrative remote; necesită api:invoke și route:command. Nu acordă login în consola admin WSM.",
+        "Permite executarea operațiilor API care cer administrator pe echipamentul destinatar, prin adaptorul WSM. Necesită api:invoke și route:command. Nu acordă autentificare în consola administrativă a serverului WSM.",
+        "Salvează configurarea WSS a echipamentului prin PUT /api/wss/settings."
+    ],
+    [
+        "route:broadcast",
+        "Trimite către mai mulți destinatari din tenant; necesită dreptul corespunzător de comandă sau eveniment.",
+        "Permite rutarea către grupuri, toate conexiunile sau un tip de client din aceeași instanță. Necesită și dreptul mesajului trimis, de exemplu route:command. Nu elimină restricțiile rolului reader sau cerința api:invoke pentru apeluri API.",
+        "Un serviciu cu route:event și route:broadcast poate trimite un eveniment tuturor clienților de tip siui-bridge."
+    ],
+    [
+        "topics:subscribe",
+        "Permite abonarea și dezabonarea la topicuri și primirea mesajelor adresate acestora în același tenant.",
+        "Permite abonarea și dezabonarea la topicuri din propria instanță WiseMED, pentru primirea mesajelor publicate pe acestea. Nu acordă dreptul de a publica.",
+        "Un client se abonează la logs:reader-1 pentru a primi evenimentele de jurnal ale readerului."
+    ],
+    [
+        "wisemed:proxy",
+        "Permite comenzile WiseMED implementate de WSM către API-ul configurat pentru tenant; necesită upstream WiseMED configurat.",
+        "Permite comenzile WiseMED implementate de WSM către API-ul WiseMED configurat pentru instanță. Nu este un proxy către adrese arbitrare; necesită configurarea upstreamului WiseMED.",
+        "wisemed.fetch_file_for_analyzer solicită un fișier pentru echipamentul indicat, prin WSM."
+    ]
+];
+}
+
+function syncWSSAuthFields(form) {
+  const mode = form.elements.namedItem("auth_mode").value;
+  form.querySelectorAll("[data-wss-auth]").forEach(group => {
+    const applies = group.dataset.wssAuth.split(" ").includes(mode);
+    group.hidden = !applies;
+    group.querySelectorAll("input, select, textarea").forEach(field => { field.disabled = !applies; });
+  });
+}
+
+function loadWSSScopes(form, value) {
+  const selected = new Set((Array.isArray(value) ? value.join(",") : String(value || "route:reply,route:event,route:command,devices:debug,connections:read,server:status")).split(/[,\s]+/).filter(Boolean));
+  form.querySelectorAll("[data-wss-scope]").forEach(field => { field.checked = selected.has(field.value); });
 }
 
 function renderWSSPanel() {
@@ -6907,27 +7062,35 @@ function renderWSSPanel() {
   if (panel.dataset.ready) return;
   panel.dataset.ready = "true";
   panel.innerHTML = `
-    <div class="panel-head"><h3>WiseMED WSS · configurare și debug</h3></div>
+    <div class="panel-head"><h3>WiseMED WSS · setări și conexiune</h3></div>
     <p class="small muted">Conexiunea folosește ID-ul echipamentului înregistrat prin API WiseMED. Lista și comenzile sunt limitate la instanța WiseMED și permisiunile cheii curente.</p>
     <p id="wss-notice" role="status" aria-live="polite"></p>
     <form id="wss-settings-form" class="wss-grid">
       <label class="wss-check"><input name="enabled" type="checkbox"> Activare WSS</label>
       <label>Server WSS<input name="url" placeholder="wss://server.example/ws" spellcheck="false"></label>
       <label>Autentificare<select name="auth_mode"><option value="device_key">Cheie echipament (JWT)</option><option value="token_file">Fișier JWT</option><option value="token_endpoint">Endpoint JWT WiseMED</option></select></label>
-      <label>Instanță WiseMED / tenant<input name="tenant_id" autocomplete="off"></label>
-      <label>ID cheie<input name="key_id" autocomplete="off"></label>
-      <label>Emitent JWT<input name="issuer"></label>
-      <label>Audiență JWT<input name="audience"></label>
-      <label>Subiect JWT<input name="subject"></label>
+      <label data-wss-auth="device_key">Instanță WiseMED / tenant<input name="tenant_id" autocomplete="off"></label>
+      <label data-wss-auth="device_key">ID cheie<input name="key_id" autocomplete="off"></label>
+      <label data-wss-auth="device_key">Emitent JWT<input name="issuer"></label>
+      <label data-wss-auth="device_key">Audiență JWT<input name="audience"></label>
+      <label data-wss-auth="device_key">Subiect JWT<input name="subject"></label>
       <label>ID client<input name="client_id"></label>
-      <label>Cheie WSS<input name="device_secret" type="password" autocomplete="new-password" spellcheck="false"><small>Cheia generată în consola WSM. Lasă gol pentru a păstra cheia salvată.</small></label>
-      <label>Fișier cheie pe calculatorul echipamentului<input name="secret_file" autocomplete="off" spellcheck="false"></label>
-      <label>Fișier JWT pe calculatorul echipamentului<input name="token_file" autocomplete="off" spellcheck="false"></label>
-      <label>Cale endpoint JWT<input name="token_path" spellcheck="false"></label>
+      <label data-wss-auth="device_key">Cheie WSS<input name="device_secret" type="password" autocomplete="new-password" spellcheck="false"><small>Cheia generată în consola WSM. Lasă gol pentru a păstra cheia salvată.</small></label>
+      <label data-wss-auth="device_key">Fișier cheie pe calculatorul echipamentului<input name="secret_file" autocomplete="off" spellcheck="false"></label>
+      <label data-wss-auth="token_file">Fișier JWT pe calculatorul echipamentului<input name="token_file" autocomplete="off" spellcheck="false"></label>
+      <label data-wss-auth="token_endpoint">Cale endpoint JWT<input name="token_path" spellcheck="false"></label>
       <label>Fișier CA suplimentar (opțional)<input name="ca_file" spellcheck="false"></label>
-      <label>Permisiuni solicitate (separate prin virgulă)<input name="scopes" spellcheck="false"></label>
+      <fieldset class="wss-wide" data-wss-auth="device_key"><legend>Permisiuni solicitate</legend>
+        <p class="small muted">Selectează permisiunile necesare. Cheia din WSM trebuie să permită fiecare permisiune selectată.</p>
+        <div class="wss-grid">${wssScopeOptions().map(([scope, label, description, example], index) => `<div class="wss-permission"><label class="wss-check" for="wss-permission-${index}"><input id="wss-permission-${index}" type="checkbox" data-wss-scope value="${scope}" aria-describedby="wss-permission-help-${index}"><span>${index + 1}. ${label}<small class="wss-permission-code">${scope}</small></span></label><details class="wss-permission-info"><summary aria-label="Informații despre ${label}" title="Explicație și exemplu">i</summary><div id="wss-permission-help-${index}" class="wss-permission-help"><p>${description}</p><p><strong>Exemplu:</strong> ${example}</p></div></details></div>`).join("")}</div>
+      </fieldset>
+      <p class="small muted wss-wide" data-wss-auth="token_file token_endpoint">Permisiunile sunt stabilite în JWT de emitentul acestuia.</p>
       <div class="wss-wide orders-buttons"><button type="submit">Salvează și aplică</button></div>
     </form>
+    <div class="orders-buttons wss-toolbar"><button data-wss-control="disconnect" type="button">Deconectare</button><button data-wss-control="reconnect" type="button">Reconectare acum</button></div>
+    <div id="wss-debug-content">
+    <div class="panel-head"><h3>WSM · diagnostic WSS</h3></div>
+    <p id="wsm-notice" role="status" aria-live="polite"></p>
     <div class="orders-buttons wss-toolbar"><button data-wss-control="disconnect" type="button">Deconectare</button><button data-wss-control="reconnect" type="button">Reconectare acum</button><button data-wss-action="ping_server" type="button">Ping server</button><button data-wss-action="list" type="button">Actualizează lista clienților</button></div>
     <details><summary>Starea conexiunii locale</summary><pre id="wss-local-status" class="wss-json"></pre></details>
     <div id="wss-relay-debug">
@@ -6937,11 +7100,11 @@ function renderWSSPanel() {
     <details open><summary>Exemplu API prin WSS</summary><p class="small muted">Solicitarea este executată de același handler API al destinatarului. Se transmit numai date JSON. Operațiile de modificare se execută efectiv pe echipamentul selectat.</p>
     <form id="wss-bridge-form" class="wss-grid"><label>Metodă<select name="method"><option>GET</option><option>POST</option><option>PUT</option><option>PATCH</option><option>DELETE</option></select></label><label>Cale API<input name="path" value="/api/status" required pattern="/api/.*" spellcheck="false"></label><label class="wss-wide">Corp JSON (opțional)<textarea name="body" rows="4" placeholder='{"example":"value"}' spellcheck="false"></textarea></label><div class="wss-wide"><button type="submit">Execută prin WSS</button></div></form></details>
     <h4>Răspuns comandă</h4><pre id="wss-response" class="wss-json" aria-live="polite">Nicio comandă executată.</pre>
-    <details open><summary>Mesaje trimise / primite · ultimele 150 înregistrări</summary><pre id="wss-trace" class="wss-json">Se încarcă…</pre></details></div>`;
+    <details open><summary>Mesaje trimise / primite · ultimele 150 înregistrări</summary><pre id="wss-trace" class="wss-json">Se încarcă…</pre></details></div></div>`;
   if (window.WSM_REMOTE) {
     panel.querySelector("#wss-relay-debug").hidden = true;
     panel.querySelectorAll("[data-wss-action], [data-wss-control='disconnect']").forEach(button => { button.hidden = true; });
-    panel.querySelector("[data-wss-control='reconnect']").textContent = "Reconectează echipamentul la WSS";
+    panel.querySelectorAll("[data-wss-control='reconnect']").forEach(button => { button.textContent = "Reconectează echipamentul la WSS"; });
     const note = document.createElement("p");
     note.textContent = "Setările și reconectarea de aici afectează echipamentul. Reconectarea întrerupe temporar controlul; revine automat după reconectarea echipamentului. Butonul din bara albastră reconectează numai această fereastră.";
     panel.prepend(note);
@@ -6952,11 +7115,18 @@ function renderWSSPanel() {
     panel.querySelectorAll("[data-wss-control], [data-wss-action]").forEach(button => { button.hidden = true; });
     wssNotice("Configurarea și comenzile WSS necesită un cont administrator. Starea conexiunii rămâne vizibilă.", true);
   }
+  const settingsForm = panel.querySelector("#wss-settings-form");
+  settingsForm.elements.namedItem("auth_mode").addEventListener("change", () => syncWSSAuthFields(settingsForm));
+  syncWSSAuthFields(settingsForm);
   panel.querySelector("#wss-settings-form").addEventListener("submit", async event => {
     event.preventDefault();
     const form = event.currentTarget;
     const payload = Object.fromEntries(new FormData(form));
     payload.enabled = form.elements.enabled.checked;
+    if (payload.auth_mode === "device_key") {
+      payload.scopes = Array.from(form.querySelectorAll("[data-wss-scope]:checked"), field => field.value).join(",");
+      if (!payload.scopes) { wssNotice("Selectează cel puțin o permisiune WSS."); return; }
+    }
     await wssBusy(form.querySelector("button"), async () => {
       await api("/api/wss/settings", {method:"PUT", body:JSON.stringify(payload)});
       form.elements.namedItem("device_secret").value = "";
@@ -6965,7 +7135,10 @@ function renderWSSPanel() {
       wssNotice("Setările WSS au fost salvate și aplicate.", true);
     });
   });
-  panel.querySelectorAll("[data-wss-control]").forEach(button => button.addEventListener("click", () => wssBusy(button, () => wssControl(button.dataset.wssControl))));
+  panel.querySelectorAll("[data-wss-control]").forEach(button => button.addEventListener("click", () => {
+    if (button.dataset.wssControl === "reconnect") wssControl("reconnect").catch(error => wssNotice(error.message));
+    else wssBusy(button, () => wssControl(button.dataset.wssControl));
+  }));
   panel.querySelectorAll("[data-wss-action]").forEach(button => button.addEventListener("click", () => wssBusy(button, () => wssDebug(button.dataset.wssAction))));
   panel.querySelector("#wss-bridge-form").addEventListener("submit", event => {
     event.preventDefault();
@@ -6981,6 +7154,8 @@ function renderWSSPanel() {
       await loadWSSStatus();
     });
   });
+  document.getElementById("wsm-debug-panel").replaceChildren(panel.querySelector("#wss-debug-content"));
+  renderWSSReconnectButtons();
 }
 
 async function wssBusy(button, action) {

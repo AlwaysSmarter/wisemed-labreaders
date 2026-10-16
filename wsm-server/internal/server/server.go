@@ -135,6 +135,8 @@ func (s *Server) routes() http.Handler {
 			next.ServeHTTP(w, r)
 		})
 	})
+	r.Get("/sdk/wsm.js", serveBrowserSDK)
+	r.Get("/sdk/siui-bridge.js", serveBrowserSDK)
 	s.adminRoutes(r)
 	r.Group(func(adminUI chi.Router) {
 		adminUI.Use(func(next http.Handler) http.Handler {
@@ -164,7 +166,7 @@ func (s *Server) connections(w http.ResponseWriter, r *http.Request) {
 	cfg := s.current()
 	claims, err := authenticate(cfg, r, false)
 	if err != nil {
-		http.Error(w, "unauthorized", 401)
+		writeAuthFailure(w, err)
 		return
 	}
 	if !claims.Has("connections:read") || !allowedOrigin(r, cfg.Tenants[claims.TenantID]) {
@@ -183,7 +185,7 @@ func (s *Server) handleWS(w http.ResponseWriter, r *http.Request) {
 	claims, err := s.authenticateSocket(cfg, r)
 	if err != nil {
 		s.gate.RUnlock()
-		http.Error(w, "unauthorized", 401)
+		writeAuthFailure(w, err)
 		return
 	}
 	tenant := cfg.Tenants[claims.TenantID]
@@ -479,7 +481,7 @@ func authorizeMessage(c *AuthClaims, m Envelope) error {
 				return nil
 			}
 		case "client_type":
-			if c.Has("route:broadcast") && (t.ClientType == "reader" || t.ClientType == "browser" || t.ClientType == "service") {
+			if c.Has("route:broadcast") && (t.ClientType == "reader" || t.ClientType == "siui-bridge" || t.ClientType == "browser" || t.ClientType == "service") {
 				return nil
 			}
 		case "topic":

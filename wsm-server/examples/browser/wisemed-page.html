@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="ro"><meta charset="utf-8"><title>WiseMED WSM integration</title>
+<p id="wsm-control">WSM deconectat</p>
+<button id="refresh" disabled>Starea readerelor</button><pre id="result"></pre>
+<script src="https://wslocal.wisemed.eu/sdk/wsm.js"></script>
+<script>
+// Serve this page and token-endpoint.php from the authenticated WiseMED origin.
+async function getWSMToken() {
+  const response = await fetch('./token-endpoint.php', {credentials:'same-origin', cache:'no-store'});
+  if (!response.ok) throw new Error('Autentificarea WiseMED/emiterea tokenului a eșuat.');
+  return (await response.json()).token;
+}
+(async () => {
+  const status = document.getElementById('wsm-control');
+  const result = document.getElementById('result');
+  const button = document.getElementById('refresh');
+  // A precalculated token is sufficient. The optional provider fetches a new one
+  // for each connection/reconnection, including after JWT expiry.
+  const token = await getWSMToken();
+  window.objWSM = WSMServer('wss://wslocal.wisemed.eu', token, {tokenProvider:getWSMToken});
+  objWSM.onConnect = () => {status.textContent='WSM conectat'; status.classList.add('wsm-connected');button.disabled=false;};
+  objWSM.onDisconnect = () => {status.textContent='WSM deconectat';status.classList.remove('wsm-connected');button.disabled=true;};
+  objWSM.onError = e => {result.textContent=e.message;};
+  button.onclick = async () => {
+    try {
+      const readers = await objWSM.getClientsByType('reader');
+      if (!readers) {result.textContent='Niciun reader conectat.';return;}
+      // Array input explicitly calls every selected client. Select readers[0]
+      // instead if only one device should receive the operation.
+      const responses = await objWSM.callAPI(readers, '/api/status', {method:'GET'});
+      result.textContent=JSON.stringify(responses,null,2);
+    } catch(e) {result.textContent=e.message;}
+  };
+  await objWSM.ready;
+})().catch(e => {document.getElementById('result').textContent=e.message;});
+</script></html>

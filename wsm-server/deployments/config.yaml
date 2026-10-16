@@ -10,19 +10,19 @@ security:
   max_token_ttl_seconds: 900
   keys:
     local-backend:
-      tenant_id: local
+      tenant_id: wisemed-local
       secret_file: keys/local-backend.key
-      roles: [browser, service]
+      roles: [browser, reader, service]
       scopes: ["route:command", "route:reply", "route:event", "route:broadcast", "topics:subscribe", "connections:read", "server:status", "devices:debug", "api:invoke", "api:admin"]
 tenants:
-  local:
-    issuer: https://localhost:8443
-    allowed_origins: ["https://localhost:8443"]
+  wisemed-local:
+    issuer: https://php.wisemed.eu
+    allowed_origins: ["https://php.wisemed.eu"]
 
 # Optional WiseMED administrator console; see docs/admin-console.md.
 admin:
-  enabled: false
-  public_origin: https://ws.example.ro
+  enabled: true
+  public_origin: https://wslocal.wisemed.eu
   session_ttl_seconds: 900
 # When enabling, also set security.device_keys_file to a writable persistent path
 # such as /var/lib/wsm-server/device-keys.yaml and configure tenant.wisemed HTTPS API.

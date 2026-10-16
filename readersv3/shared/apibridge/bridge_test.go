@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestSameHandlerAndIdentity(t *testing.T) {
@@ -104,5 +105,32 @@ func TestBinaryResponseAndBodyLimit(t *testing.T) {
 	r.Header.Set("X-WSS-Subject", "admin")
 	if _, ok := PrincipalFrom(r.Context()); ok {
 		t.Fatal("header bypass")
+	}
+}
+
+func TestSIUIInteractiveDeadlines(t *testing.T) {
+	for _, tc := range []struct {
+		method, path string
+		seconds      int
+	}{
+		{"POST", "/api/siui/general/ocsp", 130}, {"POST", "/api/siui/ocsp-test", 130},
+		{"POST", "/api/siui/invoice/package", 130}, {"GET", "/api/siui/general/ocsp", 30},
+		{"POST", "/api/siui/general/getInsured", 30},
+	} {
+		t.Run(tc.method+tc.path, func(t *testing.T) {
+			handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				deadline, ok := r.Context().Deadline()
+				remaining := time.Until(deadline)
+				if !ok || remaining > time.Duration(tc.seconds)*time.Second || remaining < time.Duration(tc.seconds-2)*time.Second {
+					t.Errorf("wrong deadline %v", remaining)
+				}
+				w.Header().Set("Content-Type", "application/json")
+				w.Write([]byte(`{"ok":true}`))
+			})
+			_, err := Invoke(context.Background(), handler, Principal{Subject: "user", TenantID: "tenant"}, Request{Method: tc.method, Path: tc.path})
+			if err != nil {
+				t.Fatal(err)
+			}
+		})
 	}
 }

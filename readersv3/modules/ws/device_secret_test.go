@@ -24,6 +24,7 @@ type secretRuntime struct {
 func (r secretRuntime) ConfigPath() string                           { return r.path }
 func (r secretRuntime) ReaderID() string                             { return "reader-test" }
 func (r secretRuntime) ModuleSettings(string) map[string]interface{} { return r.settings }
+func (r secretRuntime) Service(string) (interface{}, bool)           { return nil, false }
 func (r secretRuntime) RegisterService(string, interface{})          {}
 func (r secretRuntime) ResolvePath(path string) string {
 	return filepath.Join(filepath.Dir(r.path), path)

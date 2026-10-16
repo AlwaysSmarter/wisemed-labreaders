@@ -346,7 +346,7 @@ func (s *Server) adminLogout(w http.ResponseWriter, r *http.Request) {
 }
 func (s *Server) deviceView(c *config.Config, id string, d config.Device) map[string]interface{} {
 	online := s.equipmentStatus(d.TenantID, d.EquipmentID)["online"] == true
-	return map[string]interface{}{"key_id": id, "equipment_id": d.EquipmentID, "reader_id": d.ReaderID, "subject": d.Subject, "tenant_id": d.TenantID, "issuer": c.Tenants[d.TenantID].Issuer, "audience": c.Security.Audience, "scopes": d.EffectiveScopes(), "online": online}
+	return map[string]interface{}{"key_id": id, "equipment_id": d.EquipmentID, "reader_id": d.ReaderID, "subject": d.Subject, "tenant_id": d.TenantID, "issuer": c.Tenants[d.TenantID].Issuer, "audience": c.Security.Audience, "scopes": d.EffectiveScopes(), "roles": c.Security.Keys[id].Roles, "online": online}
 }
 func (s *Server) adminDevices(w http.ResponseWriter, r *http.Request) {
 	c, sess, ok := s.requireAdmin(w, r, false)

@@ -46,6 +46,13 @@ Sesiunea OCSP CNAS este separată de JWT-ul API. Operațiile obțin automat o se
 
 ## WSM
 
+Pentru pagini WiseMED există wrapperul `SIUIBridge(objWSM, options)`, servit de WSM
+la `/sdk/siui-bridge.js`. Acoperă toate cele 34 de operații CNAS și endpointurile
+auxiliare, inclusiv polling, descărcări fragmentate și anularea așteptării locale.
+[Integrare și inventarul metodelor](../../../../wsm-server/docs/siui-browser-wrapper.md).
+
+SIUI Bridge trimite `client_type: "siui-bridge"` în mesajul `hello`. JWT-ul folosește rolul de autorizare `service`; cheia WSM trebuie să permită `service`. Identificatorii `reader_id` și `equipment_id` rămân pentru rutarea și legarea echipamentului. Pentru token_endpoint, emitentul trebuie să emită rolul solicitat `service`; token_file trebuie reemis cu acest rol. Actualizează și WSM pentru acceptarea acestui tip; rutarea după tip folosește `target: {"mode":"client_type","client_type":"siui-bridge"}` și necesită dreptul `route:broadcast`. Rutarea directă după echipament rămâne disponibilă.
+
 Aceleași metode și corpuri JSON sunt accesibile prin comanda comună `api.request`, cu identitatea atestată de WSM. Nu se trimite JWT-ul local în acest mesaj. Exemplu de payload pentru adaptorul comun:
 
 ```json

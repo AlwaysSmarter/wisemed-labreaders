@@ -2,7 +2,7 @@
 
 Updated: 2026-09-24. This describes the current checked-out implementation, not a
 running production deployment. Paths are relative to the repository root. The
-application directory/binary is `wsm-server` (also called WMS/WiseMED WSS).
+application directory/binary is `wsm-server` (also called WSM/WiseMED WSS).
 Read `wsm-server/AGENTS.md` first. This memory supersedes the 2026-09-21 audit:
 its unauthenticated test-token endpoint, permissive role checks, missing TLS,
 copylocks diagnostics and payload logging are no longer the current architecture.
@@ -410,3 +410,178 @@ Creation persists immediately; save applies only the rights editor.
 - The new readersv3 `siui-bridge` utility exposes its authenticated HTTP API through the existing WSM `api.request` adapter; no new WSM message protocol. Validation submission returns a job ID promptly, and callers poll `/api/siui/validations/{id}` to stay within the per-message deadline.
 - Standard shared control UI now includes `/settings/siui`, certificate selection and validation testing when the target protocol is `siui`. Rebuild shared control assets when distributing this UI. Administrative certificate/settings actions require api:admin; job history is tenant/subject scoped. No .cer export or token PIN transmission over WSM.
 - SIUI now also exposes synchronous passive api.request actions: POST /api/siui/ocsp-test, /insured and /personalization. Timeout25s fits bridge30s; personalization requires api:admin and returns bounded base64 file bytes for browser download. These routes never call validateReport. Shared UI adds separate passive buttons and explicitly labelled offline fixture test; rebuild static assets to expose them in central WSM control UI.
+
+## SIUI Bridge client identity (2026-10-16)
+
+SIUI protocol sends hello client_type siui-bridge; JWT authorization role is service with existing equipment/reader binding. Keys must allow service; external token issuers/files must issue service tokens. WSM accepts optional reader_id for service only with valid reader/equipment IDs and preserves key identity constraints. WSM permits this service subtype, enforces duplicate device identity for it and allows client_type routing with route:broadcast. Update WSM before deploying the new bridge. Other client types and authorization roles are unchanged.
+
+## Local tenant rename (2026-10-16)
+
+Operator renamed the runtime tenant from local to wisemed-local. Migrated the two
+existing output/state/device-keys.yaml tenant references to wisemed-local, retaining
+keys and identities. Protected backup remains beside the registry. Installed
+output/bin/WSM_Server -check-config passed against output/deployments/config.yaml.
+No server restart or live login performed. Existing readers/token issuers must use
+the renamed tenant in JWT claims; changing only the main config is insufficient.
+
+## Startup configuration guidance (2026-10-16)
+
+cmd/wsm-server now prints tenant-rename recovery steps after a configuration-load
+failure: main tenant/static-key references, generated registry references with
+backup/preservation instructions, and reader/external JWT tenant settings. The
+original error remains first; guidance is explicitly conditional on a tenant rename.
+Includes the actual config path and validation/restart instructions. Verified Go
+command/config package checks and a missing-file startup smoke (nonzero exit and
+console guidance). Existing installed binaries require rebuilding to include it.
+
+## SIUI generated-key handshake correction (2026-10-16)
+
+Generated device keys now allow reader and service roles, retaining their existing
+tenant/subject/reader/equipment bindings and granted scopes. This fixes SIUI service
+JWT rejection with admin-provisioned keys; existing registry records need no migration.
+Regression checks cover generated-key TLS WebSocket upgrade and SIUI hello_ack,
+ordinary reader authentication, denied browser role, mismatched identities and
+ungranted api:invoke. Config/server race tests and vet passed.
+
+Local SIUI equipment 18 requested api:invoke despite having default registry scopes.
+Aligned its ignored runtime configuration with granted scopes, with a protected
+backup; no server permission was added. Rebuilt output/bin/WSM_Server. Both local
+processes were running under GoLand's debugger and were left running; restart WSM
+and SIUI in GoLand to load code/config changes. Actual deployed connectivity has
+not been verified; the successful TLS handshake check uses an isolated test server.
+
+## Actionable WSS authentication diagnostics (2026-10-16)
+
+WSM returns no-store JSON HTTP 401 with stable wsm_* error codes and Romanian
+remediation instructions, and logs the same safe diagnostic. Validly signed JWTs
+receive distinct role/scope, tenant/issuer/audience, subject/reader/equipment and
+time diagnostics. Scope denial names the ungranted scope; invalid signatures and
+unknown keys remain a common credentials error. No raw JWT/parser errors/secrets
+are exposed. Ticket failures use safe generic guidance. Shared reader WSS consumes
+bounded structured responses, closes the failed response body, logs connection
+failures and preserves the detailed message in last_error. Proxy HTML/oversized
+bodies fall back to operator guidance. Admin key views/help now show reader/service
+roles. Commands and troubleshooting are in docs/admin-console.md.
+Config/server and shared WSS race tests, vet and admin console Node tests passed.
+Both output/bin/WSM_Server and readersv3/output/siui-bridge/bin/SIUI_Bridge were
+rebuilt and replaced with backups. Runtime config validation passed. Existing
+GoLand debug processes were left running and require restart to load these binaries.
+
+## Topic subscription rights in admin (2026-10-16)
+
+Added topics:subscribe as permission 10 at the end of DevicePermissionCatalog.
+The admin rights UI consumes this catalog dynamically; validation now permits
+explicit grants and persisted registries restore them. Default device scopes stay
+unchanged. Existing WSM binaries must be rebuilt/restarted, then reload /admin/.
+For a device requesting this scope, explicitly grant it via rights/toggle/save or
+remove it from the client's requested scopes if subscriptions are unnecessary.
+Registry restart regression covers persistence and opt-in defaults.
+
+## Unified WSM permission order (2026-10-16)
+
+Audited all 11 ValidScope values against admin and shared reader/utility UI.
+Added wisemed:proxy as admin permission 11; topics:subscribe remains 10.
+Shared localhttp UI lists all permissions in admin order with visible 1–11 labels;
+checkbox values and existing selections/defaults remain unchanged. Cross-module
+Node regression compares UI order to the admin catalog and catalog completeness
+to ValidScope. Shared embedded UI applies to all WSM-enabled readers/utilities
+when rebuilt; remote control assets must also be refreshed when packaging WSM.
+No installed binaries, runtime permissions or secrets changed in this update.
+
+## Consistent permission text (2026-10-16)
+
+Preserved admin permission descriptions as the common titles for all 11 rights.
+Shared reader/utility checkbox labels now use these exact titles. Admin catalog
+adds info and example fields copied from reader help; rights prints both below
+each numbered title. Cross-module UI regression verifies all four fields match.
+Requires rebuilding installed applications and refreshing central control assets.
+
+## On-demand admin permission details (2026-10-16)
+
+rights now shows numbered titles only. After rights <equipment-id>, info <number>
+[number ...] prints the selected catalog entries' extended info and examples
+without modifying the draft or calling a write API. Uses the same positive safe
+integer parsing/deduplication as toggle; out-of-range entries reject the command.
+Help, visible command list and admin docs updated. Reader info controls unchanged.
+Eight admin UI Node tests pass, including parsing, detail output and immutability.
+
+## Persistent admin command history (2026-10-16)
+
+Admin CLI history command and ArrowUp/ArrowDown navigation use a per-origin,
+per-tenant/user localStorage history (last 1000 syntax-valid commands only).
+Survives refresh/logout/browser and WSM restarts; clear only clears output.
+Restores unfinished input after navigating forward; recall never executes.
+No responses, displayed keys or login credentials are persisted. Storage failure
+falls back to session memory with a notice. Tests cover restored history, drafts,
+identity separation, invalid input and unavailable/corrupt storage.
+
+## Browser SDK WSMServer and PHP JWT (2026-10-16)
+
+Embedded public /sdk/wsm.js, independent of admin/control assets. Factory or new
+WSMServer(url, browserJWT, options) auto-connects using subprotocol authentication;
+all WSM discovery, ping, commands, API bridge, topics, events/replies use WebSocket.
+No HTTP fetch in SDK; optional tokenProvider belongs to the authenticated WiseMED
+backend. Ready/isConnected start only at hello_ack. Fixed 30-second reconnect,
+expiry notification/provider, pending cleanup, bounded requests, no command replay.
+API 1:1 responses are pinned to peer connection IDs; ACK is not API success.
+Generic send exposes broadcast/group queue ACK with requestID and onReply events.
+getClientsByType accepts any exact string, returns matching array or null, no alias.
+Current SIUI type is siui-bridge, others in shared readersv3 remain reader; app
+identity selection uses readerID/equipmentID. ClientID ambiguity rejects calls.
+
+Sources: internal/server/sdk/wsm.js, docs/browser-sdk.md, examples/browser/ with
+PHP HS256 helper, guarded illustrative token endpoint and example WiseMED page.
+Endpoint session field names need integration with real WiseMED authentication;
+no live endpoint installed. Browser keys must allow role browser; device-generated
+reader/service keys are not browser keys. Origin must match the WiseMED page.
+Build includes browser examples, SDK itself is embedded. Built separate package at
+output/wsm-browser-sdk (repository root); active runtime not replaced/restarted.
+
+Validation: go test -race ./..., go vet ./..., 32 Node UI/SDK tests passed;
+real TLS WSS SDK test against Go WSM plus simulated SIUI peer passed with certificate
+verification; PHP-generated JWT accepted by Go authentication. PHP lint passed.
+No live WiseMED user/session, real device or public Nginx deployment tested.
+
+## SIUIBridge browser wrapper (2026-10-16)
+
+WSM embeds /sdk/siui-bridge.js, a wrapper over an existing WSMServer (no extra
+socket/fetch). SIUIBridge.create returns null for no matching online bridge,
+rejects ambiguity, and pins equipment/client identity across discovery refreshes.
+All 34 WSDL-derived operations have grouped and flat methods; 23 auxiliary
+method/route combinations cover settings, certificates, PIN, OCSP, invoices,
+legacy validations, token issuance, status/catalog/OpenAPI and call/file reads.
+Operations require stable operationId, submit once and poll by default. Explicit
+wait:false, waitCall/waitValidation and chunked downloads supported. AbortSignal
+abandons only local waiting; never claims to cancel remote CNAS work. Failed and
+unknown remain errors; completed does not imply insured/business success.
+
+Docs: wsm-server/docs/siui-browser-wrapper.md. Tests compare SOAP catalog and
+explicit handler routes, exercise all methods, polling/abort/deadline/identity and
+file chunk behavior. Existing TLS WSS wire test now exercises wrapper discovery
+and status through a simulated SIUI peer. No real CNAS or physical token calls.
+
+Shared apibridge now permits 130s for POST /api/siui/general/ocsp, /ocsp-test and
+/invoice/package (previous generic30s undercut OCSP120s); other deadlines stay
+unchanged and parent cancellation remains effective. SIUI binary rebuild needed
+for these long operations. WSM build refreshed at output/wsm-browser-sdk; active
+installations not replaced. Validation: 18 SDK Node tests, WSM race suite/vet,
+reader apibridge + ws race tests passed.
+
+## PHP inline signing secret (2026-10-17)
+
+wsmBrowserToken accepts exactly one of config.secret (string) or secret_file.
+Both sources trim the text and enforce the existing minimum32bytes. No YAML WSM
+schema change: server keys still use secret_file/secret_env. Browser gets JWT only.
+Startup guide documents direct PHP secret alongside file option; staged package
+helper/docs refreshed. Interoperability test covers both sources against WSM auth.
+
+## Consistent WSM naming (2026-10-17)
+
+Canonical browser API is WSMServer, example instance objWSM, asset /sdk/wsm.js.
+PHP helper is examples/browser/wsm-token.php and function wsmBrowserToken.
+SIUIBridge consumes WSMServer; SDK tests/imports, embedded route and all technical
+examples/docs use these names. Shared reader/utility diagnostics use WSM labels,
+DOM IDs and /debug/wsm. Integrating pages must use the new names and asset path.
+Staged output/wsm-browser-sdk rebuilt; active installations need normal updates.
+Go WSM suite and reader localhttp tests passed, 31 SDK/shared UI Node tests passed;
+optional DOM suite skipped because jsdom is unavailable. PHP syntax check passed.

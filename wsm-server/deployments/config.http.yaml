@@ -5,7 +5,7 @@
 server:
   address: "0.0.0.0"
   port: 8090
-  allow_insecure_http: true
+  allow_insecure_http: false
   control_ui_dir: /opt/wsm-server/control
   max_message_bytes: 8388608
   # No tls block: certificate/private key are configured in Nginx.

@@ -15,6 +15,14 @@ separate între instanțe.
   închidere a socketurilor la oprire și reload.
 - Diagnostic autentificat; fără generator public de tokenuri sau UI de test.
 
+## SDK JavaScript pentru pagini WiseMED
+
+Încărcați `/sdk/wsm.js` de pe adresa HTTPS WSM și creați
+`WSMServer("wss://domeniu-wsm", tokenJWT)`. SDK-ul folosește exclusiv WebSocket
+pentru descoperire, mesagerie și API-uri remote.
+[Integrare completă și emiterea JWT în PHP](docs/browser-sdk.md).
+[Wrapper SIUIBridge: toate endpointurile SIUI prin același socket](docs/siui-browser-wrapper.md).
+
 ## Documentație
 
 - [Consolă admin WiseMED: add / list / key / edit / delete / rights](docs/admin-console.md)

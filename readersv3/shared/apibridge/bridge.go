@@ -97,6 +97,11 @@ func Invoke(ctx context.Context, handler http.Handler, p Principal, in Request) 
 	if (u.Path == "/api/html-print-formatter/render" || u.Path == "/api/html-print-formatter/pdf") && method == "POST" {
 		timeout = 610 * time.Second
 	}
+	// These SIUI handlers may wait for OCSP/token interaction for up to 120s.
+	// Keep a bounded WSS deadline consistent with the local API.
+	if method == "POST" && (u.Path == "/api/siui/general/ocsp" || u.Path == "/api/siui/ocsp-test" || u.Path == "/api/siui/invoice/package") {
+		timeout = 130 * time.Second
+	}
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	ctx = context.WithValue(ctx, principalKey{}, p)

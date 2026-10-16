@@ -82,11 +82,12 @@
             <button class="nav-sublink" data-view="analytes" data-settings-subview="siui" hidden>CNAS</button>
             <button class="nav-sublink" data-view="analytes" data-settings-subview="pad" hidden>Setări PAD</button>
             <button class="nav-sublink" data-view="analytes" data-settings-subview="demo" hidden>Demo</button>
+            <button class="nav-sublink" data-view="analytes" data-settings-subview="wss">WSS</button>
           </div>
           <button id="debug-nav-link" class="nav-link" data-view="debug" data-i18n="nav_debug" hidden>Debug</button>
           <div class="nav-submenu" id="debug-submenu" hidden>
+            <button id="debug-wsm-link" class="nav-sublink" data-view="wsm">WSM</button>
             <button id="debug-communication-link" class="nav-sublink" data-view="debug">Communication</button>
-            <button class="nav-sublink" data-view="analytes" data-settings-subview="wss">WSS</button>
           </div>
           <button class="nav-link" data-view="help" data-i18n="nav_help">Help</button>
         </nav>
@@ -843,6 +844,7 @@
             <iframe class="help-frame" src="about:blank"></iframe>
           </article>
         </section>
+        <section id="view-wsm" class="panel-grid" hidden><article id="wsm-debug-panel" class="panel full-span"></article></section>
         <section id="view-debug" class="panel-grid" hidden>
           <article class="panel">
             <div class="panel-head">

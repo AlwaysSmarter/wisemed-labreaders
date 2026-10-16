@@ -22,7 +22,20 @@ security:
                 - api:invoke
                 - api:admin
             secret_file: keys/local-backend.key
-            tenant_id: local
+            tenant_id: wisemed-local
+        wisemed-web:
+            tenant_id: wisemed-local
+            secret_file: keys/wisemed-web.key
+            roles: [browser]
+            scopes:
+                - route:reply
+                - route:event
+                - route:command
+                - connections:read
+                - server:status
+                - api:invoke
+                - api:admin
+                - topics:subscribe
     max_token_ttl_seconds: 900
 server:
     address: 0.0.0.0
@@ -31,9 +44,11 @@ server:
     max_message_bytes: 8388608
     port: 8090
 tenants:
-    local:
+    wisemed-local:
         allowed_origins:
             - https://localhost:8443
+            - https://wslocal.wisemed.eu
+            - https://php.wisemed.eu
         issuer: https://localhost:8443
         wisemed:
             api_key_file: keys/local-wisemed-api.key

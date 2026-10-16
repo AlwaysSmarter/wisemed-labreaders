@@ -12,7 +12,7 @@ $now = time();
 $input = $base64url(json_encode(['alg'=>'HS256', 'typ'=>'JWT', 'kid'=>$kid], JSON_THROW_ON_ERROR)) . '.' .
     $base64url(json_encode(['iss'=>'html-print-formatter', 'aud'=>'html-print-formatter', 'sub'=>'php-client', 'iat'=>$now, 'exp'=>$now+300], JSON_THROW_ON_ERROR));
 $jwt = $input . '.' . $base64url(hash_hmac('sha256', $input, $secret, true));
-$html = file_get_contents($argv[1] ?? 'report.html');
+$html = file_get_contents(PHP_SAPI === 'cli' ? ($argv[1] ?? 'report.html') : __DIR__ . '/report.html');
 if ($html === false) { throw new RuntimeException('Cannot read HTML'); }
 $body = json_encode(['html'=>$html, 'timeout_ms'=>120000], JSON_THROW_ON_ERROR);
 // Alternatively: ['html_link'=>'https://example.org/report.html', 'timeout_ms'=>120000]
@@ -27,5 +27,10 @@ curl_close($curl);
 if ($result === false || $status !== 200) {
     throw new RuntimeException("PDF request failed ($status): " . ($error ?: $result));
 }
-if (file_put_contents('rendered.pdf', $result) === false) { throw new RuntimeException('Cannot save rendered.pdf'); }
-echo "Saved rendered.pdf\n";
+// Send the PDF directly; no PDF file is written to disk.
+header('Content-Type: application/pdf');
+header('Content-Disposition: inline; filename="raport.pdf"');
+header('Content-Length: ' . strlen($result));
+header('Cache-Control: no-store');
+echo $result;
+exit;

@@ -1,0 +1,7455 @@
+import {renderInvoiceDashboard} from "/siui-invoice.js";
+const translations = {
+  ro: {
+    language: "Limba",
+    localAdmin: "ADMIN LOCAL",
+    readerEyebrow: "READER",
+    localHttp: "HTTP LOCAL",
+    loginTitle: "WiseMED Reader Console",
+    loginSubtitle: "Login cu utilizator WiseMED pentru administrarea locala a readerului.",
+    username: "Utilizator",
+    password: "Parola",
+    login: "Login",
+    logout: "Logout",
+    navOverview: "Acasa",
+    navDailyDetails: "Detalii zilnice",
+    navAnalytes: "Analize",
+    navSettings: "Setari",
+    navOrders: "Cereri analize",
+    navQc: "Controlul calitatii",
+    navDebug: "Debug",
+    navHelp: "Ajutor",
+    debugTitle: "Debug",
+    debugDescription: "Ruleaza scenarii .tst din deployments/test.",
+    debugResultTitle: "Rezultat test",
+    debugNoTests: "Nu exista fisiere .tst in deployments/test.",
+    debugRun: "Ruleaza",
+    debugRunning: "Se ruleaza testul...",
+    debugPassed: "Test trecut",
+    debugFailed: "Test esuat",
+    debugLine: "Linia",
+    debugExpected: "Asteptat",
+    debugActual: "Primit",
+    debugInput: "Input",
+    debugTerminator: "Terminator",
+    debugDuration: "Durata",
+    settingsAnalytes: "Analize",
+    settingsReader: "Setari reader",
+    settingsDailyDetails: "Detalii zilnice",
+    settingsQc: "Setari QC",
+    labnovationImageMode: "Imagine Labnovation LD-560",
+    repeatModeLabel: "Mod tratare repetari",
+    repeatModeHelp: "Stabileste daca selectarea unui alt rezultat schimba doar analiza curenta sau tot grupul de analize lucrate simultan pentru aceeasi proba.",
+    deleteOrdersPreference: "Confirmare stergere cereri",
+    deleteOrdersPreferenceToggle: "Nu mai intreba la stergere",
+    repeatModeIndividual: "Repetari individuale pe analiza",
+    repeatModeGrouped: "Repetari grupate pe lot de rezultate",
+    saveReaderSettings: "Salveaza setarile readerului",
+    readerSettingsSaved: "Setarile readerului au fost salvate.",
+    search: "Cautare",
+    variableName: "Nume variabila",
+    value: "Valoare",
+    source: "Sursa",
+    scope: "Scop",
+    noDailyDetails: "Nu exista detalii zilnice pentru filtrul selectat.",
+    dailyDetailsDay: "ZI",
+    dailyDetailsDayRound: "ZI + RUNDA",
+    dailyDetailsDayAnalyte: "ZI + ANALIZA",
+    dailyDetailsDayRoundAnalyte: "ZI + RUNDA + ANALIZA",
+    dailyDetailsDayTab: "Pe zi",
+    dailyDetailsDayRoundTab: "Pe zi si runda",
+    dailyDetailsDayAnalyteTab: "Pe zi si analiza",
+    dailyDetailsDayRoundAnalyteTab: "Pe zi, runda si analiza",
+    sessionLabel: "Autentificat ca",
+    readerSummary: "Rezumat reader",
+    readerCategory: "Categorie",
+    medicalUnitLabel: "Unitate medicala",
+    equipmentTypeLabel: "Tip echipament",
+    equipmentIdLabel: "ID echipament",
+    readerIdLabel: "ID reader",
+    analyzerNameLabel: "Analizor",
+    protocolSubtypeLabel: "Subtip protocol",
+    readerCategoryGeneric: "Generic",
+    readerCategoryUrine: "Urina",
+    readerCategoryHematology: "Hematologie",
+    readerCategoryBiochemistry: "Biochimie",
+    readerCategoryImmunology: "Imunologie",
+    readerCategoryGas: "Gaz cromatograf",
+    readerCategorySpectro: "Spectrofotometru",
+    dashboardTitle: "Acasa",
+    wisemedws: "WiseMEDWS",
+    analyzer: "Analizor",
+    status: "Status",
+    recentLogs: "Loguri recente",
+    logPolling: "Polling (s)",
+    refresh: "Refresh",
+    analytes: "Analize",
+    searchAnalytes: "Cauta dupa tag, code, nume",
+    searchOrders: "Cauta dupa File ID, Sample code, Specimen code",
+    activeFilter: "Filtru activ",
+    analyteEditor: "Editor analiza",
+    new: "Nou",
+    tag: "Tag",
+    code: "Code",
+    name: "Nume",
+    description: "Descriere",
+    resultType: "Tip rezultat",
+    formatting: "Formatare",
+    weighting: "Pondere",
+    measureUnit: "Unitate masura",
+    reagentsSet: "Set reactivi",
+    active: "Activ",
+    save: "Salveaza",
+    delete: "Sterge",
+    howTo: "Ghid",
+    openSeparate: "Deschide separat",
+    orderDetails: "Detalii cerere",
+    round: "Runda",
+    slot: "Pozitie",
+    sample: "Proba",
+    analyses: "Analize",
+    otherResults: "Alte rezultate",
+    currentResult: "Rezultat curent",
+    selectResult: "Selecteaza rezultat",
+    analysesForSample: "Analize pentru proba",
+    analysisName: "Denumire analiza",
+    analysisTag: "Tag",
+    communicationDetails: "Detalii de comunicare",
+    resultsFilter: "Rezultate",
+    wisemedSendFilter: "Trimiteri WiseMED",
+    allStatuses: "Toate",
+    statusReceiveNone: "Neprimite",
+    statusReceivePartial: "Primite partial",
+    statusReceiveFull: "Primite complet",
+    statusSendNone: "Netrimise",
+    statusSendPartial: "Trimise partial",
+    statusSendFull: "Trimise complet",
+    analyzerSendCount: "Trimiteri analizor",
+    syncFlow: "Flux",
+    analysisSendStatus: "Status trimitere WiseMED",
+    wisemedSMID: "Serviciu medical ID",
+    wisemedFSMID: "FSM ID",
+    analysisQualitative: "Rezultat calitativ",
+    analysisQuantitative: "Rezultat cantitativ",
+    analysesCount: "Nr. analize",
+    orderDate: "Data",
+    selectAll: "Selecteaza tot",
+    importFile: "Import",
+    exportFile: "Export",
+    getWorklist: "Genereaza worklist",
+    newRound: "Runda noua",
+    exportedFile: "Fisier exportat",
+    importedFile: "Fisier importat",
+    sendToBulletin: "Trimite in buletin",
+    sendToBulletinSuccess: "Rezultatele au fost trimise in buletinul WiseMED.",
+    sendToBulletinFailed: "Trimiterea in buletinul WiseMED a esuat.",
+    syncToWiseMED: "Try WiseMED match",
+    syncToWiseMEDSuccess: "Sincronizarea de match cu WiseMED a fost rulata.",
+    syncToWiseMEDFailed: "Sincronizarea de match cu WiseMED a esuat.",
+    wisemedMatchTimer: "Syncro Match WiseMED",
+    importing: "Se importa...",
+    importSuccess: "Import finalizat",
+    importFailed: "Import esuat",
+    rowsImported: "randuri importate",
+    warningCount: "avertismente",
+    worklistPending: "Generarea worklist-ului necesita endpoint-ul WiseMED API dedicat.",
+    close: "Inchide",
+    medicalUnit: "Unitate medicala",
+    comm: "Comunicatie",
+    layout: "Layout",
+    orders: "Cereri analize",
+    results: "Rezultate",
+    events: "Evenimente",
+    todayResults: "Astazi analize",
+    dailyTrend: "Evolutie pe zile",
+    qcToday: "QC astazi",
+    qcTargetTitle: "Setari QC pentru analiza",
+    qcTargetsExisting: "Setari QC existente",
+    qcTargetAnalyte: "Analiza selectata",
+    qcTargetLevel: "Nivel QC",
+    qcTargetLot: "Lot",
+    qcTargetMean: "Medie",
+    qcTargetSD: "SD",
+    qcTargetOneSD: "1 SD",
+    qcTargetTwoSD: "2 SD",
+    qcTargetThreeSD: "3 SD",
+    qcTargetCV: "CV %",
+    saveQcTarget: "Salveaza QC",
+    deleteQcTarget: "Sterge QC",
+    westgardTitle: "Diagrama Westgard",
+    westgardAnalyte: "Analiza",
+    westgardLevel: "Nivel QC",
+    westgardLot: "Lot",
+    westgardDateFrom: "De la",
+    westgardDateTo: "Pana la",
+    editAnalyte: "Editeaza",
+    noWestgard: "Nu exista suficiente date numerice pentru filtru.",
+    qcRecords: "Controale QC",
+    qcResults: "Rezultate QC",
+    qcTargets: "Tinte QC",
+    qcDate: "Data QC",
+    qcAddManual: "Adauga QC",
+    qcManualTitle: "Adaugare QC manuala",
+    qcControlLabel: "Eticheta control",
+    qcRound: "Runda QC",
+    qcControlType: "Nivel QC",
+    allControlTypes: "Toate",
+    allAnalytes: "Toate analizele",
+    qcDetails: "Detalii QC",
+    qcLevel: "Nivel QC",
+    qcReadAt: "Citit la",
+    diluentInfo: "Diluent",
+    lotNo: "Lot",
+    numericResults: "Rezultate numerice",
+    interpretation: "Interpretare",
+    outside2sd: "Peste 2SD",
+    outside3sd: "Peste 3SD",
+    westgardPeriod: "Perioada",
+    westgardCurrentWeek: "Saptamana curenta",
+    westgardPreviousWeek: "Saptamana anterioara",
+    westgardCurrentMonth: "Luna curenta",
+    westgardPreviousMonth: "Luna anterioara",
+    westgardCurrentYear: "Anul curent",
+    westgardCustom: "Definit utilizator",
+    westgardInvalid: "Invalid",
+    westgardValid: "Valid",
+    westgardStatsOwnMean: "Media citirilor",
+    westgardMedian: "Mediana",
+    westgardOutliers: "Aberatii",
+    westgardRepeatability: "Repetabilitate",
+    noQc: "Nu exista inregistrari QC.",
+    connected: "conectat",
+    disconnected: "deconectat",
+    noLogs: "Nu exista loguri.",
+    noAnalytes: "Nu exista analize.",
+    noOrders: "Nu exista probe pentru perioada selectata",
+    editing: "Editezi",
+    readyNew: "Pregatit pentru o analiza noua",
+    saved: "Salvat.",
+    deleteConfirm: "Sterg analyte-ul",
+    noResult: "Fara rezultat",
+    analysesWithoutResult: "Analize fara rezultat",
+    analysesWithResult: "Analize cu rezultat",
+    sampleIdPrompt: "Sample ID",
+    sampleNo: "Nr. proba",
+    sentSampleCode: "Cod trimis",
+    fileId: "Fisa",
+    sampleCode: "Sample code",
+    specimenCode: "Specimen code",
+    patientId: "ID solicitant",
+    patientName: "Solicitant",
+    orderImage: "Imagine",
+    deleteSelection: "Sterge selectia",
+    deleteOrdersConfirm: "Stergi cererile selectate si toate rezultatele lor?",
+    deleteOrdersTitle: "Confirmare stergere",
+    dontAskAgain: "Nu mai intreba",
+    cancel: "Renunta",
+    deleteQCConfirm: "Stergi inregistrarile QC selectate si toate rezultatele lor?",
+    deleteSuccess: "Stergere finalizata",
+    dailyWorksheet: "Fisa de lucru",
+    statusReceived: "primit",
+    statusPending: "in asteptare",
+    statusCompleted: "finalizat",
+    statusFailed: "esuat",
+    statusProcessing: "in procesare",
+    statusImported: "importat",
+    fieldTag: "Tag",
+    fieldCode: "Cod",
+    fieldName: "Nume",
+    fieldDescription: "Descriere",
+    fieldResultType: "Tip rezultat",
+    fieldFormatting: "Formatare",
+    fieldWeighting: "Pondere",
+    fieldMeasureUnit: "Unitate masura",
+    fieldReagentsSet: "Set reactivi",
+    fieldActive: "Activ",
+  },
+  en: {
+    language: "Language",
+    localAdmin: "LOCAL ADMIN",
+    readerEyebrow: "READER",
+    localHttp: "LOCAL HTTP",
+    loginTitle: "WiseMED Reader Console",
+    loginSubtitle: "Sign in with your WiseMED account to manage the local reader.",
+    username: "Username",
+    password: "Password",
+    login: "Login",
+    logout: "Logout",
+    navOverview: "Home",
+    navDailyDetails: "Daily Details",
+    navAnalytes: "Analytes",
+    navSettings: "Settings",
+    navOrders: "Analysis Requests",
+    navQc: "Quality Control",
+    navDebug: "Debug",
+    navHelp: "Help",
+    debugTitle: "Debug",
+    debugDescription: "Run .tst scenarios from deployments/test.",
+    debugResultTitle: "Test result",
+    debugNoTests: "No .tst files found in deployments/test.",
+    debugRun: "Run",
+    debugRunning: "Running test...",
+    debugPassed: "Test passed",
+    debugFailed: "Test failed",
+    debugLine: "Line",
+    debugExpected: "Expected",
+    debugActual: "Received",
+    debugInput: "Input",
+    debugTerminator: "Terminator",
+    debugDuration: "Duration",
+    settingsAnalytes: "Analytes",
+    settingsReader: "Reader settings",
+    settingsDailyDetails: "Daily Details",
+    settingsQc: "QC Settings",
+    labnovationImageMode: "Labnovation LD-560 image",
+    repeatModeLabel: "Repeat handling mode",
+    repeatModeHelp: "Choose whether selecting another result changes only the current analysis or the whole batch of analyses produced at the same time for the same sample.",
+    deleteOrdersPreference: "Order deletion confirmation",
+    deleteOrdersPreferenceToggle: "Do not ask before deleting",
+    repeatModeIndividual: "Individual repeats per analysis",
+    repeatModeGrouped: "Grouped repeats per result batch",
+    saveReaderSettings: "Save reader settings",
+    readerSettingsSaved: "Reader settings were saved.",
+    search: "Search",
+    variableName: "Variable name",
+    value: "Value",
+    source: "Source",
+    scope: "Scope",
+    noDailyDetails: "No daily details available for the selected filter.",
+    dailyDetailsDay: "DAY",
+    dailyDetailsDayRound: "DAY + ROUND",
+    dailyDetailsDayAnalyte: "DAY + ANALYTE",
+    dailyDetailsDayRoundAnalyte: "DAY + ROUND + ANALYTE",
+    dailyDetailsDayTab: "By day",
+    dailyDetailsDayRoundTab: "By day and round",
+    dailyDetailsDayAnalyteTab: "By day and analyte",
+    dailyDetailsDayRoundAnalyteTab: "By day, round and analyte",
+    sessionLabel: "Signed in as",
+    readerSummary: "Reader summary",
+    readerCategory: "Category",
+    medicalUnitLabel: "Medical unit",
+    equipmentTypeLabel: "Equipment type",
+    equipmentIdLabel: "Equipment ID",
+    readerIdLabel: "Reader ID",
+    analyzerNameLabel: "Analyzer",
+    protocolSubtypeLabel: "Protocol subtype",
+    readerCategoryGeneric: "Generic",
+    readerCategoryUrine: "Urine",
+    readerCategoryHematology: "Hematology",
+    readerCategoryBiochemistry: "Biochemistry",
+    readerCategoryImmunology: "Immunology",
+    readerCategoryGas: "Gas chromatograph",
+    readerCategorySpectro: "Spectrophotometer",
+    dashboardTitle: "Home",
+    wisemedws: "WiseMEDWS",
+    analyzer: "Analyzer",
+    status: "Status",
+    recentLogs: "Recent Logs",
+    logPolling: "Polling (s)",
+    refresh: "Refresh",
+    analytes: "Analytes",
+    searchAnalytes: "Search by tag, code, name",
+    searchOrders: "Search by File ID, Sample code, specimen code",
+    activeFilter: "Active filter",
+    analyteEditor: "Analyte editor",
+    new: "New",
+    tag: "Tag",
+    code: "Code",
+    name: "Name",
+    description: "Description",
+    resultType: "Result Type",
+    formatting: "Formatting",
+    weighting: "Weighting",
+    measureUnit: "Measure Unit",
+    reagentsSet: "Reagents Set",
+    active: "Active",
+    save: "Save",
+    delete: "Delete",
+    howTo: "How To",
+    openSeparate: "Open separately",
+    orderDetails: "Request details",
+    round: "Round",
+    slot: "Slot",
+    sample: "Sample",
+    analyses: "Analyses",
+    otherResults: "Other results",
+    currentResult: "Current result",
+    selectResult: "Select result",
+    analysesForSample: "Analyses for sample",
+    analysisName: "Analysis name",
+    analysisTag: "Tag",
+    communicationDetails: "Communication details",
+    resultsFilter: "Results",
+    wisemedSendFilter: "WiseMED sends",
+    allStatuses: "All",
+    statusReceiveNone: "Not received",
+    statusReceivePartial: "Partially received",
+    statusReceiveFull: "Fully received",
+    statusSendNone: "Not sent",
+    statusSendPartial: "Partially sent",
+    statusSendFull: "Fully sent",
+    analyzerSendCount: "Analyzer sends",
+    syncFlow: "Flow",
+    analysisSendStatus: "WiseMED send status",
+    wisemedSMID: "Medical service ID",
+    wisemedFSMID: "FSM ID",
+    analysisQualitative: "Qualitative result",
+    analysisQuantitative: "Quantitative result",
+    analysesCount: "Analyses count",
+    orderDate: "Date",
+    selectAll: "Select all",
+    importFile: "Import",
+    exportFile: "Export",
+    getWorklist: "Get worklist",
+    newRound: "New round",
+    exportedFile: "Exported file",
+    importedFile: "Imported file",
+    sendToBulletin: "Send to bulletin",
+    sendToBulletinSuccess: "Results were sent to the WiseMED bulletin.",
+    sendToBulletinFailed: "Sending to the WiseMED bulletin failed.",
+    syncToWiseMED: "Try WiseMED match",
+    syncToWiseMEDSuccess: "WiseMED match sync was executed.",
+    syncToWiseMEDFailed: "WiseMED match sync failed.",
+    wisemedMatchTimer: "WiseMED Match Sync",
+    importing: "Importing...",
+    importSuccess: "Import completed",
+    importFailed: "Import failed",
+    rowsImported: "rows imported",
+    warningCount: "warnings",
+    worklistPending: "Get worklist needs the dedicated WiseMED API endpoint.",
+    close: "Close",
+    medicalUnit: "Medical Unit",
+    comm: "Communication",
+    layout: "Layout",
+    orders: "Analysis Requests",
+    results: "Results",
+    events: "Events",
+    todayResults: "Today's analyses",
+    dailyTrend: "Daily trend",
+    qcToday: "QC today",
+    qcTargetTitle: "QC settings for analyte",
+    qcTargetsExisting: "Saved QC settings",
+    qcTargetAnalyte: "Selected analyte",
+    qcTargetLevel: "QC level",
+    qcTargetLot: "Lot",
+    qcTargetMean: "Mean",
+    qcTargetSD: "SD",
+    qcTargetOneSD: "1 SD",
+    qcTargetTwoSD: "2 SD",
+    qcTargetThreeSD: "3 SD",
+    qcTargetCV: "CV %",
+    saveQcTarget: "Save QC",
+    deleteQcTarget: "Delete QC",
+    westgardTitle: "Westgard chart",
+    westgardAnalyte: "Analyte",
+    westgardLevel: "QC level",
+    westgardLot: "Lot",
+    westgardDateFrom: "From",
+    westgardDateTo: "To",
+    editAnalyte: "Edit",
+    noWestgard: "Not enough numeric data for this filter.",
+    qcRecords: "QC records",
+    qcResults: "QC results",
+    qcTargets: "QC targets",
+    qcDate: "QC date",
+    qcAddManual: "Add QC",
+    qcManualTitle: "Manual QC entry",
+    qcControlLabel: "Control label",
+    qcRound: "QC round",
+    qcControlType: "QC level",
+    allControlTypes: "All",
+    allAnalytes: "All analytes",
+    qcDetails: "QC details",
+    qcLevel: "QC level",
+    qcReadAt: "Read at",
+    diluentInfo: "Diluent",
+    lotNo: "Lot",
+    numericResults: "Numeric results",
+    interpretation: "Interpretation",
+    outside2sd: "Above 2SD",
+    outside3sd: "Above 3SD",
+    westgardPeriod: "Period",
+    westgardCurrentWeek: "Current week",
+    westgardPreviousWeek: "Previous week",
+    westgardCurrentMonth: "Current month",
+    westgardPreviousMonth: "Previous month",
+    westgardCurrentYear: "Current year",
+    westgardCustom: "Custom",
+    westgardInvalid: "Invalid",
+    westgardValid: "Valid",
+    westgardStatsOwnMean: "Own mean",
+    westgardMedian: "Median",
+    westgardOutliers: "Outliers",
+    westgardRepeatability: "Repeatability",
+    noQc: "No QC records available.",
+    connected: "connected",
+    disconnected: "disconnected",
+    noLogs: "No logs available.",
+    noAnalytes: "No analytes available.",
+    noOrders: "No orders for the selected period.",
+    editing: "Editing",
+    readyNew: "Ready for a new analyte",
+    saved: "Saved.",
+    deleteConfirm: "Delete analyte",
+    noResult: "No result",
+    analysesWithoutResult: "Analyses without result",
+    analysesWithResult: "Analyses with result",
+    sampleIdPrompt: "Sample ID",
+    sampleNo: "Sample No",
+    sentSampleCode: "Sent sample code",
+    fileId: "File ID",
+    sampleCode: "Sample code",
+    specimenCode: "Specimen code",
+    patientId: "Requester ID",
+    patientName: "Requester",
+    orderImage: "Image",
+    deleteSelection: "Delete selection",
+    deleteOrdersConfirm: "Delete the selected requests and all their results?",
+    deleteOrdersTitle: "Delete confirmation",
+    dontAskAgain: "Do not ask again",
+    cancel: "Cancel",
+    deleteQCConfirm: "Delete the selected QC records and all their results?",
+    deleteSuccess: "Deletion completed",
+    dailyWorksheet: "Worksheet",
+    statusReceived: "received",
+    statusPending: "pending",
+    statusCompleted: "completed",
+    statusFailed: "failed",
+    statusProcessing: "processing",
+    statusImported: "imported",
+    fieldTag: "Tag",
+    fieldCode: "Code",
+    fieldName: "Name",
+    fieldDescription: "Description",
+    fieldResultType: "Result Type",
+    fieldFormatting: "Formatting",
+    fieldWeighting: "Weighting",
+    fieldMeasureUnit: "Measure Unit",
+    fieldReagentsSet: "Reagents Set",
+    fieldActive: "Active",
+  },
+};
+
+function localISODate() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function offsetISODate(days) {
+  const now = new Date();
+  now.setDate(now.getDate() + days);
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function isoDateFromDate(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function currentPeriodBounds(period) {
+  const now = new Date();
+  const start = new Date(now);
+  const end = new Date(now);
+  if (period === "current_week") {
+    const delta = (now.getDay() + 6) % 7;
+    start.setDate(now.getDate() - delta);
+  } else if (period === "previous_week") {
+    const delta = (now.getDay() + 6) % 7;
+    start.setDate(now.getDate() - delta - 7);
+    end.setDate(now.getDate() - delta - 1);
+  } else if (period === "current_month") {
+    start.setDate(1);
+  } else if (period === "previous_month") {
+    start.setMonth(now.getMonth() - 1, 1);
+    end.setDate(0);
+  } else if (period === "current_year") {
+    start.setMonth(0, 1);
+  }
+  if (period !== "previous_week" && period !== "previous_month") {
+    end.setHours(0, 0, 0, 0);
+  }
+  start.setHours(0, 0, 0, 0);
+  return { from: isoDateFromDate(start), to: isoDateFromDate(end) };
+}
+
+const BARCODE_TYPE_OPTIONS = [
+  ["B3", "Code 39"],
+  ["B0", "Aztec Barcode"],
+  ["B1", "Code 11"],
+  ["B2", "Interleaved 2 of 5"],
+  ["B4", "Code 49"],
+  ["B5", "Planet Code"],
+  ["B7", "PDF417"],
+  ["B8", "EAN-8"],
+  ["B9", "UPC-E8"],
+  ["BA", "Code 93"],
+  ["BB", "CODABLOCK"],
+  ["BC", "Code 128"],
+  ["BD", "UPS MaxiCode"],
+  ["BE", "EAN-13"],
+  ["BF", "MicroPDF417"],
+  ["BI", "Industrial 2 of 5"],
+  ["BJ", "Standard 2 of 5"],
+  ["BK", "ANSI Codabar"],
+  ["BL", "LOGMARS"],
+  ["BM", "MSI"],
+  ["BO", "Aztec 2"],
+  ["BP", "Plessey"],
+  ["BQ", "QR Code"],
+  ["BR", "GS1 Databar"],
+  ["BS", "UPC/EAN Extensions"],
+  ["BT", "TLC39"],
+  ["BU", "UPC-A"],
+  ["BX", "Data Matrix"],
+  ["BZ", "Postal Code"],
+];
+
+const BARCODE_YES_NO = [["N", "No"], ["Y", "Yes"]];
+const BARCODE_ORIENTATION = [["N", "Normal"], ["R", "Rotated"], ["I", "Inverted"], ["B", "Bottom Up"]];
+const BARCODE_RESOLUTION = [["200", "8mm - 200dpi"], ["300", "12mm - 300dpi"], ["600", "24mm - 600dpi"]];
+const BARCODE_MODULE_WIDTH = [["1", "1 dot"], ["2", "2 dots"], ["3", "3 dots"], ["4", "4 dots"], ["5", "5 dots"], ["6", "6 dots"], ["7", "7 dots"], ["8", "8 dots"], ["9", "9 dots"], ["10", "10 dots"]];
+const BARCODE_RATIO = [["2.0", "2.0"], ["2.1", "2.1"], ["2.2", "2.2"], ["2.3", "2.3"], ["2.4", "2.4"], ["2.5", "2.5"], ["2.6", "2.6"], ["2.7", "2.7"], ["2.8", "2.8"], ["2.9", "2.9"], ["3.0", "3.0"]];
+const BARCODE_FONT_OPTIONS = [["A", "A"], ["B", "B"], ["C", "C"], ["D", "D"], ["E", "E"], ["F", "F"], ["G", "G"], ["H", "H"], ["0", "0"]];
+const BARCODE_BOX_COLOR = [["B", "Black"], ["W", "White"]];
+const BARCODE_QR_EC = [["Q", "High reliability"], ["H", "Ultra-high reliability"], ["M", "Standard"], ["L", "High density"]];
+const BARCODE_ENDPOINT_OPTIONS = [
+  ["barcode-legacy", "/barcode/print"],
+  ["barcode-api", "/api/barcode/print"],
+  ["posta-romana-legacy", "/barcode/print/posta-romana"],
+  ["posta-romana-api", "/api/barcode/print/posta-romana"],
+];
+
+const BARCODE_FIELD_SECTIONS = [
+  {
+    title: "Printer settings",
+    fields: [
+      { key: "bcp_type", label: "Printer type", type: "select", options: [["zebrazpl", "Zebra ZPL"]], default: "zebrazpl" },
+      { key: "othercfg_sel_printer", label: "Selected printer", type: "printer-select", default: "" },
+      { key: "othercfg_printer_resolution", label: "Printer resolution", type: "select", options: BARCODE_RESOLUTION, default: "200" },
+    ],
+  },
+  {
+    title: "Barcode settings",
+    fields: [
+      { key: "othercfg_print_bcodex", label: "Barcode X (mm)", type: "number", default: "2", span: 1 },
+      { key: "othercfg_print_bcodey", label: "Barcode Y (mm)", type: "number", default: "3", span: 1 },
+      { key: "othercfg_printer_barcode", label: "Barcode type", type: "select", options: BARCODE_TYPE_OPTIONS, default: "B3", span: 1 },
+      { key: "othercfg_print_bcodeopt_w", label: "Module width", type: "select", options: BARCODE_MODULE_WIDTH, default: "2", span: 1 },
+      { key: "othercfg_bc_widenarowr", label: "Wide bar to narrow bar ratio", type: "select", options: BARCODE_RATIO, default: "3.0", span: 1 },
+      { key: "othercfg_print_bcodeopt_o", label: "Orientation", type: "select", options: BARCODE_ORIENTATION, default: "N", span: 1, showFor: ["B0","B1","B2","B3","B4","B5","B7","B8","B9","BA","BB","BC","BE","BF","BI","BJ","BK","BL","BM","BO","BP","BQ","BR","BS","BT","BU","BX","BZ"] },
+      { key: "othercfg_print_bcodeopt_e", label: "Check digit", type: "select", options: BARCODE_YES_NO, default: "N", span: 1, showFor: ["B1","B2","B3","B9","BA","BC","BK","BM","BP","BU"] },
+      { key: "othercfg_print_bcodeopt_f", label: "Interpretation line", type: "select", options: BARCODE_YES_NO, default: "N", span: 1, showFor: ["B1","B2","B3","B4","B5","B8","B9","BA","BC","BE","BI","BJ","BK","BM","BP","BS","BU","BZ"] },
+      { key: "othercfg_print_bcodeopt_g", label: "Interpretation line above", type: "select", options: BARCODE_YES_NO, default: "N", span: 1, showFor: ["B1","B2","B3","B5","B8","B9","BA","BC","BE","BI","BJ","BK","BL","BM","BP","BS","BU","BZ"] },
+      { key: "othercfg_print_bcodeopt_gwc", label: "Interpretation line with check", type: "select", options: BARCODE_YES_NO, default: "N", span: 1, showFor: ["BM"] },
+      { key: "othercfg_print_bcodeopt_h", label: "Barcode height (dots)", type: "number", default: "100", span: 1, showFor: ["B1","B2","B3","B4","B5","B7","B8","B9","BA","BB","BC","BE","BF","BI","BJ","BK","BL","BM","BP","BR","BS","BT","BU","BX","BZ"] },
+      { key: "othercfg_print_bcodeopt_b", label: "Magnification factor", type: "select", options: BARCODE_YES_NO, default: "N", span: 1, showFor: ["B0"] },
+      { key: "othercfg_print_bcodeopt_d", label: "Error control", type: "number", default: "0", span: 1, showFor: ["B0"] },
+      { key: "othercfg_print_bcodeopt_ec", label: "QR error correction", type: "select", options: BARCODE_QR_EC, default: "Q", span: 1, showFor: ["BQ"] },
+      { key: "othercfg_print_bcodeopt_m", label: "Menu symbol", type: "select", options: BARCODE_YES_NO, default: "N", span: 1, showFor: ["B0"] },
+      { key: "othercfg_print_bcodeopt_c", label: "Interpretation code", type: "select", options: BARCODE_YES_NO, default: "N", span: 1, showFor: ["B0","B2"] },
+      { key: "othercfg_print_bcodeopt_syn", label: "Symbol number", type: "number", default: "2", span: 1, showFor: ["BD"] },
+      { key: "othercfg_print_bcodeopt_n", label: "No. symbols", type: "number", default: "1", span: 1, showFor: ["B0","BD"] },
+      { key: "othercfg_print_bcodeopt_s", label: "ID for structural append", type: "number", default: "0", span: 1, showFor: ["B0"] },
+      { key: "othercfg_print_bcodeopt_sm", label: "Starting mode", type: "select", options: [["A", "Automatic mode"], ["0", "Regular alphanumeric"], ["1", "Multiple read alphanumeric"], ["2", "Regular numeric"], ["3", "Group alphanumeric"], ["4", "Regular alphanumeric S1"], ["5", "Regular alphanumeric S2"]], default: "A", span: 1, showFor: ["B4"] },
+      { key: "othercfg_print_bcodeopt_sl", label: "Security level", type: "number", default: "0", span: 1, showFor: ["B7","BB"] },
+      { key: "othercfg_print_bcodeopt_ce", label: "No. cols. to encode", type: "number", default: "0", span: 1, showFor: ["B7","BX"] },
+      { key: "othercfg_print_bcodeopt_re", label: "No. rows to encode", type: "number", default: "0", span: 1, showFor: ["B7","BB","BX","BZ"] },
+      { key: "othercfg_print_bcodeopt_tr", label: "Truncate rows indicator", type: "select", options: BARCODE_YES_NO, default: "N", span: 1, showFor: ["B7"] },
+      { key: "othercfg_print_bcodeopt_rc", label: "Chars per row", type: "number", default: "0", span: 1, showFor: ["BB"] },
+      { key: "othercfg_print_bcodeopt_cbm", label: "CODABLOCK mode", type: "select", options: [["F", "F"], ["A", "A"], ["E", "E"]], default: "F", span: 1, showFor: ["BB"] },
+      { key: "othercfg_print_bcodeopt_cdm", label: "Code128 mode", type: "select", options: [["N", "No selection mode"], ["U", "UCC Case"], ["A", "Automatic"], ["D", "UCC/EAN"]], default: "N", span: 1, showFor: ["BC"] },
+      { key: "othercfg_print_bcodeopt_upsm", label: "UPS mode", type: "select", options: [["2", "Numeric"], ["3", "Alphanumeric"], ["4", "Symbol"], ["5", "Full ECC"], ["6", "Reader"]], default: "2", span: 1, showFor: ["BD"] },
+      { key: "othercfg_print_bcodeopt_qm", label: "QR code model", type: "select", options: [["1", "Model 1"], ["2", "Model 2"]], default: "2", span: 1, showFor: ["BQ"] },
+      { key: "othercfg_print_bcodeopt_nmod", label: "Numeric mode", type: "number", default: "0", span: 1, showFor: ["BF"] },
+      { key: "othercfg_print_bcodeopt_ssc", label: "Start char", type: "text", default: "A", span: 1, showFor: ["BK"] },
+      { key: "othercfg_print_bcodeopt_stc", label: "Stop char", type: "text", default: "B", span: 1, showFor: ["BK"] },
+      { key: "othercfg_print_bcodeopt_mv", label: "Mask value", type: "number", default: "0", span: 1, showFor: ["BQ"] },
+      { key: "othercfg_print_bcodeopt_sh", label: "Separator height", type: "number", default: "1", span: 1, showFor: ["BR"] },
+      { key: "othercfg_print_bcodeopt_sw", label: "Segment width", type: "number", default: "2", span: 1, showFor: ["BR"] },
+      { key: "othercfg_print_bcodeopt_sym", label: "Symbology GS1 type", type: "select", options: [["1", "GS1 DataBar Omnidirectional"], ["2", "GS1 DataBar Truncated"], ["3", "GS1 DataBar Stacked"], ["4", "GS1 DataBar Stacked Omnidirectional"], ["5", "GS1 DataBar Limited"], ["6", "GS1 DataBar Expanded"], ["7", "UPC-A"], ["8", "UPC-E"], ["9", "EAN-13"], ["10", "EAN-8"], ["11", "UCC/EAN-128"]], default: "1", span: 1, showFor: ["BR"] },
+      { key: "othercfg_print_bcodeopt_ctnwn", label: "Code39 wide to narrow", type: "number", default: "3", span: 1, showFor: ["BT"] },
+      { key: "othercfg_print_bcodeopt_rh", label: "Row height", type: "number", default: "10", span: 1, showFor: ["BT"] },
+      { key: "othercfg_print_bcodeopt_nbw", label: "Narrow bar width", type: "number", default: "2", span: 1, showFor: ["BT"] },
+      { key: "othercfg_print_bcodeopt_dmq", label: "DataMatrix quality", type: "select", options: [["0", "Auto"], ["50", "50"], ["80", "80"], ["100", "100"], ["140", "140"], ["200", "200"]], default: "0", span: 1, showFor: ["BX"] },
+      { key: "othercfg_print_bcodeopt_dmf", label: "DataMatrix format", type: "select", options: [["6", "256 ISO 8bit"], ["1", "Datanumeric"], ["2", "Uppercase alphanumeric no sym"], ["3", "Uppercase alphanumeric with sym"], ["4", "Uppercase alphanumeric no sym 2"], ["5", "128 ASCII 7bit"]], default: "6", span: 1, showFor: ["BX"] },
+      { key: "othercfg_print_bcodeopt_dma", label: "DataMatrix aspect ratio", type: "select", options: [["1", "Square"], ["2", "Rectangular"]], default: "1", span: 1, showFor: ["BX"] },
+      { key: "othercfg_print_bcodeopt_dme", label: "DataMatrix escape sequence", type: "text", default: "", span: 1, showFor: ["BX"] },
+      { key: "othercfg_print_bcodeopt_pct", label: "Postal code type", type: "select", options: [["0", "Postnet bar code"], ["1", "Planet bar code"], ["2", "Reserved"], ["3", "USPS Intelligent Mail barcode"]], default: "0", span: 1, showFor: ["BZ"] },
+    ],
+  },
+  {
+    title: "Label text settings",
+    fields: [
+      { key: "othercfg_label_width", label: "Label width (mm)", type: "number", default: "35" },
+      { key: "othercfg_label_height", label: "Label height (mm)", type: "number", default: "25" },
+      { key: "othercfg_label_ox", label: "Label origin X (mm)", type: "number", default: "0" },
+      { key: "othercfg_label_oy", label: "Label origin Y (mm)", type: "number", default: "0" },
+      { key: "othercfg_print_namex", label: "Patient name X (mm)", type: "number", default: "2" },
+      { key: "othercfg_print_namey", label: "Patient name Y (mm)", type: "number", default: "18" },
+      { key: "othercfg_print_namef", label: "Patient name font", type: "select", options: BARCODE_FONT_OPTIONS, default: "A" },
+      { key: "othercfg_print_nameo", label: "Patient name orientation", type: "select", options: BARCODE_ORIENTATION, default: "N" },
+      { key: "othercfg_print_nameh", label: "Patient name height (dots)", type: "number", default: "18" },
+      { key: "othercfg_print_namew", label: "Patient name width (dots)", type: "number", default: "12" },
+      { key: "othercfg_print_bcodetxtx", label: "Barcode text X (mm)", type: "number", default: "2" },
+      { key: "othercfg_print_bcodetxty", label: "Barcode text Y (mm)", type: "number", default: "22" },
+      { key: "othercfg_print_bcodetxtf", label: "Barcode text font", type: "select", options: BARCODE_FONT_OPTIONS, default: "D" },
+      { key: "othercfg_print_bcodetxto", label: "Barcode text orientation", type: "select", options: BARCODE_ORIENTATION, default: "N" },
+      { key: "othercfg_print_bcodetxth", label: "Barcode text height (dots)", type: "number", default: "18" },
+      { key: "othercfg_print_bcodetxtw", label: "Barcode text width (dots)", type: "number", default: "12" },
+      { key: "othercfg_print_tubecodex", label: "Tube code X (mm)", type: "number", default: "28" },
+      { key: "othercfg_print_tubecodey", label: "Tube code Y (mm)", type: "number", default: "20" },
+      { key: "othercfg_print_tubecodef", label: "Tube code font", type: "select", options: BARCODE_FONT_OPTIONS, default: "A" },
+      { key: "othercfg_print_tubecodeo", label: "Tube code orientation", type: "select", options: BARCODE_ORIENTATION, default: "N" },
+      { key: "othercfg_print_tubecodeh", label: "Tube code height (dots)", type: "number", default: "18" },
+      { key: "othercfg_print_tubecodew", label: "Tube code width (dots)", type: "number", default: "16" },
+      { key: "othercfg_print_tubecode_boxw", label: "Tube box width (mm)", type: "number", default: "4" },
+      { key: "othercfg_print_tubecode_boxh", label: "Tube box height (mm)", type: "number", default: "4" },
+      { key: "othercfg_print_tubecode_boxt", label: "Tube box border (dot)", type: "number", default: "1" },
+      { key: "othercfg_print_tubecode_boxc", label: "Tube box color", type: "select", options: BARCODE_BOX_COLOR, default: "B" },
+      { key: "othercfg_print_tubecode_boxr", label: "Tube box radius", type: "number", default: "4" },
+    ],
+  },
+  {
+    title: "Local HTTP server",
+    fields: [
+      { key: "local_http_address", label: "IP local si port", type: "text", default: "127.0.0.1:18080", span: 2 },
+      { key: "local_http_language", label: "Limba interfata", type: "select", options: [["ro", "Romana"], ["en", "English"]], default: "ro" },
+      { key: "local_http_tls", label: "HTTPS local", type: "select", options: [["false", "Nu"], ["true", "Da"]], default: "false" },
+      { key: "local_http_cors_allowed_origins", label: "Origin-uri CORS permise", type: "text", default: "https://ldse.wisemed.eu", span: 2 },
+    ],
+  },
+];
+
+const POSTA_ROMANA_FIELD_SECTIONS = [
+  {
+    title: "Endpoint settings",
+    fields: [
+      { key: "pr_sel_printer", label: "Selected printer", type: "printer-select", default: "" },
+      { key: "pr_resolution", label: "Printer resolution", type: "select", options: [["203", "203 dpi"], ["300", "300 dpi"]], default: "203" },
+      { key: "pr_orientation", label: "Orientation", type: "select", options: [["landscape", "Landscape"], ["portrait", "Portrait"]], default: "landscape" },
+      { key: "__group_logo", label: "Logo", type: "group-title", span: 3 },
+      { key: "pr_logo_data_url", label: "Logo upload", type: "image-upload", default: "", span: 3 },
+      { key: "pr_logo_x_mm", label: "Logo X (mm)", type: "number", default: "0" },
+      { key: "pr_logo_y_mm", label: "Logo Y (mm)", type: "number", default: "0" },
+      { key: "pr_logo_width_mm", label: "Logo width (mm)", type: "number", default: "0" },
+      { key: "pr_logo_height_mm", label: "Logo height (mm)", type: "number", default: "20" },
+      { key: "__group_header", label: "Header", type: "group-title", span: 3 },
+      { key: "pr_header_font_family", label: "Header font family", type: "select", options: BARCODE_FONT_OPTIONS, default: "0" },
+      { key: "pr_header_font_h", label: "Header font H", type: "number", default: "34" },
+      { key: "pr_header_font_w", label: "Header font W", type: "number", default: "24" },
+      { key: "__group_address", label: "Address", type: "group-title", span: 3 },
+      { key: "pr_address_font_family", label: "Address font family", type: "select", options: BARCODE_FONT_OPTIONS, default: "B" },
+      { key: "pr_address_font_h", label: "Address font H", type: "number", default: "38" },
+      { key: "pr_address_font_w", label: "Address font W", type: "number", default: "28" },
+      { key: "__group_address_title", label: "Address Title", type: "group-title", span: 3 },
+      { key: "pr_address_title_font_family", label: "Address title font family", type: "select", options: BARCODE_FONT_OPTIONS, default: "0" },
+      { key: "pr_address_title_font_h", label: "Address title font H", type: "number", default: "38" },
+      { key: "pr_address_title_font_w", label: "Address title font W", type: "number", default: "28" },
+      { key: "__group_footer", label: "Footer", type: "group-title", span: 3 },
+      { key: "pr_footer_font_family", label: "Footer font family", type: "select", options: BARCODE_FONT_OPTIONS, default: "0" },
+      { key: "pr_footer_font_h", label: "Footer font H", type: "number", default: "39" },
+      { key: "pr_footer_font_w", label: "Footer font W", type: "number", default: "30" },
+      { key: "__group_stamp", label: "Stamp", type: "group-title", span: 3 },
+      { key: "pr_stamp_font_family", label: "Stamp font family", type: "select", options: BARCODE_FONT_OPTIONS, default: "A" },
+      { key: "pr_stamp_font_h", label: "Stamp font H", type: "number", default: "24" },
+      { key: "pr_stamp_font_w", label: "Stamp font W", type: "number", default: "18" },
+      { key: "pr_stamp_box_w_mm", label: "Stamp box width (mm)", type: "number", default: "42" },
+      { key: "pr_stamp_box_h_mm", label: "Stamp box height (mm)", type: "number", default: "28" },
+      { key: "__group_layout", label: "Layout", type: "group-title", span: 3 },
+      { key: "pr_label_width_mm", label: "Label width (mm)", type: "number", default: "100" },
+      { key: "pr_label_height_mm", label: "Label height (mm)", type: "number", default: "150" },
+      { key: "pr_start_x_mm", label: "Start X (mm)", type: "number", default: "3" },
+      { key: "pr_start_y_mm", label: "Start Y (mm)", type: "number", default: "3" },
+      { key: "pr_outer_padding_mm", label: "Outer padding (mm)", type: "number", default: "4" },
+      { key: "pr_section_gap_mm", label: "Section gap (mm)", type: "number", default: "3" },
+      { key: "pr_section_header_h_mm", label: "Section header height (mm)", type: "number", default: "8" },
+      { key: "pr_body_line_gap", label: "Body line gap", type: "number", default: "8" },
+      { key: "pr_small_font_h", label: "Small font H", type: "number", default: "26" },
+      { key: "pr_small_font_w", label: "Small font W", type: "number", default: "20" },
+    ],
+  },
+  {
+    title: "Sender defaults",
+    fields: [
+      { key: "pr_sender_name", label: "Sender name", type: "text", default: "INSTITUTUL NATIONAL DE SANATATE PUBLICA", span: 2 },
+      { key: "pr_sender_address1", label: "Sender address 1", type: "text", default: "Str. Dr. Leonte Anastasievici, Nr. 1-3", span: 2 },
+      { key: "pr_sender_address2", label: "Sender address 2", type: "text", default: "Cod postal 077042", span: 2 },
+      { key: "pr_sender_city", label: "Sender city", type: "text", default: "Loc. Bucuresti Sector 5", span: 2 },
+      { key: "pr_sender_postal_code", label: "Sender postal code", type: "text", default: "077042" },
+      { key: "shipping_prepaid_stamp", label: "Prepaid stamp text", type: "text", default: "FRANCARE ULTERIOARA", span: 2 },
+    ],
+  },
+];
+
+const state = {
+  session: null,
+  analytes: [],
+  qcTargets: [],
+  qcLevels: [],
+  selectedAnalyteId: null,
+  selectedTag: null,
+  selectedQCTargetAnalyteTag: null,
+  currentView: "overview",
+  language: "ro",
+  readerInfo: null,
+  layoutKind: "simple_list",
+  commType: "file",
+  orders: [],
+  docsmartFiles: [],
+  qcRecords: [],
+  rounds: [1],
+  qcRounds: [1],
+  selectedRoundNo: 1,
+  selectedOrderDate: localISODate(),
+  selectedQCRoundNo: 1,
+  selectedQCPeriod: "current_month",
+  selectedQCDate: localISODate(),
+  selectedQCDateFrom: offsetISODate(-30),
+  selectedQCDateTo: localISODate(),
+  selectedQCLevel: "",
+  selectedQCAnalyteFilter: "",
+  selectedQCTargetID: null,
+  editingQCTargetID: null,
+  analyzerLastPacketAt: "",
+  analyzerPulseTimer: null,
+  westgardMetrics: null,
+  qcWestgardMetrics: null,
+  qcWestgardPeriod: "current_month",
+  selectedOrderId: null,
+  selectedQCRecordId: null,
+  selectedQCAnalysisId: null,
+  selectedQCAnalysisTag: null,
+  selectedOrderAnalysisID: null,
+  selectedDocsmartFileID: null,
+  selectedOrderIDs: [],
+  selectedOrderReceiveFilter: "",
+  selectedOrderSendFilter: "",
+  selectedOrderSearch: "",
+  selectedQCRecordIDs: [],
+  settingsSubView: "reader",
+  dailyDetailDefinitions: [],
+  dailyDetailValues: [],
+  selectedDailyDetailDefinitionID: null,
+  selectedDailyDetailDefinitionKey: null,
+  dailyDetailsDate: localISODate(),
+  dailyDetailsRounds: [1],
+  dailyDetailsScopeTab: "day",
+  dailyDetailsRoundNo: 1,
+  dailyDetailsAnalyteTag: "",
+  dailyAnalysisFilterDate: localISODate(),
+  dailyAnalysisFilters: [],
+  dailyAnalysisFilterSpecimenCodes: [],
+  logPollSeconds: 1,
+  logPollTimer: null,
+  statusPollSeconds: 2,
+  statusPollTimer: null,
+  toastTimer: null,
+  barcodeMode: false,
+ signatureSocket: null,
+  utilityMode: false,
+  formatterMode: false,
+  formatterPDFURL: null,
+  barcodeSettings: {},
+  barcodePrinters: [],
+  readerSettings: { repeat_mode: "individual", available_comm_types: [], available_protocols: [], available_tcpip_modes: [] },
+  appUpdateSettings: {},
+  appUpdateStatus: null,
+  resultsDelivery: { auto_confirm_wisemed: false, send_supported: false },
+  wisemedSetup: { settings: {}, configured: false, setup_complete: false, equipment_registered: false },
+  wisemedBootstrap: { medical_units: [], analyzer_types: [] },
+  pendingDeleteOrderIDs: [],
+  analyteTransformRules: [],
+  editingTransformRuleIndex: null,
+  debugFiles: [],
+  debugEnabled: false,
+  debugSelectedFile: "",
+  debugLastResult: null,
+};
+
+const deleteOrdersSkipConfirmKey = "wmr_skip_delete_orders_confirm";
+
+const els = {
+  loginView: document.getElementById("login-view"),
+  dashboardView: document.getElementById("dashboard-view"),
+  loginForm: document.getElementById("login-form"),
+  loginError: document.getElementById("login-error"),
+  loginSetupHost: document.getElementById("login-setup-host"),
+  languageSelectLogin: document.getElementById("language-select-login"),
+  languageSelectDashboard: document.getElementById("language-select-dashboard"),
+  readerTitle: document.getElementById("reader-title"),
+  readerSubtitle: document.getElementById("reader-subtitle"),
+  loginAppVersionLink: document.getElementById("login-app-version-link"),
+  loginAppUpdateIndicator: document.getElementById("login-app-update-indicator"),
+  loginAppUpdateMessage: document.getElementById("login-app-update-message"),
+  dashboardAppVersionLink: document.getElementById("dashboard-app-version-link"),
+  dashboardAppUpdateIndicator: document.getElementById("dashboard-app-update-indicator"),
+  dashboardAppUpdateMessage: document.getElementById("dashboard-app-update-message"),
+  readerIdentityLabel: document.getElementById("reader-identity-label"),
+  readerIdentityBadge: document.getElementById("reader-identity-badge"),
+  readerIdentityIcon: document.getElementById("reader-identity-icon"),
+  readerIdentityTitle: document.getElementById("reader-identity-title"),
+  readerIdentitySubtitle: document.getElementById("reader-identity-subtitle"),
+  readerSummaryTitle: document.getElementById("reader-summary-title"),
+  readerSummaryList: document.getElementById("reader-summary-list"),
+  sessionUser: document.getElementById("session-user"),
+  statusCards: document.getElementById("status-cards"),
+  analyzerDot: document.getElementById("analyzer-dot"),
+  analyzerPill: document.getElementById("analyzer-pill"),
+  resultSyncPill: document.getElementById("result-sync-pill"),
+  appToast: document.getElementById("app-toast"),
+  appToastBody: document.getElementById("app-toast-body"),
+  appToastClose: document.getElementById("app-toast-close"),
+  analyzerStatusLabel: document.getElementById("analyzer-status-label"),
+  resultSyncStatusLabel: document.getElementById("result-sync-status-label"),
+  logsList: document.getElementById("logs-list"),
+  logPollSeconds: document.getElementById("log-poll-seconds"),
+  refreshLogsBtn: document.getElementById("refresh-logs"),
+  settingsPanelReader: document.getElementById("settings-panel-reader"),
+  readerSettingsForm: document.getElementById("reader-settings-form"),
+  repeatModeSelect: document.getElementById("repeat-mode-select"),
+  deleteOrdersPreference: document.getElementById("delete-orders-preference"),
+  runResultSyncBtn: document.getElementById("run-result-sync"),
+  resetResultSyncBtn: document.getElementById("reset-result-sync"),
+  resultSyncStatus: document.getElementById("result-sync-status"),
+  readerSettingsMessage: document.getElementById("reader-settings-message"),
+  settingsPanelASTMSpecimens: document.getElementById("settings-panel-astm-specimens"),
+  astmSpecimenList: document.getElementById("astm-specimen-list"),
+  astmSpecimenDefault: document.getElementById("astm-specimen-default"),
+  astmSpecimenMessage: document.getElementById("astm-specimen-message"),
+  newASTMSpecimenBtn: document.getElementById("new-astm-specimen"),
+  saveASTMSpecimensBtn: document.getElementById("save-astm-specimens"),
+  analyteList: document.getElementById("analyte-list"),
+  settingsSubmenu: document.getElementById("settings-submenu"),
+  settingsPanelAnalytes: document.getElementById("settings-panel-analytes"),
+  settingsPanelQCEditor: document.getElementById("settings-panel-qc-editor"),
+  settingsPanelDailyDetails: document.getElementById("settings-panel-daily-details"),
+  settingsPanelDailyAnalysisFilters: document.getElementById("settings-panel-daily-analysis-filters"),
+  dailyAnalysisFilterPill: document.getElementById("daily-analysis-filter-pill"),
+  dailyAnalysisFilterDate: document.getElementById("daily-analysis-filter-date"),
+  dailyAnalysisFilterAnalyte: document.getElementById("daily-analysis-filter-analyte"),
+  dailyAnalysisFilterMode: document.getElementById("daily-analysis-filter-mode"),
+  dailyAnalysisFilterSpecimensBox: document.getElementById("daily-analysis-filter-specimens-box"),
+  dailyAnalysisFilterSpecimens: document.getElementById("daily-analysis-filter-specimens"),
+  dailyAnalysisFilterList: document.getElementById("daily-analysis-filter-list"),
+  dailyAnalysisFilterMessage: document.getElementById("daily-analysis-filter-message"),
+  addDailyAnalysisFilterBtn: document.getElementById("add-daily-analysis-filter"),
+  refreshDailyAnalysisFiltersBtn: document.getElementById("refresh-daily-analysis-filters"),
+  analyteForm: document.getElementById("analyte-form"),
+  analyteMessage: document.getElementById("analyte-message"),
+  deleteAnalyteBtn: document.getElementById("delete-analyte"),
+  newAnalyteBtn: document.getElementById("new-analyte"),
+  refreshAnalytesBtn: document.getElementById("refresh-analytes"),
+  analyteModal: document.getElementById("analyte-modal"),
+  analyteModalBackdrop: document.getElementById("analyte-modal-backdrop"),
+  closeAnalyteModalBtn: document.getElementById("close-analyte-modal"),
+  addTransformRuleBtn: document.getElementById("add-transform-rule"),
+  transformRulesList: document.getElementById("transform-rules-list"),
+  transformRuleModal: document.getElementById("transform-rule-modal"),
+  transformRuleModalBackdrop: document.getElementById("transform-rule-modal-backdrop"),
+  closeTransformRuleModalBtn: document.getElementById("close-transform-rule-modal"),
+  transformRuleForm: document.getElementById("transform-rule-form"),
+  transformRuleMessage: document.getElementById("transform-rule-message"),
+  transformFormulaFunctions: document.getElementById("transform-formula-functions"),
+  transformFormulaVariables: document.getElementById("transform-formula-variables"),
+  analyteSearch: document.getElementById("analyte-search"),
+  refreshOrdersBtn: document.getElementById("refresh-orders"),
+  orderDate: document.getElementById("order-date"),
+  roundSelect: document.getElementById("round-select"),
+  ordersSelectAll: document.getElementById("orders-select-all"),
+  ordersReceivedFilter: document.getElementById("orders-received-filter"),
+  ordersSentFilter: document.getElementById("orders-sent-filter"),
+  ordersSearch: document.getElementById("orders-search"),
+  ordersFilterActive: document.getElementById("orders-filter-active"),
+  ordersSelectAllBox: document.getElementById("orders-select-all-box"),
+  ordersSelectAllLabel: document.getElementById("orders-select-all-label"),
+  importOrdersBtn: document.getElementById("import-orders"),
+  exportOrdersBtn: document.getElementById("export-orders"),
+  syncOrdersWiseMEDBtn: document.getElementById("sync-orders-wisemed"),
+  reapplyOrderTransformationsBtn: document.getElementById("reapply-order-transformations"),
+  sendOrdersWiseMEDBtn: document.getElementById("send-orders-wisemed"),
+  worklistOrdersBtn: document.getElementById("worklist-orders"),
+  deleteOrdersBtn: document.getElementById("delete-orders"),
+  ordersDeleteModal: document.getElementById("orders-delete-modal"),
+  ordersDeleteModalBackdrop: document.getElementById("orders-delete-modal-backdrop"),
+  closeOrdersDeleteModalBtn: document.getElementById("close-orders-delete-modal"),
+  ordersDeleteMessage: document.getElementById("orders-delete-message"),
+  ordersDeleteSkipConfirm: document.getElementById("orders-delete-skip-confirm"),
+  ordersDeleteConfirmBtn: document.getElementById("orders-delete-confirm"),
+  ordersDeleteCancelBtn: document.getElementById("orders-delete-cancel"),
+  newRoundBtn: document.getElementById("new-round"),
+  ordersImportFile: document.getElementById("orders-import-file"),
+  ordersLayout: document.getElementById("orders-layout"),
+  orderDetails: document.getElementById("order-details"),
+  dailyDetailsDate: document.getElementById("daily-details-date"),
+  dailyDetailsRoundBox: document.getElementById("daily-details-round-box"),
+  dailyDetailsRound: document.getElementById("daily-details-round"),
+  dailyDetailsAnalyteBox: document.getElementById("daily-details-analyte-box"),
+  dailyDetailsAnalyte: document.getElementById("daily-details-analyte"),
+  dailyDetailsValueSearch: document.getElementById("daily-details-value-search"),
+  dailyDetailsPrintBtn: document.getElementById("daily-details-print"),
+  refreshDailyDetailValuesBtn: document.getElementById("refresh-daily-detail-values"),
+  dailyDetailsTabs: [...document.querySelectorAll("[data-daily-scope]")],
+  dailyDetailDefinitionSearch: document.getElementById("daily-detail-search"),
+  dailyDetailDefinitionList: document.getElementById("daily-detail-definition-list"),
+  newDailyDetailDefinitionBtn: document.getElementById("new-daily-detail-definition"),
+  refreshDailyDetailDefinitionsBtn: document.getElementById("refresh-daily-detail-definitions"),
+  dailyDetailDefinitionModal: document.getElementById("daily-detail-definition-modal"),
+  dailyDetailDefinitionModalBackdrop: document.getElementById("daily-detail-definition-modal-backdrop"),
+  closeDailyDetailDefinitionModalBtn: document.getElementById("close-daily-detail-definition-modal"),
+  dailyDetailDefinitionForm: document.getElementById("daily-detail-definition-form"),
+  dailyDetailDefinitionMessage: document.getElementById("daily-detail-definition-message"),
+  deleteDailyDetailDefinitionBtn: document.getElementById("delete-daily-detail-definition"),
+  refreshQCBtn: document.getElementById("refresh-qc"),
+  qcPeriod: document.getElementById("qc-period"),
+  qcDateFrom: document.getElementById("qc-date-from"),
+  qcDateTo: document.getElementById("qc-date-to"),
+  newQCRecordBtn: document.getElementById("new-qc-record"),
+  qcRoundSelect: document.getElementById("qc-round-select"),
+  qcAnalyteFilter: document.getElementById("qc-analyte-filter"),
+  qcLevelFilter: document.getElementById("qc-level-filter"),
+  qcSelectAll: document.getElementById("qc-select-all"),
+  qcSelectAllBox: document.getElementById("qc-select-all-box"),
+  qcSelectAllLabel: document.getElementById("qc-select-all-label"),
+  qcLayout: document.getElementById("qc-layout"),
+  qcDetails: document.getElementById("qc-details"),
+  qcSummary: document.getElementById("qc-summary"),
+  qcOpenWestgardBtn: document.getElementById("qc-open-westgard"),
+  deleteQCRecordsBtn: document.getElementById("delete-qc-records"),
+  qcRecordModal: document.getElementById("qc-record-modal"),
+  qcRecordModalBackdrop: document.getElementById("qc-record-modal-backdrop"),
+  closeQCRecordModalBtn: document.getElementById("close-qc-record-modal"),
+  qcRecordForm: document.getElementById("qc-record-form"),
+  qcRecordMessage: document.getElementById("qc-record-message"),
+  qcRecordDate: document.getElementById("qc-record-date"),
+  qcRecordAnalyte: document.getElementById("qc-record-analyte"),
+  qcRecordLot: document.getElementById("qc-record-lot"),
+  qcRecordLevel: document.getElementById("qc-record-level"),
+  qcRecordLabel: document.getElementById("qc-record-label"),
+  qcRecordQualitative: document.getElementById("qc-record-qualitative"),
+  qcRecordQuantitative: document.getElementById("qc-record-quantitative"),
+  qcRecordInterpretation: document.getElementById("qc-record-interpretation"),
+  qcWestgardModal: document.getElementById("qc-westgard-modal"),
+  qcWestgardModalBackdrop: document.getElementById("qc-westgard-modal-backdrop"),
+  closeQCWestgardModalBtn: document.getElementById("close-qc-westgard-modal"),
+  qcWestgardPeriod: document.getElementById("qc-westgard-period"),
+  qcWestgardDateFrom: document.getElementById("qc-westgard-date-from"),
+  qcWestgardDateTo: document.getElementById("qc-westgard-date-to"),
+  qcWestgardValidateBtn: document.getElementById("qc-westgard-validate"),
+  qcWestgardSummary: document.getElementById("qc-westgard-summary"),
+  qcWestgardChart: document.getElementById("qc-westgard-chart"),
+  qcWestgardRules: document.getElementById("qc-westgard-rules"),
+  qcTargetForm: document.getElementById("qc-target-form"),
+  qcTargetModal: document.getElementById("qc-target-modal"),
+  qcTargetModalBackdrop: document.getElementById("qc-target-modal-backdrop"),
+  closeQCTargetModalBtn: document.getElementById("close-qc-target-modal"),
+  qcTargetMessage: document.getElementById("qc-target-message"),
+  qcTargetAnalyte: document.getElementById("qc-target-analyte"),
+  qcTargetFilterAnalyte: document.getElementById("qc-target-filter-analyte"),
+  qcTargetLevel: document.getElementById("qc-target-level"),
+  qcTargetLot: document.getElementById("qc-target-lot"),
+  qcTargetMean: document.getElementById("qc-target-mean"),
+  qcTargetSD: document.getElementById("qc-target-sd"),
+  qcTarget1SD: document.getElementById("qc-target-1sd"),
+  qcTarget2SD: document.getElementById("qc-target-2sd"),
+  qcTarget3SD: document.getElementById("qc-target-3sd"),
+  qcTargetCV: document.getElementById("qc-target-cv"),
+  deleteQCTargetBtn: document.getElementById("delete-qc-target"),
+  qcTargetList: document.getElementById("qc-target-list"),
+  newQCTargetBtn: document.getElementById("new-qc-target"),
+  refreshQCTargetsBtn: document.getElementById("refresh-qc-targets"),
+  todayDonut: document.getElementById("today-donut"),
+  todayLegend: document.getElementById("today-legend"),
+  lineChart: document.getElementById("line-chart"),
+  lineLegend: document.getElementById("line-legend"),
+  logoutBtn: document.getElementById("logout-btn"),
+  debugNavLink: document.getElementById("debug-nav-link"),
+  refreshDebugTestsBtn: document.getElementById("refresh-debug-tests"),
+  debugTestsList: document.getElementById("debug-tests-list"),
+  debugRunStatus: document.getElementById("debug-run-status"),
+  debugResult: document.getElementById("debug-result"),
+  logsPanel: document.getElementById("logs-panel"),
+  navLinks: [...document.querySelectorAll(".nav-link")],
+  navSublinks: [...document.querySelectorAll(".nav-sublink[data-settings-subview]")],
+  views: {
+    overview: document.getElementById("view-overview"),
+    analytes: document.getElementById("view-analytes"),
+    "daily-details": document.getElementById("view-daily-details"),
+    orders: document.getElementById("view-orders"),
+    qc: document.getElementById("view-qc"),
+    debug: document.getElementById("view-debug"),
+    wsm: document.getElementById("view-wsm"),
+    help: document.getElementById("view-help"),
+  },
+};
+
+init();
+
+async function init() {
+  bindEvents();
+  initWSSUI();
+  if (!window.WSM_REMOTE) document.querySelector(".help-frame").src = "/help/";
+  else document.getElementById("help-open").addEventListener("click", event => { event.preventDefault(); showRemoteHelp(); });
+  const prefResp = await api("/api/preferences");
+  state.language = prefResp.preferences?.language || "ro";
+  syncLanguageControls();
+  applyLanguage();
+  const sessionResp = await api("/api/session");
+  if (sessionResp.preferences?.language) {
+    state.language = sessionResp.preferences.language;
+    syncLanguageControls();
+    applyLanguage();
+  }
+  state.readerInfo = { ...(sessionResp.reader || {}) };
+  state.appUpdateSettings = { ...(sessionResp.app_update || {}) };
+  syncAppVersionUI();
+  refreshAppUpdateStatus(false).catch(() => {});
+  if (sessionResp.authenticated) {
+    state.session = sessionResp.session;
+    await mountDashboard(sessionResp);
+    return;
+  }
+  state.wisemedSetup = sessionResp.wisemed || state.wisemedSetup;
+  showLogin();
+}
+
+function bindEvents() {
+  bindAsyncSubmit(els.loginForm, onLogin);
+  bindAsyncClick(els.logoutBtn, onLogout);
+  els.languageSelectLogin.addEventListener("change", onLanguageChange);
+  els.languageSelectDashboard.addEventListener("change", onLanguageChange);
+  if (els.loginAppVersionLink) els.loginAppVersionLink.addEventListener("click", onAppVersionClick);
+  if (els.dashboardAppVersionLink) els.dashboardAppVersionLink.addEventListener("click", onAppVersionClick);
+  if (els.loginAppUpdateIndicator) els.loginAppUpdateIndicator.addEventListener("click", onAppUpdateIndicatorClick);
+  if (els.dashboardAppUpdateIndicator) els.dashboardAppUpdateIndicator.addEventListener("click", onAppUpdateIndicatorClick);
+  bindAsyncClick(els.refreshLogsBtn, loadLogs);
+  bindAsyncClick(els.refreshDebugTestsBtn, loadDebugTests);
+  bindAsyncClick(els.resultSyncPill, onRunResultSync);
+  els.logPollSeconds.addEventListener("change", onLogPollChange);
+  bindAsyncClick(els.refreshOrdersBtn, onRefreshOrdersClick);
+  els.orderDate.addEventListener("change", onOrderDateChange);
+  els.roundSelect.addEventListener("change", onRoundChange);
+  els.ordersSelectAll.addEventListener("change", onOrdersSelectAllChange);
+  if (els.ordersReceivedFilter) els.ordersReceivedFilter.addEventListener("change", onOrdersReceiveFilterChange);
+  if (els.ordersSentFilter) els.ordersSentFilter.addEventListener("change", onOrdersSendFilterChange);
+  if (els.ordersSearch) els.ordersSearch.addEventListener("input", onOrdersSearchInput);
+  els.importOrdersBtn.addEventListener("click", onImportOrdersClick);
+  bindAsyncClick(els.exportOrdersBtn, onExportOrdersClick);
+  bindAsyncClick(els.syncOrdersWiseMEDBtn, onSyncOrdersWiseMEDClick);
+  bindAsyncClick(els.reapplyOrderTransformationsBtn, onReapplyOrderTransformationsClick);
+  bindAsyncClick(els.sendOrdersWiseMEDBtn, onSendOrdersWiseMEDClick);
+  bindAsyncClick(els.worklistOrdersBtn, onWorklistOrdersClick);
+  bindAsyncClick(els.deleteOrdersBtn, onDeleteOrdersClick);
+  if (els.ordersDeleteModalBackdrop) els.ordersDeleteModalBackdrop.addEventListener("click", closeOrdersDeleteModal);
+  if (els.closeOrdersDeleteModalBtn) els.closeOrdersDeleteModalBtn.addEventListener("click", closeOrdersDeleteModal);
+  if (els.ordersDeleteCancelBtn) els.ordersDeleteCancelBtn.addEventListener("click", closeOrdersDeleteModal);
+  if (els.ordersDeleteConfirmBtn) bindAsyncClick(els.ordersDeleteConfirmBtn, onConfirmDeleteOrdersClick);
+  bindAsyncClick(els.newRoundBtn, onNewRoundClick);
+  bindAsyncClick(els.refreshQCBtn, loadQCRecords);
+  els.newQCRecordBtn.addEventListener("click", openQCRecordModal);
+  if (els.qcPeriod) els.qcPeriod.addEventListener("change", onQCPeriodChange);
+  if (els.qcDateFrom) els.qcDateFrom.addEventListener("change", onQCDateRangeChange);
+  if (els.qcDateTo) els.qcDateTo.addEventListener("change", onQCDateRangeChange);
+  els.qcRoundSelect.addEventListener("change", onQCRoundChange);
+  els.qcAnalyteFilter.addEventListener("change", onQCAnalyteFilterChange);
+  els.qcLevelFilter.addEventListener("change", onQCLevelFilterChange);
+  els.qcSelectAll.addEventListener("change", onQCSelectAllChange);
+  bindAsyncClick(els.deleteQCRecordsBtn, onDeleteQCRecordsClick);
+  els.ordersImportFile.addEventListener("change", onOrdersImportFileChange);
+  els.appToastClose.addEventListener("click", hideToast);
+  els.newAnalyteBtn.addEventListener("click", () => openAnalyteModal());
+  if (els.newASTMSpecimenBtn) els.newASTMSpecimenBtn.addEventListener("click", () => addASTMSpecimenRow());
+  if (els.saveASTMSpecimensBtn) bindAsyncClick(els.saveASTMSpecimensBtn, saveASTMSpecimens);
+  bindAsyncClick(els.refreshAnalytesBtn, onRefreshAnalytesClick);
+  if (els.readerSettingsForm) bindAsyncSubmit(els.readerSettingsForm, onSaveReaderSettings);
+  if (els.deleteOrdersPreference) els.deleteOrdersPreference.addEventListener("change", onDeleteOrdersPreferenceChange);
+  if (els.readerSettingsForm?.elements?.analyzer_comm_type) els.readerSettingsForm.elements.analyzer_comm_type.addEventListener("change", syncReaderSettingsTransportFields);
+  if (els.readerSettingsForm?.elements?.analyzer_protocol) els.readerSettingsForm.elements.analyzer_protocol.addEventListener("change", syncReaderSettingsTransportFields);
+  if (els.readerSettingsForm?.elements?.tcpip_mode) els.readerSettingsForm.elements.tcpip_mode.addEventListener("change", syncReaderSettingsTransportFields);
+  if (els.runResultSyncBtn) bindAsyncClick(els.runResultSyncBtn, onRunResultSync);
+  if (els.resetResultSyncBtn) bindAsyncClick(els.resetResultSyncBtn, onResetResultSync);
+  bindAsyncClick(els.deleteAnalyteBtn, onDeleteAnalyte);
+  bindAsyncSubmit(els.analyteForm, onSaveAnalyte);
+  if (els.addTransformRuleBtn) els.addTransformRuleBtn.addEventListener("click", () => openTransformRuleModal());
+  if (els.transformRuleForm) bindAsyncSubmit(els.transformRuleForm, onSaveTransformRule);
+  if (els.transformRuleModalBackdrop) els.transformRuleModalBackdrop.addEventListener("click", closeTransformRuleModal);
+  if (els.closeTransformRuleModalBtn) els.closeTransformRuleModalBtn.addEventListener("click", closeTransformRuleModal);
+  if (els.transformRuleForm?.elements?.type) els.transformRuleForm.elements.type.addEventListener("change", syncTransformRuleFormVisibility);
+  if (els.transformRuleForm?.elements?.target_field) els.transformRuleForm.elements.target_field.addEventListener("change", syncTransformRuleFormVisibility);
+  els.analyteSearch.addEventListener("input", renderAnalyteList);
+  if (els.dailyDetailDefinitionForm) bindAsyncSubmit(els.dailyDetailDefinitionForm, onSaveDailyDetailDefinition);
+  if (els.dailyDetailDefinitionSearch) els.dailyDetailDefinitionSearch.addEventListener("input", renderDailyDetailDefinitionList);
+  if (els.newDailyDetailDefinitionBtn) els.newDailyDetailDefinitionBtn.addEventListener("click", () => openDailyDetailDefinitionModal());
+  if (els.refreshDailyDetailDefinitionsBtn) bindAsyncClick(els.refreshDailyDetailDefinitionsBtn, onRefreshDailyDetailDefinitionsClick);
+  if (els.dailyDetailsDate) els.dailyDetailsDate.addEventListener("change", onDailyDetailsDateChange);
+  if (els.dailyAnalysisFilterDate) els.dailyAnalysisFilterDate.addEventListener("change", onDailyAnalysisFilterDateChange);
+  if (els.dailyAnalysisFilterMode) els.dailyAnalysisFilterMode.addEventListener("change", syncDailyAnalysisFilterMode);
+  if (els.addDailyAnalysisFilterBtn) bindAsyncClick(els.addDailyAnalysisFilterBtn, onAddDailyAnalysisFilter);
+  if (els.refreshDailyAnalysisFiltersBtn) bindAsyncClick(els.refreshDailyAnalysisFiltersBtn, loadDailyAnalysisFilters);
+  if (els.dailyAnalysisFilterPill) els.dailyAnalysisFilterPill.addEventListener("click", () => { state.settingsSubView = "daily-analysis-filters"; activateView("analytes"); });
+  if (els.dailyDetailsRound) els.dailyDetailsRound.addEventListener("change", onDailyDetailsRoundChange);
+  if (els.dailyDetailsAnalyte) els.dailyDetailsAnalyte.addEventListener("change", onDailyDetailsAnalyteChange);
+  if (els.dailyDetailsPrintBtn) bindAsyncClick(els.dailyDetailsPrintBtn, onPrintDailyWorksheetClick);
+  if (els.dailyDetailsValueSearch) els.dailyDetailsValueSearch.addEventListener("input", renderDailyDetailValuesWorkspace);
+  if (els.refreshDailyDetailValuesBtn) bindAsyncClick(els.refreshDailyDetailValuesBtn, () => loadDailyDetailsWorkspace().catch((error) => showToast(error?.message || "Cannot load daily details", "error")));
+  els.dailyDetailsTabs.forEach((tab) => tab.addEventListener("click", () => onDailyDetailsScopeChange(tab.dataset.dailyScope || "day")));
+  if (els.dailyDetailDefinitionModalBackdrop) els.dailyDetailDefinitionModalBackdrop.addEventListener("click", closeDailyDetailDefinitionModal);
+  if (els.closeDailyDetailDefinitionModalBtn) els.closeDailyDetailDefinitionModalBtn.addEventListener("click", closeDailyDetailDefinitionModal);
+  if (els.deleteDailyDetailDefinitionBtn) bindAsyncClick(els.deleteDailyDetailDefinitionBtn, onDeleteDailyDetailDefinition);
+  bindAsyncSubmit(els.qcTargetForm, onSaveQCTarget);
+  bindAsyncClick(els.newQCTargetBtn, async () => {
+    if (!state.qcLevels.length) {
+      await loadQCMeta().catch(() => {});
+    }
+    openQCTargetModal();
+  });
+  bindAsyncClick(els.refreshQCTargetsBtn, onRefreshQCTargetsClick);
+  bindAsyncClick(els.deleteQCTargetBtn, onDeleteQCTarget);
+  els.qcTargetFilterAnalyte.addEventListener("change", onQCTargetFilterAnalyteChange);
+  els.qcTargetAnalyte.addEventListener("change", onQCTargetAnalyteChange);
+  els.qcTargetLevel.addEventListener("change", syncSelectedTargetFromForm);
+  els.qcTargetLot.addEventListener("input", syncSelectedTargetFromForm);
+  els.qcTargetMean.addEventListener("input", updateQCTargetDerivedFields);
+  els.qcTargetSD.addEventListener("input", updateQCTargetDerivedFields);
+  bindAsyncClick(els.qcOpenWestgardBtn, onGenerateQCWestgard);
+  els.qcRecordModalBackdrop.addEventListener("click", closeQCRecordModal);
+  els.closeQCRecordModalBtn.addEventListener("click", closeQCRecordModal);
+  bindAsyncSubmit(els.qcRecordForm, onSaveQCRecord);
+  els.qcRecordAnalyte.addEventListener("change", syncQCRecordLotOptions);
+  els.qcRecordLot.addEventListener("change", syncQCRecordLotMetadata);
+  els.qcWestgardModalBackdrop.addEventListener("click", closeQCWestgardModal);
+  els.closeQCWestgardModalBtn.addEventListener("click", closeQCWestgardModal);
+  els.qcWestgardPeriod.addEventListener("change", onQCWestgardPeriodChange);
+  els.qcWestgardDateFrom.addEventListener("change", onQCWestgardCustomDateChange);
+  els.qcWestgardDateTo.addEventListener("change", onQCWestgardCustomDateChange);
+  bindAsyncClick(els.qcWestgardValidateBtn, onShowQCWestgardIssues);
+  els.qcTargetModalBackdrop.addEventListener("click", closeQCTargetModal);
+  els.closeQCTargetModalBtn.addEventListener("click", closeQCTargetModal);
+  els.analyteModalBackdrop.addEventListener("click", closeAnalyteModal);
+  els.closeAnalyteModalBtn.addEventListener("click", closeAnalyteModal);
+  els.navLinks.forEach((link) => link.addEventListener("click", () => {
+    if (link.dataset.view === "analytes") {
+      state.settingsSubView = isSIUIMode() ? "siui" : isESignatureMode() ? "pad" : "reader";
+      if(isSIUIMode()) window.history.replaceState({},"","/settings/siui");
+      if(isESignatureMode()) window.history.replaceState({},"","/settings/pad");
+    }
+    if (link.dataset.view === "debug" && !state.debugEnabled) {
+      activateView("wsm"); return;
+    }
+    activateView(link.dataset.view);
+  }));
+  document.getElementById("debug-wsm-link").addEventListener("click", () => activateView("wsm"));
+  document.getElementById("debug-communication-link").addEventListener("click", () => activateView("debug"));
+  els.navSublinks.forEach((link) => link.addEventListener("click", () => {
+    activateSettingsSubView(link.dataset.settingsSubview || "reader");
+    activateView(link.dataset.view || "analytes");
+  }));
+  document.addEventListener("keydown", (event) => {
+    if (els.transformRuleModal && !els.transformRuleModal.hidden && event.key === "Escape") {
+      closeTransformRuleModal();
+      return;
+    }
+    if (event.key === "Escape" && !els.analyteModal.hidden) {
+      closeAnalyteModal();
+      return;
+    }
+    if (els.dailyDetailDefinitionModal && !els.dailyDetailDefinitionModal.hidden && event.key === "Escape") {
+      closeDailyDetailDefinitionModal();
+      return;
+    }
+    if (event.key === "Escape" && !els.qcTargetModal.hidden) {
+      closeQCTargetModal();
+      return;
+    }
+    if (event.key === "Escape" && !els.qcRecordModal.hidden) {
+      closeQCRecordModal();
+      return;
+    }
+    if (event.key === "Escape" && !els.qcWestgardModal.hidden) {
+      closeQCWestgardModal();
+      return;
+    }
+    if (els.ordersDeleteModal && !els.ordersDeleteModal.hidden && event.key === "Escape") {
+      closeOrdersDeleteModal();
+    }
+  });
+  window.addEventListener("popstate", () => {
+    if(isESignatureMode()) state.settingsSubView=settingsSubViewFromLocation();
+    activateView(viewFromLocation(), false);
+  });
+}
+
+function bindAsyncClick(element, handler) {
+  if (!element) return;
+  element.addEventListener("click", async (event) => {
+    const button = resolveActionButton(event.currentTarget);
+    try {
+      setButtonLoading(button, true);
+      await handler(event);
+    } finally {
+      setButtonLoading(button, false);
+    }
+  });
+}
+
+function bindAsyncSubmit(form, handler) {
+  if (!form) return;
+  form.addEventListener("submit", async (event) => {
+    const button = resolveActionButton(event.submitter) || form.querySelector('button[type="submit"], input[type="submit"]');
+    try {
+      setButtonLoading(button, true);
+      await handler(event);
+    } finally {
+      setButtonLoading(button, false);
+    }
+  });
+}
+
+function resolveActionButton(target) {
+  if (!target) return null;
+  if (target instanceof HTMLButtonElement) return target;
+  if (target instanceof HTMLElement) return target.closest("button");
+  return null;
+}
+
+function setButtonLoading(button, loading) {
+  if (!button) return;
+  if (loading) {
+    if (!button.dataset.originalLabel) {
+      button.dataset.originalLabel = button.innerHTML;
+    }
+    if (!button.dataset.originalDisabled) {
+      button.dataset.originalDisabled = button.disabled ? "true" : "false";
+    }
+    button.classList.add("is-loading");
+    button.disabled = true;
+    button.setAttribute("aria-busy", "true");
+    return;
+  }
+  if (button.dataset.originalLabel) {
+    button.innerHTML = button.dataset.originalLabel;
+    delete button.dataset.originalLabel;
+  }
+  const wasDisabled = button.dataset.originalDisabled === "true";
+  delete button.dataset.originalDisabled;
+  button.disabled = wasDisabled;
+  button.classList.remove("is-loading");
+  button.removeAttribute("aria-busy");
+}
+
+function applyHTMLFormatterUI() {
+  for (const name of ["orders", "qc", "daily-details"]) {
+    const link = barcodeNavButton(name); if (link) link.hidden = true;
+  }
+  for (const id of ["analyzer-pill", "result-sync-pill", "daily-analysis-filter-pill", "debug-communication-link"]) {
+    const node = document.getElementById(id); if (node) node.hidden = true;
+  }
+  document.querySelectorAll("#settings-panel-reader .settings-section-transport, #settings-panel-reader .settings-section-results").forEach(node => node.hidden = true);
+  // Keep server identity and update controls, without unused analyzer/database fields.
+  for (const name of ["analyzer_name", "analyzer_code", "db_name", "sqlite_path"]) {
+    const field = els.readerSettingsForm?.elements.namedItem(name); if (field) field.closest("label").hidden = true;
+  }
+  for (const id of ["today-donut", "qc-summary", "line-chart"]) {
+    const node = document.getElementById(id); if (node) node.closest("article").hidden = true;
+  }
+  if (els.settingsSubmenu) els.settingsSubmenu.hidden = false;
+  els.navSublinks.forEach(link => {
+    if (link.dataset.settingsSubview) link.hidden = !["reader", "wss"].includes(link.dataset.settingsSubview);
+    if (link.dataset.settingsSubview === "reader") link.textContent = "Server și actualizări";
+  });
+  for (const [id, label] of [["reader-eyebrow", "UTILITAR"], ["reader-summary-title", "HTML Print Formatter"], ["reader-settings-title", "Server și actualizări"]]) {
+    const node = document.getElementById(id); if (node) node.textContent = label;
+  }
+  const overview = barcodeNavButton("overview"); if (overview) overview.textContent = "HTML Print Formatter";
+  if (!document.getElementById("formatter-workspace")) {
+    const panel = document.createElement("article");
+    panel.id = "formatter-workspace"; panel.className = "panel full-span";
+    panel.innerHTML = `<h3>Randare HTML</h3><p>Completați fie documentul HTML, fie linkul HTML. „Randează” așteaptă window.printReady = true și exportă DOM-ul procesat. „HTML → PDF direct” nu cere acest semnal.</p>
+      <label>HTML<textarea id="formatter-html" rows="10" style="width:100%" spellcheck="false" placeholder="Lipiți documentul HTML complet aici"></textarea></label>
+      <label>Link HTML<input id="formatter-html-link" type="url" style="width:100%" placeholder="https://exemplu.ro/raport.html"></label>
+      <label>Timeout (ms)<input id="formatter-timeout" type="number" min="1" max="600000" step="1" value="120000" required></label>
+      <button id="formatter-render" type="button">Randează → PDF</button>
+      <button id="formatter-pdf-direct" type="button">HTML → PDF direct</button>
+      <p id="formatter-notice" role="status"></p>
+      <p><a id="formatter-pdf-download" hidden download="rendered.pdf">Descarcă PDF</a></p>
+      <label>DOM rezultat<textarea id="formatter-output" rows="12" readonly style="width:100%"></textarea></label>`;
+    els.views.overview.insertBefore(panel, els.logsPanel);
+    document.getElementById("formatter-render").onclick = () => renderHTMLFormatter();
+    document.getElementById("formatter-pdf-direct").onclick = () => renderHTMLFormatter(false);
+  }
+}
+
+function clearHTMLFormatterPDF() {
+  if (state.formatterPDFURL) URL.revokeObjectURL(state.formatterPDFURL);
+  state.formatterPDFURL = null;
+  const download = document.getElementById("formatter-pdf-download");
+  if (download) { download.hidden = true; download.removeAttribute("href"); }
+}
+
+async function renderHTMLFormatter(waitForPrintReady = true) {
+  const button = document.getElementById(waitForPrintReady ? "formatter-render" : "formatter-pdf-direct");
+  const otherButton = document.getElementById(waitForPrintReady ? "formatter-pdf-direct" : "formatter-render");
+  otherButton.disabled = true;
+  const notice = document.getElementById("formatter-notice");
+  const output = document.getElementById("formatter-output");
+  clearHTMLFormatterPDF();
+  setButtonLoading(button, true); output.value = ""; notice.textContent = "Randare HTML și generare PDF în curs…";
+  try {
+    const html = document.getElementById("formatter-html").value;
+    const htmlLink = document.getElementById("formatter-html-link").value.trim();
+    const timeoutMS = Number(document.getElementById("formatter-timeout").value);
+    if (!!html.trim() === !!htmlLink) {
+      throw new Error("Completați un singur câmp: HTML sau Link HTML.");
+    }
+    if (!Number.isInteger(timeoutMS) || timeoutMS < 1 || timeoutMS > 600000) {
+      throw new Error("Timeout-ul trebuie să fie un număr întreg între 1 și 600000 ms.");
+    }
+    const body = JSON.stringify({ ...(htmlLink ? {html_link: htmlLink} : {html}), timeout_ms: timeoutMS, wait_for_print_ready: waitForPrintReady });
+    const headers = {};
+    if (!window.WSM_REMOTE) {
+      const auth = await api("/api/html-print-formatter/token", {method:"POST", body:"{}"});
+      headers.Authorization = "Bearer " + auth.token;
+    }
+    const response = await api("/api/html-print-formatter/pdf", {method:"POST", body, headers});
+    output.value = response.html;
+    const bytes = Uint8Array.from(atob(response.pdf_base64), char => char.charCodeAt(0));
+    state.formatterPDFURL = URL.createObjectURL(new Blob([bytes], {type: "application/pdf"}));
+    const download = document.getElementById("formatter-pdf-download");
+    download.href = state.formatterPDFURL; download.hidden = false;
+    notice.textContent = "Finalizat · request_id: " + response.request_id;
+  } catch (error) { notice.textContent = error.message; }
+  finally { setButtonLoading(button, false); otherButton.disabled = false; }
+}
+
+function isSIUIMode() { return state.readerInfo?.protocol === "siui"; }
+
+function isESignatureMode() {
+ return state.readerInfo?.protocol === "signing-pad" || state.readerInfo?.id === "esignature-server";
+}
+
+function isBarcodeMode() {
+  const code = String(state.readerInfo?.analyzer_code || "").toLowerCase();
+  const readerID = String(state.readerInfo?.id || "").toLowerCase();
+  const protocol = String(state.readerInfo?.protocol || "").toLowerCase();
+  return code === "barcodeprinter" || protocol === "barcodeprinter" || readerID.includes("barcodeprinter");
+}
+
+function isUtilityMode() {
+  const commType = String(state.readerInfo?.comm_type || state.readerSettings?.analyzer_comm_type || state.commType || "").toLowerCase();
+  return commType === "utility";
+}
+
+function isDocsmartMode() {
+  const protocol = String(state.readerInfo?.protocol || state.readerSettings?.analyzer_protocol || "").toLowerCase();
+  return state.utilityMode && protocol === "anaf-docsmart";
+}
+
+function barcodeNavButton(viewName) {
+  return document.querySelector(`.nav-link[data-view="${viewName}"]`);
+}
+
+function applyBarcodeModeUI() {
+ if (state.readerInfo?.protocol === "html-print-formatter") {
+  state.formatterMode = true; state.utilityMode = true; state.barcodeMode = false;
+  applyHTMLFormatterUI(); return;
+ }
+ if (isSIUIMode()) {
+  state.utilityMode = true; state.barcodeMode = false;
+ document.querySelectorAll("#settings-panel-reader .settings-section-transport, #settings-panel-reader .settings-section-results").forEach(node=>node.hidden=true);
+ const debugLabel=document.getElementById("debug-communication-link");if(debugLabel)debugLabel.textContent="GENERAL / CLINICE";
+  for(const id of ["analyzer-pill","result-sync-pill"]) {const node=document.getElementById(id);if(node)node.hidden=true;}
+  for (const name of ["orders", "qc", "daily-details"]) { const link=barcodeNavButton(name); if(link) link.hidden=true; }
+  if(els.settingsSubmenu) els.settingsSubmenu.hidden=false;
+  els.navSublinks.forEach(link => { if(link.dataset.settingsSubview) link.hidden=!["siui","reader","wss"].includes(link.dataset.settingsSubview); });
+  els.navSublinks.forEach(link=>{if(link.dataset.settingsSubview==="reader")link.textContent=state.language==="en"?"Server and updates":"Server și actualizări";});
+  return;
+ }
+ if (isESignatureMode()) {state.utilityMode=true; applyESignatureUI(); return;}
+  state.barcodeMode = isBarcodeMode();
+  state.utilityMode = isUtilityMode();
+  if (!state.utilityMode) return;
+
+  const navOrders = barcodeNavButton("orders");
+  const navQC = barcodeNavButton("qc");
+  const navDailyDetails = barcodeNavButton("daily-details");
+  if (navOrders && isDocsmartMode()) navOrders.textContent = state.language === "en" ? "Parsed files" : "Fisiere parse";
+  if (navOrders && state.barcodeMode) navOrders.textContent = state.language === "en" ? "History" : "Istoric";
+  if (navQC) navQC.style.display = "none";
+  if (isDocsmartMode()) {
+    if (navDailyDetails) navDailyDetails.style.display = "none";
+    if (els.settingsSubmenu) { els.settingsSubmenu.hidden = false; els.navSublinks.forEach(link => { link.hidden = !["reader", "wss"].includes(link.dataset.settingsSubview); }); }
+    if (els.settingsPanelReader) els.settingsPanelReader.hidden = false;
+    if (els.settingsPanelAnalytes) els.settingsPanelAnalytes.hidden = true;
+    if (els.settingsPanelQCEditor) els.settingsPanelQCEditor.hidden = true;
+    if (els.settingsPanelDailyDetails) els.settingsPanelDailyDetails.hidden = true;
+  }
+  if (state.barcodeMode) {
+    if (navDailyDetails) navDailyDetails.style.display = "none";
+    if (els.settingsSubmenu) { els.settingsSubmenu.hidden = false; els.navSublinks.forEach(link => { link.hidden = !["reader", "wss"].includes(link.dataset.settingsSubview); }); }
+    if (els.settingsPanelReader) els.settingsPanelReader.hidden = true;
+    if (els.settingsPanelQCEditor) els.settingsPanelQCEditor.hidden = true;
+  }
+
+  if (state.barcodeMode) {
+    if (els.importOrdersBtn) els.importOrdersBtn.hidden = true;
+    if (els.exportOrdersBtn) els.exportOrdersBtn.hidden = true;
+    if (els.worklistOrdersBtn) els.worklistOrdersBtn.hidden = true;
+    if (els.newRoundBtn) els.newRoundBtn.hidden = true;
+    if (els.ordersSelectAllBox) els.ordersSelectAllBox.hidden = true;
+    if (els.orderDate?.parentElement) els.orderDate.parentElement.hidden = true;
+    if (els.roundSelect?.parentElement) els.roundSelect.parentElement.hidden = true;
+    if (els.qcSummary?.closest(".panel")) els.qcSummary.closest(".panel").style.display = "none";
+  }
+}
+
+async function onLanguageChange(event) {
+  const lang = event.target.value;
+  const resp = await api("/api/preferences/language", {
+    method: "PUT",
+    body: JSON.stringify({ language: lang }),
+  });
+  state.language = resp.preferences.language;
+  syncLanguageControls();
+  applyLanguage();
+  if (!els.dashboardView.hidden) {
+    if (state.formatterMode) {
+      await Promise.all([loadStatus(), loadLogs(), loadReaderSettings()]);
+    } else if (isSIUIMode()) {
+      await Promise.all([loadStatus(), loadLogs(), loadReaderSettings()]);
+    } else if (isESignatureMode()) {
+      applyESignatureUI(); await Promise.all([loadStatus(), loadLogs(), loadDashboard()]);
+    } else if (state.barcodeMode) {
+      await Promise.all([loadStatus(), loadLogs(), loadDashboard(), loadBarcodeSettingsView(), loadBarcodeHistory()]);
+    } else if (state.utilityMode) {
+      if (isDocsmartMode()) {
+        await Promise.all([loadStatus(), loadLogs(), loadReaderSettings(), loadOrders(), loadDashboard()]);
+      } else {
+        await Promise.all([loadStatus(), loadLogs(), loadReaderSettings(), loadAnalytes(), loadDailyDetailDefinitions(), loadOrders(), loadDashboard()]);
+      }
+    } else {
+      await Promise.all([loadStatus(), loadLogs(), loadAnalytes(), loadQCTargets(), loadDailyDetailDefinitions(), loadOrders(), loadQCRecords(), loadDashboard()]);
+      if (state.currentView === "daily-details" || state.settingsSubView === "daily-details") {
+        await loadDailyDetailsWorkspace();
+      }
+    }
+  }
+}
+
+async function onLogin(event) {
+  event.preventDefault();
+  els.loginError.hidden = true;
+  try {
+    const latestSetup = await api("/api/wisemed/setup");
+    state.wisemedSetup = latestSetup;
+  } catch (error) {
+    els.loginError.hidden = false;
+    els.loginError.textContent = error.message;
+    return;
+  }
+  if (!state.wisemedSetup?.setup_complete) {
+    els.loginError.hidden = false;
+    els.loginError.textContent = "Completeaza mai intai configurarea WiseMED.";
+    return;
+  }
+  const form = new FormData(els.loginForm);
+  try {
+    const resp = await api("/api/session/login", {
+      method: "POST",
+      body: JSON.stringify({
+        username: form.get("username"),
+        password: form.get("password"),
+        medical_unit_id: state.wisemedSetup?.settings?.unitate_medicala_id || "",
+      }),
+    });
+    state.session = resp.session;
+    await mountDashboard(await api("/api/session"));
+  } catch (error) {
+    els.loginError.hidden = false;
+    els.loginError.textContent = error.message;
+  }
+}
+
+async function onLogout() {
+  if (state.formatterMode) clearHTMLFormatterPDF();
+  siuiPollGeneration++;
+  siuiDebugGeneration++;
+  document.getElementById("siui-debug-panel")?.remove();
+  const siuiPanel=document.getElementById("settings-panel-siui");
+  if(siuiPanel) {siuiPanel.replaceChildren();delete siuiPanel.dataset.loaded;}
+  if (window.WSM_REMOTE) {
+    closeESignatureDemo();
+    window.WSM_REMOTE.close();
+    state.session = null;
+    els.dashboardView.hidden = true;
+    if (state.logPollTimer) clearInterval(state.logPollTimer);
+    if (state.statusPollTimer) clearInterval(state.statusPollTimer);
+    window.close();
+    document.body.replaceChildren();
+    const message = document.createElement("p");
+    message.textContent = "Controlul la distanță a fost închis. Poți închide această fereastră. Readerul continuă să funcționeze.";
+    document.body.append(message);
+    return;
+  }
+ closeESignatureDemo();
+  await api("/api/session/logout", { method: "POST" });
+  state.wss.snapshot = null;
+  state.wss.reconnectPending = null;
+  state.wss.controlInFlight = null;
+  state.wss.controlRevision = (state.wss.controlRevision || 0) + 1;
+  state.wss.windows.clear();
+  const wssPanel = document.getElementById("settings-panel-wss");
+  wssPanel.replaceChildren();
+  delete wssPanel.dataset.ready;
+  document.getElementById("wsm-debug-panel").replaceChildren();
+  state.session = null;
+  state.orders = [];
+  state.selectedOrderId = null;
+  els.loginForm.reset();
+  els.loginError.hidden = true;
+  if (state.logPollTimer) {
+    clearInterval(state.logPollTimer);
+    state.logPollTimer = null;
+  }
+  if (state.statusPollTimer) {
+    clearInterval(state.statusPollTimer);
+    state.statusPollTimer = null;
+  }
+  showLogin();
+}
+
+function showLogin() {
+ closeESignatureDemo();
+  els.loginView.hidden = false;
+  els.dashboardView.hidden = true;
+  hideAppUpdateMessage();
+  renderLoginSetupPanel().catch((error) => {
+    els.loginError.hidden = false;
+    els.loginError.textContent = error.message || "Nu s-au putut incarca setarile WiseMED.";
+  });
+  syncLanguageControls();
+  applyLanguage();
+ if(isESignatureMode()) {document.title="eSignature server";document.getElementById("login-title").textContent="eSignature server";}
+}
+
+async function renderLoginSetupPanel() {
+  if (!els.loginSetupHost) return;
+  const setupResp = await api("/api/wisemed/setup");
+  state.wisemedSetup = setupResp;
+  const needsSetup = !setupResp.setup_complete;
+  if (!needsSetup) {
+    els.loginSetupHost.innerHTML = "";
+    return;
+  }
+  let bootstrap = { medical_units: [], analyzer_types: [] };
+  if (setupResp.configured && !setupResp.login_only) {
+    try {
+      bootstrap = await api("/api/wisemed/bootstrap");
+    } catch (error) {
+      bootstrap = { medical_units: [], analyzer_types: [] };
+    }
+  }
+  state.wisemedBootstrap = bootstrap;
+  const settings = { ...(setupResp.settings || {}) };
+  const medicalUnits = bootstrap.medical_units || [];
+  const analyzerTypes = bootstrap.analyzer_types || [];
+  const muOptions = [`<option value="">Selecteaza unitatea medicala</option>`]
+    .concat(medicalUnits.map((item) => {
+      const value = String(item.medical_unit_id ?? item.id ?? "");
+      const label = String(item.medical_unit_name ?? item.name ?? value);
+      return `<option value="${escapeHtml(value)}" ${value === String(settings.unitate_medicala_id || "") ? "selected" : ""}>${escapeHtml(label)}</option>`;
+    })).join("");
+  const typeOptions = [`<option value="">Selecteaza tipul echipamentului</option>`]
+    .concat(analyzerTypes.map((item) => {
+      const value = String(item.analyzer_type_id ?? item.id ?? "");
+      const label = String(item.analyzer_type_name ?? item.name ?? value);
+      return `<option value="${escapeHtml(value)}" ${value === String(settings.tip_de_echipament_id || "") ? "selected" : ""}>${escapeHtml(label)}</option>`;
+    })).join("");
+  els.loginSetupHost.innerHTML = `
+    <section class="login-setup-panel">
+      <div class="panel-head">
+        <h3>${setupResp.login_only ? "Server de autentificare" : "Initializare WiseMED"}</h3>
+        <div class="inline-actions">
+          <button id="wisemed-setup-refresh" type="button" class="ghost">Refresh</button>
+        </div>
+      </div>
+      <p class="small muted">${needsSetup ? "Completeaza datele de conectare, apoi autentifica-te cu utilizatorul WiseMED." : "Configurarea WiseMED este disponibila local si poate fi actualizata oricand."}</p>
+      <form id="wisemed-setup-form" class="stack">
+        <div class="two-col">
+          <label><span>Protocol</span><select name="cfg_wisemed_protocol"><option value="https" ${String(settings.cfg_wisemed_protocol || "") === "https" ? "selected" : ""}>https</option><option value="http" ${String(settings.cfg_wisemed_protocol || "") === "http" ? "selected" : ""}>http</option></select></label>
+          <label><span>IP / Host</span><input name="cfg_wisemed_ip" value="${escapeHtml(settings.cfg_wisemed_ip || "")}"></label>
+        </div>
+        <div class="two-col">
+          <label><span>Port</span><input name="cfg_wisemed_port" value="${escapeHtml(settings.cfg_wisemed_port || "")}"></label>
+          <label><span>Path</span><input name="cfg_wisemed_path" value="${escapeHtml(settings.cfg_wisemed_path || "/api")}"></label>
+        </div>
+        <label><span>API key</span><input type="password" name="cfg_wisemed_key" autocomplete="new-password" value="${escapeHtml(settings.cfg_wisemed_key || "")}"></label>
+        ${setupResp.login_only ? "" : `<div class="two-col">
+          <label><span>Unitate medicala</span><select name="unitate_medicala_id">${muOptions}</select></label>
+          <label><span>Tip echipament</span><select name="tip_de_echipament_id">${typeOptions}</select></label>
+        </div>
+        <div class="two-col">
+          <label><span>Cod echipament</span><input name="cod_echipament" value="${escapeHtml(settings.cod_echipament || "")}"></label>
+          <label><span>Serie echipament</span><input name="numar_serial_echipament" value="${escapeHtml(settings.numar_serial_echipament || "")}"></label>
+        </div>
+        <div class="two-col">
+          <label><span>Echipament ID</span><input value="${escapeHtml(settings.echipament_id || "")}" readonly></label>
+          <label><span>API key echipament</span><input value="${escapeHtml(settings.api_key_echipament || "")}" readonly></label>
+        </div>`}
+        <div class="orders-buttons">
+          <button id="wisemed-setup-save" type="submit" class="ghost">Salveaza configurarea</button>
+        </div>
+        <p id="wisemed-setup-message" class="small muted"></p>
+      </form>
+    </section>
+  `;
+
+  const form = document.getElementById("wisemed-setup-form");
+  const msg = document.getElementById("wisemed-setup-message");
+  const refreshBtn = document.getElementById("wisemed-setup-refresh");
+  if (refreshBtn) {
+    refreshBtn.addEventListener("click", () => {
+      renderLoginSetupPanel().catch((error) => {
+        els.loginError.hidden = false;
+        els.loginError.textContent = error.message || "Refresh WiseMED failed.";
+      });
+    });
+  }
+  if (form) {
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      msg.textContent = "";
+      const payload = Object.fromEntries(new FormData(form).entries());
+      const saved = await api("/api/wisemed/setup", {
+        method: "PUT",
+        body: JSON.stringify(payload),
+      });
+      state.wisemedSetup = saved;
+      msg.textContent = "Configurarea WiseMED a fost salvata.";
+      await renderLoginSetupPanel();
+    });
+  }
+}
+
+async function refreshSIUICertificatesAfterLogin() {
+  try {
+    await api("/api/siui/certificates/refresh", {method:"POST", body:"{}"});
+  } catch (error) {
+    showToast("Reîncărcarea certificatelor: " + error.message, "error");
+  }
+}
+async function mountDashboard(sessionResp) {
+  loadWSSStatus().catch(() => {});
+  els.loginView.hidden = true;
+  els.dashboardView.hidden = false;
+  state.readerInfo = { ...(sessionResp.reader || {}) };
+  state.appUpdateSettings = { ...(sessionResp.app_update || state.appUpdateSettings || {}) };
+  state.formatterMode = state.readerInfo?.protocol === "html-print-formatter";
+  state.settingsSubView = settingsSubViewFromLocation();
+  applyBarcodeModeUI();
+  els.readerTitle.textContent = formatReaderPrimaryLabel(sessionResp.reader);
+  els.readerSubtitle.textContent = formatReaderSecondaryLabel(sessionResp.reader);
+  syncAppVersionUI();
+  const userParts = [state.session?.first_name, state.session?.last_name].filter(Boolean);
+  els.sessionUser.textContent = userParts.join(" ").trim() || state.session?.username || "-";
+  syncLanguageControls();
+  applyLanguage();
+  toggleLogsAccess(!!sessionResp.permissions?.can_view_logs);
+  state.debugEnabled = !!sessionResp.permissions?.can_debug_tests;
+  syncDebugNavVisibility();
+  syncOrderControls();
+  if(isESignatureMode()) applyESignatureUI();
+  if (!state.barcodeMode) {
+    activateSettingsSubView(state.settingsSubView || "reader");
+  }
+  renderRoundSelect();
+  activateView(viewFromLocation(), false);
+  if (state.formatterMode) {
+    await Promise.all([loadStatus(), loadLogs(), loadReaderSettings()]);
+  } else if (isSIUIMode()) {
+    await refreshSIUICertificatesAfterLogin();
+    await Promise.all([loadStatus(), loadLogs(), loadReaderSettings()]);
+  } else if (isESignatureMode()) {
+    await Promise.all([loadStatus(), loadLogs(), loadDashboard()]);
+  } else if (state.barcodeMode) {
+    await Promise.all([loadStatus(), loadLogs(), loadDashboard(), loadBarcodeSettingsView(), loadBarcodeHistory()]);
+  } else if (state.utilityMode) {
+    if (isDocsmartMode()) {
+      await Promise.all([loadStatus(), loadLogs(), loadReaderSettings(), loadOrders(), loadDashboard()]);
+    } else {
+      await Promise.all([loadStatus(), loadLogs(), loadReaderSettings(), loadAnalytes(), loadDailyDetailDefinitions(), loadOrders(), loadDashboard()]);
+      if (state.currentView === "daily-details" || state.settingsSubView === "daily-details") {
+        await loadDailyDetailsWorkspace();
+      }
+    }
+  } else {
+    await Promise.all([loadStatus(), loadLogs(), loadQCMeta(), loadReaderSettings(), loadAnalytes(), loadQCTargets(), loadDailyDetailDefinitions(), loadOrders(), loadQCRecords(), loadDashboard()]);
+    if (state.currentView === "daily-details" || state.settingsSubView === "daily-details") {
+      await loadDailyDetailsWorkspace();
+    }
+  }
+  restartLogPolling();
+  restartStatusPolling();
+  if ((Number(state.session?.user_type) || 0) <= 0) {
+    loadDebugTests().catch(() => {
+      state.debugEnabled = false;
+      syncDebugNavVisibility();
+    });
+  }
+  refreshAppUpdateStatus(false).catch(() => {});
+}
+
+function syncAppVersionUI() {
+  const version = String(state.appUpdateSettings?.current_version || state.readerInfo?.app_version || "0.0.0").trim() || "0.0.0";
+  const label = `v${version}`;
+  if (els.loginAppVersionLink) els.loginAppVersionLink.textContent = label;
+  if (els.dashboardAppVersionLink) els.dashboardAppVersionLink.textContent = label;
+}
+
+async function refreshAppUpdateStatus(force = false) {
+  const suffix = force ? "?refresh=1" : "";
+  const resp = await api(`/api/app-update/status${suffix}`);
+  state.appUpdateStatus = resp || null;
+  renderAppUpdateStatus();
+  return resp;
+}
+
+function syncDebugNavVisibility() {
+  if (!els.debugNavLink) return;
+  const enabled = (isSIUIMode() || !!state.debugEnabled) && (Number(state.session?.user_type) || 0) <= 0;
+  const admin = (Number(state.session?.user_type) || 0) <= 0;
+  els.debugNavLink.hidden = !admin;
+  document.getElementById("debug-submenu").hidden = !admin;
+  document.getElementById("debug-communication-link").disabled = !enabled;
+  document.getElementById("debug-communication-link").title = enabled ? "" : "Debug de comunicație indisponibil pentru configurația curentă";
+  if (!enabled && state.currentView === "debug") {
+    activateView("overview");
+  }
+}
+
+async function loadDebugTests() {
+ if(state.formatterMode){state.debugEnabled=false;syncDebugNavVisibility();return;}
+ if(isSIUIMode()){state.debugEnabled=true;syncDebugNavVisibility();await loadSIUIDebug();return;}
+  if ((Number(state.session?.user_type) || 0) > 0) {
+    state.debugEnabled = false;
+    state.debugFiles = [];
+    syncDebugNavVisibility();
+    renderDebugTests();
+    return;
+  }
+  const resp = await api("/api/debug/tests");
+  state.debugFiles = Array.isArray(resp.files) ? resp.files : [];
+  state.debugEnabled = !!resp.enabled;
+  if (!state.debugFiles.some((item) => item.name === state.debugSelectedFile)) {
+    state.debugSelectedFile = state.debugFiles[0]?.name || "";
+  }
+  syncDebugNavVisibility();
+  renderDebugTests();
+}
+
+function renderDebugTests() {
+  if (!els.debugTestsList) return;
+  if (!state.debugEnabled || !state.debugFiles.length) {
+    els.debugTestsList.innerHTML = `<div class="debug-empty">${escapeHtml(t("debugNoTests"))}</div>`;
+    return;
+  }
+  els.debugTestsList.innerHTML = state.debugFiles.map((item) => `
+    <button class="debug-test-item ${item.name === state.debugSelectedFile ? "active" : ""}" data-debug-file="${escapeHtml(item.name)}">
+      <strong>${escapeHtml(item.name)}</strong>
+      <span>${escapeHtml(t("debugRun"))}</span>
+    </button>
+  `).join("");
+  els.debugTestsList.querySelectorAll("[data-debug-file]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      state.debugSelectedFile = button.dataset.debugFile || "";
+      renderDebugTests();
+      try {
+        await runDebugTest(state.debugSelectedFile);
+      } catch (error) {
+        showToast(error.message || "Debug run failed", "error");
+      }
+    });
+  });
+}
+
+async function runDebugTest(fileName) {
+  if (!fileName) return;
+  if (els.debugRunStatus) {
+    els.debugRunStatus.textContent = `${t("debugRunning")} ${fileName}`;
+  }
+  const resp = await api("/api/debug/tests/run", {
+    method: "POST",
+    body: JSON.stringify({ file: fileName }),
+  });
+  state.debugLastResult = resp.result || null;
+  renderDebugResult();
+}
+
+function renderDebugResult() {
+  if (!els.debugResult || !els.debugRunStatus) return;
+  const result = state.debugLastResult;
+  if (!result) {
+    els.debugRunStatus.textContent = "";
+    els.debugResult.innerHTML = "";
+    return;
+  }
+  els.debugRunStatus.textContent = `${result.script_name || state.debugSelectedFile} · ${result.passed ? t("debugPassed") : t("debugFailed")}`;
+  const steps = Array.isArray(result.steps) ? result.steps : [];
+  els.debugResult.innerHTML = steps.map((step) => `
+    <article class="debug-step ${step.passed ? "passed" : "failed"}">
+      <div class="debug-step-head">
+        <strong>#${escapeHtml(String(step.index || "-"))}</strong>
+        <span>${escapeHtml(t("debugLine"))}: ${escapeHtml(String(step.line || "-"))}</span>
+        <span>${escapeHtml(t("debugTerminator"))}: ${escapeHtml(String(step.terminator || "-").toUpperCase())}</span>
+        <span>${escapeHtml(t("debugDuration"))}: ${escapeHtml(String(step.duration_ms || 0))} ms</span>
+      </div>
+      ${step.error ? `<div class="debug-step-error">${escapeHtml(String(step.error))}</div>` : ""}
+      <div class="debug-step-grid">
+        <section><h4>${escapeHtml(t("debugInput"))}</h4><pre>${escapeHtml(String(step.input_preview || ""))}</pre></section>
+        <section><h4>${escapeHtml(t("debugExpected"))}</h4><pre>${escapeHtml(String(step.expected_output || ""))}</pre></section>
+        <section><h4>${escapeHtml(t("debugActual"))}</h4><pre>${escapeHtml(String(step.actual_output || ""))}</pre></section>
+      </div>
+    </article>
+  `).join("");
+}
+
+function renderAppUpdateStatus() {
+  const status = state.appUpdateStatus || {};
+  const icon = status.icon || "off";
+  const iconText = icon === "ok" ? "✓" : icon === "alert" ? "!" : "?";
+  [els.loginAppUpdateIndicator, els.dashboardAppUpdateIndicator].forEach((node) => {
+    if (!node) return;
+    node.classList.remove("ok", "alert", "off");
+    node.classList.add(icon);
+    node.textContent = iconText;
+    node.title = String(status.message || "");
+  });
+}
+
+function hideAppUpdateMessage() {
+  if (els.loginAppUpdateMessage) {
+    els.loginAppUpdateMessage.hidden = true;
+    els.loginAppUpdateMessage.textContent = "";
+  }
+  if (els.dashboardAppUpdateMessage) {
+    els.dashboardAppUpdateMessage.hidden = true;
+    els.dashboardAppUpdateMessage.textContent = "";
+  }
+}
+
+function showAppUpdateMessage() {
+  const message = String(state.appUpdateStatus?.message || "Nu exista informatii de update.").trim();
+  if (!els.dashboardView.hidden) {
+    showToast(message, state.appUpdateStatus?.icon === "ok" ? "success" : "error");
+    return;
+  }
+  if (els.loginAppUpdateMessage) {
+    els.loginAppUpdateMessage.hidden = false;
+    els.loginAppUpdateMessage.textContent = message;
+  }
+}
+
+async function onAppVersionClick(event) {
+  event.preventDefault();
+  try {
+    const resp = await refreshAppUpdateStatus(true);
+    if (els.dashboardView.hidden && els.loginAppUpdateMessage) {
+      els.loginAppUpdateMessage.hidden = false;
+      els.loginAppUpdateMessage.textContent = String(resp?.message || "Verificare update finalizata.");
+      return;
+    }
+    showToast(String(resp?.message || "Verificare update finalizata."), resp?.icon === "ok" ? "success" : "error");
+  } catch (error) {
+    if (els.dashboardView.hidden && els.loginAppUpdateMessage) {
+      els.loginAppUpdateMessage.hidden = false;
+      els.loginAppUpdateMessage.textContent = error.message || "Nu s-a putut verifica update-ul.";
+      return;
+    }
+    showToast(error.message || "Nu s-a putut verifica update-ul.", "error");
+  }
+}
+
+function onAppUpdateIndicatorClick(event) {
+  event.preventDefault();
+  showAppUpdateMessage();
+}
+
+function activateView(name, pushHistory = true) {
+ if(state.formatterMode && ["orders","qc","daily-details","debug"].includes(name)) name="overview";
+ if (isESignatureMode() && name !== "analytes") closeESignatureDemo();
+  if (name === "help") {
+    if (window.WSM_REMOTE) { showRemoteHelp(); return; }
+    const helpTab = window.open("/help/", "_blank", "noopener");
+    if (helpTab) helpTab.opener = null;
+    return;
+  }
+  if (name === "debug" && ((!isSIUIMode() && !state.debugEnabled) || (Number(state.session?.user_type) || 0) > 0)) {
+    name = "overview";
+  }
+  if (state.utilityMode && name === "qc") {
+    name = "orders";
+  }
+  if (name === "analytes" && !isESignatureMode()) {
+    state.settingsSubView = settingsSubViewFromLocation();
+  }
+  if (name === "wsm" && (Number(state.session?.user_type) || 0) > 0) name = "overview";
+  state.currentView = name;
+  els.navLinks.forEach((link) => link.classList.toggle("active", link.dataset.view === (name === "wsm" ? "debug" : name)));
+  document.getElementById("debug-wsm-link").classList.toggle("active", name === "wsm");
+  document.getElementById("debug-communication-link").classList.toggle("active", name === "debug");
+  if(name !== "analytes") els.navSublinks.forEach(link => link.classList.remove("active"));
+  Object.entries(els.views).forEach(([key, view]) => {
+    view.hidden = key !== name;
+  });
+  renderTopbarTitle();
+  if (pushHistory) {
+    const path = pathForView(name);
+    if (currentUIPath() !== path) {
+      window.history.pushState({ view: name }, "", path);
+    }
+  }
+  if (name === "wsm") {
+    renderWSSPanel();
+    loadWSSStatus().catch(error => wssNotice(error.message));
+    return;
+  }
+  if (name === "analytes") {
+    if (state.formatterMode) {activateSettingsSubView(state.settingsSubView);if(state.settingsSubView==="reader")loadReaderSettings().catch(error=>showToast(error.message,"error"));return;}
+    if (isSIUIMode()) {activateSettingsSubView(state.settingsSubView);if(state.settingsSubView==="reader")loadReaderSettings().catch(error=>showToast(error.message,"error"));return;}
+    if (isESignatureMode()) {activateSettingsSubView(state.settingsSubView); return;}
+    if (state.settingsSubView === "wss") { activateSettingsSubView("wss"); return; }
+    if (state.barcodeMode) {
+      activateSettingsSubView("reader");
+      loadBarcodeSettingsView().catch(() => {});
+    } else {
+      activateSettingsSubView(state.settingsSubView || "reader");
+      Promise.all([loadQCMeta(), loadReaderSettings(), loadAnalytes(), loadQCTargets(), loadDailyDetailDefinitions()]).catch(() => {});
+    }
+  }
+  if (name === "daily-details") {
+    Promise.all([
+      loadAnalytes().catch(() => {}),
+      loadQCTargets().catch(() => {}),
+      loadDailyDetailDefinitions().catch(() => {}),
+    ]).finally(() => {
+      loadDailyDetailsWorkspace().catch(() => {});
+    });
+  }
+  if (name === "orders") {
+    if (isESignatureMode()) {loadESignatureHistory().catch(error => showToast(error.message,"error")); return;}
+    if (state.barcodeMode) {
+      loadBarcodeHistory().catch(() => {});
+    } else {
+      loadOrdersWithFeedback();
+    }
+  }
+  if (!state.utilityMode && name === "qc") {
+    loadQCRecords().catch(() => {});
+  }
+  if (name === "debug") {
+    loadDebugTests().catch(() => {});
+  }
+}
+
+function renderTopbarTitle() {
+ if(state.currentView === "wsm"){document.getElementById("dashboard-title").textContent="Debug · WSM";return;}
+ if(state.formatterMode){document.getElementById("dashboard-title").textContent=state.currentView==="analytes" ? (state.settingsSubView==="wss" ? "WSS" : "Server și actualizări") : "HTML Print Formatter";return;}
+  if (state.currentView === "analytes" && state.settingsSubView === "wss") { document.getElementById("dashboard-title").textContent = "WSS"; return; }
+ if(isESignatureMode()) {
+ const title=document.getElementById("dashboard-title");
+ if(title) title.textContent=state.currentView==="analytes" ? ({pad:"Setări PAD",demo:"Demo",reader:"Server și update-uri"}[state.settingsSubView] || "Settings") : state.currentView==="orders" ? "Istoric semnături" : "eSignature server";
+ return;
+ }
+  const title = document.getElementById("dashboard-title");
+  if (!title) return;
+  if (state.barcodeMode) {
+    if (state.currentView === "analytes") {
+      title.textContent = t("navSettings");
+      return;
+    }
+    if (state.currentView === "daily-details") {
+      title.textContent = t("navDailyDetails");
+      return;
+    }
+    if (state.currentView === "orders") {
+      title.textContent = state.language === "en" ? "Print history" : "Istoric tipariri";
+      return;
+    }
+  }
+  if (state.currentView === "daily-details") {
+    title.textContent = t("navDailyDetails");
+    return;
+  }
+  if (state.currentView === "analytes") {
+    title.textContent = state.settingsSubView === "reader"
+      ? t("settingsReader")
+      : (state.settingsSubView === "qc" ? t("settingsQc") : (state.settingsSubView === "daily-details" ? t("settingsDailyDetails") : (state.settingsSubView === "daily-analysis-filters" ? "Filtre" : (state.settingsSubView === "astm-specimens" ? "Tipuri de probe" : t("settingsAnalytes")))));
+    return;
+  }
+  if (state.currentView === "orders") {
+    title.textContent = isDocsmartMode() ? (state.language === "en" ? "Parsed files" : "Fisiere parse") : t("navOrders");
+    return;
+  }
+  if (state.currentView === "qc") {
+    title.textContent = t("navQc");
+    return;
+  }
+  if (state.currentView === "debug") {
+    title.textContent = t("navDebug");
+    return;
+  }
+  if (state.currentView === "help") {
+    title.textContent = t("navHelp");
+    return;
+  }
+  title.textContent = t("dashboardTitle");
+}
+
+function viewFromLocation() {
+ if(currentUIPath() === "/debug/wsm") return "wsm";
+ if(state.formatterMode) return currentUIPath().startsWith("/settings") ? "analytes" : "overview";
+ if(isSIUIMode()) return currentUIPath()==="/debug" ? "debug" : "analytes";
+  if (currentUIPath() === "/settings/wss") return "analytes";
+ if(isESignatureMode() && currentUIPath().startsWith("/settings")) return "analytes";
+  const path = currentUIPath() || "/";
+  if (state.barcodeMode) {
+    if (path === "/settings" || path === "/settings/reader" || path === "/settings/analytes" || path === "/settings/qc") return "analytes";
+    if (path === "/daily-details") return "daily-details";
+    if (path === "/orders") return "orders";
+    if (path === "/debug") return "debug";
+    if (path === "/help") return "help";
+    return "overview";
+  }
+  if (path === "/settings" || path === "/settings/reader" || path === "/settings/analytes" || path === "/settings/qc" || path === "/settings/daily-details" || path === "/settings/daily-analysis-filters" || path === "/settings/astm-specimens") return "analytes";
+  if (path === "/daily-details") return "daily-details";
+  if (path === "/orders") return "orders";
+  if (path === "/qc") return "qc";
+  if (path === "/debug") return "debug";
+  if (path === "/help") return "help";
+  return "overview";
+}
+
+function settingsSubViewFromLocation() {
+ if(state.formatterMode) return currentUIPath()==="/settings/wss" ? "wss" : "reader";
+ if(isSIUIMode()) return currentUIPath()==="/settings/wss" ? "wss" : currentUIPath()==="/settings/reader" ? "reader" : "siui";
+  if (currentUIPath() === "/settings/wss") return "wss";
+ if(isESignatureMode()) {return currentUIPath()==="/settings/demo" ? "demo" : currentUIPath()==="/settings/reader" ? "reader" : "pad";}
+  const path = currentUIPath() || "/";
+  if (path === "/settings/reader" || path === "/settings") return "reader";
+  if (path === "/settings/qc") return "qc";
+  if (path === "/settings/daily-details") return "daily-details";
+  if (path === "/settings/daily-analysis-filters") return "daily-analysis-filters";
+  if (path === "/settings/astm-specimens") return "astm-specimens";
+  return "analytes";
+}
+
+function pathForView(name) {
+ if(name === "wsm") return "/debug/wsm";
+ if(state.formatterMode) return name==="analytes" ? (state.settingsSubView==="wss" ? "/settings/wss" : "/settings/reader") : "/";
+ if(isSIUIMode() && name==="analytes" && state.settingsSubView==="siui") return "/settings/siui";
+  if (name === "analytes" && state.settingsSubView === "wss") return "/settings/wss";
+ if(isESignatureMode() && name==="analytes") return "/settings/"+(["pad","demo","reader"].includes(state.settingsSubView)?state.settingsSubView:"pad");
+  if (state.barcodeMode) {
+    if (name === "analytes") return "/settings";
+    if (name === "daily-details") return "/daily-details";
+    if (name === "orders") return "/orders";
+    if (name === "debug") return "/debug";
+    if (name === "help") return "/help";
+    return "/";
+  }
+  if (name === "analytes") {
+    if (state.settingsSubView === "reader") return "/settings/reader";
+    if (state.settingsSubView === "qc") return "/settings/qc";
+    if (state.settingsSubView === "daily-details") return "/settings/daily-details";
+    if (state.settingsSubView === "daily-analysis-filters") return "/settings/daily-analysis-filters";
+    if (state.settingsSubView === "astm-specimens") return "/settings/astm-specimens";
+    return "/settings/analytes";
+  }
+  if (name === "daily-details") return "/daily-details";
+  if (name === "orders") return "/orders";
+  if (name === "qc") return "/qc";
+  if (name === "debug") return "/debug";
+  if (name === "help") return "/help";
+  return "/";
+}
+
+function activateSettingsSubView(name) {
+ if(state.formatterMode && !["reader","wss"].includes(name)) name="reader";
+ const siuiPanel=document.getElementById("settings-panel-siui");
+ if(siuiPanel) siuiPanel.hidden=name!=="siui";
+ if(name==="siui" && isSIUIMode()) {
+  state.settingsSubView="siui";
+  document.querySelectorAll('[id^="settings-panel-"]').forEach(p=>p.hidden=p.id!=="settings-panel-siui");
+  els.navSublinks.forEach(link=>link.classList.toggle("active",link.dataset.settingsSubview==="siui"));
+  window.history.replaceState({view:"analytes"},"","/settings/siui");
+  loadSIUIPanel().catch(error=>showToast(error.message,"error"));
+  return;
+ }
+  document.getElementById("settings-panel-wss").hidden = name !== "wss";
+  if (name === "wss") {
+    if (isESignatureMode()) closeESignatureDemo();
+    state.settingsSubView = "wss";
+    document.querySelectorAll('[id^="settings-panel-"]').forEach(panel => { panel.hidden = panel.id !== "settings-panel-wss"; });
+    els.navSublinks.forEach(link => link.classList.toggle("active", link.dataset.settingsSubview === "wss"));
+    window.history.replaceState({view:"analytes"}, "", "/settings/wss");
+    renderWSSPanel();
+    loadWSSStatus().catch(error => wssNotice(error.message));
+    renderTopbarTitle();
+    return;
+  }
+
+ if(isESignatureMode()) {activateESignatureSettings(name);return;}
+  if (state.barcodeMode) {
+    state.settingsSubView = "reader";
+    window.history.replaceState({view:"analytes"}, "", "/settings");
+    els.navSublinks.forEach(link => link.classList.toggle("active", link.dataset.settingsSubview === "reader"));
+    if (els.settingsPanelAnalytes) els.settingsPanelAnalytes.hidden = false;
+    if (els.settingsPanelReader) els.settingsPanelReader.hidden = true;
+    if (els.settingsPanelQCEditor) els.settingsPanelQCEditor.hidden = true;
+    if (!els.views.analytes.hidden) {
+      renderTopbarTitle();
+    }
+    return;
+  }
+  if (isDocsmartMode()) {
+    state.settingsSubView = "reader";
+    window.history.replaceState({view:"analytes"}, "", "/settings/reader");
+    els.navSublinks.forEach(link => link.classList.toggle("active", link.dataset.settingsSubview === "reader"));
+    if (els.settingsPanelReader) els.settingsPanelReader.hidden = false;
+    if (els.settingsPanelAnalytes) els.settingsPanelAnalytes.hidden = true;
+    if (els.settingsPanelQCEditor) els.settingsPanelQCEditor.hidden = true;
+    if (els.settingsPanelDailyDetails) els.settingsPanelDailyDetails.hidden = true;
+    if (!els.views.analytes.hidden) {
+      renderTopbarTitle();
+    }
+    return;
+  }
+  state.settingsSubView = ["reader", "qc", "daily-details", "daily-analysis-filters", "analytes", "astm-specimens"].includes(name) ? name : "reader";
+  const readerActive = state.settingsSubView === "reader";
+  const qcActive = state.settingsSubView === "qc";
+  const dailyDetailsActive = state.settingsSubView === "daily-details";
+  const dailyAnalysisFiltersActive = state.settingsSubView === "daily-analysis-filters";
+  const astmSpecimensActive = state.settingsSubView === "astm-specimens";
+  if (els.settingsPanelReader) els.settingsPanelReader.hidden = !readerActive;
+  els.settingsPanelAnalytes.hidden = readerActive || qcActive || dailyDetailsActive || dailyAnalysisFiltersActive || astmSpecimensActive;
+  els.settingsPanelQCEditor.hidden = !qcActive;
+  if (els.settingsPanelDailyDetails) els.settingsPanelDailyDetails.hidden = !dailyDetailsActive;
+  if (els.settingsPanelDailyAnalysisFilters) els.settingsPanelDailyAnalysisFilters.hidden = !dailyAnalysisFiltersActive;
+  if (els.settingsPanelASTMSpecimens) els.settingsPanelASTMSpecimens.hidden = !astmSpecimensActive;
+  els.navSublinks.forEach((link) => {
+    link.classList.toggle("active", (link.dataset.settingsSubview || "analytes") === state.settingsSubView);
+  });
+  if (!els.views.analytes.hidden) {
+    renderTopbarTitle();
+    const path = pathForView("analytes");
+    if (currentUIPath() !== path) {
+      window.history.replaceState({ view: "analytes" }, "", path);
+    }
+  }
+  if (qcActive && !state.qcLevels.length) {
+    loadQCMeta().catch(() => {});
+  }
+  if (dailyDetailsActive) {
+    renderDailyDetailDefinitionList();
+  }
+  if (dailyAnalysisFiltersActive) {
+    loadDailyAnalysisFilters().catch((error) => showToast(error?.message || "Nu se pot încărca filtrele", "error"));
+  }
+  if (astmSpecimensActive) {
+    loadASTMSpecimens().catch((error) => showToast(error?.message || "Nu se pot incarca mapa ASTM", "error"));
+  }
+}
+
+async function loadASTMSpecimens() {
+  if (!els.astmSpecimenList) return;
+  const response = await api("/api/settings/astm-specimens");
+  const settings = response.settings || {};
+  els.astmSpecimenDefault.value = settings.default || "1";
+  renderASTMSpecimenRows(settings.rows || []);
+}
+
+async function loadDailyAnalysisFilters() {
+  if (!els.dailyAnalysisFilterDate) return;
+  const date = state.dailyAnalysisFilterDate || localISODate();
+  els.dailyAnalysisFilterDate.value = date;
+  const response = await api(`/api/daily-analysis-filters?scope_date=${encodeURIComponent(date)}`);
+  state.dailyAnalysisFilters = response.filters || [];
+  state.dailyAnalysisFilterSpecimenCodes = response.specimen_codes || state.dailyAnalysisFilterSpecimenCodes || [];
+  syncDailyAnalysisFilterOptions();
+  renderDailyAnalysisFilterList();
+  if (els.dailyAnalysisFilterPill) {
+    const count = state.dailyAnalysisFilters.length;
+    els.dailyAnalysisFilterPill.hidden = count === 0;
+    els.dailyAnalysisFilterPill.textContent = `Filtre: ${count}`;
+  }
+}
+
+function syncDailyAnalysisFilterOptions() {
+  if (els.dailyAnalysisFilterAnalyte) {
+    els.dailyAnalysisFilterAnalyte.innerHTML = state.analytes.map((item) => `<option value="${escapeHtml(item.tag)}">${escapeHtml(item.tag)} · ${escapeHtml(item.name || "-")}</option>`).join("");
+  }
+  if (els.dailyAnalysisFilterSpecimens) {
+    els.dailyAnalysisFilterSpecimens.innerHTML = state.dailyAnalysisFilterSpecimenCodes.map((code) => `<option value="${escapeHtml(code)}">${escapeHtml(code)}</option>`).join("");
+  }
+  syncDailyAnalysisFilterMode();
+}
+
+function syncDailyAnalysisFilterMode() {
+  if (els.dailyAnalysisFilterSpecimensBox) els.dailyAnalysisFilterSpecimensBox.hidden = els.dailyAnalysisFilterMode?.value !== "specimen_codes";
+}
+
+function renderDailyAnalysisFilterList() {
+  if (!els.dailyAnalysisFilterList) return;
+  if (!state.dailyAnalysisFilters.length) { els.dailyAnalysisFilterList.innerHTML = '<div class="log-item">Nu există filtre. Toate analizele sunt trimise către analizor.</div>'; return; }
+  const names = Object.fromEntries(state.analytes.map((item) => [item.tag, item.name]));
+  els.dailyAnalysisFilterList.innerHTML = `<div class="analyte-table-wrap"><table class="analyte-table"><thead><tr><th>Analiză</th><th>Mod</th><th>Coduri probă</th><th>Acțiune</th></tr></thead><tbody>${state.dailyAnalysisFilters.map((item) => `<tr><td><strong>${escapeHtml(item.analyte_tag)}</strong><div class="small muted">${escapeHtml(names[item.analyte_tag] || "")}</div></td><td>${item.mode === "global" ? "Global" : "Pe cod de probă"}</td><td>${escapeHtml((item.specimen_codes || []).join(", ") || "Toate")}</td><td><button class="danger daily-analysis-filter-delete" data-filter-id="${item.id}" type="button">Șterge</button></td></tr>`).join("")}</tbody></table></div>`;
+  els.dailyAnalysisFilterList.querySelectorAll(".daily-analysis-filter-delete").forEach((button) => button.addEventListener("click", () => deleteDailyAnalysisFilter(button.dataset.filterId)));
+}
+
+async function onAddDailyAnalysisFilter() {
+  const specimenCodes = [...(els.dailyAnalysisFilterSpecimens?.selectedOptions || [])].map((option) => option.value);
+  const payload = { scope_date: state.dailyAnalysisFilterDate || localISODate(), analyte_tag: els.dailyAnalysisFilterAnalyte?.value || "", mode: els.dailyAnalysisFilterMode?.value || "global", specimen_codes: specimenCodes };
+  await api("/api/daily-analysis-filters", { method: "POST", body: JSON.stringify(payload) });
+  if (els.dailyAnalysisFilterMessage) els.dailyAnalysisFilterMessage.textContent = "Filtru salvat. Cererile LIS următoare vor respecta blocarea.";
+  await loadDailyAnalysisFilters();
+}
+
+async function deleteDailyAnalysisFilter(id) {
+  await api(`/api/daily-analysis-filters/${encodeURIComponent(id)}`, { method: "DELETE" });
+  await loadDailyAnalysisFilters();
+}
+
+function onDailyAnalysisFilterDateChange() {
+  state.dailyAnalysisFilterDate = els.dailyAnalysisFilterDate?.value || localISODate();
+  loadDailyAnalysisFilters().catch((error) => showToast(error?.message || "Nu se pot încărca filtrele", "error"));
+}
+
+function renderASTMSpecimenRows(rows) {
+  if (!els.astmSpecimenList) return;
+  const normalized = Array.isArray(rows) ? rows : [];
+  els.astmSpecimenList.innerHTML = `
+    <div class="analyte-table-wrap"><table class="analyte-table">
+      <thead><tr><th>Cod tip proba WiseMED</th><th>Cod tip proba analizor</th><th class="col-state">Actiune</th></tr></thead>
+      <tbody>${normalized.map((row) => astmSpecimenRowHTML(row.source || "", row.target || "")).join("")}</tbody>
+    </table></div>`;
+  bindASTMSpecimenRowActions();
+}
+
+function astmSpecimenRowHTML(source, target) {
+  return `<tr><td><input class="astm-specimen-source" value="${escapeHtml(source)}" placeholder="ex. SER"></td><td><input class="astm-specimen-target" value="${escapeHtml(target)}" placeholder="ex. 1"></td><td class="col-state"><button class="danger astm-specimen-delete" type="button">Sterge</button></td></tr>`;
+}
+
+function bindASTMSpecimenRowActions() {
+  if (!els.astmSpecimenList) return;
+  els.astmSpecimenList.querySelectorAll(".astm-specimen-delete").forEach((button) => button.addEventListener("click", () => button.closest("tr")?.remove()));
+}
+
+function addASTMSpecimenRow() {
+  const body = els.astmSpecimenList?.querySelector("tbody");
+  if (!body) {
+    renderASTMSpecimenRows([{ source: "", target: "" }]);
+    return;
+  }
+  body.insertAdjacentHTML("beforeend", astmSpecimenRowHTML("", ""));
+  bindASTMSpecimenRowActions();
+}
+
+async function saveASTMSpecimens() {
+  const rows = [...(els.astmSpecimenList?.querySelectorAll("tbody tr") || [])].map((row) => ({
+    source: row.querySelector(".astm-specimen-source")?.value || "",
+    target: row.querySelector(".astm-specimen-target")?.value || "",
+  }));
+  const response = await api("/api/settings/astm-specimens", {
+    method: "PUT",
+    body: JSON.stringify({ default: els.astmSpecimenDefault?.value || "1", rows }),
+  });
+  if (els.astmSpecimenMessage) els.astmSpecimenMessage.textContent = response.restart_required ? "Salvat. Reporniti readerul pentru aplicare." : "Salvat.";
+  showToast("Mapa tipurilor de proba ASTM a fost salvata.", "success");
+}
+
+async function loadStatus() {
+  const resp = await api("/api/status");
+  const data = resp.data || resp;
+  state.readerInfo = { ...(state.readerInfo || {}), ...(data.reader || {}) };
+  const stats = data.stats || {};
+  const communication = data.communication || {};
+  state.commType = communication.type || state.commType || "file";
+  const layout = data.layout || {};
+  state.layoutKind = layout.kind || state.layoutKind || "simple_list";
+  state.resultsDelivery = { ...(state.resultsDelivery || {}), ...(data.results_delivery || {}) };
+  const connections = data.connections || {};
+  updateConnectionPills(connections);
+ if(isESignatureMode()) applyESignatureUI();
+  const cards = state.formatterMode ? [{label:"Utilitar",value:"HTML Print Formatter"},{label:"Comunicare",value:"HTTP / WSS"}] : isESignatureMode() ? [{label:"Utilitar",value:"eSignature server"},{label:"Comunicare",value:"HTTP / WSS"}] : state.barcodeMode ? [
+    { label: "Tipariri", value: stats.orders ?? 0 },
+    { label: "Etichete", value: stats.results ?? 0 },
+    { label: t("events"), value: stats.events ?? 0 },
+    { label: t("comm"), value: communication.type || "-" },
+    { label: t("layout"), value: layout.kind || "-" },
+  ] : [
+    { label: t("analytes"), value: stats.analytes ?? 0 },
+    { label: t("orders"), value: stats.orders ?? 0 },
+    { label: t("results"), value: stats.results ?? 0 },
+    { label: t("qcRecords"), value: stats.qc_records ?? 0 },
+    { label: t("qcResults"), value: stats.qc_results ?? 0 },
+    { label: t("qcTargets"), value: stats.qc_targets ?? 0 },
+    { label: t("events"), value: stats.events ?? 0 },
+    { label: t("comm"), value: communication.type || "-" },
+    { label: t("layout"), value: layout.kind || "-" },
+  ];
+  els.statusCards.innerHTML = cards.map((item) => `<div class="metric"><span class="muted small">${escapeHtml(item.label)}</span><strong>${escapeHtml(String(item.value))}</strong></div>`).join("");
+  renderReaderSidebar();
+}
+
+async function loadDashboard() {
+ if(state.formatterMode) return;
+ if(isSIUIMode()) return;
+ if(isESignatureMode()) {
+ const data=await api("/api/esignature/stats/daily");
+ const rows=data.stats||[];const today=rows.find(row=>row.date===new Date().toISOString().slice(0,10))||{};
+ els.todayLegend.innerHTML=`<p>Semnături confirmate: ${Number(today.confirmed||0)}</p><p>Anulări: ${Number(today.cancelled||0)}</p><p>Erori: ${Number(today.failed||0)}</p>`;
+ els.todayDonut.style.background="#e8f0ed";
+ els.lineChart.innerHTML=""; els.lineLegend.textContent="Statistici operații de semnare (UTC)";
+ return;
+ }
+  if (state.barcodeMode) {
+    const today = localISODate();
+    const resp = await api(`/api/barcode/stats/daily?date_from=${encodeURIComponent(today)}&date_to=${encodeURIComponent(today)}`);
+    const entry = (resp.daily || [])[0] || { prints: 0, labels: 0, ok: 0, fail: 0 };
+    renderDonut({ with_result: Number(entry.ok || 0), without_result: Number(entry.fail || 0) });
+    const from = offsetISODate(-14);
+    const range = await api(`/api/barcode/stats/daily?date_from=${encodeURIComponent(from)}&date_to=${encodeURIComponent(today)}`);
+    const series = (range.daily || []).map((item) => ({
+      day: item.day,
+      orders: Number(item.prints || 0),
+      analyses: Number(item.labels || 0),
+      analyses_with_result: Number(item.ok || 0),
+    })).reverse();
+    renderLineChart(series);
+    return;
+  }
+  const resp = await api("/api/dashboard");
+  renderDonut(resp.today || { without_result: 0, with_result: 0 });
+  renderQCSummary(resp.qc_today || {});
+  renderLineChart(resp.series || []);
+}
+
+async function loadReaderSettings() {
+  if (state.barcodeMode || !els.repeatModeSelect) return;
+  const resp = await api("/api/reader-settings");
+  state.readerSettings = {
+    repeat_mode: String(resp.settings?.repeat_mode || "individual"),
+    reader_id: String(resp.settings?.reader_id || ""),
+    reader_label: String(resp.settings?.reader_label || ""),
+    analyzer_name: String(resp.settings?.analyzer_name || ""),
+    analyzer_code: String(resp.settings?.analyzer_code || ""),
+    db_name: String(resp.settings?.db_name || ""),
+    sqlite_path: String(resp.settings?.sqlite_path || ""),
+    local_http_address: String(resp.settings?.local_http_address || ""),
+    local_http_language: String(resp.settings?.local_http_language || "ro"),
+    local_http_tls: String(resp.settings?.local_http_tls || "false"),
+    local_http_cors_allowed_origins: String(resp.settings?.local_http_cors_allowed_origins || "https://ldse.wisemed.eu"),
+    analyzer_comm_type: String(resp.settings?.analyzer_comm_type || ""),
+    analyzer_protocol: String(resp.settings?.analyzer_protocol || ""),
+    available_comm_types: Array.isArray(resp.settings?.available_comm_types) ? resp.settings.available_comm_types : [],
+    available_protocols: Array.isArray(resp.settings?.available_protocols) ? resp.settings.available_protocols : [],
+    available_tcpip_modes: Array.isArray(resp.settings?.available_tcpip_modes) ? resp.settings.available_tcpip_modes : [],
+    available_serial_bauds: Array.isArray(resp.settings?.available_serial_bauds) ? resp.settings.available_serial_bauds : ["9600"],
+    available_serial_data_bits: Array.isArray(resp.settings?.available_serial_data_bits) ? resp.settings.available_serial_data_bits : ["8"],
+    available_serial_parities: Array.isArray(resp.settings?.available_serial_parities) ? resp.settings.available_serial_parities : ["none"],
+    available_serial_stop_bits: Array.isArray(resp.settings?.available_serial_stop_bits) ? resp.settings.available_serial_stop_bits : ["1"],
+    available_serial_flow_controls: Array.isArray(resp.settings?.available_serial_flow_controls) ? resp.settings.available_serial_flow_controls : ["none"],
+    available_astm_checksum_modes: Array.isArray(resp.settings?.available_astm_checksum_modes) ? resp.settings.available_astm_checksum_modes : ["astm", "none"],
+    available_astm_trailer_modes: Array.isArray(resp.settings?.available_astm_trailer_modes) ? resp.settings.available_astm_trailer_modes : ["crlf", "none"],
+    tcpip_mode: String(resp.settings?.tcpip_mode || "server"),
+    tcpip_host: String(resp.settings?.tcpip_host || ""),
+    tcpip_port: String(resp.settings?.tcpip_port || ""),
+    tcpip_remote_host: String(resp.settings?.tcpip_remote_host || ""),
+    tcpip_remote_port: String(resp.settings?.tcpip_remote_port || ""),
+    serial_port: String(resp.settings?.serial_port || ""),
+    serial_baud: String(resp.settings?.serial_baud || "9600"),
+    serial_data_bits: String(resp.settings?.serial_data_bits || "8"),
+    serial_parity: String(resp.settings?.serial_parity || "none"),
+    serial_stop_bits: String(resp.settings?.serial_stop_bits || "1"),
+    serial_flow_control: String(resp.settings?.serial_flow_control || "none"),
+    astm_checksum_mode: String(resp.settings?.astm_checksum_mode || "astm"),
+    astm_trailer_mode: String(resp.settings?.astm_trailer_mode || "crlf"),
+    file_import_dir: String(resp.settings?.file_import_dir || "./inbox"),
+    file_processed_dir: String(resp.settings?.file_processed_dir || "./processed"),
+    file_failed_dir: String(resp.settings?.file_failed_dir || "./failed"),
+    file_pattern: String(resp.settings?.file_pattern || "*"),
+    logging_verbose_level: String(resp.settings?.logging_verbose_level || "1"),
+    results_auto_confirm_wisemed: String(resp.settings?.results_auto_confirm_wisemed || "false"),
+    wisemed_reagent_set_name: String(resp.settings?.wisemed_reagent_set_name || ""),
+    results_send_supported: Boolean(resp.settings?.results_send_supported),
+    app_updates_enabled: String(resp.settings?.app_updates_enabled || "true"),
+    app_updates_app_id: String(resp.settings?.app_updates_app_id || ""),
+    app_updates_current_version: String(resp.settings?.app_updates_current_version || "0.0.0"),
+    app_updates_channel: String(resp.settings?.app_updates_channel || "stable"),
+    app_updates_base_url: String(resp.settings?.app_updates_base_url || ""),
+    app_updates_auto_download: String(resp.settings?.app_updates_auto_download || "true"),
+    app_updates_download_dir: String(resp.settings?.app_updates_download_dir || "./updates"),
+    result_sync_enabled: String(resp.settings?.result_sync_enabled || "true"),
+    result_sync_interval_minutes: String(resp.settings?.result_sync_interval_minutes || "5"),
+    result_sync_sample_prefixes: String(resp.settings?.result_sync_sample_prefixes || ""),
+    result_sync_sample_suffixes: String(resp.settings?.result_sync_sample_suffixes || ""),
+    result_sync_separators: String(resp.settings?.result_sync_separators || "-"),
+    result_sync_qc_prefixes: String(resp.settings?.result_sync_qc_prefixes || ""),
+    protocol_subtype: String(resp.settings?.protocol_subtype || "auto"),
+    labnovation_image_mode: String(resp.settings?.labnovation_image_mode || "no_image"),
+	zonci_result_separator: String(resp.settings?.zonci_result_separator || "VIRGULA"),
+    labnovation_enabled: Boolean(resp.settings?.labnovation_enabled),
+  };
+  state.resultsDelivery = {
+    ...(state.resultsDelivery || {}),
+    auto_confirm_wisemed: state.readerSettings.results_auto_confirm_wisemed === "true",
+    send_supported: Boolean(state.readerSettings.results_send_supported),
+  };
+  const form = els.readerSettingsForm;
+  if (form) {
+    fillSelect(form.elements.analyzer_comm_type, state.readerSettings.available_comm_types, state.readerSettings.analyzer_comm_type);
+    fillSelect(form.elements.analyzer_protocol, state.readerSettings.available_protocols, state.readerSettings.analyzer_protocol);
+    fillSelect(form.elements.tcpip_mode, state.readerSettings.available_tcpip_modes, state.readerSettings.tcpip_mode);
+    fillSelect(form.elements.serial_baud, state.readerSettings.available_serial_bauds, state.readerSettings.serial_baud);
+    fillSelect(form.elements.serial_data_bits, state.readerSettings.available_serial_data_bits, state.readerSettings.serial_data_bits);
+    fillSelect(form.elements.serial_parity, state.readerSettings.available_serial_parities, state.readerSettings.serial_parity);
+    fillSelect(form.elements.serial_stop_bits, state.readerSettings.available_serial_stop_bits, state.readerSettings.serial_stop_bits);
+    fillSelect(form.elements.serial_flow_control, state.readerSettings.available_serial_flow_controls, state.readerSettings.serial_flow_control);
+    for (const option of form.elements.serial_flow_control.options) {
+      option.textContent = ({ none: "None", rtscts: "RtsCts", dtrdsr: "DtrDsr", software: "Software", custom: "Custom" })[option.value] || option.value;
+    }
+    fillSelect(form.elements.astm_checksum_mode, state.readerSettings.available_astm_checksum_modes, state.readerSettings.astm_checksum_mode);
+    fillSelect(form.elements.astm_trailer_mode, state.readerSettings.available_astm_trailer_modes, state.readerSettings.astm_trailer_mode);
+    form.elements.reader_id.value = state.readerSettings.reader_id;
+    form.elements.reader_label.value = state.readerSettings.reader_label;
+    form.elements.analyzer_name.value = state.readerSettings.analyzer_name;
+    form.elements.analyzer_code.value = state.readerSettings.analyzer_code;
+    form.elements.db_name.value = state.readerSettings.db_name;
+    form.elements.sqlite_path.value = state.readerSettings.sqlite_path;
+    form.elements.local_http_address.value = state.readerSettings.local_http_address;
+    form.elements.local_http_language.value = state.readerSettings.local_http_language;
+    form.elements.local_http_tls.value = state.readerSettings.local_http_tls;
+    form.elements.local_http_cors_allowed_origins.value = state.readerSettings.local_http_cors_allowed_origins;
+    form.elements.analyzer_comm_type.value = state.readerSettings.analyzer_comm_type;
+    form.elements.analyzer_protocol.value = state.readerSettings.analyzer_protocol;
+    form.elements.tcpip_mode.value = state.readerSettings.tcpip_mode;
+    form.elements.tcpip_host.value = state.readerSettings.tcpip_host;
+    form.elements.tcpip_port.value = state.readerSettings.tcpip_port;
+    form.elements.tcpip_remote_host.value = state.readerSettings.tcpip_remote_host;
+    form.elements.tcpip_remote_port.value = state.readerSettings.tcpip_remote_port;
+    form.elements.serial_port.value = state.readerSettings.serial_port;
+    form.elements.serial_baud.value = state.readerSettings.serial_baud;
+    form.elements.serial_data_bits.value = state.readerSettings.serial_data_bits;
+    form.elements.serial_parity.value = state.readerSettings.serial_parity;
+    form.elements.serial_stop_bits.value = state.readerSettings.serial_stop_bits;
+    form.elements.serial_flow_control.value = state.readerSettings.serial_flow_control;
+    form.elements.astm_checksum_mode.value = state.readerSettings.astm_checksum_mode || "astm";
+    form.elements.astm_trailer_mode.value = state.readerSettings.astm_trailer_mode || "crlf";
+    form.elements.file_import_dir.value = state.readerSettings.file_import_dir;
+    form.elements.file_processed_dir.value = state.readerSettings.file_processed_dir;
+    form.elements.file_failed_dir.value = state.readerSettings.file_failed_dir;
+    form.elements.file_pattern.value = state.readerSettings.file_pattern;
+    form.elements.logging_verbose_level.value = state.readerSettings.logging_verbose_level;
+    form.elements.results_auto_confirm_wisemed.value = state.readerSettings.results_auto_confirm_wisemed;
+    form.elements.wisemed_reagent_set_name.value = state.readerSettings.wisemed_reagent_set_name;
+    form.elements.app_updates_enabled.value = state.readerSettings.app_updates_enabled;
+    form.elements.app_updates_app_id.value = state.readerSettings.app_updates_app_id;
+    form.elements.app_updates_current_version.value = state.readerSettings.app_updates_current_version;
+    form.elements.app_updates_channel.value = state.readerSettings.app_updates_channel;
+    form.elements.app_updates_base_url.value = state.readerSettings.app_updates_base_url;
+    form.elements.app_updates_auto_download.value = state.readerSettings.app_updates_auto_download;
+    form.elements.app_updates_download_dir.value = state.readerSettings.app_updates_download_dir;
+    form.elements.result_sync_enabled.value = state.readerSettings.result_sync_enabled;
+    form.elements.result_sync_interval_minutes.value = state.readerSettings.result_sync_interval_minutes;
+    form.elements.result_sync_sample_prefixes.value = state.readerSettings.result_sync_sample_prefixes;
+    form.elements.result_sync_sample_suffixes.value = state.readerSettings.result_sync_sample_suffixes;
+    form.elements.result_sync_separators.value = state.readerSettings.result_sync_separators;
+    form.elements.result_sync_qc_prefixes.value = state.readerSettings.result_sync_qc_prefixes;
+    form.elements.protocol_subtype.value = state.readerSettings.protocol_subtype || "auto";
+    form.elements.labnovation_image_mode.value = state.readerSettings.labnovation_image_mode || "no_image";
+	form.elements.zonci_result_separator.value = state.readerSettings.zonci_result_separator || "VIRGULA";
+    syncReaderSettingsTransportFields();
+  }
+  els.repeatModeSelect.value = state.readerSettings.repeat_mode;
+  syncDeleteOrdersPreferenceControls();
+  await loadResultSyncStatus();
+  if (els.readerSettingsMessage) {
+    els.readerSettingsMessage.textContent = "";
+  }
+}
+
+async function onSaveReaderSettings(event) {
+  event.preventDefault();
+  if (!els.repeatModeSelect) return;
+  const form = els.readerSettingsForm;
+  const payload = {
+    reader_id: String(form.elements.reader_id.value || "").trim(),
+    reader_label: String(form.elements.reader_label.value || "").trim(),
+    analyzer_name: String(form.elements.analyzer_name.value || "").trim(),
+    analyzer_code: String(form.elements.analyzer_code.value || "").trim(),
+    db_name: String(form.elements.db_name.value || "").trim(),
+    sqlite_path: String(form.elements.sqlite_path.value || "").trim(),
+    local_http_address: String(form.elements.local_http_address.value || "").trim(),
+    local_http_language: String(form.elements.local_http_language.value || "ro").trim(),
+    local_http_tls: String(form.elements.local_http_tls.value || "false").trim(),
+    local_http_cors_allowed_origins: String(form.elements.local_http_cors_allowed_origins.value || "https://ldse.wisemed.eu").trim(),
+    analyzer_comm_type: String(form.elements.analyzer_comm_type.value || "").trim(),
+    analyzer_protocol: String(form.elements.analyzer_protocol.value || "").trim(),
+    tcpip_mode: String(form.elements.tcpip_mode.value || "server").trim(),
+    tcpip_host: String(form.elements.tcpip_host.value || "").trim(),
+    tcpip_port: String(form.elements.tcpip_port.value || "").trim(),
+    tcpip_remote_host: String(form.elements.tcpip_remote_host.value || "").trim(),
+    tcpip_remote_port: String(form.elements.tcpip_remote_port.value || "").trim(),
+    serial_port: String(form.elements.serial_port.value || "").trim(),
+    serial_baud: String(form.elements.serial_baud.value || "9600").trim(),
+    serial_data_bits: String(form.elements.serial_data_bits.value || "8").trim(),
+    serial_parity: String(form.elements.serial_parity.value || "none").trim(),
+    serial_stop_bits: String(form.elements.serial_stop_bits.value || "1").trim(),
+    serial_flow_control: String(form.elements.serial_flow_control.value || "none").trim(),
+    astm_checksum_mode: String(form.elements.astm_checksum_mode.value || "astm").trim(),
+    astm_trailer_mode: String(form.elements.astm_trailer_mode.value || "crlf").trim(),
+    file_import_dir: String(form.elements.file_import_dir.value || "./inbox").trim(),
+    file_processed_dir: String(form.elements.file_processed_dir.value || "./processed").trim(),
+    file_failed_dir: String(form.elements.file_failed_dir.value || "./failed").trim(),
+    file_pattern: String(form.elements.file_pattern.value || "*").trim(),
+    logging_verbose_level: String(form.elements.logging_verbose_level.value || "1").trim(),
+    results_auto_confirm_wisemed: String(form.elements.results_auto_confirm_wisemed.value || "false").trim(),
+    wisemed_reagent_set_name: String(form.elements.wisemed_reagent_set_name.value || "").trim(),
+    app_updates_enabled: String(form.elements.app_updates_enabled.value || "true").trim(),
+    app_updates_app_id: String(form.elements.app_updates_app_id.value || "").trim(),
+    app_updates_current_version: String(form.elements.app_updates_current_version.value || "0.0.0").trim(),
+    app_updates_channel: String(form.elements.app_updates_channel.value || "stable").trim(),
+    app_updates_base_url: String(form.elements.app_updates_base_url.value || "").trim(),
+    app_updates_auto_download: String(form.elements.app_updates_auto_download.value || "true").trim(),
+    app_updates_download_dir: String(form.elements.app_updates_download_dir.value || "./updates").trim(),
+    result_sync_enabled: String(form.elements.result_sync_enabled.value || "true").trim(),
+    result_sync_interval_minutes: String(form.elements.result_sync_interval_minutes.value || "5").trim(),
+    result_sync_sample_prefixes: String(form.elements.result_sync_sample_prefixes.value || "").trim(),
+    result_sync_sample_suffixes: String(form.elements.result_sync_sample_suffixes.value || "").trim(),
+    result_sync_separators: String(form.elements.result_sync_separators.value || "-").trim(),
+    result_sync_qc_prefixes: String(form.elements.result_sync_qc_prefixes.value || "").trim(),
+    protocol_subtype: String(form.elements.protocol_subtype.value || "").trim(),
+    labnovation_image_mode: String(form.elements.labnovation_image_mode.value || "no_image").trim(),
+	zonci_result_separator: String(form.elements.zonci_result_separator.value || "VIRGULA").trim(),
+    repeat_mode: String(els.repeatModeSelect.value || "individual"),
+  };
+  const resp = await api("/api/reader-settings", {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+  rememberDeleteOrdersConfirmPreference(Boolean(els.deleteOrdersPreference?.checked));
+  state.readerSettings = {
+    repeat_mode: String(resp.settings?.repeat_mode || payload.repeat_mode),
+    reader_id: String(resp.settings?.reader_id || payload.reader_id),
+    reader_label: String(resp.settings?.reader_label || payload.reader_label),
+    analyzer_name: String(resp.settings?.analyzer_name || payload.analyzer_name),
+    analyzer_code: String(resp.settings?.analyzer_code || payload.analyzer_code),
+    db_name: String(resp.settings?.db_name || payload.db_name),
+    sqlite_path: String(resp.settings?.sqlite_path || payload.sqlite_path),
+    local_http_address: String(resp.settings?.local_http_address || payload.local_http_address),
+    local_http_language: String(resp.settings?.local_http_language || payload.local_http_language),
+    local_http_tls: String(resp.settings?.local_http_tls || payload.local_http_tls),
+    local_http_cors_allowed_origins: String(resp.settings?.local_http_cors_allowed_origins || payload.local_http_cors_allowed_origins),
+    analyzer_comm_type: String(resp.settings?.analyzer_comm_type || payload.analyzer_comm_type),
+    analyzer_protocol: String(resp.settings?.analyzer_protocol || payload.analyzer_protocol),
+    available_comm_types: Array.isArray(resp.settings?.available_comm_types) ? resp.settings.available_comm_types : state.readerSettings.available_comm_types,
+    available_protocols: Array.isArray(resp.settings?.available_protocols) ? resp.settings.available_protocols : state.readerSettings.available_protocols,
+    available_tcpip_modes: Array.isArray(resp.settings?.available_tcpip_modes) ? resp.settings.available_tcpip_modes : state.readerSettings.available_tcpip_modes,
+    available_serial_bauds: Array.isArray(resp.settings?.available_serial_bauds) ? resp.settings.available_serial_bauds : state.readerSettings.available_serial_bauds,
+    available_serial_data_bits: Array.isArray(resp.settings?.available_serial_data_bits) ? resp.settings.available_serial_data_bits : state.readerSettings.available_serial_data_bits,
+    available_serial_parities: Array.isArray(resp.settings?.available_serial_parities) ? resp.settings.available_serial_parities : state.readerSettings.available_serial_parities,
+    available_serial_stop_bits: Array.isArray(resp.settings?.available_serial_stop_bits) ? resp.settings.available_serial_stop_bits : state.readerSettings.available_serial_stop_bits,
+    available_serial_flow_controls: Array.isArray(resp.settings?.available_serial_flow_controls) ? resp.settings.available_serial_flow_controls : state.readerSettings.available_serial_flow_controls,
+    available_astm_checksum_modes: Array.isArray(resp.settings?.available_astm_checksum_modes) ? resp.settings.available_astm_checksum_modes : state.readerSettings.available_astm_checksum_modes,
+    available_astm_trailer_modes: Array.isArray(resp.settings?.available_astm_trailer_modes) ? resp.settings.available_astm_trailer_modes : state.readerSettings.available_astm_trailer_modes,
+    tcpip_mode: String(resp.settings?.tcpip_mode || payload.tcpip_mode),
+    tcpip_host: String(resp.settings?.tcpip_host || payload.tcpip_host),
+    tcpip_port: String(resp.settings?.tcpip_port || payload.tcpip_port),
+    tcpip_remote_host: String(resp.settings?.tcpip_remote_host || payload.tcpip_remote_host),
+    tcpip_remote_port: String(resp.settings?.tcpip_remote_port || payload.tcpip_remote_port),
+    serial_port: String(resp.settings?.serial_port || payload.serial_port),
+    serial_baud: String(resp.settings?.serial_baud || payload.serial_baud),
+    serial_data_bits: String(resp.settings?.serial_data_bits || payload.serial_data_bits),
+    serial_parity: String(resp.settings?.serial_parity || payload.serial_parity),
+    serial_stop_bits: String(resp.settings?.serial_stop_bits || payload.serial_stop_bits),
+    serial_flow_control: String(resp.settings?.serial_flow_control || payload.serial_flow_control),
+    astm_checksum_mode: String(resp.settings?.astm_checksum_mode || payload.astm_checksum_mode),
+    astm_trailer_mode: String(resp.settings?.astm_trailer_mode || payload.astm_trailer_mode),
+    file_import_dir: String(resp.settings?.file_import_dir || payload.file_import_dir),
+    file_processed_dir: String(resp.settings?.file_processed_dir || payload.file_processed_dir),
+    file_failed_dir: String(resp.settings?.file_failed_dir || payload.file_failed_dir),
+    file_pattern: String(resp.settings?.file_pattern || payload.file_pattern),
+    logging_verbose_level: String(resp.settings?.logging_verbose_level || payload.logging_verbose_level),
+    results_auto_confirm_wisemed: String(resp.settings?.results_auto_confirm_wisemed || payload.results_auto_confirm_wisemed),
+    wisemed_reagent_set_name: String(resp.settings?.wisemed_reagent_set_name || payload.wisemed_reagent_set_name),
+    results_send_supported: Boolean(resp.settings?.results_send_supported),
+    app_updates_enabled: String(resp.settings?.app_updates_enabled || payload.app_updates_enabled),
+    app_updates_app_id: String(resp.settings?.app_updates_app_id || payload.app_updates_app_id),
+    app_updates_current_version: String(resp.settings?.app_updates_current_version || payload.app_updates_current_version),
+    app_updates_channel: String(resp.settings?.app_updates_channel || payload.app_updates_channel),
+    app_updates_base_url: String(resp.settings?.app_updates_base_url || payload.app_updates_base_url),
+    app_updates_auto_download: String(resp.settings?.app_updates_auto_download || payload.app_updates_auto_download),
+    app_updates_download_dir: String(resp.settings?.app_updates_download_dir || payload.app_updates_download_dir),
+    result_sync_enabled: String(resp.settings?.result_sync_enabled || payload.result_sync_enabled),
+    result_sync_interval_minutes: String(resp.settings?.result_sync_interval_minutes || payload.result_sync_interval_minutes),
+    result_sync_sample_prefixes: String(resp.settings?.result_sync_sample_prefixes || payload.result_sync_sample_prefixes),
+    result_sync_sample_suffixes: String(resp.settings?.result_sync_sample_suffixes || payload.result_sync_sample_suffixes),
+    result_sync_separators: String(resp.settings?.result_sync_separators || payload.result_sync_separators),
+    result_sync_qc_prefixes: String(resp.settings?.result_sync_qc_prefixes || payload.result_sync_qc_prefixes),
+    protocol_subtype: String(resp.settings?.protocol_subtype || payload.protocol_subtype),
+    labnovation_image_mode: String(resp.settings?.labnovation_image_mode || payload.labnovation_image_mode),
+    labnovation_enabled: Boolean(resp.settings?.labnovation_enabled),
+  };
+  els.repeatModeSelect.value = state.readerSettings.repeat_mode;
+  syncDeleteOrdersPreferenceControls();
+  syncReaderSettingsTransportFields();
+  if (els.readerSettingsMessage) {
+    els.readerSettingsMessage.textContent = t("readerSettingsSaved");
+  }
+  state.readerInfo = {
+    ...(state.readerInfo || {}),
+    id: state.readerSettings.reader_id || state.readerInfo?.id,
+    label: state.readerSettings.reader_label || state.readerInfo?.label,
+    analyzer_name: state.readerSettings.analyzer_name || state.readerInfo?.analyzer_name,
+    analyzer_code: state.readerSettings.analyzer_code || state.readerInfo?.analyzer_code,
+    comm_type: state.readerSettings.analyzer_comm_type || state.readerInfo?.comm_type,
+    protocol: state.readerSettings.analyzer_protocol || state.readerInfo?.protocol,
+    protocol_subtype: state.readerSettings.protocol_subtype || state.readerInfo?.protocol_subtype,
+    repeat_mode: state.readerSettings.repeat_mode,
+    app_version: state.readerSettings.app_updates_current_version || state.readerInfo?.app_version,
+  };
+  state.appUpdateSettings = {
+    enabled: state.readerSettings.app_updates_enabled,
+    app_id: state.readerSettings.app_updates_app_id,
+    current_version: state.readerSettings.app_updates_current_version,
+    channel: state.readerSettings.app_updates_channel,
+    base_url: state.readerSettings.app_updates_base_url,
+    auto_download: state.readerSettings.app_updates_auto_download,
+    download_dir: state.readerSettings.app_updates_download_dir,
+  };
+  state.resultsDelivery = {
+    ...(state.resultsDelivery || {}),
+    auto_confirm_wisemed: state.readerSettings.results_auto_confirm_wisemed === "true",
+    send_supported: Boolean(state.readerSettings.results_send_supported),
+  };
+  syncAppVersionUI();
+  refreshAppUpdateStatus(true).catch(() => {});
+  syncOrderControls();
+  if (state.readerSettings.local_http_language && state.readerSettings.local_http_language !== state.language) {
+    state.language = state.readerSettings.local_http_language;
+    syncLanguageControls();
+    applyLanguage();
+  }
+  showToast(t("readerSettingsSaved"), "success");
+  await loadResultSyncStatus();
+}
+
+function fillSelect(select, values, currentValue) {
+  if (!select) return;
+  const options = Array.isArray(values) && values.length ? values : [currentValue || ""];
+  select.innerHTML = options.map((value) => `<option value="${escapeHtml(String(value || ""))}">${escapeHtml(String(value || ""))}</option>`).join("");
+  select.value = currentValue || options[0] || "";
+}
+
+function syncReaderSettingsTransportFields() {
+  const form = els.readerSettingsForm;
+  if (!form) return;
+  const commType = String(form.elements.analyzer_comm_type.value || state.readerSettings.analyzer_comm_type || "").toLowerCase();
+  const tcpMode = String(form.elements.tcpip_mode.value || state.readerSettings.tcpip_mode || "server").toLowerCase();
+  const analyzerProtocol = String(form.elements.analyzer_protocol.value || state.readerSettings.analyzer_protocol || "").toLowerCase();
+  const tcpModeRow = document.getElementById("reader-settings-tcp-mode-row");
+  const tcpServerRow = document.getElementById("reader-settings-tcp-server-row");
+  const tcpClientRow = document.getElementById("reader-settings-tcp-client-row");
+  const serialRow = document.getElementById("reader-settings-serial-row");
+  const astmFramingRow = document.getElementById("reader-settings-astm-framing-row");
+  const astmSpecimenRow = document.getElementById("reader-settings-astm-specimen-row");
+  const astmSpecimenSettingsLink = document.getElementById("astm-specimen-settings-link");
+	const zonciSeparatorRow = document.getElementById("reader-settings-zonci-separator-row");
+  const fileRow = document.getElementById("reader-settings-file-row");
+  const labnovationImageRow = document.getElementById("reader-settings-labnovation-image-row");
+  const showTCP = commType === "tcpip";
+  const showFile = commType === "file";
+	const showSerial = commType === "serial";
+  const usesASTM = analyzerProtocol === "astm" || analyzerProtocol === "horiba-abx-pentra400";
+  const showASTMFraming = showTCP && analyzerProtocol === "astm";
+  const showLabnovationImage = analyzerProtocol === "labnovation-ld560";
+	const showZonciSeparator = analyzerProtocol === "zonci-xl1000i";
+  if (tcpModeRow) tcpModeRow.hidden = !showTCP;
+  if (tcpServerRow) tcpServerRow.hidden = !showTCP || tcpMode === "client";
+  if (tcpClientRow) tcpClientRow.hidden = !showTCP || tcpMode !== "client";
+	if (serialRow) serialRow.hidden = !showSerial;
+  if (astmFramingRow) astmFramingRow.hidden = !showASTMFraming;
+  if (astmSpecimenRow) astmSpecimenRow.hidden = !usesASTM;
+  if (astmSpecimenSettingsLink) astmSpecimenSettingsLink.hidden = !usesASTM;
+  if (fileRow) fileRow.hidden = !showFile;
+  if (labnovationImageRow) labnovationImageRow.hidden = !showLabnovationImage;
+	if (zonciSeparatorRow) zonciSeparatorRow.hidden = !showZonciSeparator;
+}
+
+async function loadResultSyncStatus() {
+  if (!els.resultSyncStatus && !els.resultSyncStatusLabel) return;
+  try {
+    const resp = await api("/api/result-sync/status");
+    const parts = [];
+    parts.push(resp.running ? "ruleaza" : "idle");
+    parts.push(`interval ${resp.interval_minutes || 5} min`);
+    if (resp.last_run_at) parts.push(`ultima rulare ${formatDate(resp.last_run_at)}`);
+    if (resp.last_summary?.matched !== undefined) {
+      parts.push(`matched ${resp.last_summary.matched || 0}/${resp.last_summary.processed || 0}`);
+    }
+    if (resp.last_error) parts.push(`eroare: ${resp.last_error}`);
+    if (els.resultSyncStatus) els.resultSyncStatus.textContent = parts.join(" • ");
+    if (els.resultSyncStatusLabel) {
+      const timer = formatNextSyncCountdown(resp.next_run_at);
+      els.resultSyncStatusLabel.textContent = `${t("wisemedMatchTimer")} · ${timer}`;
+    }
+  } catch (error) {
+    if (els.resultSyncStatus) els.resultSyncStatus.textContent = error?.message || "Nu se poate incarca statusul sincronizarii";
+    if (els.resultSyncStatusLabel) els.resultSyncStatusLabel.textContent = `${t("wisemedMatchTimer")} · --:--`;
+  }
+}
+
+async function onRunResultSync() {
+  try {
+    const resp = await api("/api/result-sync/run", { method: "POST" });
+    await loadResultSyncStatus();
+    showToast(`Sync rulat: ${resp.summary?.matched || 0} match-uri`, "success");
+  } catch (error) {
+    showToast(error?.message || "Nu se poate rula sincronizarea", "error");
+  }
+}
+
+async function onResetResultSync() {
+  try {
+    await api("/api/result-sync/reset", { method: "POST" });
+    await loadResultSyncStatus();
+    showToast("Status sincronizare resetat", "success");
+  } catch (error) {
+    showToast(error?.message || "Nu se poate reseta sincronizarea", "error");
+  }
+}
+
+async function loadBarcodeSettingsView() {
+  if (!state.barcodeMode || !els.settingsPanelAnalytes) return;
+  const [settingsResp, printersResp, updateResp] = await Promise.all([
+    api("/api/barcode/settings"),
+    api("/api/barcode/printers").catch(() => ({ printers: [] })),
+    api("/api/app-update/settings").catch(() => ({ settings: {} })),
+  ]);
+  state.barcodeSettings = settingsResp.settings || {};
+  state.barcodePrinters = printersResp.printers || [];
+  state.appUpdateSettings = updateResp.settings || state.appUpdateSettings || {};
+  const selectedProfile = normalizeBarcodeEndpointProfile(state.barcodeSettingsViewProfile || state.barcodeSettings.print_profile || "barcode-legacy");
+  state.barcodeSettingsViewProfile = selectedProfile;
+  const sections = activeBarcodeSections(selectedProfile);
+  const values = buildBarcodeSettingsState(state.barcodeSettings, selectedProfile);
+  els.settingsPanelAnalytes.innerHTML = `
+    <div class="orders-toolbar">
+      <div class="orders-buttons">
+        <select id="barcode-settings-profile" class="ghost">
+          ${BARCODE_ENDPOINT_OPTIONS.map(([value, label]) => `<option value="${escapeHtml(value)}" ${value === selectedProfile ? "selected" : ""}>${escapeHtml(label)}</option>`).join("")}
+        </select>
+        <button id="barcode-settings-save" class="ghost">Salveaza</button>
+        <button id="barcode-settings-test" class="ghost">Test print</button>
+        <button id="barcode-settings-refresh" class="ghost">Refresh</button>
+      </div>
+    </div>
+    <div class="barcode-settings-layout">
+      <div class="table-wrap barcode-settings-form">
+        ${sections.map((section) => `
+          <section class="barcode-settings-section">
+            <h3>${escapeHtml(section.title)}</h3>
+            <div class="barcode-settings-grid">
+              ${section.fields.map((field) => renderBarcodeField(field, values, state.barcodePrinters)).join("")}
+            </div>
+          </section>`).join("")}
+        <section class="barcode-settings-section">
+          <h3>Update server</h3>
+          <div class="barcode-settings-grid">
+            ${renderBarcodeUpdateField("Update enabled", "enabled", state.appUpdateSettings.enabled || "true", "select", [["true", "Da"], ["false", "Nu"]])}
+            ${renderBarcodeUpdateField("App ID update", "app_id", state.appUpdateSettings.app_id || state.readerInfo?.id || "")}
+            ${renderBarcodeUpdateField("Versiune curenta", "current_version", state.appUpdateSettings.current_version || state.readerInfo?.app_version || "0.0.0")}
+            ${renderBarcodeUpdateField("Canal", "channel", state.appUpdateSettings.channel || "stable", "select", [["stable", "stable"]])}
+            ${renderBarcodeUpdateField("Update server URL", "base_url", state.appUpdateSettings.base_url || "", "text", null, 2)}
+            ${renderBarcodeUpdateField("Auto download", "auto_download", state.appUpdateSettings.auto_download || "true", "select", [["true", "Da"], ["false", "Nu"]])}
+            ${renderBarcodeUpdateField("Director download update", "download_dir", state.appUpdateSettings.download_dir || "./updates", "text", null, 2)}
+          </div>
+        </section>
+      </div>
+      <aside class="panel barcode-preview-panel">
+        <div class="panel-head">
+          <h3>Preview eticheta</h3>
+        </div>
+        <div id="barcode-preview" class="barcode-preview"></div>
+      </aside>
+    </div>
+  `;
+
+  const collect = () => {
+    const out = { ...state.barcodeSettings };
+    const preview = {};
+    els.settingsPanelAnalytes.querySelectorAll("[data-setting-key]").forEach((node) => {
+      const key = node.getAttribute("data-setting-key");
+      const baseKey = node.getAttribute("data-base-key");
+      if (!key) return;
+      out[key] = node.value ?? "";
+      if (baseKey) preview[baseKey] = node.value ?? "";
+    });
+    if (!isPostaRomanaBarcodeProfile(selectedProfile)) {
+      preview.othercfg_printer_type = preview.bcp_type || "zebrazpl";
+      preview.othercfg_bc_width = preview.othercfg_print_bcodeopt_w || preview.othercfg_bc_width || "2";
+    }
+    return { payload: out, preview };
+  };
+  const collectUpdate = () => {
+    const out = {};
+    els.settingsPanelAnalytes.querySelectorAll("[data-update-setting-key]").forEach((node) => {
+      const key = node.getAttribute("data-update-setting-key");
+      if (!key) return;
+      out[key] = node.value ?? "";
+    });
+    return out;
+  };
+
+  const profileSelect = document.getElementById("barcode-settings-profile");
+  const saveBtn = document.getElementById("barcode-settings-save");
+  const testBtn = document.getElementById("barcode-settings-test");
+  const refreshBtn = document.getElementById("barcode-settings-refresh");
+  const bindRerender = () => {
+    applyBarcodeFieldVisibility(selectedProfile);
+    renderBarcodeSettingsPreview(collect().preview, selectedProfile);
+  };
+
+  els.settingsPanelAnalytes.querySelectorAll("[data-setting-key]").forEach((node) => {
+    node.addEventListener("input", bindRerender);
+    node.addEventListener("change", bindRerender);
+  });
+  els.settingsPanelAnalytes.querySelectorAll("[data-setting-upload]").forEach((node) => {
+    node.addEventListener("change", async () => {
+      const storageKey = node.getAttribute("data-setting-upload");
+      const hidden = storageKey ? els.settingsPanelAnalytes.querySelector(`[data-setting-key="${storageKey}"]`) : null;
+      const field = node.closest(".barcode-field");
+      const file = node.files && node.files[0];
+      if (!hidden || !file) return;
+      try {
+        hidden.value = await readFileAsDataURL(file);
+        let previewHost = field?.querySelector(".barcode-logo-preview");
+        if (!previewHost && field) {
+          field.insertAdjacentHTML("beforeend", `<div class="barcode-logo-preview"><img src="${escapeHtml(hidden.value)}" alt="Logo preview"></div>`);
+          previewHost = field.querySelector(".barcode-logo-preview");
+        }
+        const img = previewHost?.querySelector("img");
+        if (img) img.src = hidden.value;
+        bindRerender();
+      } catch (error) {
+        showToast(error?.message || "Nu se poate citi logo-ul", "error");
+      }
+    });
+  });
+  els.settingsPanelAnalytes.querySelectorAll("[data-setting-clear]").forEach((node) => {
+    node.addEventListener("click", () => {
+      const storageKey = node.getAttribute("data-setting-clear");
+      const hidden = storageKey ? els.settingsPanelAnalytes.querySelector(`[data-setting-key="${storageKey}"]`) : null;
+      const fileInput = storageKey ? els.settingsPanelAnalytes.querySelector(`[data-setting-upload="${storageKey}"]`) : null;
+      const previewHost = node.closest(".barcode-field")?.querySelector(".barcode-logo-preview");
+      if (hidden) hidden.value = "";
+      if (fileInput) fileInput.value = "";
+      if (previewHost) previewHost.remove();
+      bindRerender();
+    });
+  });
+  if (profileSelect) {
+    profileSelect.addEventListener("change", async () => {
+      state.barcodeSettingsViewProfile = normalizeBarcodeEndpointProfile(profileSelect.value);
+      await loadBarcodeSettingsView();
+    });
+  }
+
+  if (saveBtn) {
+    saveBtn.addEventListener("click", async () => {
+      try {
+        setButtonLoading(saveBtn, true);
+        const payload = collect().payload;
+        const updatePayload = collectUpdate();
+        const settingsResp = await api("/api/barcode/settings", {
+          method: "PUT",
+          body: JSON.stringify(payload),
+        });
+        const updateResp = await api("/api/app-update/settings", {
+          method: "PUT",
+          body: JSON.stringify(updatePayload),
+        });
+        state.barcodeSettings = settingsResp.settings || payload;
+        state.appUpdateSettings = updateResp.settings || { ...state.appUpdateSettings, ...updatePayload };
+        state.readerInfo = { ...(state.readerInfo || {}), app_version: updatePayload.current_version || state.readerInfo?.app_version };
+        syncAppVersionUI();
+        refreshAppUpdateStatus(true).catch(() => {});
+        await loadBarcodeSettingsView();
+        showToast("Setari salvate", "success");
+      } finally {
+        setButtonLoading(saveBtn, false);
+      }
+    });
+  }
+  if (testBtn) {
+    testBtn.addEventListener("click", async () => {
+      try {
+        setButtonLoading(testBtn, true);
+        await api("/api/barcode/test-print", { method: "POST", body: JSON.stringify({ profile: selectedProfile }) });
+        showToast("Test print trimis", "success");
+      } finally {
+        setButtonLoading(testBtn, false);
+      }
+    });
+  }
+  if (refreshBtn) {
+    refreshBtn.addEventListener("click", async () => {
+      try {
+        setButtonLoading(refreshBtn, true);
+        await loadBarcodeSettingsView();
+      } catch (e) {
+        showToast(e.message || "Refresh failed", "error");
+      } finally {
+        setButtonLoading(refreshBtn, false);
+      }
+    });
+  }
+  bindRerender();
+}
+
+function buildBarcodeSettingsState(current = {}, profile = "barcode-legacy") {
+  const values = {};
+  activeBarcodeSections(profile).forEach((section) => {
+    section.fields.forEach((field) => {
+      const storageKey = barcodeProfileStorageKey(profile, field.key);
+      values[storageKey] = current[storageKey] ?? current[field.key] ?? field.default ?? "";
+    });
+  });
+  Object.entries(current || {}).forEach(([key, value]) => {
+    if (key === "auth_username" || key === "auth_password" || key === "log_db_path") return;
+    if (!(key in values)) values[key] = value ?? "";
+  });
+  return values;
+}
+
+function normalizeBarcodeEndpointProfile(profile) {
+  switch (String(profile || "").trim()) {
+    case "barcode-api":
+    case "posta-romana-legacy":
+    case "posta-romana-api":
+      return String(profile).trim();
+    case "barcode":
+    case "barcode-legacy":
+    default:
+      return "barcode-legacy";
+  }
+}
+
+function isPostaRomanaBarcodeProfile(profile) {
+  return profile === "posta-romana-legacy" || profile === "posta-romana-api";
+}
+
+function barcodeProfileStoragePrefix(profile) {
+  switch (profile) {
+    case "barcode-legacy":
+    case "barcode-api":
+      return "ep_barcode__";
+    case "posta-romana-legacy":
+    case "posta-romana-api":
+      return "ep_posta__";
+    default:
+      return "ep_barcode__";
+  }
+}
+
+function barcodeProfileStorageKey(profile, baseKey) {
+  if (baseKey.startsWith("local_http_")) return baseKey;
+  return `${barcodeProfileStoragePrefix(profile)}${baseKey}`;
+}
+
+function activeBarcodeSections(profile) {
+  const endpointSections = isPostaRomanaBarcodeProfile(profile) ? POSTA_ROMANA_FIELD_SECTIONS : BARCODE_FIELD_SECTIONS.slice(0, 3);
+  const localHTTPSections = BARCODE_FIELD_SECTIONS.slice(3);
+  return endpointSections
+    .concat(localHTTPSections)
+    .map((section) => ({
+      ...section,
+      fields: section.fields.map((field) => ({
+        ...field,
+        baseKey: field.key,
+        storageKey: barcodeProfileStorageKey(profile, field.key),
+      })),
+    }));
+}
+
+function renderBarcodeField(field, values, printers) {
+  const storageKey = field.storageKey || field.key;
+  const baseKey = field.baseKey || field.key;
+  const current = String(values[storageKey] ?? field.default ?? "");
+  const showFor = field.showFor ? field.showFor.join(",") : "";
+  const style = field.span === 2 ? "grid-column:span 2;" : field.span === 3 ? "grid-column:span 3;" : "";
+  if (field.type === "group-title") {
+    return `<div class="barcode-field-group-title" data-key="${escapeHtml(storageKey)}" data-base-key="${escapeHtml(baseKey)}" style="${style}"><span>${escapeHtml(field.label)}</span></div>`;
+  }
+  let control = "";
+  if (field.type === "printer-select") {
+    const listID = `printer-options-${escapeHtml(storageKey)}`;
+    const options = printers.map((name) => `<option value="${escapeHtml(name)}"></option>`).join("");
+    control = [
+      `<input data-setting-key="${escapeHtml(storageKey)}" data-base-key="${escapeHtml(baseKey)}" value="${escapeHtml(current)}" list="${listID}" placeholder="\\\\server\\printer sau nume local">`,
+      `<datalist id="${listID}">${options}</datalist>`,
+      `<small>Puteti selecta din lista sau introduce manual numele exact al imprimantei shared.</small>`,
+    ].join("");
+  } else if (field.type === "image-upload") {
+    const preview = current
+      ? `<div class="barcode-logo-preview"><img src="${escapeHtml(current)}" alt="Logo preview"></div><small>Logo incarcat. Selectati alt fisier pentru inlocuire sau Clear pentru stergere.</small>`
+      : `<small>Accepta PNG, JPG sau GIF. Imaginea se salveaza in setari.</small>`;
+    control = [
+      `<input type="file" accept="image/png,image/jpeg,image/gif" data-setting-upload="${escapeHtml(storageKey)}" data-base-key="${escapeHtml(baseKey)}">`,
+      `<input type="hidden" data-setting-key="${escapeHtml(storageKey)}" data-base-key="${escapeHtml(baseKey)}" value="${escapeHtml(current)}">`,
+      `<div class="inline-actions"><button type="button" class="ghost" data-setting-clear="${escapeHtml(storageKey)}">Clear</button></div>`,
+      preview,
+    ].join("");
+  } else if (field.type === "select") {
+    control = `<select data-setting-key="${escapeHtml(storageKey)}" data-base-key="${escapeHtml(baseKey)}">${(field.options || []).map(([value, label]) => `<option value="${escapeHtml(value)}" ${value === current ? "selected" : ""}>${escapeHtml(label)}</option>`).join("")}</select>`;
+  } else {
+    const inputMode = field.type === "number" ? `inputmode="decimal"` : "";
+    control = `<input ${inputMode} data-setting-key="${escapeHtml(storageKey)}" data-base-key="${escapeHtml(baseKey)}" value="${escapeHtml(current)}">`;
+  }
+  return `<label class="barcode-field" data-key="${escapeHtml(storageKey)}" data-base-key="${escapeHtml(baseKey)}" data-show-for="${escapeHtml(showFor)}" style="${style}"><span>${escapeHtml(field.label)}</span>${control}</label>`;
+}
+
+function renderBarcodeUpdateField(label, key, current, type = "text", options = null, span = 1) {
+  const style = span === 2 ? "grid-column:span 2;" : "";
+  let control = "";
+  if (type === "select" && Array.isArray(options)) {
+    control = `<select data-update-setting-key="${escapeHtml(key)}">${options.map(([value, text]) => `<option value="${escapeHtml(value)}" ${String(current) === String(value) ? "selected" : ""}>${escapeHtml(text)}</option>`).join("")}</select>`;
+  } else {
+    control = `<input type="${escapeHtml(type)}" data-update-setting-key="${escapeHtml(key)}" value="${escapeHtml(current || "")}">`;
+  }
+  return `<label class="barcode-field" style="${style}"><span>${escapeHtml(label)}</span>${control}</label>`;
+}
+
+function applyBarcodeFieldVisibility(profile = "barcode-legacy") {
+  if (isPostaRomanaBarcodeProfile(profile)) {
+    els.settingsPanelAnalytes.querySelectorAll(".barcode-field").forEach((node) => {
+      const showFor = String(node.dataset.showFor || "").trim();
+      if (showFor) node.hidden = false;
+    });
+    return;
+  }
+  const type = String(els.settingsPanelAnalytes.querySelector('[data-base-key="othercfg_printer_barcode"]')?.value || "B3");
+  els.settingsPanelAnalytes.querySelectorAll(".barcode-field").forEach((node) => {
+    const showFor = String(node.dataset.showFor || "").trim();
+    node.hidden = !!showFor && !showFor.split(",").includes(type);
+  });
+}
+
+function renderBarcodeSettingsPreview(settings, profile = "barcode-legacy") {
+  const host = document.getElementById("barcode-preview");
+  if (!host) return;
+  if (isPostaRomanaBarcodeProfile(profile)) {
+    host.innerHTML = `
+      <div class="barcode-preview-meta">
+        <span>Posta Romana</span>
+        <span>${escapeHtml(`${settings.pr_label_width_mm || "100"}mm x ${settings.pr_label_height_mm || "150"}mm`)}</span>
+      </div>
+      <div class="empty-state">Preview-ul vizual pentru acest endpoint nu este generat aici. Foloseste "Test print" pentru verificare rapida.</div>
+    `;
+    return;
+  }
+  const dpi = Math.max(200, parseInt(settings.othercfg_printer_resolution || "200", 10) || 200);
+  const labelWidthMM = Math.max(20, parseFloat(settings.othercfg_label_width || 35) || 35);
+  const labelHeightMM = Math.max(15, parseFloat(settings.othercfg_label_height || 25) || 25);
+  const labelWidthDots = Math.max(120, mmToDots(labelWidthMM, dpi));
+  const labelHeightDots = Math.max(80, mmToDots(labelHeightMM, dpi));
+  const maxWidth = 380;
+  const scale = Math.min(maxWidth / labelWidthDots, 2.25);
+  const widthPx = Math.round(labelWidthDots * scale);
+  const heightPx = Math.round(labelHeightDots * scale);
+  const originX = dotsToPreviewPx(mmToDots(settings.othercfg_label_ox || 0, dpi), scale);
+  const originY = dotsToPreviewPx(mmToDots(settings.othercfg_label_oy || 0, dpi), scale);
+  const barcodeX = originX + dotsToPreviewPx(mmToDots(settings.othercfg_print_bcodex || 0, dpi), scale);
+  const barcodeY = originY + dotsToPreviewPx(mmToDots(settings.othercfg_print_bcodey || 0, dpi), scale);
+  const barcodeTextX = originX + dotsToPreviewPx(mmToDots(settings.othercfg_print_bcodetxtx || 0, dpi), scale);
+  const barcodeTextY = originY + dotsToPreviewPx(mmToDots(settings.othercfg_print_bcodetxty || 0, dpi), scale);
+  const patientX = originX + dotsToPreviewPx(mmToDots(settings.othercfg_print_namex || 0, dpi), scale);
+  const patientY = originY + dotsToPreviewPx(mmToDots(settings.othercfg_print_namey || 0, dpi), scale);
+  const tubeX = originX + dotsToPreviewPx(mmToDots(settings.othercfg_print_tubecodex || 0, dpi), scale);
+  const tubeY = originY + dotsToPreviewPx(mmToDots(settings.othercfg_print_tubecodey || 0, dpi), scale);
+  const tubeW = Math.max(12, dotsToPreviewPx(mmToDots(settings.othercfg_print_tubecode_boxw || 0, dpi), scale));
+  const tubeH = Math.max(12, dotsToPreviewPx(mmToDots(settings.othercfg_print_tubecode_boxh || 0, dpi), scale));
+  const barcodeType = String(settings.othercfg_printer_barcode || "B3");
+  const barcodeValue = "240015990123";
+  const patientName = "Popescu Ion";
+  const tubeCode = "A";
+  const barcodeGraphic = isMatrixBarcode(barcodeType)
+    ? renderMatrixBarcodePreview(barcodeType, barcodeX, barcodeY, barcodeValue, scale, settings, dpi)
+    : renderLinearBarcodePreview(barcodeType, barcodeX, barcodeY, barcodeValue, scale, settings, dpi);
+  const patientFont = previewFontSpec(settings.othercfg_print_namef, settings.othercfg_print_namew, settings.othercfg_print_nameh, scale);
+  const barcodeTextFont = previewFontSpec(settings.othercfg_print_bcodetxtf, settings.othercfg_print_bcodetxtw, settings.othercfg_print_bcodetxth, scale);
+  const tubeFont = previewFontSpec(settings.othercfg_print_tubecodef, settings.othercfg_print_tubecodew, settings.othercfg_print_tubecodeh, scale);
+  host.innerHTML = `
+    <div class="barcode-preview-meta">
+      <span>${escapeHtml((BARCODE_TYPE_OPTIONS.find(([value]) => value === barcodeType) || [barcodeType, barcodeType])[1])}</span>
+      <span>${escapeHtml(`${labelWidthMM}mm x ${labelHeightMM}mm`)}</span>
+    </div>
+    <svg viewBox="0 0 ${widthPx} ${heightPx}" class="barcode-preview-svg" preserveAspectRatio="xMidYMid meet">
+      <rect x="1" y="1" width="${Math.max(0, widthPx - 2)}" height="${Math.max(0, heightPx - 2)}" rx="12" ry="12" fill="#fffefb" stroke="#cad6ce" stroke-width="2"></rect>
+      ${barcodeGraphic}
+      ${renderPreviewText(patientName, patientX, patientY, settings.othercfg_print_nameo, patientFont)}
+      ${renderPreviewText(barcodeValue, barcodeTextX, barcodeTextY, settings.othercfg_print_bcodetxto, barcodeTextFont)}
+      <rect x="${tubeX}" y="${tubeY}" width="${tubeW}" height="${tubeH}" rx="${Math.min(8, parseInt(settings.othercfg_print_tubecode_boxr || 4, 10) || 4)}" ry="${Math.min(8, parseInt(settings.othercfg_print_tubecode_boxr || 4, 10) || 4)}" fill="${String(settings.othercfg_print_tubecode_boxc || "B") === "W" ? "#fff" : "#111"}" stroke="#111" stroke-width="${Math.max(1, parseInt(settings.othercfg_print_tubecode_boxt || 1, 10) || 1)}"></rect>
+      ${renderPreviewText(tubeCode, tubeX + 8, tubeY + tubeH - 6, settings.othercfg_print_tubecodeo, tubeFont, String(settings.othercfg_print_tubecode_boxc || "B") === "W" ? "#111" : "#fff")}
+    </svg>
+  `;
+}
+
+function mmToDots(value, dpi) {
+  const mm = parseFloat(value || 0) || 0;
+  return Math.round(mm * dpi / 25.4);
+}
+
+function isMatrixBarcode(type) {
+  return ["B0", "BQ", "BX", "BD", "B7", "BF", "BB"].includes(String(type || ""));
+}
+
+function dotsToPreviewPx(value, scale) {
+  return Math.round((Number(value || 0) || 0) * scale);
+}
+
+function renderLinearBarcodePreview(type, x, y, value, scale, settings, dpi) {
+  const encoded = encodeLinearBarcode(type, value, settings);
+  const narrowDot = Math.max(1, parseInt(settings.othercfg_print_bcodeopt_w || settings.othercfg_print_bcodeopt_nbw || "2", 10) || 2);
+  const wideRatio = Math.max(2, parseFloat(settings.othercfg_bc_widenarowr || settings.othercfg_print_bcodeopt_ctnwn || "3.0") || 3);
+  const modulePx = Math.max(1, dotsToPreviewPx(narrowDot, scale));
+  const barHeight = Math.max(24, dotsToPreviewPx(parseInt(settings.othercfg_print_bcodeopt_h || "100", 10) || 100, scale));
+  if (!encoded) {
+    return renderPseudoLinearBarcode(x, y, value, modulePx, barHeight);
+  }
+  let cursor = x;
+  const bars = [];
+  for (const item of encoded) {
+    const widthModules = item === "w" ? wideRatio : 1;
+    const segmentPx = Math.max(1, Math.round(modulePx * widthModules));
+    if (item !== "0" && item !== "n") {
+      bars.push(`<rect x="${cursor}" y="${y}" width="${segmentPx}" height="${barHeight}" fill="#111"></rect>`);
+    }
+    cursor += segmentPx;
+  }
+  return `<g>${bars.join("")}</g>`;
+}
+
+function renderPseudoLinearBarcode(x, y, value, modulePx, barHeight) {
+  const bars = [];
+  let cursor = x;
+  const source = `${value}WM`;
+  for (let i = 0; i < source.length; i += 1) {
+    const code = source.charCodeAt(i);
+    for (let bit = 0; bit < 7; bit += 1) {
+      const on = ((code >> bit) & 1) === 1;
+      const w = on ? modulePx * 2 : modulePx;
+      if (on) bars.push(`<rect x="${cursor}" y="${y}" width="${w}" height="${barHeight}" fill="#111"></rect>`);
+      cursor += w + 1;
+    }
+    cursor += modulePx;
+  }
+  return `<g>${bars.join("")}</g>`;
+}
+
+function renderMatrixBarcodePreview(type, x, y, value, scale, settings) {
+  const quality = Math.max(6, parseInt(settings.othercfg_print_bcodeopt_dmq || "0", 10) || 14);
+  const size = Math.max(4, Math.round(scale * Math.max(0.8, quality / 120)));
+  const cells = [];
+  const seed = `${type}:${value}:PREVIEW`;
+  for (let row = 0; row < 14; row += 1) {
+    for (let col = 0; col < 14; col += 1) {
+      const idx = (row * 14 + col) % seed.length;
+      const on = ((seed.charCodeAt(idx) + row * 13 + col * 7) % 3) !== 0;
+      if (on) cells.push(`<rect x="${x + col * size}" y="${y + row * size}" width="${size - 1}" height="${size - 1}" fill="#111"></rect>`);
+    }
+  }
+  return `<g>${cells.join("")}</g>`;
+}
+
+function renderPreviewText(text, x, y, orientation, font, fill = "#111") {
+  const safe = escapeHtml(text);
+  const size = Math.max(6, Number(font.size || 12));
+  const family = font.family || "Arial, sans-serif";
+  const weight = font.weight || "500";
+  const stretch = Math.max(0.4, Number(font.stretch || 1));
+  const transformScale = stretch === 1 ? "" : ` scale(${stretch} 1)`;
+  const baseAttrs = `fill="${fill}" font-size="${size}" font-family="${family}" font-weight="${weight}" textLength="${Math.max(size, size * Math.max(1, text.length * stretch * 0.6))}" lengthAdjust="spacingAndGlyphs"`;
+  if (orientation === "R") {
+    return `<text x="${x}" y="${y}" ${baseAttrs} transform="rotate(90 ${x} ${y})${transformScale}">${safe}</text>`;
+  }
+  if (orientation === "I") {
+    return `<text x="${x}" y="${y}" ${baseAttrs} transform="rotate(180 ${x} ${y})${transformScale}">${safe}</text>`;
+  }
+  if (orientation === "B") {
+    return `<text x="${x}" y="${y}" ${baseAttrs} transform="rotate(-90 ${x} ${y})${transformScale}">${safe}</text>`;
+  }
+  return `<text x="${x}" y="${y}" ${baseAttrs} transform="${transformScale.trim()}">${safe}</text>`;
+}
+
+function previewFontSpec(fontCode, widthDots, heightDots, scale) {
+  const size = Math.max(7, dotsToPreviewPx(parseInt(heightDots || "18", 10) || 18, scale));
+  const stretch = Math.max(0.55, (parseInt(widthDots || "12", 10) || 12) / Math.max(1, parseInt(heightDots || "18", 10) || 18));
+  const code = String(fontCode || "A").toUpperCase();
+  const map = {
+    A: { family: "Arial, Helvetica, sans-serif", weight: "500" },
+    B: { family: "\"Arial Narrow\", Arial, Helvetica, sans-serif", weight: "700" },
+    C: { family: "\"Courier New\", monospace", weight: "700" },
+    D: { family: "\"OCR-B\", \"Courier New\", monospace", weight: "500" },
+    E: { family: "Georgia, serif", weight: "600" },
+    F: { family: "\"Helvetica Neue\", Arial, sans-serif", weight: "400" },
+    G: { family: "\"Trebuchet MS\", Arial, sans-serif", weight: "700" },
+    H: { family: "\"Times New Roman\", serif", weight: "700" },
+    "0": { family: "\"Courier New\", monospace", weight: "500" },
+  };
+  return { ...(map[code] || map.A), size, stretch };
+}
+
+function encodeLinearBarcode(type, value, settings) {
+  switch (String(type || "")) {
+    case "BE":
+      return encodeEAN13(value);
+    case "B8":
+      return encodeEAN8(value);
+    case "BU":
+      return encodeUPCA(value);
+    case "B3":
+    case "BL":
+    case "BT":
+      return encodeCode39(value, settings);
+    case "BK":
+      return encodeCodabar(value, settings);
+    default:
+      return null;
+  }
+}
+
+function encodeEAN13(value) {
+  const digits = String(value || "").replace(/\D/g, "");
+  const normalized = digits.length >= 13 ? digits.slice(0, 13) : digits.length === 12 ? `${digits}${eanChecksum(digits)}` : "2400159901238";
+  const parity = ["LLLLLL","LLGLGG","LLGGLG","LLGGGL","LGLLGG","LGGLLG","LGGGLL","LGLGLG","LGLGGL","LGGLGL"][Number(normalized[0])];
+  const L = ["0001101","0011001","0010011","0111101","0100011","0110001","0101111","0111011","0110111","0001011"];
+  const G = ["0100111","0110011","0011011","0100001","0011101","0111001","0000101","0010001","0001001","0010111"];
+  const R = ["1110010","1100110","1101100","1000010","1011100","1001110","1010000","1000100","1001000","1110100"];
+  let pattern = "101";
+  for (let i = 1; i <= 6; i += 1) {
+    const digit = Number(normalized[i]);
+    pattern += parity[i - 1] === "L" ? L[digit] : G[digit];
+  }
+  pattern += "01010";
+  for (let i = 7; i < 13; i += 1) pattern += R[Number(normalized[i])];
+  pattern += "101";
+  return pattern.split("");
+}
+
+function encodeEAN8(value) {
+  const digits = String(value || "").replace(/\D/g, "");
+  const normalized = digits.length >= 8 ? digits.slice(0, 8) : digits.length === 7 ? `${digits}${eanChecksum(`00000${digits}`)}`.slice(-8) : "12345670";
+  const L = ["0001101","0011001","0010011","0111101","0100011","0110001","0101111","0111011","0110111","0001011"];
+  const R = ["1110010","1100110","1101100","1000010","1011100","1001110","1010000","1000100","1001000","1110100"];
+  let pattern = "101";
+  for (let i = 0; i < 4; i += 1) pattern += L[Number(normalized[i])];
+  pattern += "01010";
+  for (let i = 4; i < 8; i += 1) pattern += R[Number(normalized[i])];
+  pattern += "101";
+  return pattern.split("");
+}
+
+function encodeUPCA(value) {
+  const digits = String(value || "").replace(/\D/g, "");
+  const normalized = digits.length >= 12 ? digits.slice(0, 12) : digits.length === 11 ? `${digits}${eanChecksum(`0${digits}`)}`.slice(-12) : "240015990123";
+  return encodeEAN13(`0${normalized}`);
+}
+
+function eanChecksum(digits) {
+  const arr = String(digits || "").replace(/\D/g, "").split("").map(Number);
+  let sum = 0;
+  for (let i = 0; i < arr.length; i += 1) {
+    const fromRight = arr.length - i;
+    sum += arr[i] * (fromRight % 2 === 0 ? 3 : 1);
+  }
+  return String((10 - (sum % 10)) % 10);
+}
+
+function encodeCode39(value) {
+  const map = {
+    "0": "nnnwwnwnn","1": "wnnwnnnnw","2": "nnwwnnnnw","3": "wnwwnnnnn","4": "nnnwwnnnw","5": "wnnwwnnnn","6": "nnwwwnnnn","7": "nnnwnnwnw","8": "wnnwnnwnn","9": "nnwwnnwnn",
+    A: "wnnnnwnnw", B: "nnwnnwnnw", C: "wnwnnwnnn", D: "nnnnwwnnw", E: "wnnnwwnnn", F: "nnwnwwnnn", G: "nnnnnwwnw", H: "wnnnnwwnn", I: "nnwnnwwnn", J: "nnnnwwwnn",
+    K: "wnnnnnnww", L: "nnwnnnnww", M: "wnwnnnnwn", N: "nnnnwnnww", O: "wnnnwnnwn", P: "nnwnwnnwn", Q: "nnnnnnwww", R: "wnnnnnwwn", S: "nnwnnnwwn", T: "nnnnwnwwn",
+    U: "wwnnnnnnw", V: "nwwnnnnnw", W: "wwwnnnnnn", X: "nwnnwnnnw", Y: "wwnnwnnnn", Z: "nwwnwnnnn", "-": "nwnnnnwnw", ".": "wwnnnnwnn", " ": "nwwnnnwnn", "$": "nwnwnwnnn",
+    "/": "nwnwnnnwn", "+": "nwnnnwnwn", "%": "nnnwnwnwn", "*": "nwnnwnwnn",
+  };
+  const data = `*${String(value || "").toUpperCase()}*`;
+  const pattern = [];
+  for (let i = 0; i < data.length; i += 1) {
+    const token = map[data[i]] || map["*"];
+    for (let j = 0; j < token.length; j += 1) {
+      const char = token[j];
+      const isBar = j % 2 === 0;
+      pattern.push(isBar ? char : "0");
+    }
+    if (i < data.length - 1) pattern.push("0");
+  }
+  return pattern;
+}
+
+function encodeCodabar(value) {
+  const map = {
+    "0":"nnnnnww","1":"nnnnwwn","2":"nnnwnnw","3":"wwnnnnn","4":"nnwnnwn","5":"wnnnnwn","6":"nwnnnwn","7":"nwnnwnn","8":"nwwnnnn","9":"wnnwnnn",
+    "-":"nnnwwnn","$":"nnwwnnn",":":"wnnnwnw","/":"wnwnnnw",".":"wnwnwnn","+":"nnwnwnw","A":"nnwwnwn","B":"nwnwnnw","C":"nnnwnww","D":"nnnwwwn",
+  };
+  const data = (() => {
+    const raw = String(value || "").toUpperCase();
+    if (/^[ABCD].*[ABCD]$/.test(raw)) return raw;
+    return `A${raw}B`;
+  })();
+  const pattern = [];
+  for (let i = 0; i < data.length; i += 1) {
+    const token = map[data[i]] || map["A"];
+    for (let j = 0; j < token.length; j += 1) {
+      const char = token[j];
+      const isBar = j % 2 === 0;
+      pattern.push(isBar ? char : "0");
+    }
+    if (i < data.length - 1) pattern.push("0");
+  }
+  return pattern;
+}
+
+async function loadBarcodeHistory() {
+  if (!state.barcodeMode) return;
+  const dateFrom = encodeURIComponent(offsetISODate(-30));
+  const dateTo = encodeURIComponent(localISODate());
+  const resp = await api(`/api/barcode/jobs?limit=300&date_from=${dateFrom}&date_to=${dateTo}`);
+  const rows = resp.jobs || [];
+  els.ordersLayout.innerHTML = `
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Data</th>
+            <th>IP</th>
+            <th>FileID</th>
+            <th>Nume</th>
+            <th>Tip BC</th>
+            <th>Etichete</th>
+            <th>Status</th>
+            <th>Eroare</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map((item) => `
+            <tr>
+              <td>${escapeHtml(formatDate(item.created_at))}</td>
+              <td>${escapeHtml(item.client_ip || "-")}</td>
+              <td>${escapeHtml(item.file_id || "-")}</td>
+              <td>${escapeHtml(item.name || "-")}</td>
+              <td>${escapeHtml(item.bc_type || "-")}</td>
+              <td>${escapeHtml(String(item.labels_count ?? 0))}</td>
+              <td>${escapeHtml(item.status || "-")}</td>
+              <td>${escapeHtml(item.error || "-")}</td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+  els.orderDetails.innerHTML = `<div class="muted">${rows.length} inregistrari</div>`;
+}
+
+async function loadLogs() {
+  if (els.logsPanel.hidden) return;
+  const resp = await api("/api/logs?limit=40");
+  els.logsList.innerHTML = (resp.logs || []).map((item) => {
+    const payload = formatLogPayload(item.payload);
+    return `<div class="log-item ${["error","fatal","critical"].includes(String(item.level).toLowerCase())||item.message.includes("[ERROR]")?"siui-error":""}"><div class="meta"><span>${escapeHtml(item.level.toUpperCase())} · ${escapeHtml(item.event_type)}</span><span>${escapeHtml(formatDate(item.created_at))}</span></div><div>${escapeHtml(item.message)}</div>${payload ? `<pre class="log-payload">${escapeHtml(payload)}</pre>` : ""}</div>`;
+  }).join("") || `<div class="log-item">${escapeHtml(t("noLogs"))}</div>`;
+}
+
+function onLogPollChange() {
+  const value = Number(els.logPollSeconds.value || 0);
+  state.logPollSeconds = Number.isFinite(value) && value >= 0 ? value : 1;
+  restartLogPolling();
+}
+
+function restartLogPolling() {
+  if (state.logPollTimer) {
+    clearInterval(state.logPollTimer);
+    state.logPollTimer = null;
+  }
+  if (state.logPollSeconds > 0 && !els.logsPanel.hidden) {
+    state.logPollTimer = setInterval(() => {
+      if (!els.dashboardView.hidden) {
+        loadLogs().catch(() => {});
+      }
+    }, state.logPollSeconds * 1000);
+  }
+}
+
+function restartStatusPolling() {
+  if (state.statusPollTimer) {
+    clearInterval(state.statusPollTimer);
+    state.statusPollTimer = null;
+  }
+  if (state.statusPollSeconds > 0) {
+    state.statusPollTimer = setInterval(() => {
+      if (!els.dashboardView.hidden) {
+        loadStatus().catch(() => {});
+        loadDashboard().catch(() => {});
+      }
+    }, state.statusPollSeconds * 1000);
+  }
+}
+
+async function loadAnalytes() {
+  const resp = await api("/api/analytes");
+  state.analytes = resp.analytes || [];
+  if (state.selectedTag && !state.analytes.some((item) => item.tag === state.selectedTag)) {
+    state.selectedTag = null;
+  }
+  if (!state.selectedTag && state.analytes.length > 0) {
+    state.selectedTag = state.analytes[0].tag;
+  }
+  if (state.selectedQCTargetAnalyteTag && !state.analytes.some((item) => item.tag === state.selectedQCTargetAnalyteTag)) {
+    state.selectedQCTargetAnalyteTag = null;
+  }
+  renderAnalyteList();
+  loadDailyAnalysisFilters().catch(() => {});
+  syncQCTargetAnalyteOptions();
+  syncQCTargetFormAnalyteOptions();
+  syncDailyDetailAnalyteOptions();
+  if (state.currentView === "daily-details" || state.settingsSubView === "daily-details") {
+    renderDailyDetailValuesWorkspace();
+  }
+  renderQCAnalyteFilter();
+  renderQCTargetList();
+}
+
+async function loadDailyDetailDefinitions() {
+  const resp = await api("/api/daily-details/definitions");
+  state.dailyDetailDefinitions = resp.definitions || [];
+  renderDailyDetailDefinitionList();
+}
+
+async function loadDailyDetailValues(scopeDate, roundNo) {
+  const params = new URLSearchParams();
+  params.set("scope_date", scopeDate || localISODate());
+  if (roundNo > 0) params.set("round_no", String(roundNo));
+  const resp = await api(`/api/daily-details?${params.toString()}`);
+  state.dailyDetailValues = resp.values || [];
+}
+
+async function loadDailyDetailsWorkspace() {
+  state.dailyDetailsDate = state.dailyDetailsDate || localISODate();
+  if (els.dailyDetailsDate) {
+    els.dailyDetailsDate.value = state.dailyDetailsDate;
+  }
+  await loadDailyDetailRounds();
+  syncDailyDetailAnalyteOptions();
+  const usesRound = ["day_round", "day_round_analyte"].includes(state.dailyDetailsScopeTab);
+  await loadDailyDetailValues(state.dailyDetailsDate, usesRound ? Number(state.dailyDetailsRoundNo || 0) : 0);
+  renderDailyDetailValuesWorkspace();
+}
+
+async function loadDailyDetailRounds() {
+  const params = new URLSearchParams();
+  params.set("order_date", state.dailyDetailsDate || localISODate());
+  const resp = await api(`/api/orders/rounds?${params.toString()}`);
+  state.dailyDetailsRounds = resp.rounds || [];
+  if (state.dailyDetailsRounds.length === 0) {
+    state.dailyDetailsRounds = [1];
+  }
+  if (!state.dailyDetailsRounds.includes(state.dailyDetailsRoundNo)) {
+    state.dailyDetailsRoundNo = state.dailyDetailsRounds[0] || 1;
+  }
+  if (els.dailyDetailsRound) {
+    els.dailyDetailsRound.innerHTML = state.dailyDetailsRounds.map((item) => `<option value="${item}">${item}</option>`).join("");
+    els.dailyDetailsRound.value = String(state.dailyDetailsRoundNo || 1);
+  }
+}
+
+function syncDailyDetailAnalyteOptions() {
+  const items = knownAnalyteOptions();
+  if (!state.dailyDetailsAnalyteTag || !items.some((item) => item.tag === state.dailyDetailsAnalyteTag)) {
+    state.dailyDetailsAnalyteTag = items[0]?.tag || "";
+  }
+  if (els.dailyDetailsAnalyte) {
+    els.dailyDetailsAnalyte.innerHTML = items.map((item) => `<option value="${escapeHtml(item.tag)}">${escapeHtml(item.tag)} · ${escapeHtml(item.name || "-")}</option>`).join("");
+    els.dailyDetailsAnalyte.value = state.dailyDetailsAnalyteTag || "";
+  }
+}
+
+function setAnalyteRefreshButtonState(loading) {
+  els.refreshAnalytesBtn.disabled = loading;
+  els.refreshAnalytesBtn.classList.toggle("is-loading", loading);
+  els.refreshAnalytesBtn.textContent = t("refresh");
+}
+
+function setAnalyteSaveState(loading) {
+  const button = document.getElementById("save-analyte");
+  button.disabled = loading;
+  button.classList.toggle("is-loading", loading);
+}
+
+async function onRefreshAnalytesClick() {
+  setAnalyteRefreshButtonState(true);
+  try {
+    await Promise.all([loadAnalytes(), loadQCTargets()]);
+    els.analyteMessage.textContent = "";
+  } catch (error) {
+    showToast(error?.message || "Cannot load analytes", "error");
+  } finally {
+    setAnalyteRefreshButtonState(false);
+  }
+}
+
+async function loadOrders() {
+  if (isDocsmartMode()) {
+    const resp = await api("/api/docsmart/parsed-files");
+    state.docsmartFiles = resp.files || [];
+    state.orders = [];
+    if (!state.selectedDocsmartFileID && state.docsmartFiles.length > 0) {
+      state.selectedDocsmartFileID = state.docsmartFiles[0].id;
+    }
+    if (state.selectedDocsmartFileID && !state.docsmartFiles.some((item) => item.id === state.selectedDocsmartFileID)) {
+      state.selectedDocsmartFileID = state.docsmartFiles[0]?.id || null;
+    }
+    if (els.ordersSearch) els.ordersSearch.value = state.selectedOrderSearch || "";
+    renderOrdersLayout();
+    renderOrderDetails();
+    return;
+  }
+  const requestedRoundNo = state.selectedRoundNo;
+  const params = new URLSearchParams();
+  params.set("include_analysis", "1");
+  if (requestedRoundNo > 0 && !state.selectedOrderSearch.trim()) params.set("round_no", String(requestedRoundNo));
+  if (state.selectedOrderDate) params.set("order_date", state.selectedOrderDate);
+  if (state.selectedOrderSearch.trim()) params.set("search", state.selectedOrderSearch.trim());
+  const query = params.toString() ? `?${params.toString()}` : "";
+  const resp = await api(`/api/orders${query}`);
+  state.orders = resp.orders || [];
+  state.rounds = resp.rounds || [];
+  state.selectedOrderDate = resp.order_date || state.selectedOrderDate;
+  if (state.rounds.length === 0) {
+    state.rounds = [1];
+  }
+  const responseRoundNo = Number(resp.round_no || 0);
+  const selectedRoundExists = state.rounds.includes(state.selectedRoundNo);
+  if (responseRoundNo > 0) {
+    state.selectedRoundNo = responseRoundNo;
+  } else if (!selectedRoundExists) {
+    state.selectedRoundNo = state.rounds[state.rounds.length - 1] || 1;
+  }
+  syncOrderControls();
+  renderRoundSelect();
+  renderOrderStatusFilters();
+  if (!state.selectedOrderId && state.orders.length > 0) {
+    state.selectedOrderId = state.orders[0].order.id;
+  }
+  if (state.selectedOrderId && !state.orders.some((item) => item.order.id === state.selectedOrderId)) {
+    state.selectedOrderId = state.orders[0]?.order?.id || null;
+    state.selectedOrderAnalysisID = null;
+  }
+  state.selectedOrderIDs = state.selectedOrderIDs.filter((id) => state.orders.some((item) => item.order.id === id));
+  renderOrdersLayout();
+  renderOrderDetails();
+}
+
+function syncOrderControls() {
+  if (state.barcodeMode) {
+    els.importOrdersBtn.hidden = true;
+    els.exportOrdersBtn.hidden = true;
+    if (els.syncOrdersWiseMEDBtn) els.syncOrdersWiseMEDBtn.hidden = true;
+    if (els.reapplyOrderTransformationsBtn) els.reapplyOrderTransformationsBtn.hidden = true;
+    if (els.sendOrdersWiseMEDBtn) els.sendOrdersWiseMEDBtn.hidden = true;
+    els.worklistOrdersBtn.hidden = true;
+    if (els.deleteOrdersBtn) els.deleteOrdersBtn.hidden = true;
+    els.newRoundBtn.hidden = true;
+    els.ordersSelectAllBox.hidden = true;
+    if (els.orderDate?.parentElement) els.orderDate.parentElement.hidden = true;
+    if (els.roundSelect?.parentElement) els.roundSelect.parentElement.hidden = true;
+    return;
+  }
+  if (isDocsmartMode()) {
+    els.importOrdersBtn.hidden = true;
+    els.exportOrdersBtn.hidden = true;
+    if (els.syncOrdersWiseMEDBtn) els.syncOrdersWiseMEDBtn.hidden = true;
+    if (els.reapplyOrderTransformationsBtn) els.reapplyOrderTransformationsBtn.hidden = true;
+    if (els.sendOrdersWiseMEDBtn) els.sendOrdersWiseMEDBtn.hidden = true;
+    els.worklistOrdersBtn.hidden = true;
+    if (els.deleteOrdersBtn) els.deleteOrdersBtn.hidden = true;
+    els.newRoundBtn.hidden = true;
+    els.ordersSelectAllBox.hidden = true;
+    if (els.orderDate?.parentElement) els.orderDate.parentElement.hidden = true;
+    if (els.roundSelect?.parentElement) els.roundSelect.parentElement.hidden = true;
+    if (els.ordersReceivedFilter?.parentElement) els.ordersReceivedFilter.parentElement.hidden = true;
+    if (els.ordersSentFilter?.parentElement) els.ordersSentFilter.parentElement.hidden = true;
+    if (els.ordersFilterActive) els.ordersFilterActive.hidden = true;
+    return;
+  }
+  if (els.orderDate) {
+    els.orderDate.value = state.selectedOrderDate || "";
+  }
+  const fileMode = state.commType === "file";
+  const caryMode = String(state.readerInfo?.protocol || state.readerInfo?.analyzer_code || "").toLowerCase() === "cary60-uvvis";
+  const canOperateOrders = !state.barcodeMode;
+  els.importOrdersBtn.hidden = !fileMode;
+  els.exportOrdersBtn.hidden = !fileMode;
+  if (els.syncOrdersWiseMEDBtn) els.syncOrdersWiseMEDBtn.hidden = !canOperateOrders;
+  if (els.reapplyOrderTransformationsBtn) els.reapplyOrderTransformationsBtn.hidden = !canOperateOrders;
+  if (els.sendOrdersWiseMEDBtn) els.sendOrdersWiseMEDBtn.hidden = !(canOperateOrders && state.resultsDelivery?.send_supported);
+  els.worklistOrdersBtn.hidden = !(fileMode && caryMode);
+  if (els.deleteOrdersBtn) els.deleteOrdersBtn.hidden = !canOperateOrders;
+  els.newRoundBtn.hidden = !canOperateOrders;
+  els.ordersSelectAllBox.hidden = !canOperateOrders;
+  if (els.ordersSearch) els.ordersSearch.value = state.selectedOrderSearch || "";
+  if (els.ordersFilterActive) els.ordersFilterActive.hidden = !state.selectedOrderSearch.trim();
+}
+
+function onRefreshOrdersClick() {
+  if (state.barcodeMode) {
+    loadBarcodeHistory().catch((error) => showToast(error?.message || "Cannot load history", "error"));
+    return;
+  }
+  loadOrders().catch((error) => showToast(error?.message || "Cannot load orders", "error"));
+}
+
+function syncQCControls() {
+  if (els.qcPeriod && !els.qcPeriod.options.length) {
+    els.qcPeriod.innerHTML = [
+      ["current_week", t("westgardCurrentWeek")],
+      ["previous_week", t("westgardPreviousWeek")],
+      ["current_month", t("westgardCurrentMonth")],
+      ["previous_month", t("westgardPreviousMonth")],
+      ["current_year", t("westgardCurrentYear")],
+      ["custom", t("westgardCustom")],
+    ].map(([value, label]) => `<option value="${escapeHtml(value)}">${escapeHtml(label)}</option>`).join("");
+  }
+  if (els.qcPeriod) {
+    els.qcPeriod.value = state.selectedQCPeriod || "current_month";
+  }
+  if (els.qcDateFrom) {
+    els.qcDateFrom.value = state.selectedQCDateFrom || "";
+    els.qcDateFrom.disabled = (state.selectedQCPeriod || "current_month") !== "custom";
+  }
+  if (els.qcDateTo) {
+    els.qcDateTo.value = state.selectedQCDateTo || "";
+    els.qcDateTo.disabled = (state.selectedQCPeriod || "current_month") !== "custom";
+  }
+  if (els.qcAnalyteFilter) {
+    els.qcAnalyteFilter.value = state.selectedQCAnalyteFilter || "";
+  }
+  if (els.qcLevelFilter) {
+    els.qcLevelFilter.value = state.selectedQCLevel || "";
+  }
+  if (els.qcSelectAll) {
+    const candidates = selectedQCRecordCandidates();
+    els.qcSelectAll.checked = candidates.length > 0 && candidates.every((id) => state.selectedQCRecordIDs.includes(id));
+  }
+}
+
+function onOrderDateChange() {
+  state.selectedOrderDate = els.orderDate.value || "";
+  state.selectedRoundNo = 1;
+  state.rounds = [1];
+  state.selectedOrderId = null;
+  state.selectedOrderAnalysisID = null;
+  state.selectedOrderIDs = [];
+  syncOrderControls();
+  renderRoundSelect();
+  loadOrdersWithFeedback();
+}
+
+function onRoundChange() {
+  state.selectedRoundNo = Number(els.roundSelect.value || 0);
+  state.selectedOrderId = null;
+  state.selectedOrderAnalysisID = null;
+  loadOrdersWithFeedback();
+}
+
+function onOrdersSearchInput() {
+  state.selectedOrderSearch = String(els.ordersSearch?.value || "").trim();
+  state.selectedOrderId = null;
+  state.selectedOrderAnalysisID = null;
+  state.selectedOrderIDs = [];
+  syncOrderControls();
+  loadOrdersWithFeedback();
+}
+
+function onQCPeriodChange() {
+  state.selectedQCPeriod = els.qcPeriod?.value || "current_month";
+  if (state.selectedQCPeriod !== "custom") {
+    const bounds = currentPeriodBounds(state.selectedQCPeriod);
+    state.selectedQCDateFrom = bounds.from;
+    state.selectedQCDateTo = bounds.to;
+  }
+  state.selectedQCDate = state.selectedQCDateFrom || "";
+  state.selectedQCRecordId = null;
+  state.selectedQCAnalysisId = null;
+  syncQCControls();
+  loadQCRecords().catch(() => {});
+}
+
+function onQCDateRangeChange() {
+  state.selectedQCPeriod = "custom";
+  state.selectedQCDateFrom = els.qcDateFrom?.value || "";
+  state.selectedQCDateTo = els.qcDateTo?.value || "";
+  state.selectedQCDate = state.selectedQCDateFrom || "";
+  state.selectedQCRecordId = null;
+  state.selectedQCAnalysisId = null;
+  syncQCControls();
+  loadQCRecords().catch(() => {});
+}
+
+function onQCRoundChange() {
+  state.selectedQCRoundNo = Number(els.qcRoundSelect.value || 0);
+}
+
+function onQCLevelFilterChange() {
+  state.selectedQCLevel = els.qcLevelFilter.value || "";
+  syncQCSelectionAfterFilter();
+}
+
+function onQCAnalyteFilterChange() {
+  state.selectedQCAnalyteFilter = els.qcAnalyteFilter.value || "";
+  syncQCSelectionAfterFilter();
+}
+
+function selectedQCRecordCandidates() {
+  return filteredQCRecords().map((item) => item.record.id);
+}
+
+function onQCSelectAllChange() {
+  if (els.qcSelectAll.checked) {
+    state.selectedQCRecordIDs = selectedQCRecordCandidates();
+  } else {
+    state.selectedQCRecordIDs = [];
+  }
+  renderQCLayout();
+}
+
+async function onDeleteQCRecordsClick() {
+  const ids = state.selectedQCRecordIDs.length ? [...state.selectedQCRecordIDs] : (state.selectedQCRecordId ? [state.selectedQCRecordId] : []);
+  if (!ids.length) return;
+  if (!window.confirm(t("deleteQCConfirm"))) return;
+  try {
+    await api("/api/qc-records/delete", {
+      method: "POST",
+      body: JSON.stringify({ qc_record_ids: ids }),
+    });
+    state.selectedQCRecordIDs = [];
+    state.selectedQCRecordId = null;
+    state.selectedQCAnalysisId = null;
+    state.selectedQCAnalysisTag = null;
+    await Promise.all([loadQCRecords(), loadDashboard(), loadStatus(), loadLogs().catch(() => {})]);
+    showToast(t("deleteSuccess"), "success");
+  } catch (error) {
+    showToast(error?.message || "Cannot delete QC records", "error");
+  }
+}
+
+function syncQCSelectionAfterFilter() {
+  const filtered = filteredQCRows();
+  if (!filtered.some((item) => item.record.id === state.selectedQCRecordId && item.analysis.id === state.selectedQCAnalysisId)) {
+    state.selectedQCRecordId = filtered[0]?.record?.id || null;
+    state.selectedQCAnalysisId = filtered[0]?.analysis?.id || null;
+    state.selectedQCAnalysisTag = filtered[0]?.analysis?.analyte_tag || null;
+  }
+  renderQCLayout();
+  renderQCDetails();
+}
+
+function onQCWestgardPeriodChange() {
+  state.qcWestgardPeriod = els.qcWestgardPeriod.value || "current_month";
+  syncQCWestgardPeriodControls();
+  if (!els.qcWestgardModal.hidden) {
+    onGenerateQCWestgard().catch((error) => showToast(error.message, "error"));
+  }
+}
+
+function onQCWestgardCustomDateChange() {
+  if ((els.qcWestgardDateFrom.value || "") && (els.qcWestgardDateTo.value || "")) {
+    state.qcWestgardPeriod = "custom";
+    els.qcWestgardPeriod.value = "custom";
+    syncQCWestgardPeriodControls();
+    if (!els.qcWestgardModal.hidden) {
+      onGenerateQCWestgard().catch((error) => showToast(error.message, "error"));
+    }
+  }
+}
+
+function onShowQCWestgardIssues() {
+  const issues = Array.isArray(state.qcWestgardMetrics?.validation_issues) ? state.qcWestgardMetrics.validation_issues : [];
+  if (!issues.length) {
+    window.alert(t("westgardValid"));
+    return;
+  }
+  window.alert(issues.join("\n"));
+}
+
+function onDailyDetailsDateChange() {
+  state.dailyDetailsDate = els.dailyDetailsDate.value || localISODate();
+  loadDailyDetailsWorkspace().catch((error) => showToast(error?.message || "Cannot load daily details", "error"));
+}
+
+function onDailyDetailsRoundChange() {
+  state.dailyDetailsRoundNo = Number(els.dailyDetailsRound.value || 0);
+  loadDailyDetailsWorkspace().catch((error) => showToast(error?.message || "Cannot load daily details", "error"));
+}
+
+function onDailyDetailsAnalyteChange() {
+  state.dailyDetailsAnalyteTag = els.dailyDetailsAnalyte.value || "";
+  renderDailyDetailValuesWorkspace();
+}
+
+function onDailyDetailsScopeChange(scope) {
+  state.dailyDetailsScopeTab = scope;
+  syncDailyDetailAnalyteOptions();
+  renderDailyDetailValuesWorkspace();
+  loadDailyDetailsWorkspace().catch((error) => showToast(error?.message || "Cannot load daily details", "error"));
+}
+
+function onPrintDailyWorksheetClick() {
+  const scope = state.dailyDetailsScopeTab || "day";
+  const params = new URLSearchParams({
+    order_date: state.dailyDetailsDate || localISODate(),
+    scope,
+  });
+  if (scope === "day_round" || scope === "day_round_analyte") {
+    params.set("round_no", String(Number(state.dailyDetailsRoundNo || 0)));
+  }
+  if (scope === "day_analyte" || scope === "day_round_analyte") {
+    params.set("analyte_tag", String(state.dailyDetailsAnalyteTag || "").trim());
+  }
+  if (window.WSM_REMOTE) { openRemotePrint("/api/daily-details/worksheet", params); return; }
+  window.open(`/api/daily-details/worksheet?${params.toString()}`, "_blank", "noopener,noreferrer");
+}
+
+function onOrdersSelectAllChange() {
+  const visibleOrders = filteredOrders();
+  if (els.ordersSelectAll.checked) {
+    state.selectedOrderIDs = visibleOrders.map((item) => item.order.id);
+  } else {
+    const visibleIDs = new Set(visibleOrders.map((item) => item.order.id));
+    state.selectedOrderIDs = state.selectedOrderIDs.filter((id) => !visibleIDs.has(id));
+  }
+  renderOrdersLayout();
+}
+
+function onOrdersReceiveFilterChange() {
+  state.selectedOrderReceiveFilter = String(els.ordersReceivedFilter?.value || "").trim();
+  renderOrdersLayout();
+}
+
+function onOrdersSendFilterChange() {
+  state.selectedOrderSendFilter = String(els.ordersSentFilter?.value || "").trim();
+  renderOrdersLayout();
+}
+
+async function onDeleteOrdersClick() {
+  const ids = state.selectedOrderIDs.length ? [...state.selectedOrderIDs] : (state.selectedOrderId ? [state.selectedOrderId] : []);
+  if (!ids.length) return;
+  if (shouldSkipDeleteOrdersConfirm()) {
+    await deleteOrders(ids);
+    return;
+  }
+  openOrdersDeleteModal(ids);
+}
+
+async function onConfirmDeleteOrdersClick() {
+  const ids = state.pendingDeleteOrderIDs.length ? [...state.pendingDeleteOrderIDs] : [];
+  if (!ids.length) {
+    closeOrdersDeleteModal();
+    return;
+  }
+  rememberDeleteOrdersConfirmPreference(Boolean(els.ordersDeleteSkipConfirm?.checked));
+  await deleteOrders(ids);
+  closeOrdersDeleteModal();
+}
+
+function openOrdersDeleteModal(ids) {
+  state.pendingDeleteOrderIDs = Array.isArray(ids) ? [...ids] : [];
+  if (els.ordersDeleteSkipConfirm) {
+    els.ordersDeleteSkipConfirm.checked = false;
+  }
+  if (els.ordersDeleteMessage) {
+    els.ordersDeleteMessage.textContent = t("deleteOrdersConfirm");
+  }
+  if (els.ordersDeleteModal) {
+    els.ordersDeleteModal.hidden = false;
+  }
+}
+
+function closeOrdersDeleteModal() {
+  state.pendingDeleteOrderIDs = [];
+  if (els.ordersDeleteSkipConfirm) {
+    els.ordersDeleteSkipConfirm.checked = false;
+  }
+  if (els.ordersDeleteModal) {
+    els.ordersDeleteModal.hidden = true;
+  }
+}
+
+function shouldSkipDeleteOrdersConfirm() {
+  try {
+    return window.localStorage.getItem(deleteOrdersSkipConfirmKey) === "1";
+  } catch (_) {
+    return false;
+  }
+}
+
+function rememberDeleteOrdersConfirmPreference(skip) {
+  try {
+    if (skip) {
+      window.localStorage.setItem(deleteOrdersSkipConfirmKey, "1");
+    } else {
+      window.localStorage.removeItem(deleteOrdersSkipConfirmKey);
+    }
+  } catch (_) {
+  }
+  syncDeleteOrdersPreferenceControls();
+}
+
+function syncDeleteOrdersPreferenceControls() {
+  if (els.deleteOrdersPreference) {
+    els.deleteOrdersPreference.checked = shouldSkipDeleteOrdersConfirm();
+  }
+}
+
+function onDeleteOrdersPreferenceChange() {
+  rememberDeleteOrdersConfirmPreference(Boolean(els.deleteOrdersPreference?.checked));
+}
+
+async function deleteOrders(ids) {
+  try {
+    await api("/api/orders/delete", {
+      method: "POST",
+      body: JSON.stringify({ order_ids: ids }),
+    });
+    state.selectedOrderIDs = [];
+    state.selectedOrderId = null;
+    state.selectedOrderAnalysisID = null;
+    await Promise.all([loadOrders(), loadDashboard(), loadStatus(), loadLogs().catch(() => {})]);
+    showToast(t("deleteSuccess"), "success");
+  } catch (error) {
+    showToast(error?.message || "Cannot delete orders", "error");
+  }
+}
+
+function selectedOrderIDsForAction() {
+  if (state.selectedOrderIDs.length) {
+    return [...state.selectedOrderIDs];
+  }
+  if (state.selectedOrderId) {
+    return [state.selectedOrderId];
+  }
+  const visibleOrders = filteredOrders();
+  if (visibleOrders.length === 1) {
+    return [visibleOrders[0].order.id];
+  }
+  return [];
+}
+
+async function onSendOrdersWiseMEDClick() {
+  const ids = selectedOrderIDsForAction();
+  if (!ids.length) {
+    showToast("Selecteaza o cerere sau bifeaza cel putin o linie.", "error");
+    return;
+  }
+  try {
+    showToast(`Se trimit ${ids.length} cereri in buletin...`, "success");
+    const resp = await api("/api/orders/send-to-bulletin", {
+      method: "POST",
+      body: JSON.stringify({
+        order_ids: ids,
+        order_date: state.selectedOrderDate || localISODate(),
+        round_no: Number(state.selectedRoundNo || state.rounds[state.rounds.length - 1] || 0),
+      }),
+    });
+    showToast(resp?.ok === false ? t("sendToBulletinFailed") : t("sendToBulletinSuccess"), resp?.ok === false ? "error" : "success");
+    await Promise.all([loadOrders(), loadLogs().catch(() => {})]);
+  } catch (error) {
+    showToast(error?.message || t("sendToBulletinFailed"), "error");
+    await loadLogs().catch(() => {});
+  }
+}
+
+async function onSyncOrdersWiseMEDClick() {
+  const ids = selectedOrderIDsForAction();
+  if (!ids.length) {
+    showToast("Selecteaza o cerere sau bifeaza cel putin o linie.", "error");
+    return;
+  }
+  try {
+    const resp = await api("/api/result-sync/orders", {
+      method: "POST",
+      body: JSON.stringify({
+        order_ids: ids,
+        order_date: state.selectedOrderDate || localISODate(),
+        round_no: Number(state.selectedRoundNo || 0),
+      }),
+    });
+    const summary = resp?.summary || {};
+    showToast(`${t("syncToWiseMEDSuccess")} ${summary.matched || 0}/${summary.processed || 0} matched`, "success");
+    await Promise.all([loadOrders(), loadResultSyncStatus(), loadLogs().catch(() => {})]);
+  } catch (error) {
+    showToast(error?.message || t("syncToWiseMEDFailed"), "error");
+    await loadLogs().catch(() => {});
+  }
+}
+
+async function onReapplyOrderTransformationsClick() {
+  const ids = selectedOrderIDsForAction();
+  if (!ids.length) {
+    showToast("Selecteaza o cerere sau bifeaza cel putin o linie.", "error");
+    return;
+  }
+  try {
+    await api("/api/orders/reapply-transformations", {
+      method: "POST",
+      body: JSON.stringify({ order_ids: ids }),
+    });
+    showToast("Transformarile au fost reaplicate.", "success");
+    await Promise.all([loadOrders(), loadLogs().catch(() => {})]);
+  } catch (error) {
+    showToast(error?.message || "Nu s-au putut reaplica transformarile.", "error");
+    await loadLogs().catch(() => {});
+  }
+}
+
+function onImportOrdersClick() {
+  els.ordersImportFile.value = "";
+  els.ordersImportFile.click();
+}
+
+function setImportButtonState(loading) {
+  els.importOrdersBtn.disabled = loading;
+  els.importOrdersBtn.classList.toggle("is-loading", loading);
+  els.importOrdersBtn.textContent = loading ? t("importing") : t("importFile");
+}
+
+function hideToast() {
+  if (state.toastTimer) {
+    clearTimeout(state.toastTimer);
+    state.toastTimer = null;
+  }
+  els.appToast.hidden = true;
+  els.appToast.classList.remove("success", "error");
+  els.appToastBody.textContent = "";
+}
+
+function showToast(message, kind = "success") {
+  hideToast();
+  els.appToastBody.textContent = message;
+  els.appToast.hidden = false;
+  els.appToast.classList.add(kind === "error" ? "error" : "success");
+  state.toastTimer = setTimeout(hideToast, kind === "error" ? 10000 : 1000);
+}
+
+function buildImportMessage(payload, fileName) {
+  const imported = Number(payload?.imported || 0);
+  const warnings = Number(payload?.warnings || 0);
+  let message = `${t("importSuccess")}: ${payload?.file_name || fileName}`;
+  if (imported > 0) {
+    message += ` • ${imported} ${t("rowsImported")}`;
+  }
+  if (warnings > 0) {
+    message += ` • ${warnings} ${t("warningCount")}`;
+  }
+  return message;
+}
+
+async function onOrdersImportFileChange() {
+  const [file] = els.ordersImportFile.files || [];
+  if (!file) return;
+  setImportButtonState(true);
+  try {
+    const form = new FormData();
+    form.append("file", file);
+    form.append("order_date", state.selectedOrderDate || localISODate());
+    const response = await fetch("/api/orders/import", {
+      method: "POST",
+      credentials: "same-origin",
+      body: form,
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || payload.ok === false) {
+      throw new Error(payload.error?.message || payload.error || payload.message || `Request failed with ${response.status}`);
+    }
+    showToast(buildImportMessage(payload, file.name), "success");
+    await Promise.all([
+      loadOrders(),
+      loadDashboard(),
+      loadStatus(),
+      loadLogs().catch(() => {}),
+    ]);
+  } catch (error) {
+    showToast(`${t("importFailed")}: ${error.message}`, "error");
+    await loadLogs().catch(() => {});
+  } finally {
+    setImportButtonState(false);
+    els.ordersImportFile.value = "";
+  }
+}
+
+async function onExportOrdersClick() {
+  try {
+    const resp = await api("/api/orders/export", {
+      method: "POST",
+      body: JSON.stringify({
+        order_ids: state.selectedOrderIDs,
+        order_date: state.selectedOrderDate,
+      }),
+    });
+    window.alert(`${t("exportedFile")}: ${resp.path}`);
+  } catch (error) {
+    window.alert(error.message);
+  }
+}
+
+function onWorklistOrdersClick() {
+  const params = new URLSearchParams();
+  if (state.selectedOrderDate) params.set("order_date", state.selectedOrderDate);
+  if (state.selectedRoundNo > 0) params.set("round_no", String(state.selectedRoundNo));
+  if (window.WSM_REMOTE) { openRemotePrint("/api/orders/worklist", params); return; }
+  window.open(`/api/orders/worklist?${params.toString()}`, "_blank", "noopener,noreferrer");
+}
+
+async function onNewRoundClick() {
+  try {
+    const resp = await api("/api/orders/rounds", {
+      method: "POST",
+      body: JSON.stringify({
+        order_date: state.selectedOrderDate || localISODate(),
+      }),
+    });
+    state.selectedOrderDate = resp.order_date || state.selectedOrderDate;
+    state.rounds = resp.rounds || state.rounds;
+    state.selectedRoundNo = Number(resp.round_no || 1);
+    state.selectedOrderId = null;
+    state.selectedOrderAnalysisID = null;
+    state.selectedOrderIDs = [];
+    await loadOrdersWithFeedback();
+  } catch (error) {
+    window.alert(error.message);
+  }
+}
+
+async function loadOrdersWithFeedback() {
+  try {
+    await loadOrders();
+  } catch (error) {
+    syncOrderControls();
+    renderRoundSelect();
+    const message = error?.message || "Cannot load orders";
+    els.ordersLayout.innerHTML = `<div class="log-item">${escapeHtml(message)}</div>`;
+    els.orderDetails.innerHTML = `<div class="log-item">${escapeHtml(message)}</div>`;
+  }
+}
+
+async function loadQCRecords() {
+  if ((state.selectedQCPeriod || "current_month") !== "custom") {
+    const bounds = currentPeriodBounds(state.selectedQCPeriod || "current_month");
+    state.selectedQCDateFrom = bounds.from;
+    state.selectedQCDateTo = bounds.to;
+    state.selectedQCDate = bounds.from;
+  }
+  const params = new URLSearchParams();
+  params.set("include_analysis", "1");
+  if (state.selectedQCDateFrom) params.set("date_from", state.selectedQCDateFrom);
+  if (state.selectedQCDateTo) params.set("date_to", state.selectedQCDateTo);
+  if (state.selectedQCDate) params.set("run_date", state.selectedQCDate);
+  const query = params.toString() ? `?${params.toString()}` : "";
+  const resp = await api(`/api/qc-records${query}`);
+  state.qcRecords = resp.qc_records || [];
+  state.selectedQCDate = resp.run_date || state.selectedQCDate;
+  state.selectedQCDateFrom = resp.date_from || state.selectedQCDateFrom;
+  state.selectedQCDateTo = resp.date_to || state.selectedQCDateTo;
+  syncQCControls();
+  renderQCAnalyteFilter();
+  const filtered = filteredQCRows();
+  if (!state.selectedQCRecordId && filtered.length > 0) {
+    state.selectedQCRecordId = filtered[0].record?.id || null;
+    state.selectedQCAnalysisId = filtered[0].analysis?.id || null;
+    state.selectedQCAnalysisTag = filtered[0].analysis?.analyte_tag || null;
+  }
+  if (state.selectedQCRecordId && !filtered.some((item) => item.record.id === state.selectedQCRecordId && item.analysis.id === state.selectedQCAnalysisId)) {
+    state.selectedQCRecordId = filtered[0]?.record?.id || null;
+    state.selectedQCAnalysisId = filtered[0]?.analysis?.id || null;
+    state.selectedQCAnalysisTag = filtered[0]?.analysis?.analyte_tag || null;
+  }
+  state.selectedQCRecordIDs = state.selectedQCRecordIDs.filter((id) => state.qcRecords.some((item) => item.record.id === id));
+  state.qcWestgardMetrics = null;
+  renderQCLayout();
+  renderQCDetails();
+}
+
+async function loadQCMeta() {
+  const resp = await api("/api/qc/meta");
+  state.qcLevels = Array.isArray(resp.levels) ? resp.levels.map((item) => String(item || "").trim()).filter(Boolean) : [];
+  syncQCConfiguredLevels();
+}
+
+async function loadQCTargets() {
+  const resp = await api("/api/qc-targets");
+  state.qcTargets = resp.qc_targets || [];
+  if (state.selectedQCTargetID && !state.qcTargets.some((item) => item.id === state.selectedQCTargetID)) {
+    state.selectedQCTargetID = null;
+  }
+  syncQCTargetAnalyteOptions();
+  syncQCConfiguredLevels();
+  syncQCTargetFormAnalyteOptions();
+  syncQCRecordAnalyteOptions();
+  syncDailyDetailAnalyteOptions();
+  if (state.currentView === "daily-details" || state.settingsSubView === "daily-details") {
+    renderDailyDetailValuesWorkspace();
+  }
+  renderQCAnalyteFilter();
+  syncSelectedTargetFromForm();
+  renderQCTargetList();
+}
+
+function configuredQCLevels(extra = []) {
+  const values = [...state.qcLevels, ...extra.map((item) => String(item || "").trim()).filter(Boolean)];
+  const seen = new Set();
+  const out = [];
+  values.forEach((value) => {
+    if (!value || seen.has(value)) return;
+    seen.add(value);
+    out.push(value);
+  });
+  return out.length > 0 ? out : ["QC"];
+}
+
+function syncQCConfiguredLevels() {
+  if (!els.qcTargetLevel) return;
+  const levels = configuredQCLevels(state.qcTargets.map((item) => String(item.control_level || "").trim()));
+  const current = String(els.qcTargetLevel.value || "").trim();
+  els.qcTargetLevel.innerHTML = levels.map((level) => `<option value="${escapeHtml(level)}">${escapeHtml(level)}</option>`).join("");
+  els.qcTargetLevel.value = levels.includes(current) ? current : (levels[0] || "");
+}
+
+function openQCRecordModal() {
+  syncQCRecordAnalyteOptions();
+  els.qcRecordDate.value = state.selectedQCDate || localISODate();
+  syncQCRecordLotOptions();
+  els.qcRecordLabel.dataset.autofill = "1";
+  els.qcRecordQualitative.value = "";
+  els.qcRecordQuantitative.value = "";
+  els.qcRecordInterpretation.value = "";
+  els.qcRecordMessage.textContent = "";
+  els.qcRecordModal.hidden = false;
+}
+
+function closeQCRecordModal() {
+  els.qcRecordModal.hidden = true;
+  els.qcRecordMessage.textContent = "";
+}
+
+function syncQCRecordAnalyteOptions() {
+  const activeItems = knownAnalyteOptions();
+  const preferred = state.selectedQCAnalysisTag && activeItems.some((item) => item.tag === state.selectedQCAnalysisTag) ? state.selectedQCAnalysisTag : "";
+  els.qcRecordAnalyte.innerHTML = [
+    `<option value="">Selecteaza analiza</option>`,
+    ...activeItems.map((item) => `<option value="${escapeHtml(item.tag)}">${escapeHtml(item.tag)} · ${escapeHtml(item.name || "-")}</option>`),
+  ].join("");
+  els.qcRecordAnalyte.value = preferred;
+}
+
+function syncQCRecordLotOptions() {
+  const analyteTag = String(els.qcRecordAnalyte.value || "").trim();
+  const targets = state.qcTargets.filter((item) => item.active !== false && item.analyte_tag === analyteTag);
+  if (!analyteTag) {
+    els.qcRecordLot.disabled = true;
+    els.qcRecordLot.innerHTML = `<option value="">Selecteaza mai intai analiza</option>`;
+    syncQCRecordLotMetadata();
+    return;
+  }
+  els.qcRecordLot.disabled = targets.length === 0;
+  els.qcRecordLot.innerHTML = targets.length > 0
+    ? targets.map((item) => `<option value="${escapeHtml(String(item.id))}">${escapeHtml(item.lot_no || "-")} · ${escapeHtml(item.control_level || "-")}</option>`).join("")
+    : `<option value="">Nu exista loturi QC definite pentru analiza selectata</option>`;
+  syncQCRecordLotMetadata();
+}
+
+function syncQCRecordLotMetadata() {
+  const targetID = Number(els.qcRecordLot.value || 0);
+  const target = state.qcTargets.find((item) => item.id === targetID);
+  const hasAnalyte = !!String(els.qcRecordAnalyte.value || "").trim();
+  const level = target?.control_level || (hasAnalyte ? (state.selectedQCLevel || configuredQCLevels()[0] || "QC") : "");
+  const lot = target?.lot_no || "";
+  els.qcRecordLevel.value = level;
+  if (!els.qcRecordLabel.value || els.qcRecordLabel.dataset.autofill === "1") {
+    els.qcRecordLabel.value = `${level} ${lot}`.trim();
+    els.qcRecordLabel.dataset.autofill = "1";
+  }
+}
+
+async function onSaveQCRecord(event) {
+  event.preventDefault();
+  const analyteTag = els.qcRecordAnalyte.value || "";
+  const analyte = state.analytes.find((item) => item.tag === analyteTag);
+  if (!analyte) {
+    els.qcRecordMessage.textContent = "Analiza este obligatorie";
+    return;
+  }
+  const targetID = Number(els.qcRecordLot.value || 0);
+  const target = state.qcTargets.find((item) => item.id === targetID);
+  const quantitativeValue = (els.qcRecordQuantitative.value || "").trim();
+  const payload = {
+    run_date: els.qcRecordDate.value || localISODate(),
+    analyte_tag: analyte.tag,
+    analyte_name: analyte.name || analyte.tag,
+    control_level: target?.control_level || els.qcRecordLevel.value || configuredQCLevels()[0] || "QC",
+    lot_no: target?.lot_no || (els.qcRecordLabel.value || "-").trim(),
+    control_label: (els.qcRecordLabel.value || `${target?.control_level || ""} ${target?.lot_no || "-"}`).trim(),
+    result_value: quantitativeValue,
+    raw_value: quantitativeValue,
+    interpreted_value: "",
+    unit: analyte.result_measure_unit || target?.unit || "",
+  };
+  try {
+    await api("/api/qc-records", { method: "POST", body: JSON.stringify(payload) });
+    closeQCRecordModal();
+    state.selectedQCDate = payload.run_date;
+    await Promise.all([loadQCRecords(), loadStatus(), loadDashboard()]);
+    showToast(t("saveQcTarget"), "success");
+  } catch (error) {
+    els.qcRecordMessage.textContent = error.message;
+  }
+}
+
+function renderAnalyteList() {
+  const query = els.analyteSearch.value.trim().toLowerCase();
+  const filtered = state.analytes.filter((item) => [item.tag, item.code, item.name, item.description].join(" ").toLowerCase().includes(query));
+  if (filtered.length === 0) {
+    els.analyteList.innerHTML = `<div class="log-item">${escapeHtml(t("noAnalytes"))}</div>`;
+  } else {
+    els.analyteList.innerHTML = `
+      <div class="analyte-table-wrap">
+        <table class="analyte-table">
+          <thead>
+            <tr>
+              <th class="col-tag">Tag</th>
+              <th class="col-code">Code</th>
+              <th>Name</th>
+              <th class="col-type">Type</th>
+              <th class="col-state">State</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${filtered.map((item) => `
+              <tr class="${item.tag === state.selectedTag ? "active" : ""}" data-tag="${escapeHtml(item.tag)}">
+                <td class="col-tag"><span class="cell-ellipsis" title="${escapeHtml(item.tag)}"><strong>${escapeHtml(item.tag)}</strong></span></td>
+                <td class="col-code"><span class="cell-ellipsis" title="${escapeHtml(item.code || "-")}">${escapeHtml(item.code || "-")}</span></td>
+                <td>
+                  <div class="analyte-main">
+                    <strong>${escapeHtml(item.name || "-")}${Array.isArray(item.transform_rules) && item.transform_rules.length > 0 ? ` <span class="transform-indicator" title="Are reguli de transformare active">↺</span>` : ""}</strong>
+                    <div class="small muted">${escapeHtml(item.description || "")}</div>
+                  </div>
+                </td>
+                <td class="col-type">${escapeHtml(item.result_type || "-")}</td>
+                <td class="col-state"><span class="badge">${item.active ? "active" : "inactive"}</span></td>
+              </tr>`).join("")}
+          </tbody>
+        </table>
+      </div>`;
+  }
+  [...els.analyteList.querySelectorAll("[data-tag]")].forEach((button) => {
+    button.addEventListener("click", () => {
+      state.selectedTag = button.dataset.tag;
+      renderAnalyteList();
+      const item = state.analytes.find((entry) => entry.tag === state.selectedTag);
+      if (item) {
+        openAnalyteModal(item);
+      }
+    });
+  });
+}
+
+function currentAnalyte() {
+  return state.analytes.find((item) => item.tag === state.selectedTag) || null;
+}
+
+function selectedQCTarget() {
+  const analyteTag = String(els.qcTargetAnalyte.value || "").trim();
+  if (!analyteTag) return null;
+  const controlLevel = String(els.qcTargetLevel.value || configuredQCLevels()[0] || "QC").trim();
+  const lotNo = String(els.qcTargetLot.value || "-").trim() || "-";
+  return state.qcTargets.find((item) => item.analyte_tag === analyteTag && item.control_level === controlLevel && (item.lot_no || "-") === lotNo) || null;
+}
+
+function currentQCTargetAnalyteTag() {
+  return state.selectedQCTargetAnalyteTag || state.analytes[0]?.tag || "";
+}
+
+function syncQCTargetAnalyteOptions() {
+  const activeItems = state.analytes.filter((item) => item.active !== false);
+  if (state.selectedQCTargetAnalyteTag && !activeItems.some((item) => item.tag === state.selectedQCTargetAnalyteTag)) {
+    state.selectedQCTargetAnalyteTag = null;
+  }
+  if (!state.selectedQCTargetAnalyteTag) {
+    state.selectedQCTargetAnalyteTag = state.selectedTag || activeItems[0]?.tag || null;
+  }
+  els.qcTargetFilterAnalyte.innerHTML = activeItems.map((item) => `<option value="${escapeHtml(item.tag)}">${escapeHtml(item.tag)} · ${escapeHtml(item.name || "-")}</option>`).join("");
+  if (state.selectedQCTargetAnalyteTag) {
+    els.qcTargetFilterAnalyte.value = state.selectedQCTargetAnalyteTag;
+  }
+}
+
+function syncQCTargetFormAnalyteOptions() {
+  const activeItems = state.analytes.filter((item) => item.active !== false);
+  els.qcTargetAnalyte.innerHTML = activeItems.map((item) => `<option value="${escapeHtml(item.tag)}">${escapeHtml(item.tag)} · ${escapeHtml(item.name || "-")}</option>`).join("");
+  syncQCConfiguredLevels();
+  if (currentQCTargetAnalyteTag()) {
+    els.qcTargetAnalyte.value = currentQCTargetAnalyteTag();
+  }
+}
+
+function onQCTargetFilterAnalyteChange() {
+  state.selectedQCTargetAnalyteTag = els.qcTargetFilterAnalyte.value || null;
+  state.selectedQCTargetID = null;
+  renderQCTargetList();
+}
+
+function onQCTargetAnalyteChange() {
+  syncSelectedTargetFromForm();
+}
+
+function syncSelectedTargetFromForm() {
+  const analyteTag = String(els.qcTargetAnalyte.value || "").trim();
+  const analyte = state.analytes.find((item) => item.tag === analyteTag) || null;
+  if (!analyte) {
+    if (!state.editingQCTargetID) {
+      state.selectedQCTargetID = null;
+    }
+    els.qcTargetMessage.textContent = "";
+    return;
+  }
+  const target = selectedQCTarget();
+  if (!state.editingQCTargetID) {
+    state.selectedQCTargetID = target?.id || null;
+    els.qcTargetMean.value = target ? String(target.target_mean ?? "") : "";
+    els.qcTargetSD.value = target ? String(target.target_sd ?? "") : "";
+  }
+  updateQCTargetDerivedFields();
+  if (state.editingQCTargetID) {
+    els.qcTargetMessage.textContent = `${t("editing")} ${analyte.tag}`;
+  } else {
+    els.qcTargetMessage.textContent = target ? `${t("editing")} ${analyte.tag} / ${target.control_level} / ${target.lot_no || "-"}` : t("readyNew");
+  }
+}
+
+function updateQCTargetDerivedFields() {
+  const mean = Number(els.qcTargetMean.value || 0);
+  const sd = Number(els.qcTargetSD.value || 0);
+  const cv = mean !== 0 ? Math.abs(sd / mean) * 100 : 0;
+  els.qcTarget1SD.value = sd ? `± ${sd.toFixed(4)}` : "";
+  els.qcTarget2SD.value = sd ? `± ${(sd * 2).toFixed(4)}` : "";
+  els.qcTarget3SD.value = sd ? `± ${(sd * 3).toFixed(4)}` : "";
+  els.qcTargetCV.value = mean && sd ? cv.toFixed(2) : "";
+}
+
+function renderQCTargetList() {
+  const analyteTag = currentQCTargetAnalyteTag();
+  const items = analyteTag ? state.qcTargets.filter((item) => item.analyte_tag === analyteTag) : [];
+  if (state.selectedQCTargetID && !items.some((item) => item.id === state.selectedQCTargetID)) {
+    state.selectedQCTargetID = null;
+  }
+  if (items.length === 0) {
+    els.qcTargetList.innerHTML = `<div class="log-item">${escapeHtml(t("noQc"))}</div>`;
+    return;
+  }
+  els.qcTargetList.innerHTML = `
+    <div class="analyte-table-wrap">
+      <table class="analyte-table">
+        <thead>
+          <tr>
+            <th class="col-code">${escapeHtml(t("analysisTag"))}</th>
+            <th>${escapeHtml(t("qcLevel"))}</th>
+            <th>${escapeHtml(t("lotNo"))}</th>
+            <th>${escapeHtml(t("qcTargetMean"))}</th>
+            <th>${escapeHtml(t("qcTargetSD"))}</th>
+            <th>${escapeHtml(t("qcTargetCV"))}</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${items.map((item) => `<tr class="${item.id === state.selectedQCTargetID ? "active" : ""}" data-target-id="${item.id}">
+            <td class="col-code"><span class="cell-ellipsis">${escapeHtml(item.analyte_tag || "-")}</span></td>
+            <td>${escapeHtml(item.control_level || "-")}</td>
+            <td>${escapeHtml(item.lot_no || "-")}</td>
+            <td>${escapeHtml(String(item.target_mean ?? "-"))}</td>
+            <td>${escapeHtml(String(item.target_sd ?? "-"))}</td>
+            <td>${escapeHtml(String(item.target_cv ?? "-"))}</td>
+          </tr>`).join("")}
+        </tbody>
+      </table>
+    </div>`;
+  [...els.qcTargetList.querySelectorAll("[data-target-id]")].forEach((row) => {
+    row.addEventListener("click", async () => {
+      const id = Number(row.dataset.targetId || 0);
+      const target = state.qcTargets.find((item) => item.id === id);
+      if (!target) return;
+      if (!state.qcLevels.length) {
+        await loadQCMeta().catch(() => {});
+      }
+      state.selectedQCTargetID = id;
+      state.selectedQCTargetAnalyteTag = target.analyte_tag || currentQCTargetAnalyteTag();
+      els.qcTargetFilterAnalyte.value = state.selectedQCTargetAnalyteTag;
+      renderQCTargetList();
+      openQCTargetModal(target);
+    });
+  });
+}
+
+function filteredDailyDetailDefinitions() {
+  const query = String(els.dailyDetailDefinitionSearch?.value || "").trim().toLowerCase();
+  if (!query) return state.dailyDetailDefinitions;
+  return state.dailyDetailDefinitions.filter((item) => [item.key, item.label, item.scope, item.field_type].join(" ").toLowerCase().includes(query));
+}
+
+function renderDailyDetailDefinitionList() {
+  if (!els.dailyDetailDefinitionList) return;
+  const items = filteredDailyDetailDefinitions();
+  if (items.length === 0) {
+    els.dailyDetailDefinitionList.innerHTML = `<div class="log-item">Nu exista definitii pentru detalii zilnice.</div>`;
+    return;
+  }
+  els.dailyDetailDefinitionList.innerHTML = `
+    <div class="analyte-table-wrap">
+      <table class="analyte-table">
+        <thead>
+          <tr>
+            <th>Cheie</th>
+            <th>Eticheta</th>
+            <th>Scope</th>
+            <th>Tip</th>
+            <th>Sursa</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${items.map((item) => `<tr class="${item.id === state.selectedDailyDetailDefinitionID ? "active" : ""}" data-daily-detail-definition-id="${item.id || 0}" data-daily-detail-definition-key="${escapeHtml(item.key || "")}">
+            <td>${escapeHtml(item.key || "-")}</td>
+            <td>${escapeHtml(item.label || "-")}</td>
+            <td>${escapeHtml(item.scope || "-")}</td>
+            <td>${escapeHtml(item.field_type || "-")}</td>
+            <td>${escapeHtml(item.source || "static")}</td>
+          </tr>`).join("")}
+        </tbody>
+      </table>
+    </div>`;
+  [...els.dailyDetailDefinitionList.querySelectorAll("[data-daily-detail-definition-key]")].forEach((row) => {
+    row.addEventListener("click", () => {
+      const key = String(row.dataset.dailyDetailDefinitionKey || "");
+      const item = state.dailyDetailDefinitions.find((entry) => entry.key === key);
+      if (!item) return;
+      state.selectedDailyDetailDefinitionID = Number(item.id || 0) || null;
+      state.selectedDailyDetailDefinitionKey = item.key || null;
+      renderDailyDetailDefinitionList();
+      openDailyDetailDefinitionModal(item);
+    });
+  });
+}
+
+function openDailyDetailDefinitionModal(item = null) {
+  if (!els.dailyDetailDefinitionForm || !els.dailyDetailDefinitionModal) return;
+  state.selectedDailyDetailDefinitionID = item?.id || null;
+  state.selectedDailyDetailDefinitionKey = item?.key || null;
+  const form = els.dailyDetailDefinitionForm;
+  form.key.value = item?.key || "";
+  form.label.value = item?.label || "";
+  form.scope.value = item?.scope || "day";
+  form.field_type.value = item?.field_type || "text";
+  form.placeholder.value = item?.placeholder || "";
+  form.default_value.value = item?.default_value || "";
+  form.options_csv.value = Array.isArray(item?.options) ? item.options.join(", ") : "";
+  form.sort_order.value = item?.sort_order ?? "";
+  form.required.checked = !!item?.required;
+  form.active.checked = item ? !!item.active : true;
+  form.key.disabled = item?.source === "static";
+  const saveBtn = document.getElementById("save-daily-detail-definition");
+  if (saveBtn) saveBtn.disabled = item?.source === "static";
+  els.deleteDailyDetailDefinitionBtn.hidden = !item || item?.source === "static";
+  els.dailyDetailDefinitionMessage.textContent = item?.source === "static" ? "Definitiile statice pot fi doar consultate." : (item ? `Editing ${item.key}` : "Ready");
+  els.dailyDetailDefinitionModal.hidden = false;
+}
+
+function closeDailyDetailDefinitionModal() {
+  if (!els.dailyDetailDefinitionModal) return;
+  els.dailyDetailDefinitionModal.hidden = true;
+  state.selectedDailyDetailDefinitionID = null;
+  state.selectedDailyDetailDefinitionKey = null;
+  const saveBtn = document.getElementById("save-daily-detail-definition");
+  if (saveBtn) saveBtn.disabled = false;
+  if (els.dailyDetailDefinitionMessage) els.dailyDetailDefinitionMessage.textContent = "";
+}
+
+async function onRefreshDailyDetailDefinitionsClick() {
+  try {
+    await loadDailyDetailDefinitions();
+  } catch (error) {
+    showToast(error?.message || "Cannot load daily detail definitions", "error");
+  }
+}
+
+async function onSaveDailyDetailDefinition(event) {
+  event.preventDefault();
+  const form = new FormData(els.dailyDetailDefinitionForm);
+  const payload = {
+    id: state.selectedDailyDetailDefinitionID || 0,
+    key: String(form.get("key") || "").trim(),
+    label: String(form.get("label") || "").trim(),
+    scope: String(form.get("scope") || "day").trim(),
+    field_type: String(form.get("field_type") || "text").trim(),
+    placeholder: String(form.get("placeholder") || "").trim(),
+    default_value: String(form.get("default_value") || "").trim(),
+    options: String(form.get("options_csv") || "").split(",").map((item) => item.trim()).filter(Boolean),
+    sort_order: Number(form.get("sort_order") || 0),
+    required: !!form.get("required"),
+    active: !!form.get("active"),
+  };
+  const url = payload.id ? `/api/daily-details/definitions/${payload.id}` : "/api/daily-details/definitions";
+  const method = payload.id ? "PUT" : "POST";
+  try {
+    await api(url, { method, body: JSON.stringify(payload) });
+    await loadDailyDetailDefinitions();
+    closeDailyDetailDefinitionModal();
+    showToast("Definitia a fost salvata.", "success");
+  } catch (error) {
+    els.dailyDetailDefinitionMessage.textContent = error?.message || "Cannot save definition";
+    showToast(error?.message || "Cannot save definition", "error");
+  }
+}
+
+async function onDeleteDailyDetailDefinition() {
+  if (!state.selectedDailyDetailDefinitionID) return;
+  if (!window.confirm("Stergi definitia selectata?")) return;
+  try {
+    await api(`/api/daily-details/definitions/${state.selectedDailyDetailDefinitionID}`, { method: "DELETE" });
+    await loadDailyDetailDefinitions();
+    closeDailyDetailDefinitionModal();
+    showToast("Definitia a fost stearsa.", "success");
+  } catch (error) {
+    showToast(error?.message || "Cannot delete definition", "error");
+  }
+}
+
+function filteredDailyDetailValueDefinitions() {
+  const scope = state.dailyDetailsScopeTab || "day";
+  const query = String(els.dailyDetailsValueSearch?.value || "").trim().toLowerCase();
+  return (state.dailyDetailDefinitions || [])
+    .filter((item) => item.active !== false && (item.scope === scope || item.key === "cod_formular_fisa_lucru"))
+    .filter((item) => !query || [item.key, item.label, item.placeholder].join(" ").toLowerCase().includes(query));
+}
+
+function renderDailyDetailValuesWorkspace() {
+  const host = document.getElementById("daily-detail-values-list");
+  if (!host) return;
+  const scope = state.dailyDetailsScopeTab || "day";
+  const usesRound = ["day_round", "day_round_analyte"].includes(scope);
+  const usesAnalyte = ["day_analyte", "day_round_analyte"].includes(scope);
+  if (usesAnalyte) {
+    syncDailyDetailAnalyteOptions();
+  }
+  if (els.dailyDetailsRoundBox) els.dailyDetailsRoundBox.hidden = !usesRound;
+  if (els.dailyDetailsAnalyteBox) els.dailyDetailsAnalyteBox.hidden = !usesAnalyte;
+  els.dailyDetailsTabs.forEach((tab) => tab.classList.toggle("active", (tab.dataset.dailyScope || "day") === scope));
+  const definitions = filteredDailyDetailValueDefinitions();
+  if (definitions.length === 0) {
+    host.innerHTML = `<div class="log-item">${escapeHtml(t("noDailyDetails"))}</div>`;
+    return;
+  }
+  const roundNo = usesRound ? Number(state.dailyDetailsRoundNo || 0) : 0;
+  const analyteTag = usesAnalyte ? String(state.dailyDetailsAnalyteTag || "").trim() : "";
+  const valuesIndex = new Map((state.dailyDetailValues || []).map((item) => [`${item.definition_key}|${item.round_no || 0}|${item.analyte_tag || ""}`, item]));
+  host.innerHTML = `
+    <div class="analyte-table-wrap">
+      <table class="analyte-table">
+        <thead>
+          <tr>
+            <th>${escapeHtml(t("variableName"))}</th>
+            <th>${escapeHtml(t("scope"))}</th>
+            ${usesRound ? `<th>${escapeHtml(t("round"))}</th>` : ""}
+            ${usesAnalyte ? `<th>${escapeHtml(t("navAnalytes"))}</th>` : ""}
+            <th>${escapeHtml(t("value"))}</th>
+            <th>${escapeHtml(t("source"))}</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${definitions.map((item) => {
+            const key = `${item.key}|${roundNo}|${analyteTag}`;
+            const current = valuesIndex.get(key);
+            const value = current?.value_text ?? item.default_value ?? "";
+            const field = item.field_type === "select"
+              ? `<select data-daily-detail-key="${escapeHtml(item.key)}" data-round-no="${roundNo}" data-analyte-tag="${escapeHtml(analyteTag)}">
+                  <option value=""></option>
+                  ${(item.options || []).map((option) => `<option value="${escapeHtml(option)}" ${option === value ? "selected" : ""}>${escapeHtml(option)}</option>`).join("")}
+                </select>`
+              : `<input type="${item.field_type === "number" ? "number" : "text"}" step="any" value="${escapeHtml(value)}" placeholder="${escapeHtml(item.placeholder || "")}" data-daily-detail-key="${escapeHtml(item.key)}" data-round-no="${roundNo}" data-analyte-tag="${escapeHtml(analyteTag)}">`;
+            return `<tr>
+              <td><strong>${escapeHtml(item.label || item.key)}</strong><div class="small muted">${escapeHtml(item.key || "-")}</div></td>
+              <td>${escapeHtml(item.scope || "-")}</td>
+              ${usesRound ? `<td>${escapeHtml(String(roundNo || "-"))}</td>` : ""}
+              ${usesAnalyte ? `<td>${escapeHtml(analyteTag || "-")}</td>` : ""}
+              <td>${field}</td>
+              <td>${escapeHtml(item.source || "shared")}</td>
+            </tr>`;
+          }).join("")}
+        </tbody>
+      </table>
+    </div>`;
+  [...host.querySelectorAll("[data-daily-detail-key]")].forEach((input) => {
+    const save = async () => {
+      const payload = {
+        definition_key: input.dataset.dailyDetailKey || "",
+        scope_date: state.dailyDetailsDate || localISODate(),
+        round_no: Number(input.dataset.roundNo || 0),
+        analyte_tag: String(input.dataset.analyteTag || "").trim(),
+        value_text: String(input.value || "").trim(),
+      };
+      try {
+        await api("/api/daily-details", { method: "PUT", body: JSON.stringify(payload) });
+        await loadDailyDetailValues(state.dailyDetailsDate, usesRound ? roundNo : 0);
+        showToast(t("saved"), "success");
+      } catch (error) {
+        showToast(error?.message || "Cannot save daily detail", "error");
+      }
+    };
+    input.addEventListener("change", save);
+    input.addEventListener("blur", save);
+  });
+}
+
+function fillAnalyteForm(item = null) {
+  state.selectedAnalyteId = item?.id || null;
+  state.selectedTag = item?.tag || null;
+  state.analyteTransformRules = normalizeTransformRules(item?.transform_rules || []);
+  const form = els.analyteForm;
+  form.tag.value = item?.tag || "";
+  form.code.value = item?.code || "";
+  form.result_formula_code.value = item?.result_formula_code || "";
+  form.name.value = item?.name || "";
+  form.description.value = item?.description || "";
+  form.result_type.value = item?.result_type || "text";
+  form.result_formatting.value = item?.result_formatting || "raw";
+  form.result_weighting.value = item?.result_weighting ?? 1;
+  form.result_measure_unit.value = item?.result_measure_unit || "";
+  form.result_reagents_set.value = item?.result_reagents_set || "";
+  form.worklist_label.value = item?.protocol_options?.worklist_label || "";
+  form.detected_max_cq.value = item?.protocol_options?.detected_max_cq ?? "";
+  form.active.checked = item ? !!item.active : true;
+  syncTransformRulesField();
+  renderTransformRulesEditor();
+  syncAnalyteProtocolFields();
+  els.deleteAnalyteBtn.hidden = !item;
+  els.analyteMessage.textContent = item ? `${t("editing")} ${item.tag}` : t("readyNew");
+  renderAnalyteList();
+}
+
+function analyteUsesDetectedMaxCq() {
+  return String(state.readerInfo?.protocol || state.readerSettings?.analyzer_protocol || "").trim().toLowerCase() === "cfx96-quantitation";
+}
+
+function syncAnalyteProtocolFields() {
+  const field = document.getElementById("analyte-detected-max-cq-field");
+  if (!field || !els.analyteForm) return;
+  const visible = analyteUsesDetectedMaxCq();
+  field.hidden = !visible;
+  if (!visible) {
+    els.analyteForm.detected_max_cq.value = "";
+  }
+}
+
+function openAnalyteModal(item = null) {
+  fillAnalyteForm(item);
+  els.analyteModal.hidden = false;
+}
+
+function closeAnalyteModal() {
+  els.analyteModal.hidden = true;
+  closeTransformRuleModal();
+  els.analyteMessage.textContent = "";
+}
+
+function normalizeTransformRules(rules) {
+  return (Array.isArray(rules) ? rules : []).map((rule, index) => ({
+    id: String(rule?.id || `regula-${index + 1}`).trim(),
+    order: Number(rule?.order || (index + 1) * 10),
+    enabled: rule?.enabled !== false,
+    type: String(rule?.type || "value_map").trim() || "value_map",
+    source_field: String(rule?.source_field || "source_result").trim() || "source_result",
+    target_field: String(rule?.target_field || "result_value").trim() || "result_value",
+    target_mode: String(rule?.target_mode || "").trim(),
+    match_value: String(rule?.match_value || "").trim(),
+    match_ignore_case: rule?.match_ignore_case !== false,
+    output_value: String(rule?.output_value || "").trim(),
+    formula: String(rule?.formula || "").trim(),
+    stop_after_apply: rule?.stop_after_apply !== false,
+  }));
+}
+
+function syncTransformRulesField() {
+  if (!els.analyteForm?.elements?.transform_rules) return;
+  els.analyteForm.elements.transform_rules.value = JSON.stringify(
+    state.analyteTransformRules.map((rule, index) => ({
+      ...rule,
+      order: (index + 1) * 10,
+    }))
+  );
+}
+
+function transformRuleTypeLabel(type) {
+  return String(type || "").trim() === "formula" ? "Formula" : "Valoare -> valoare";
+}
+
+function transformRuleTargetLabel(target) {
+  switch (String(target || "").trim()) {
+    case "raw_value":
+      return "Rezultat cantitativ";
+    case "interpreted":
+      return "Interpretare";
+    default:
+      return "Rezultat calitativ";
+  }
+}
+
+function formatTransformRuleSummary(rule) {
+  if (String(rule?.type || "").trim() === "formula") {
+    return rule?.formula || "Formula lipsa";
+  }
+  return `${rule?.match_value || "(gol)"} -> ${rule?.output_value || "(gol)"}`;
+}
+
+function renderTransformRulesEditor() {
+  if (!els.transformRulesList) return;
+  syncTransformRulesField();
+  if (!state.analyteTransformRules.length) {
+    els.transformRulesList.innerHTML = `<div class="transform-rule-empty">Nu exista reguli definite.</div>`;
+    return;
+  }
+  els.transformRulesList.innerHTML = state.analyteTransformRules.map((rule, index) => `
+    <div class="transform-rule-card ${rule.enabled === false ? "is-disabled" : ""}">
+      <div class="transform-rule-card-main">
+        <div class="transform-rule-card-title">
+          <strong>${escapeHtml(rule.id || `Regula ${index + 1}`)}</strong>
+          <span class="badge">${escapeHtml(transformRuleTypeLabel(rule.type))}</span>
+          <span class="badge">${escapeHtml(transformRuleTargetLabel(rule.target_field))}</span>
+          ${rule.enabled === false ? `<span class="badge">Inactiva</span>` : ""}
+        </div>
+        <div class="small muted">${escapeHtml(formatTransformRuleSummary(rule))}</div>
+        <div class="small muted">${escapeHtml(rule.stop_after_apply ? "Opreste dupa aplicare" : "Continua cu regula urmatoare")}</div>
+      </div>
+      <div class="transform-rule-card-actions">
+        <button type="button" class="ghost" data-rule-move="up" data-rule-index="${index}" ${index === 0 ? "disabled" : ""}>Sus</button>
+        <button type="button" class="ghost" data-rule-move="down" data-rule-index="${index}" ${index === state.analyteTransformRules.length - 1 ? "disabled" : ""}>Jos</button>
+        <button type="button" class="ghost" data-rule-edit="${index}">Editeaza</button>
+        <button type="button" class="danger" data-rule-delete="${index}">Sterge</button>
+      </div>
+    </div>`).join("");
+  [...els.transformRulesList.querySelectorAll("[data-rule-edit]")].forEach((button) => {
+    button.addEventListener("click", () => openTransformRuleModal(Number(button.dataset.ruleEdit || -1)));
+  });
+  [...els.transformRulesList.querySelectorAll("[data-rule-delete]")].forEach((button) => {
+    button.addEventListener("click", () => deleteTransformRule(Number(button.dataset.ruleDelete || -1)));
+  });
+  [...els.transformRulesList.querySelectorAll("[data-rule-move]")].forEach((button) => {
+    button.addEventListener("click", () => moveTransformRule(Number(button.dataset.ruleIndex || -1), button.dataset.ruleMove || ""));
+  });
+}
+
+function defaultTransformRule() {
+  return {
+    id: `regula-${state.analyteTransformRules.length + 1}`,
+    type: "value_map",
+    source_field: "source_result",
+    target_field: "result_value",
+    target_mode: "",
+    match_value: "",
+    match_ignore_case: true,
+    output_value: "",
+    formula: "",
+    enabled: true,
+    stop_after_apply: true,
+  };
+}
+
+const transformFormulaTemplates = [
+  { label: "IF", insert: 'IF(SRC_RAW > 40, "NEDETECTABIL", "DETECTABIL")' },
+  { label: "SQRT", insert: "SQRT(SRC_RAW)" },
+  { label: "ABS", insert: "ABS(SRC_RAW)" },
+  { label: "ROUND", insert: "ROUND(SRC_RAW, 2)" },
+  { label: "SUM", insert: "SUM(SRC_RAW, RES_FCAT)" },
+  { label: "AVG", insert: "AVG(SRC_RAW, RES_FCAT, RES_FPT)" },
+  { label: "MIN", insert: "MIN(SRC_RAW, RES_FCAT)" },
+  { label: "MAX", insert: "MAX(SRC_RAW, RES_FCAT)" },
+  { label: "POW", insert: "POW(SRC_RAW, 2)" },
+];
+
+function transformFormulaVariables() {
+  const base = [
+    { label: "SRC_RESULT", insert: "SRC_RESULT", title: "Rezultatul brut calitativ primit de la analizor" },
+    { label: "SRC_RAW", insert: "SRC_RAW", title: "Rezultatul brut cantitativ primit de la analizor" },
+    { label: "CUR_RESULT", insert: "CUR_RESULT", title: "Rezultatul curent calitativ dupa reguli anterioare" },
+    { label: "CUR_RAW", insert: "CUR_RAW", title: "Rezultatul curent cantitativ dupa reguli anterioare" },
+    { label: "RAW", insert: "RAW", title: "Alias pentru SRC_RAW" },
+    { label: "CUR", insert: "CUR", title: "Alias pentru CUR_RAW" },
+  ];
+  const analyteVars = (Array.isArray(state.analytes) ? state.analytes : [])
+    .map((item) => {
+      const code = String(item?.result_formula_code || "").trim().toUpperCase();
+      if (!code) return null;
+      return {
+        label: `RES_${code}`,
+        insert: `RES_${code}`,
+        title: `${item?.tag || "-"} - ${item?.name || ""}`.trim(),
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.label.localeCompare(b.label));
+  return [...base, ...analyteVars];
+}
+
+function insertTransformFormulaText(text) {
+  const field = els.transformRuleForm?.elements?.formula;
+  if (!field) return;
+  const start = field.selectionStart ?? field.value.length;
+  const end = field.selectionEnd ?? field.value.length;
+  const before = field.value.slice(0, start);
+  const after = field.value.slice(end);
+  const needsSpaceBefore = before && !/\s|\(|,|\n$/.test(before.slice(-1));
+  const needsSpaceAfter = after && !/^\s|\)|,|\n/.test(after.charAt(0));
+  const insertion = `${needsSpaceBefore ? " " : ""}${text}${needsSpaceAfter ? " " : ""}`;
+  field.value = `${before}${insertion}${after}`;
+  const cursor = before.length + insertion.length;
+  field.focus();
+  field.setSelectionRange(cursor, cursor);
+}
+
+function renderTransformFormulaHelpers() {
+  if (els.transformFormulaFunctions) {
+    els.transformFormulaFunctions.innerHTML = transformFormulaTemplates.map((item) => (
+      `<button type="button" class="transform-formula-chip" data-transform-formula-insert="${escapeHtml(item.insert)}" title="${escapeHtml(item.insert)}">${escapeHtml(item.label)}</button>`
+    )).join("");
+  }
+  if (els.transformFormulaVariables) {
+    els.transformFormulaVariables.innerHTML = transformFormulaVariables().map((item) => (
+      `<button type="button" class="transform-formula-chip" data-transform-formula-insert="${escapeHtml(item.insert)}" title="${escapeHtml(item.title || item.insert)}">${escapeHtml(item.label)}</button>`
+    )).join("");
+  }
+  [...document.querySelectorAll("[data-transform-formula-insert]")].forEach((button) => {
+    button.addEventListener("click", () => insertTransformFormulaText(button.dataset.transformFormulaInsert || ""));
+  });
+}
+
+function openTransformRuleModal(index = null) {
+  if (!els.transformRuleModal || !els.transformRuleForm) return;
+  state.editingTransformRuleIndex = Number.isInteger(index) && index >= 0 ? index : null;
+  const rule = state.editingTransformRuleIndex === null ? defaultTransformRule() : { ...state.analyteTransformRules[state.editingTransformRuleIndex] };
+  els.transformRuleForm.elements.id.value = rule.id || "";
+  els.transformRuleForm.elements.type.value = rule.type || "value_map";
+  els.transformRuleForm.elements.source_field.value = rule.source_field || "source_result";
+  els.transformRuleForm.elements.target_field.value = rule.target_field || "result_value";
+  els.transformRuleForm.elements.target_mode.value = rule.target_mode || "";
+  els.transformRuleForm.elements.stop_after_apply.value = rule.stop_after_apply === false ? "false" : "true";
+  els.transformRuleForm.elements.match_value.value = rule.match_value || "";
+  els.transformRuleForm.elements.output_value.value = rule.output_value || "";
+  els.transformRuleForm.elements.formula.value = rule.formula || "";
+  els.transformRuleForm.elements.enabled.checked = rule.enabled !== false;
+  els.transformRuleForm.elements.match_ignore_case.checked = rule.match_ignore_case !== false;
+  els.transformRuleMessage.textContent = state.editingTransformRuleIndex === null ? "Defineste o regula noua." : `Editezi regula ${rule.id || state.editingTransformRuleIndex + 1}.`;
+  renderTransformFormulaHelpers();
+  syncTransformRuleFormVisibility();
+  els.transformRuleModal.hidden = false;
+}
+
+function closeTransformRuleModal() {
+  if (!els.transformRuleModal) return;
+  els.transformRuleModal.hidden = true;
+  state.editingTransformRuleIndex = null;
+  if (els.transformRuleMessage) els.transformRuleMessage.textContent = "";
+}
+
+function syncTransformRuleFormVisibility() {
+  if (!els.transformRuleForm) return;
+  const type = String(els.transformRuleForm.elements.type.value || "value_map").trim();
+  const targetField = String(els.transformRuleForm.elements.target_field.value || "result_value").trim();
+  const mapFields = els.transformRuleForm.querySelector(".transform-rule-map-fields");
+  const formulaField = els.transformRuleForm.querySelector(".transform-rule-formula-field");
+  const targetModeField = els.transformRuleForm.elements.target_mode?.closest("label");
+  if (mapFields) mapFields.hidden = type === "formula";
+  if (formulaField) formulaField.hidden = type !== "formula";
+  if (targetModeField) targetModeField.hidden = targetField !== "interpreted";
+}
+
+function moveTransformRule(index, direction) {
+  if (index < 0 || index >= state.analyteTransformRules.length) return;
+  const nextIndex = direction === "up" ? index - 1 : index + 1;
+  if (nextIndex < 0 || nextIndex >= state.analyteTransformRules.length) return;
+  const rules = [...state.analyteTransformRules];
+  [rules[index], rules[nextIndex]] = [rules[nextIndex], rules[index]];
+  state.analyteTransformRules = rules;
+  renderTransformRulesEditor();
+}
+
+function deleteTransformRule(index) {
+  if (index < 0 || index >= state.analyteTransformRules.length) return;
+  state.analyteTransformRules = state.analyteTransformRules.filter((_, itemIndex) => itemIndex !== index);
+  renderTransformRulesEditor();
+}
+
+async function onSaveTransformRule(event) {
+  event.preventDefault();
+  const form = new FormData(els.transformRuleForm);
+  const type = String(form.get("type") || "value_map").trim();
+  const targetField = String(form.get("target_field") || "result_value").trim();
+  const rule = {
+    id: String(form.get("id") || "").trim() || `regula-${state.analyteTransformRules.length + 1}`,
+    type,
+    source_field: String(form.get("source_field") || "source_result").trim(),
+    target_field: targetField,
+    target_mode: targetField === "interpreted" ? String(form.get("target_mode") || "").trim() : "",
+    match_value: String(form.get("match_value") || "").trim(),
+    match_ignore_case: !!form.get("match_ignore_case"),
+    output_value: String(form.get("output_value") || "").trim(),
+    formula: String(form.get("formula") || "").trim(),
+    enabled: !!form.get("enabled"),
+    stop_after_apply: String(form.get("stop_after_apply") || "true").trim() !== "false",
+  };
+  if (type === "formula" && !rule.formula) {
+    els.transformRuleMessage.textContent = "Formula este obligatorie.";
+    return;
+  }
+  if (type !== "formula" && !rule.match_value && !rule.output_value) {
+    els.transformRuleMessage.textContent = "Completeaza valoarea cautata si valoarea rezultata.";
+    return;
+  }
+  if (state.editingTransformRuleIndex === null) {
+    state.analyteTransformRules = [...state.analyteTransformRules, rule];
+  } else {
+    state.analyteTransformRules = state.analyteTransformRules.map((item, index) => index === state.editingTransformRuleIndex ? rule : item);
+  }
+  renderTransformRulesEditor();
+  closeTransformRuleModal();
+}
+
+function openQCTargetModal(target = null) {
+  syncQCConfiguredLevels();
+  syncQCTargetFormAnalyteOptions();
+  if (target) {
+    state.editingQCTargetID = target.id || null;
+    state.selectedQCTargetID = target.id || null;
+    els.qcTargetAnalyte.value = target.analyte_tag || currentQCTargetAnalyteTag();
+    els.qcTargetLevel.value = target.control_level || configuredQCLevels([target.control_level])[0] || "QC";
+    els.qcTargetLot.value = target.lot_no || "-";
+    els.qcTargetMean.value = target.target_mean ?? "";
+    els.qcTargetSD.value = target.target_sd ?? "";
+    updateQCTargetDerivedFields();
+    els.qcTargetMessage.textContent = `${t("editing")} ${target.analyte_tag} / ${target.control_level} / ${target.lot_no || "-"}`;
+  } else {
+    state.editingQCTargetID = null;
+    state.selectedQCTargetID = null;
+    els.qcTargetAnalyte.value = currentQCTargetAnalyteTag();
+    els.qcTargetLevel.value = configuredQCLevels()[0] || "QC";
+    els.qcTargetLot.value = "-";
+    els.qcTargetMean.value = "";
+    els.qcTargetSD.value = "";
+    updateQCTargetDerivedFields();
+    els.qcTargetMessage.textContent = t("readyNew");
+  }
+  els.qcTargetModal.hidden = false;
+}
+
+function closeQCTargetModal() {
+  els.qcTargetModal.hidden = true;
+  state.editingQCTargetID = null;
+  els.qcTargetMessage.textContent = "";
+}
+
+async function onRefreshQCTargetsClick() {
+  try {
+    await Promise.all([loadQCMeta(), loadAnalytes(), loadQCTargets()]);
+  } catch (error) {
+    showToast(error?.message || "Cannot load QC settings", "error");
+  }
+}
+
+async function onSaveAnalyte(event) {
+  event.preventDefault();
+  const form = new FormData(els.analyteForm);
+  const existing = state.analytes.find((item) => item.id === state.selectedAnalyteId) || state.analytes.find((item) => item.tag === state.selectedTag) || null;
+  const protocolOptions = { ...(existing?.protocol_options || {}) };
+  protocolOptions.worklist_label = String(form.get("worklist_label") || "").trim();
+  const detectedMaxCq = String(form.get("detected_max_cq") || "").trim();
+  if (analyteUsesDetectedMaxCq() && detectedMaxCq) {
+    protocolOptions.detected_max_cq = Number(detectedMaxCq);
+  } else {
+    delete protocolOptions.detected_max_cq;
+  }
+  const transformRulesRaw = String(form.get("transform_rules") || "").trim();
+  let transformRules = [];
+  if (transformRulesRaw) {
+    try {
+      const parsed = JSON.parse(transformRulesRaw);
+      if (!Array.isArray(parsed)) {
+        throw new Error("Regulile de transformare trebuie sa fie un array JSON.");
+      }
+      transformRules = parsed;
+    } catch (error) {
+      const message = error?.message || "JSON invalid pentru regulile de transformare";
+      els.analyteMessage.textContent = message;
+      showToast(message, "error");
+      return;
+    }
+  }
+  const payload = {
+    id: state.selectedAnalyteId || 0,
+    tag: String(form.get("tag") || "").trim(),
+    code: String(form.get("code") || "").trim(),
+    result_formula_code: String(form.get("result_formula_code") || "").trim(),
+    name: String(form.get("name") || "").trim(),
+    description: String(form.get("description") || "").trim(),
+    result_type: String(form.get("result_type") || "text").trim(),
+    result_formatting: String(form.get("result_formatting") || "raw").trim(),
+    result_weighting: Number(form.get("result_weighting") || 1),
+    result_measure_unit: String(form.get("result_measure_unit") || "").trim(),
+    result_reagents_set: String(form.get("result_reagents_set") || "").trim(),
+    transform_rules: transformRules,
+    protocol_options: protocolOptions,
+    active: !!form.get("active"),
+  };
+  const method = state.selectedAnalyteId ? "PUT" : "POST";
+  const url = state.selectedAnalyteId ? `/api/analytes/${state.selectedAnalyteId}` : "/api/analytes";
+  setAnalyteSaveState(true);
+  try {
+    const resp = await api(url, { method, body: JSON.stringify(payload) });
+    await loadAnalytes();
+    const savedID = Number(resp.id || payload.id || 0);
+    const saved = state.analytes.find((item) => item.id === savedID) || state.analytes.find((item) => item.tag === payload.tag);
+    fillAnalyteForm(saved || null);
+    els.analyteMessage.textContent = t("saved");
+    showToast(`${t("saved")} ${payload.tag}`, "success");
+  } catch (error) {
+    els.analyteMessage.textContent = error?.message || "Cannot save analyte";
+    showToast(error?.message || "Cannot save analyte", "error");
+  } finally {
+    setAnalyteSaveState(false);
+  }
+}
+
+async function onDeleteAnalyte() {
+  if (!state.selectedAnalyteId) return;
+  if (!window.confirm(`${t("deleteConfirm")} ${state.selectedTag}?`)) return;
+  try {
+    const deletedTag = state.selectedTag;
+    await api(`/api/analytes/${state.selectedAnalyteId}`, { method: "DELETE" });
+    state.selectedAnalyteId = null;
+    state.selectedTag = null;
+    fillAnalyteForm();
+    await loadAnalytes();
+    closeAnalyteModal();
+    showToast(`${t("delete")} ${deletedTag}`, "success");
+  } catch (error) {
+    els.analyteMessage.textContent = error?.message || "Cannot delete analyte";
+    showToast(error?.message || "Cannot delete analyte", "error");
+  }
+}
+
+async function onSaveQCTarget(event) {
+  event.preventDefault();
+  const analyteTag = String(els.qcTargetAnalyte.value || "").trim();
+  const analyte = state.analytes.find((item) => item.tag === analyteTag) || null;
+  if (!analyte) {
+    showToast("Selecteaza o analiza", "error");
+    return;
+  }
+  const payload = {
+    id: state.editingQCTargetID || state.selectedQCTargetID || 0,
+    active: true,
+    analyte_tag: analyte.tag,
+    analyte_name: analyte.name || analyte.tag,
+    control_level: String(els.qcTargetLevel.value || "QC").trim(),
+    lot_no: String(els.qcTargetLot.value || "-").trim() || "-",
+    unit: analyte.result_measure_unit || "",
+    target_mean: Number(els.qcTargetMean.value || 0),
+    target_sd: Number(els.qcTargetSD.value || 0),
+  };
+  const method = payload.id ? "PUT" : "POST";
+  const url = payload.id ? `/api/qc-targets/${payload.id}` : "/api/qc-targets";
+  try {
+    await api(url, { method, body: JSON.stringify(payload) });
+    state.selectedQCTargetAnalyteTag = payload.analyte_tag;
+    state.selectedQCTargetID = Number(payload.id || 0) || state.selectedQCTargetID;
+    await loadQCTargets();
+    closeQCTargetModal();
+    showToast(`${t("saveQcTarget")} ${payload.analyte_tag}`, "success");
+  } catch (error) {
+    els.qcTargetMessage.textContent = error.message;
+    showToast(error.message, "error");
+  }
+}
+
+async function onDeleteQCTarget() {
+  const targetID = state.editingQCTargetID || state.selectedQCTargetID;
+  if (!targetID) return;
+  const target = state.qcTargets.find((item) => item.id === targetID);
+  if (!window.confirm(`${t("delete")} ${target?.analyte_tag || ""} / ${target?.lot_no || "-" }?`)) return;
+  try {
+    await api(`/api/qc-targets/${targetID}`, { method: "DELETE" });
+    state.selectedQCTargetID = null;
+    state.editingQCTargetID = null;
+    await loadQCTargets();
+    closeQCTargetModal();
+    showToast(t("delete"), "success");
+  } catch (error) {
+    showToast(error.message, "error");
+  }
+}
+
+function renderWestgardSummaryInto(metrics, summaryEl, rulesEl) {
+  if (!metrics || !Number(metrics.count || 0)) {
+    summaryEl.innerHTML = `<div class="log-item">${escapeHtml(t("noWestgard"))}</div>`;
+    rulesEl.innerHTML = "";
+    els.qcWestgardValidateBtn.hidden = true;
+    return;
+  }
+  const cards = [
+    { label: "N", value: metrics.count ?? 0 },
+    { label: t("qcTargetMean"), value: formatMetricNumber(metrics.target_mean) },
+    { label: t("qcTargetSD"), value: formatMetricNumber(metrics.target_sd) },
+    { label: t("qcTargetCV"), value: formatMetricNumber(metrics.target_cv) },
+    { label: "Mean", value: formatMetricNumber(metrics.mean) },
+    { label: "SD", value: formatMetricNumber(metrics.sd) },
+    { label: "CV", value: formatMetricNumber(metrics.cv) },
+    { label: t("westgardMedian"), value: formatMetricNumber(metrics.median) },
+    { label: t("westgardOutliers"), value: metrics.outliers ?? 0 },
+    { label: t("westgardRepeatability"), value: formatMetricNumber(metrics.repeatability) },
+    ...(metrics.use_own_mean ? [{ label: t("westgardStatsOwnMean"), value: formatMetricNumber(metrics.robust_mean) }] : []),
+    { label: "1_2s", value: metrics.westgard?.["1_2s"] ?? 0 },
+    { label: "1_3s", value: metrics.westgard?.["1_3s"] ?? 0 },
+    { label: "2_2s", value: metrics.westgard?.["2_2s"] ?? 0 },
+    { label: "R_4s", value: metrics.westgard?.["r_4s"] ?? 0 },
+    { label: "4_1s", value: metrics.westgard?.["4_1s"] ?? 0 },
+    { label: "10x", value: metrics.westgard?.["10x"] ?? 0 },
+    { label: "7T", value: metrics.westgard?.["7t"] ?? 0 },
+  ];
+  summaryEl.innerHTML = cards.map((item) => `<div class="metric"><span class="muted small">${escapeHtml(String(item.label))}</span><strong>${escapeHtml(String(item.value))}</strong></div>`).join("");
+  const rules = Array.isArray(metrics.westgard?.rules) ? metrics.westgard.rules : [];
+  rulesEl.innerHTML = rules.map((item) => `<div class="legend-item"><span class="legend-swatch" style="background:#d63a48"></span><span>${escapeHtml(`${item.run_date} · ${item.control_label || "-"} · ${item.rules.join(", ")}`)}</span></div>`).join("");
+  const issues = Array.isArray(metrics.validation_issues) ? metrics.validation_issues : [];
+  els.qcWestgardValidateBtn.hidden = false;
+  els.qcWestgardValidateBtn.textContent = issues.length ? t("westgardInvalid") : t("westgardValid");
+  els.qcWestgardValidateBtn.className = issues.length ? "danger" : "ghost";
+}
+
+function renderWestgardChartInto(metrics, chartEl) {
+  const points = Array.isArray(metrics?.points) ? metrics.points : [];
+  if (points.length === 0) {
+    chartEl.innerHTML = "";
+    return;
+  }
+  const width = 960;
+  const height = 320;
+  const padL = 60;
+  const padR = 24;
+  const padT = 20;
+  const padB = 42;
+  const targetMean = Number(metrics.target_mean || 0);
+  const targetSD = Number(metrics.target_sd || 0);
+  const values = points.map((item) => Number(item.value || 0));
+  const bounds = [targetMean - 3 * targetSD, targetMean + 3 * targetSD, ...values];
+  const minVal = Math.min(...bounds);
+  const maxVal = Math.max(...bounds);
+  const span = maxVal - minVal || 1;
+  const x = (index) => padL + index * ((width - padL - padR) / Math.max(points.length - 1, 1));
+  const y = (value) => height - padB - (((value - minVal) / span) * (height - padT - padB));
+  const guide = (value, label, color, dash = "4 4") => `<line x1="${padL}" y1="${y(value)}" x2="${width - padR}" y2="${y(value)}" stroke="${color}" stroke-width="1.2" stroke-dasharray="${dash}"/><text x="${padL}" y="${y(value) - 6}" fill="${color}" font-size="11">${escapeHtml(label)}</text>`;
+  const path = points.map((item, index) => `${index === 0 ? "M" : "L"} ${x(index)} ${y(Number(item.value || 0))}`).join(" ");
+  chartEl.innerHTML = `
+    <rect x="0" y="0" width="${width}" height="${height}" fill="#ffffff"></rect>
+    ${guide(targetMean, "Mean", "#14786b", "0")}
+    ${targetSD > 0 ? guide(targetMean + targetSD, "+1SD", "#1e9a8a") : ""}
+    ${targetSD > 0 ? guide(targetMean - targetSD, "-1SD", "#1e9a8a") : ""}
+    ${targetSD > 0 ? guide(targetMean + 2 * targetSD, "+2SD", "#d98a1f") : ""}
+    ${targetSD > 0 ? guide(targetMean - 2 * targetSD, "-2SD", "#d98a1f") : ""}
+    ${targetSD > 0 ? guide(targetMean + 3 * targetSD, "+3SD", "#d63a48") : ""}
+    ${targetSD > 0 ? guide(targetMean - 3 * targetSD, "-3SD", "#d63a48") : ""}
+    <path d="${path}" fill="none" stroke="#229148" stroke-width="2.4"></path>
+    ${points.map((item, index) => {
+      const rules = Array.isArray(item.westgard_rules) ? item.westgard_rules : [];
+      const color = rules.length ? "#d63a48" : "#229148";
+      return `<circle cx="${x(index)}" cy="${y(Number(item.value || 0))}" r="4.5" fill="${color}">
+        <title>${escapeHtml(`${item.run_date} · ${item.control_label || "-"} · ${item.value}`)}${rules.length ? escapeHtml(` · ${rules.join(", ")}`) : ""}</title>
+      </circle><text x="${x(index)}" y="${height - 14}" text-anchor="middle" fill="#5f6e67" font-size="10">${index + 1}</text>`;
+    }).join("")}
+  `;
+}
+
+async function onGenerateQCWestgard() {
+  const bundle = state.qcRecords.find((item) => item.record.id === state.selectedQCRecordId);
+  const selectedAnalysis = bundle?.analyses?.find((item) => item.id === state.selectedQCAnalysisId) || bundle?.analyses?.find((item) => item.analyte_tag === state.selectedQCAnalysisTag);
+  if (!bundle || !selectedAnalysis) {
+    return;
+  }
+  syncQCWestgardPeriodControls();
+  const { from, to } = qcWestgardRange();
+  const params = new URLSearchParams({
+    analyte_tag: selectedAnalysis.analyte_tag || "",
+    control_level: selectedAnalysis.control_level || bundle.record.control_level || "",
+    lot_no: (selectedAnalysis.lot_no || bundle.record.lot_no || "-").trim() || "-",
+    date_from: from,
+    date_to: to,
+  });
+  const resp = await api(`/api/qc/metrics?${params.toString()}`);
+  state.qcWestgardMetrics = resp.metrics || null;
+  els.qcWestgardModal.hidden = false;
+  renderWestgardSummaryInto(state.qcWestgardMetrics, els.qcWestgardSummary, els.qcWestgardRules);
+  renderWestgardChartInto(state.qcWestgardMetrics, els.qcWestgardChart);
+}
+
+function closeQCWestgardModal() {
+  els.qcWestgardModal.hidden = true;
+}
+
+function syncQCWestgardPeriodControls() {
+  if (!els.qcWestgardPeriod) return;
+  if (!els.qcWestgardPeriod.options.length) {
+    els.qcWestgardPeriod.innerHTML = [
+      ["current_week", t("westgardCurrentWeek")],
+      ["previous_week", t("westgardPreviousWeek")],
+      ["current_month", t("westgardCurrentMonth")],
+      ["previous_month", t("westgardPreviousMonth")],
+      ["current_year", t("westgardCurrentYear")],
+      ["custom", t("westgardCustom")],
+    ].map(([value, label]) => `<option value="${escapeHtml(value)}">${escapeHtml(label)}</option>`).join("");
+  }
+  els.qcWestgardPeriod.value = state.qcWestgardPeriod || "current_month";
+  const isCustom = els.qcWestgardPeriod.value === "custom";
+  const bounds = currentPeriodBounds(els.qcWestgardPeriod.value || "current_month");
+  if (!isCustom) {
+    els.qcWestgardDateFrom.value = bounds.from;
+    els.qcWestgardDateTo.value = bounds.to;
+  }
+  els.qcWestgardDateFrom.disabled = !isCustom;
+  els.qcWestgardDateTo.disabled = !isCustom;
+}
+
+function qcWestgardRange() {
+  if ((state.qcWestgardPeriod || "current_month") === "custom") {
+    return {
+      from: els.qcWestgardDateFrom.value || localISODate(),
+      to: els.qcWestgardDateTo.value || localISODate(),
+    };
+  }
+  return currentPeriodBounds(state.qcWestgardPeriod || "current_month");
+}
+
+function formatMetricNumber(value) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return "-";
+  return num.toFixed(4).replace(/\.?0+$/, "");
+}
+
+function renderOrdersLayout() {
+  if (isDocsmartMode()) {
+    const items = state.docsmartFiles.filter((item) => {
+      const search = String(state.selectedOrderSearch || "").trim().toLowerCase();
+      if (!search) return true;
+      return [item.file_name, item.institution_name, item.document_date, item.year, item.month, item.status, item.location]
+        .some((value) => String(value || "").toLowerCase().includes(search));
+    });
+    if (items.length === 0) {
+      els.ordersLayout.innerHTML = `<div class="log-item">${escapeHtml(state.selectedOrderSearch ? "Nu exista fisiere pentru filtrul selectat." : "Nu exista fisiere XML parse-ate.")}</div>`;
+      return;
+    }
+    els.ordersLayout.innerHTML = `
+      <div class="orders-table-wrap">
+        <table class="orders-table">
+          <thead>
+            <tr>
+              <th>Fisier</th>
+              <th>Stare</th>
+              <th>Locatie</th>
+              <th>Institutie</th>
+              <th>Data</th>
+              <th>An/Luna</th>
+              <th>Conturi</th>
+              <th>Total debit</th>
+              <th>Total credit</th>
+            </tr>
+          </thead>
+          <tbody>${items.map((item) => `
+            <tr class="${item.id === state.selectedDocsmartFileID ? "active" : ""}" data-docsmart-file-id="${escapeHtml(item.id)}">
+              <td><strong>${escapeHtml(item.file_name || "-")}</strong></td>
+              <td><span class="status-pill-soft">${escapeHtml(item.status || "-")}</span></td>
+              <td>${escapeHtml(item.location || "-")}</td>
+              <td>${escapeHtml(item.institution_name || "-")}</td>
+              <td>${escapeHtml(item.document_date || "-")}</td>
+              <td>${escapeHtml(`${item.year || "-"} / ${item.month || "-"}`)}</td>
+              <td>${escapeHtml(String(item.accounts_count || 0))}</td>
+              <td>${escapeHtml(item.debit_total || "0.00")}</td>
+              <td>${escapeHtml(item.credit_total || "0.00")}</td>
+            </tr>`).join("")}
+          </tbody>
+        </table>
+      </div>`;
+    [...els.ordersLayout.querySelectorAll("[data-docsmart-file-id]")].forEach((row) => {
+      row.addEventListener("click", () => {
+        state.selectedDocsmartFileID = row.dataset.docsmartFileId || null;
+        renderOrdersLayout();
+        renderOrderDetails();
+      });
+    });
+    return;
+  }
+  const visibleOrders = filteredOrders();
+  if (visibleOrders.length === 0) {
+    els.ordersSelectAll.checked = false;
+    els.ordersLayout.innerHTML = `<div class="log-item">${escapeHtml(t("noOrders"))}</div>`;
+    return;
+  }
+  const layoutKind = inferLayoutKind();
+  if (layoutKind === "rack_positions") {
+    const racks = new Map();
+    visibleOrders.forEach((bundle) => {
+      const rackNo = bundle.order.rack_no || 1;
+      if (!racks.has(rackNo)) racks.set(rackNo, []);
+      racks.get(rackNo).push(bundle);
+    });
+    els.ordersLayout.innerHTML = `<div class="rack-grid">${[...racks.entries()].sort((a, b) => a[0] - b[0]).map(([rackNo, items]) => `
+      <div class="rack-card">
+        <div class="rack-title">Rack ${rackNo}</div>
+        <div class="slot-grid">${items.sort((a, b) => (a.order.rack_position || 0) - (b.order.rack_position || 0)).map((bundle) => renderSlot(bundle)).join("")}</div>
+      </div>`).join("")}</div>`;
+  } else {
+    els.ordersLayout.innerHTML = `
+      <div class="orders-table-wrap">
+        <table class="orders-table">
+          <thead>
+            <tr>
+              <th class="col-check"></th>
+              <th class="col-flow">${escapeHtml(t("syncFlow"))}</th>
+              <th class="col-slot">${escapeHtml(t("slot"))}</th>
+              <th class="col-sample">${escapeHtml(t("sample"))}</th>
+              <th class="col-status">${escapeHtml(t("status"))}</th>
+              <th class="col-send-count">${escapeHtml(t("analyzerSendCount"))}</th>
+              <th class="col-analyses">${escapeHtml(t("analyses"))}</th>
+            </tr>
+          </thead>
+          <tbody>${visibleOrders.sort((a, b) => {
+            const aSampleNo = a.order.sample_no || 0;
+            const bSampleNo = b.order.sample_no || 0;
+            if (aSampleNo !== bSampleNo) return aSampleNo - bSampleNo;
+            return (a.order.id || 0) - (b.order.id || 0);
+          }).map((bundle) => renderSimpleRow(bundle)).join("")}</tbody>
+        </table>
+      </div>`;
+  }
+  [...els.ordersLayout.querySelectorAll("[data-order-id]")].forEach((button) => {
+    button.addEventListener("click", () => {
+      state.selectedOrderId = Number(button.dataset.orderId);
+      const bundle = state.orders.find((item) => item.order.id === state.selectedOrderId);
+      state.selectedOrderAnalysisID = bundle?.analyses?.[0]?.analysis?.id || null;
+      renderOrdersLayout();
+      renderOrderDetails();
+    });
+  });
+  [...els.ordersLayout.querySelectorAll("[data-order-check]")].forEach((checkbox) => {
+    checkbox.addEventListener("click", (event) => {
+      event.stopPropagation();
+    });
+    checkbox.addEventListener("change", () => {
+      const id = Number(checkbox.dataset.orderCheck || 0);
+      if (!id) return;
+      if (checkbox.checked) {
+        if (!state.selectedOrderIDs.includes(id)) state.selectedOrderIDs.push(id);
+      } else {
+        state.selectedOrderIDs = state.selectedOrderIDs.filter((item) => item !== id);
+      }
+      const visibleOrders = filteredOrders();
+      els.ordersSelectAll.checked = visibleOrders.length > 0 && visibleOrders.every((item) => state.selectedOrderIDs.includes(item.order.id));
+    });
+  });
+  els.ordersSelectAll.checked = visibleOrders.length > 0 && visibleOrders.every((item) => state.selectedOrderIDs.includes(item.order.id));
+}
+
+function filteredOrders() {
+  return state.orders.filter((bundle) => {
+    const receiveOk = !state.selectedOrderReceiveFilter || orderReceiveStatus(bundle) === state.selectedOrderReceiveFilter;
+    const sendOk = !state.selectedOrderSendFilter || orderSendStatus(bundle) === state.selectedOrderSendFilter;
+    return receiveOk && sendOk;
+  });
+}
+
+function renderRoundSelect() {
+  if (!els.roundSelect) return;
+  els.roundSelect.innerHTML = state.rounds.map((roundNo) => `<option value="${roundNo}">${roundNo}</option>`).join("");
+  els.roundSelect.value = String(state.selectedRoundNo > 0 ? state.selectedRoundNo : (state.rounds[0] || 1));
+}
+
+function renderOrderStatusFilters() {
+  if (els.ordersReceivedFilter) {
+    els.ordersReceivedFilter.innerHTML = [
+      `<option value="">${escapeHtml(t("allStatuses"))}</option>`,
+      `<option value="none">${escapeHtml(t("statusReceiveNone"))}</option>`,
+      `<option value="partial">${escapeHtml(t("statusReceivePartial"))}</option>`,
+      `<option value="full">${escapeHtml(t("statusReceiveFull"))}</option>`,
+    ].join("");
+    els.ordersReceivedFilter.value = state.selectedOrderReceiveFilter || "";
+  }
+  if (els.ordersSentFilter) {
+    els.ordersSentFilter.innerHTML = [
+      `<option value="">${escapeHtml(t("allStatuses"))}</option>`,
+      `<option value="none">${escapeHtml(t("statusSendNone"))}</option>`,
+      `<option value="partial">${escapeHtml(t("statusSendPartial"))}</option>`,
+      `<option value="full">${escapeHtml(t("statusSendFull"))}</option>`,
+    ].join("");
+    els.ordersSentFilter.value = state.selectedOrderSendFilter || "";
+  }
+}
+
+function renderQCRoundSelect() {
+  if (!els.qcRoundSelect) return;
+  els.qcRoundSelect.innerHTML = state.qcRounds.map((roundNo) => `<option value="${roundNo}">${roundNo}</option>`).join("");
+  els.qcRoundSelect.value = String(state.selectedQCRoundNo > 0 ? state.selectedQCRoundNo : (state.qcRounds[0] || 1));
+}
+
+function knownAnalyteOptions() {
+  const seen = new Set();
+  const options = [];
+  const push = (tag, name = "") => {
+    const normalizedTag = String(tag || "").trim();
+    if (!normalizedTag || seen.has(normalizedTag)) return;
+    seen.add(normalizedTag);
+    options.push({ tag: normalizedTag, name: String(name || "").trim() });
+  };
+  state.analytes.filter((item) => item.active !== false).forEach((item) => push(item.tag, item.name));
+  state.qcTargets.forEach((item) => push(item.analyte_tag, item.analyte_name));
+  state.qcRecords.forEach((bundle) => (bundle.analyses || []).forEach((item) => push(item.analyte_tag, item.analyte_name)));
+  return options.sort((a, b) => a.tag.localeCompare(b.tag));
+}
+
+function renderQCAnalyteFilter() {
+  if (!els.qcAnalyteFilter) return;
+  const analytes = knownAnalyteOptions();
+  if (state.selectedQCAnalyteFilter && !analytes.some((item) => item.tag === state.selectedQCAnalyteFilter)) {
+    state.selectedQCAnalyteFilter = "";
+  }
+  els.qcAnalyteFilter.innerHTML = [`<option value="">${escapeHtml(t("allAnalytes"))}</option>`, ...analytes.map((item) => `<option value="${escapeHtml(item.tag)}">${escapeHtml(item.tag)}${item.name ? ` · ${escapeHtml(item.name)}` : ""}</option>`)].join("");
+  els.qcAnalyteFilter.value = state.selectedQCAnalyteFilter || "";
+}
+
+function renderQCLevelFilter() {
+  if (!els.qcLevelFilter) return;
+  const levels = configuredQCLevels([
+    ...state.qcRecords.map((item) => String(item.record.control_level || "").trim()),
+    ...state.qcRecords.flatMap((item) => (item.analyses || []).map((analysis) => String(analysis.control_level || "").trim())),
+  ]).sort((a, b) => a.localeCompare(b));
+  els.qcLevelFilter.innerHTML = [`<option value="">${escapeHtml(t("allControlTypes"))}</option>`, ...levels.map((level) => `<option value="${escapeHtml(level)}">${escapeHtml(level)}</option>`)].join("");
+  els.qcLevelFilter.value = state.selectedQCLevel || "";
+}
+
+function filteredQCRecords() {
+  return state.qcRecords.filter((item) => {
+    const levelOk = !state.selectedQCLevel || String(item.record.control_level || "").trim() === state.selectedQCLevel;
+    const analyteOk = !state.selectedQCAnalyteFilter || (item.analyses || []).some((entry) => String(entry.analyte_tag || "").trim() === state.selectedQCAnalyteFilter);
+    return levelOk && analyteOk;
+  });
+}
+
+function filteredQCRows() {
+  return filteredQCRecords().flatMap((bundle) => {
+    const analyses = (bundle.analyses || []).filter((analysis) => {
+      const levelOk = !state.selectedQCLevel || String((analysis.control_level || bundle.record.control_level || "")).trim() === state.selectedQCLevel;
+      const analyteOk = !state.selectedQCAnalyteFilter || String(analysis.analyte_tag || "").trim() === state.selectedQCAnalyteFilter;
+      return levelOk && analyteOk;
+    });
+    return analyses.map((analysis) => ({ record: bundle.record, analysis }));
+  });
+}
+
+function renderSlot(bundle) {
+  const order = bundle.order;
+  const analyses = bundle.analyses || [];
+  const summary = analyses.map((item) => item.analysis.analyte_tag).slice(0, 2).join(", ");
+  return `<button class="slot filled" data-order-id="${order.id}" type="button">
+    <span class="slot-index">${escapeHtml(slotLabel(order))}</span>
+    <span class="slot-value">${escapeHtml(order.sample_id || "-")}</span>
+    <span class="small muted">${escapeHtml(summary || order.status || "")}</span>
+  </button>`;
+}
+
+function orderSentSampleCode(order) {
+  return String(order?.meta?.sent_sample_code || order?.sample_id || "").trim();
+}
+
+function orderFileID(order) {
+  return String(order?.file_id || "").trim();
+}
+
+function orderSampleCode(order) {
+  return String(order?.meta?.sample_code_id || "").trim();
+}
+
+function orderSpecimenCode(order) {
+  return String(order?.meta?.sample_code_specimen_id || "").trim();
+}
+
+function orderPatientID(order) {
+  return String(order?.patient_id || "").trim();
+}
+
+function orderPatientName(order) {
+  return String(order?.patient_name || "").trim();
+}
+
+function renderSimpleRow(bundle) {
+  const order = bundle.order;
+  const analysesCount = (bundle.analyses || []).length;
+  const sentSampleCode = orderSentSampleCode(order);
+  const fileID = orderFileID(order);
+  const sampleCode = orderSampleCode(order);
+  const specimenCode = orderSpecimenCode(order);
+  const patientID = orderPatientID(order);
+  const patientName = orderPatientName(order);
+  const receiveStatus = orderReceiveStatus(bundle);
+  const sendStatus = orderSendStatus(bundle);
+  const analyzerSendCount = orderAnalyzerSendCount(order);
+  const fileIDClass = missingFileID(order) ? "required-label required-label-danger" : "";
+  return `<tr class="${order.id === state.selectedOrderId ? "active" : ""}" data-order-id="${order.id}">
+    <td class="col-check">
+      ${!state.barcodeMode ? `<span class="order-select"><input type="checkbox" data-order-check="${order.id}" ${state.selectedOrderIDs.includes(order.id) ? "checked" : ""}></span>` : ""}
+    </td>
+    <td class="col-flow"><div class="orders-flow"><span class="status-stack"><span class="status-bar receive ${escapeHtml(receiveStatus)}"></span><span class="status-bar send ${escapeHtml(sendStatus)}"></span></span></div></td>
+    <td class="col-slot"><span class="slot-pill">${escapeHtml(slotLabel(order))}</span></td>
+    <td class="col-sample">
+        <div class="sample-main">
+        <div class="sample-id">${escapeHtml(order.sample_id || "-")}</div>
+        <div class="sample-sub">
+          <span>${escapeHtml(`${t("sampleNo")}: ${String(order.sample_no || 0)}`)}</span>
+          <span>${escapeHtml(`${t("sentSampleCode")}: ${sentSampleCode || "-"}`)}</span>
+          <span class="${fileIDClass}">${escapeHtml(`${t("fileId")}: ${fileID || "-"}`)}</span>
+          <span>${escapeHtml(`${t("sampleCode")}: ${sampleCode || "-"}`)}</span>
+          <span>${escapeHtml(`${t("specimenCode")}: ${specimenCode || "-"}`)}</span>
+          <span>${escapeHtml(`${t("patientId")}: ${patientID || "-"}`)}</span>
+          <span>${escapeHtml(`${t("patientName")}: ${patientName || "-"}`)}</span>
+        </div>
+      </div>
+    </td>
+    <td class="col-status"><span class="status-pill-soft">${escapeHtml(localizeOrderStatus(order.status || ""))}</span></td>
+    <td class="col-send-count"><span class="count-pill">${escapeHtml(String(analyzerSendCount))}</span></td>
+    <td class="col-analyses"><span class="count-pill">${escapeHtml(String(analysesCount))}</span></td>
+  </tr>`;
+}
+
+function orderReceiveStatus(bundle) {
+  const analyses = bundle?.analyses || [];
+  if (!analyses.length) return "none";
+  const received = analyses.filter((item) => {
+    const analysis = item.analysis || {};
+    return String(analysis.raw_value || "").trim() || String(analysis.result_value || "").trim();
+  }).length;
+  if (received <= 0) return "none";
+  if (received < analyses.length) return "partial";
+  return "full";
+}
+
+function analysisSendStatus(analysis) {
+  const status = String(analysis?.flags?.wisemed_send_status || "").trim().toLowerCase();
+  if (status === "sent") return "full";
+  if (status === "pending") return "none";
+  return "none";
+}
+
+function orderSendStatus(bundle) {
+  const analyses = bundle?.analyses || [];
+  if (!analyses.length) return "none";
+  const sendable = analyses.filter((item) => {
+    const analysis = item.analysis || {};
+    return String(analysis.raw_value || "").trim() || String(analysis.result_value || "").trim();
+  });
+  if (!sendable.length) return "none";
+  const sent = sendable.filter((item) => analysisSendStatus(item.analysis) === "full").length;
+  if (sent <= 0) return "none";
+  if (sent < sendable.length) return "partial";
+  return "full";
+}
+
+function orderAnalyzerSendCount(order) {
+  const value = Number(order?.meta?.analyzer_send_count || 0);
+  return Number.isFinite(value) && value > 0 ? value : 0;
+}
+
+function missingFileID(order) {
+  return !String(order?.file_id || "").trim();
+}
+
+function missingWiseMEDFSMID(analysis) {
+  return !String(analysis?.wisemed_fsm_id || "").trim();
+}
+
+function analysisCommunicationDetails(analysis) {
+  return String(analysis?.flags?.communication_details || analysis?.interpreted_value || "").trim();
+}
+
+function localizeSendStatus(status) {
+  switch (status) {
+    case "full":
+      return t("statusSendFull");
+    case "partial":
+      return t("statusSendPartial");
+    default:
+      return t("statusSendNone");
+  }
+}
+
+function formatNextSyncCountdown(nextRunAt) {
+  if (!nextRunAt) return "--:--";
+  const target = new Date(nextRunAt).getTime();
+  const now = Date.now();
+  const diffMs = Math.max(0, target - now);
+  const totalSeconds = Math.floor(diffMs / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
+function slotLabel(order) {
+  if (inferLayoutKind() === "rack_positions") {
+    return `R${order.rack_no || 1} · P${order.rack_position || 0}`;
+  }
+  return `#${order.sample_no || 0}`;
+}
+
+
+function renderOrderIDCorrection(order) {
+  const change = order?.meta?.id_correction;
+  if (!change) return "";
+  const message = `ID modificat de ${change.actor}, valoarea initiala: ${change.original_id}${change.reason ? ` (${change.reason})` : ""}`;
+  const history = order?.meta?.id_correction_history || [];
+  return `<div class="order-id-correction">${escapeHtml(message)}</div>${history.length > 1 ? `<details class="order-id-correction"><summary>Istoric modificări ID (${history.length})</summary>${history.map((item) => `<div>${escapeHtml(`${item.previous_id} → ${item.new_id} · ${item.actor} · ${formatDate(item.changed_at)}${item.reason ? ` (${item.reason})` : ""}`)}</div>`).join("")}</details>` : ""}`;
+}
+
+function openOrderIDChange(order) {
+  if (document.getElementById("order-id-change-dialog")) return;
+  const shell = document.createElement("div");
+  shell.className = "modal-shell order-id-modal";
+  const backdrop = document.createElement("div");
+  backdrop.className = "modal-backdrop";
+  const dialog = document.createElement("section");
+  dialog.id = "order-id-change-dialog";
+  dialog.className = "modal-card order-id-dialog";
+  dialog.setAttribute("role", "dialog");
+  dialog.setAttribute("aria-modal", "true");
+  dialog.setAttribute("aria-labelledby", "order-id-change-title");
+  dialog.innerHTML = `<form>
+    <h2 id="order-id-change-title">Modificare ID cerere</h2>
+    <p>ID curent: <strong>${escapeHtml(order.sample_id)}</strong></p>
+    <p>Noul ID va fi folosit la Synchro Match și confirmarea WiseMED. Asocierea WiseMED existentă va fi eliminată. Valorile analizelor se păstrează.</p>
+    <label>ID nou din WiseMED<input name="new_id" required maxlength="200" autocomplete="off" value="${escapeHtml(order.sample_id)}"></label>
+    <label>Motiv (opțional)<textarea name="reason" maxlength="1000" rows="3"></textarea></label>
+    <label>Pentru a confirma modificarea, scrie exact <strong>deacord</strong><input name="confirmation" required autocomplete="off" spellcheck="false"></label>
+    <p class="order-id-correction" role="alert" data-id-error></p>
+    <div class="actions"><button type="button" data-id-cancel>Renunță</button><button type="submit" class="primary" data-id-save disabled>Confirmă modificarea</button></div>
+  </form>`;
+  shell.append(backdrop, dialog);
+  document.body.appendChild(shell);
+  const form = dialog.querySelector("form");
+  const save = dialog.querySelector("[data-id-save]");
+  const cancel = dialog.querySelector("[data-id-cancel]");
+  let saving = false;
+  const validate = () => {
+    save.disabled = saving || !form.elements.new_id.value.trim() || form.elements.new_id.value.trim() === String(order.sample_id) || form.elements.confirmation.value !== "deacord";
+  };
+  form.addEventListener("input", validate);
+  const closeDialog = () => {
+    document.removeEventListener("keydown", onDialogKeydown, true);
+    shell.remove();
+    els.orderDetails.querySelector("[data-edit-order-id]")?.focus();
+  };
+  const onDialogKeydown = (event) => {
+    if (event.key === "Escape") {
+      event.preventDefault(); event.stopPropagation();
+      if (!saving) closeDialog();
+    }
+    if (event.key === "Tab") {
+      const controls = [...dialog.querySelectorAll("input:not(:disabled),textarea:not(:disabled),button:not(:disabled)")];
+      const first = controls[0], last = controls[controls.length - 1];
+      if (!first) { event.preventDefault(); return; }
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    }
+  };
+  document.addEventListener("keydown", onDialogKeydown, true);
+  cancel.addEventListener("click", () => { if (!saving) closeDialog(); });
+  backdrop.addEventListener("click", () => { if (!saving) closeDialog(); });
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    validate();
+    if (save.disabled) return;
+    const change = {order_id: order.id, expected_id: order.sample_id, expected_revision: Number(order.meta?.id_revision || 0), new_id: form.elements.new_id.value.trim(), confirmation: form.elements.confirmation.value, reason: form.elements.reason.value.trim()};
+    saving = true; save.disabled = true; cancel.disabled = true;
+    for (const input of form.querySelectorAll("input,textarea")) input.disabled = true;
+    dialog.querySelector("[data-id-error]").textContent = "";
+    try {
+      const response = await api("/api/orders/id", {method:"PUT", body:JSON.stringify(change)});
+      const bundle = state.orders.find((item) => item.order.id === order.id);
+      if (bundle) bundle.order = response.order;
+      renderOrdersLayout(); renderOrderDetails();
+      closeDialog();
+      showToast("ID modificat. Rulează Synchro Match pentru noua asociere WiseMED.");
+    } catch (error) {
+      dialog.querySelector("[data-id-error]").textContent = error.message;
+    } finally {
+      saving = false; cancel.disabled = false;
+      for (const input of form.querySelectorAll("input,textarea")) input.disabled = false;
+      validate();
+    }
+  });
+  form.elements.new_id.focus(); form.elements.new_id.select();
+}
+
+function renderOrderDetails() {
+  if (isDocsmartMode()) {
+    const item = state.docsmartFiles.find((entry) => entry.id === state.selectedDocsmartFileID);
+    if (!item) {
+      els.orderDetails.innerHTML = `<div class="log-item">Selecteaza un fisier XML pentru a vedea detaliile parse-ate.</div>`;
+      return;
+    }
+    const topAccounts = Array.isArray(item.top_accounts) ? item.top_accounts : [];
+    els.orderDetails.innerHTML = `
+      <div class="order-card">
+        <div class="order-headline">
+          <div class="order-title">
+            <strong>${escapeHtml(item.file_name || "-")}</strong>
+            <div class="small muted">${escapeHtml(item.path || "-")}</div>
+          </div>
+          <div class="analysis-send-pill"><span class="slot-pill">${escapeHtml(item.status || "-")}</span></div>
+        </div>
+        <div class="order-meta-grid">
+          <div class="meta-kpi"><span class="label">Institutie</span><span class="value">${escapeHtml(item.institution_name || "-")}</span></div>
+          <div class="meta-kpi"><span class="label">Data document</span><span class="value">${escapeHtml(item.document_date || "-")}</span></div>
+          <div class="meta-kpi"><span class="label">An</span><span class="value">${escapeHtml(item.year || "-")}</span></div>
+          <div class="meta-kpi"><span class="label">Luna</span><span class="value">${escapeHtml(item.month || "-")}</span></div>
+          <div class="meta-kpi"><span class="label">Suma control</span><span class="value">${escapeHtml(item.control_sum || "-")}</span></div>
+          <div class="meta-kpi"><span class="label">Conturi</span><span class="value">${escapeHtml(String(item.accounts_count || 0))}</span></div>
+          <div class="meta-kpi"><span class="label">Total debit</span><span class="value">${escapeHtml(item.debit_total || "0.00")}</span></div>
+          <div class="meta-kpi"><span class="label">Total credit</span><span class="value">${escapeHtml(item.credit_total || "0.00")}</span></div>
+        </div>
+        ${item.error ? `<div class="log-item">${escapeHtml(item.error)}</div>` : ""}
+      </div>
+      <div class="analysis-card">
+        <strong>Primele conturi parse-ate</strong>
+        ${topAccounts.length ? `
+          <div class="analysis-table-wrap">
+            <table class="analysis-table">
+              <thead><tr><th>Cont</th><th>Sursa</th><th>Debit</th><th>Credit</th></tr></thead>
+              <tbody>${topAccounts.map((acc) => `<tr><td>${escapeHtml(acc.symbol || "-")}</td><td>${escapeHtml(acc.source_code || "-")}</td><td>${escapeHtml(acc.debit || "-")}</td><td>${escapeHtml(acc.credit || "-")}</td></tr>`).join("")}</tbody>
+            </table>
+          </div>` : `<div class="log-item">Fisierul nu contine conturi parse-abile.</div>`}
+      </div>`;
+    return;
+  }
+  const bundle = state.orders.find((item) => item.order.id === state.selectedOrderId);
+  if (!bundle) {
+    els.orderDetails.innerHTML = `<div class="log-item">${escapeHtml(t("orderDetails"))}</div>`;
+    return;
+  }
+  const analyses = bundle.analyses || [];
+  if (!state.selectedOrderAnalysisID && analyses.length > 0) {
+    state.selectedOrderAnalysisID = analyses[0].analysis.id;
+  }
+  const selectedAnalysisBundle = analyses.find((item) => item.analysis.id === state.selectedOrderAnalysisID) || analyses[0] || null;
+  const sentSampleCode = orderSentSampleCode(bundle.order);
+  const fileID = orderFileID(bundle.order);
+  const sampleCode = orderSampleCode(bundle.order);
+  const specimenCode = orderSpecimenCode(bundle.order);
+  const patientID = orderPatientID(bundle.order);
+  const patientName = orderPatientName(bundle.order);
+  const imagePath = String(bundle.order?.meta?.labnovation_image_path || "").trim();
+  const receiveStatus = orderReceiveStatus(bundle);
+  const sendStatus = orderSendStatus(bundle);
+  const fileIDValueClass = missingFileID(bundle.order) ? "value required-label required-label-danger" : "value";
+  els.orderDetails.innerHTML = `
+    <div class="order-card">
+      <div class="order-headline">
+        <div class="order-title">
+          <button type="button" class="order-id-edit" data-edit-order-id title="Modifică ID-ul cererii">${escapeHtml(bundle.order.sample_id)}</button>
+          <button type="button" class="order-id-edit-action" data-edit-order-id>Modifică ID</button>
+          ${renderOrderIDCorrection(bundle.order)}
+          <div class="small muted">${escapeHtml(`${t("sentSampleCode")}: ${sentSampleCode || "-"}`)}</div>
+        </div>
+        <div class="analysis-send-pill"><span class="status-stack"><span class="status-bar receive ${escapeHtml(receiveStatus)}"></span><span class="status-bar send ${escapeHtml(sendStatus)}"></span></span><span class="slot-pill">${escapeHtml(`${t("round")} ${bundle.order.round_no || 1}`)}</span></div>
+      </div>
+      <div class="order-meta-grid">
+        <div class="meta-kpi">
+          <span class="label">${escapeHtml(t("sampleNo"))}</span>
+          <span class="value">${escapeHtml(String(bundle.order.sample_no || 0))}</span>
+        </div>
+        <div class="meta-kpi">
+          <span class="label">${escapeHtml(t("orderDate"))}</span>
+          <span class="value">${escapeHtml(bundle.order.order_date || "-")}</span>
+        </div>
+        <div class="meta-kpi">
+          <span class="label">${escapeHtml(t("status"))}</span>
+          <span class="value">${escapeHtml(localizeOrderStatus(bundle.order.status || ""))}</span>
+        </div>
+        <div class="meta-kpi">
+          <span class="label">${escapeHtml(t("fileId"))}</span>
+          <button type="button" class="order-id-edit ${fileIDValueClass}" data-edit-order-id title="Modifică ID-ul cererii">${escapeHtml(fileID || "-")}</button>
+        </div>
+        <div class="meta-kpi">
+          <span class="label">${escapeHtml(t("sampleCode"))}</span>
+          <span class="value">${escapeHtml(sampleCode || "-")}</span>
+        </div>
+        <div class="meta-kpi">
+          <span class="label">${escapeHtml(t("specimenCode"))}</span>
+          <span class="value">${escapeHtml(specimenCode || "-")}</span>
+        </div>
+        <div class="meta-kpi">
+          <span class="label">${escapeHtml(t("patientId"))}</span>
+          <span class="value">${escapeHtml(patientID || "-")}</span>
+        </div>
+        <div class="meta-kpi">
+          <span class="label">${escapeHtml(t("patientName"))}</span>
+          <span class="value">${escapeHtml(patientName || "-")}</span>
+        </div>
+      </div>
+      ${imagePath ? `
+        <div class="order-image-preview">
+          <span class="label">${escapeHtml(t("orderImage"))}</span>
+          <img ${window.WSM_REMOTE ? 'data-wss-image' : 'src'}="/api/order-image?path=${encodeURIComponent(imagePath)}" alt="${escapeHtml(t("orderImage"))}" loading="lazy">
+        </div>` : ""}
+    </div>
+    <div class="analysis-list">
+      <div class="analysis-card">
+        <strong>${escapeHtml(t("analysesForSample"))}</strong>
+        ${analyses.length > 0 ? `
+          <div class="analysis-table-wrap">
+            <table class="analysis-table">
+              <thead>
+                <tr>
+                  <th>${escapeHtml(t("analysisName"))}</th>
+                  <th>${escapeHtml(t("analysisTag"))}</th>
+                  <th>Eroare</th>
+                  <th>${escapeHtml(t("analysisSendStatus"))}</th>
+                  <th>${escapeHtml(t("analysisQualitative"))}</th>
+                  <th>${escapeHtml(t("analysisQuantitative"))}</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${analyses.map((item) => `
+                  <tr class="${item.analysis.id === state.selectedOrderAnalysisID ? "active" : ""}" data-analysis-id="${item.analysis.id}">
+                    <td>
+                      <strong>${escapeHtml(item.analysis.analyte_name || item.analysis.analyte_tag || "-")}</strong>
+                      <div class="small muted">${escapeHtml(item.analysis.analyte_description || "")}</div>
+                      <div class="small muted">${escapeHtml(`${t("wisemedSMID")}: ${item.analysis.wisemed_sm_id || "-"}`)}</div>
+                      <div class="small ${missingWiseMEDFSMID(item.analysis) ? "required-label required-label-warn" : "muted"}">${escapeHtml(`${t("wisemedFSMID")}: ${item.analysis.wisemed_fsm_id || "-"}`)}</div>
+                    </td>
+                    <td>${escapeHtml(item.analysis.analyte_tag || "-")}</td>
+                    <td>${item.analysis.flags?.transformation_error ? `<span title="${escapeHtml(String(item.analysis.flags?.transformation_error_message || "Eroare transformare"))}">!</span>` : ""}</td>
+                    <td><span class="analysis-send-pill"><span class="status-bar send ${escapeHtml(analysisSendStatus(item.analysis))}"></span><span>${escapeHtml(localizeSendStatus(analysisSendStatus(item.analysis)))}</span></span></td>
+                    <td>${escapeHtml(item.analysis.result_value || t("noResult"))}</td>
+                    <td>${escapeHtml(item.analysis.raw_value || "-")}</td>
+                  </tr>`).join("")}
+              </tbody>
+            </table>
+          </div>` : `<div class="log-item">${escapeHtml(t("noAnalytes"))}</div>`}
+      </div>
+      ${selectedAnalysisBundle ? `
+        <div class="analysis-card">
+          <div class="analysis-header">
+            <div class="analysis-title">
+              <strong>${escapeHtml(selectedAnalysisBundle.analysis.analyte_tag)}</strong>
+              <div class="small muted">${escapeHtml(selectedAnalysisBundle.analysis.analyte_name || "")}</div>
+              <div class="small muted">${escapeHtml(selectedAnalysisBundle.analysis.analyte_description || "")}</div>
+              <div class="small muted">${escapeHtml(`${t("wisemedSMID")}: ${selectedAnalysisBundle.analysis.wisemed_sm_id || "-"}`)}</div>
+              <div class="small ${missingWiseMEDFSMID(selectedAnalysisBundle.analysis) ? "required-label required-label-warn" : "muted"}">${escapeHtml(`${t("wisemedFSMID")}: ${selectedAnalysisBundle.analysis.wisemed_fsm_id || "-"}`)}</div>
+              <div class="small muted">${escapeHtml(`${t("analysisSendStatus")}: ${localizeSendStatus(analysisSendStatus(selectedAnalysisBundle.analysis))}`)}</div>
+              ${selectedAnalysisBundle.analysis.flags?.transformation_error ? `<div class="small muted">Eroare transformare: ${escapeHtml(String(selectedAnalysisBundle.analysis.flags?.transformation_error_message || "-"))}</div>` : ""}
+            </div>
+            <div class="analysis-value-box">
+              <div class="small muted">${escapeHtml(t("currentResult"))}</div>
+              <strong>${escapeHtml(selectedAnalysisBundle.analysis.result_value || selectedAnalysisBundle.analysis.raw_value || t("noResult"))}</strong>
+              <div class="small muted">${escapeHtml(`${t("analysisQuantitative")}: ${selectedAnalysisBundle.analysis.raw_value || "-"}`)}</div>
+              <div class="small muted">${escapeHtml(`${t("communicationDetails")}: ${analysisCommunicationDetails(selectedAnalysisBundle.analysis) || "-"}`)}</div>
+            </div>
+          </div>
+          <label class="stack">
+            <span>${escapeHtml(t("otherResults"))}</span>
+            <select data-default-analysis-id="${selectedAnalysisBundle.analysis.id}">
+              <option value="">${escapeHtml(t("selectResult"))}</option>
+              ${(selectedAnalysisBundle.results || []).map((result) => `<option value="${result.id}" ${result.id === selectedAnalysisBundle.analysis.default_result_id ? "selected" : ""}>${escapeHtml(result.result_value || t("noResult"))} · ${escapeHtml(result.raw_value || "-")} · ${escapeHtml(formatDate(result.created_at))}</option>`).join("")}
+            </select>
+          </label>
+        </div>` : ""}
+    </div>`;
+  if (window.WSM_REMOTE) {
+    els.orderDetails.querySelectorAll('[data-wss-image]').forEach(async image => {
+      try {
+        const response = await fetch(image.dataset.wssImage);
+        if (!response.ok) throw new Error('Imagine indisponibilă');
+        const blob = await response.blob();
+        if (!image.isConnected) return;
+        const objectURL = URL.createObjectURL(blob);
+        image.onload = image.onerror = () => URL.revokeObjectURL(objectURL);
+        image.src = objectURL;
+      } catch (error) { image.alt = error.message; }
+    });
+  }
+  els.orderDetails.querySelectorAll("[data-edit-order-id]").forEach((button) => {
+    button.addEventListener("click", () => openOrderIDChange(bundle.order));
+  });
+  [...els.orderDetails.querySelectorAll("[data-analysis-id]")].forEach((row) => {
+    row.addEventListener("click", () => {
+      state.selectedOrderAnalysisID = Number(row.dataset.analysisId || 0) || null;
+      renderOrderDetails();
+    });
+  });
+  [...els.orderDetails.querySelectorAll("[data-default-analysis-id]")].forEach((select) => {
+    select.addEventListener("change", async () => {
+      const resultID = Number(select.value || 0);
+      const orderAnalysisID = Number(select.dataset.defaultAnalysisId || 0);
+      if (!resultID || !orderAnalysisID) return;
+      await api("/api/results/default", {
+        method: "PUT",
+        body: JSON.stringify({ order_analysis_id: orderAnalysisID, result_id: resultID }),
+      });
+      await loadOrders();
+      });
+  });
+}
+
+function renderQCLayout() {
+  renderQCLevelFilter();
+  renderQCAnalyteFilter();
+  const items = filteredQCRows();
+  if (items.length === 0) {
+    els.qcLayout.innerHTML = `<div class="log-item">${escapeHtml(t("noQc"))}</div>`;
+    return;
+  }
+  els.qcLayout.innerHTML = `
+    <div class="orders-table-wrap">
+      <table class="orders-table">
+        <thead>
+          <tr>
+            <th class="col-check"></th>
+            <th class="col-slot">${escapeHtml(t("qcDate"))}</th>
+            <th>${escapeHtml(t("analysisName"))}</th>
+            <th>${escapeHtml(t("lotNo"))}</th>
+            <th>${escapeHtml(t("analysisQuantitative"))}</th>
+            <th class="col-status">${escapeHtml(t("qcLevel"))}</th>
+          </tr>
+        </thead>
+        <tbody>${items.map((row) => renderQCRow(row)).join("")}</tbody>
+      </table>
+    </div>`;
+  [...els.qcLayout.querySelectorAll("[data-qc-record-id][data-qc-analysis-id]")].forEach((row) => {
+    row.addEventListener("click", () => {
+      state.selectedQCRecordId = Number(row.dataset.qcRecordId || 0);
+      state.selectedQCAnalysisId = Number(row.dataset.qcAnalysisId || 0) || null;
+      state.selectedQCAnalysisTag = row.dataset.qcAnalysisTag || null;
+      state.qcWestgardMetrics = null;
+      renderQCLayout();
+      renderQCDetails();
+    });
+  });
+  [...els.qcLayout.querySelectorAll("[data-qc-record-check]")].forEach((checkbox) => {
+    checkbox.addEventListener("click", (event) => event.stopPropagation());
+    checkbox.addEventListener("change", () => {
+      const id = Number(checkbox.dataset.qcRecordCheck || 0);
+      if (!id) return;
+      if (checkbox.checked) {
+        if (!state.selectedQCRecordIDs.includes(id)) state.selectedQCRecordIDs.push(id);
+      } else {
+        state.selectedQCRecordIDs = state.selectedQCRecordIDs.filter((item) => item !== id);
+      }
+      const candidates = selectedQCRecordCandidates();
+      els.qcSelectAll.checked = candidates.length > 0 && candidates.every((candidate) => state.selectedQCRecordIDs.includes(candidate));
+    });
+  });
+  const candidates = selectedQCRecordCandidates();
+  els.qcSelectAll.checked = candidates.length > 0 && candidates.every((id) => state.selectedQCRecordIDs.includes(id));
+}
+
+function renderQCRow(row) {
+  const record = row.record;
+  const analysis = row.analysis;
+  const isActive = record.id === state.selectedQCRecordId && analysis?.id === state.selectedQCAnalysisId;
+  return `<tr class="${isActive ? "active" : ""}" data-qc-record-id="${record.id}" data-qc-analysis-id="${analysis?.id || 0}" data-qc-analysis-tag="${escapeHtml(analysis?.analyte_tag || "")}">
+    <td class="col-check"><span class="order-select"><input type="checkbox" data-qc-record-check="${record.id}" ${state.selectedQCRecordIDs.includes(record.id) ? "checked" : ""}></span></td>
+    <td class="col-slot"><span class="slot-pill">${escapeHtml(formatDate(analysis?.created_at || record.created_at || record.run_date || "-"))}</span></td>
+    <td><strong>${escapeHtml(analysis?.analyte_name || analysis?.analyte_tag || "-")}</strong><div class="small muted">${escapeHtml(analysis?.analyte_tag || "-")}</div></td>
+    <td>${escapeHtml(analysis?.lot_no || record.lot_no || "-")}</td>
+    <td>${escapeHtml(analysis?.raw_value || "-")}</td>
+    <td class="col-status"><span class="status-pill-soft">${escapeHtml(analysis?.control_level || record.control_level || "-")}</span></td>
+  </tr>`;
+}
+
+function renderQCDetails() {
+  const bundle = state.qcRecords.find((item) => item.record.id === state.selectedQCRecordId);
+  if (!bundle) {
+    els.qcDetails.innerHTML = `<div class="log-item">${escapeHtml(t("qcDetails"))}</div>`;
+    els.qcOpenWestgardBtn.disabled = true;
+    return;
+  }
+  const analyses = (bundle.analyses || []).filter((item) => {
+    const levelOk = !state.selectedQCLevel || String((item.control_level || bundle.record.control_level || "")).trim() === state.selectedQCLevel;
+    const analyteOk = !state.selectedQCAnalyteFilter || String(item.analyte_tag || "").trim() === state.selectedQCAnalyteFilter;
+    return levelOk && analyteOk;
+  });
+  const selectedAnalysis = analyses.find((item) => item.id === state.selectedQCAnalysisId) || analyses[0] || null;
+  if (selectedAnalysis) {
+    state.selectedQCAnalysisId = selectedAnalysis.id;
+    state.selectedQCAnalysisTag = selectedAnalysis.analyte_tag || null;
+  }
+  els.qcOpenWestgardBtn.disabled = !selectedAnalysis;
+  els.qcDetails.innerHTML = `
+    <div class="order-card">
+      <div class="order-headline">
+        <div class="order-title">
+          <strong>${escapeHtml(bundle.record.control_label || "-")}</strong>
+          <div class="small muted">${escapeHtml(`${t("qcLevel")}: ${bundle.record.control_level || "-"}`)}</div>
+        </div>
+        <span class="slot-pill">${escapeHtml(bundle.record.run_date || "-")}</span>
+      </div>
+      <div class="order-meta-grid">
+        <div class="meta-kpi"><span class="label">${escapeHtml(t("lotNo"))}</span><span class="value">${escapeHtml(selectedAnalysis?.lot_no || bundle.record.lot_no || "-")}</span></div>
+        <div class="meta-kpi"><span class="label">${escapeHtml(t("qcLevel"))}</span><span class="value">${escapeHtml(selectedAnalysis?.control_level || bundle.record.control_level || "-")}</span></div>
+        <div class="meta-kpi"><span class="label">${escapeHtml(t("qcReadAt"))}</span><span class="value">${escapeHtml(formatDate(selectedAnalysis?.created_at || bundle.record.created_at || bundle.record.run_date || "-"))}</span></div>
+      </div>
+      <div class="analysis-table-wrap">
+        <table class="analysis-table">
+          <thead>
+            <tr>
+              <th>${escapeHtml(t("qcReadAt"))}</th>
+              <th>${escapeHtml(t("analysisName"))}</th>
+              <th>${escapeHtml(t("lotNo"))}</th>
+              <th>${escapeHtml(t("analysisQuantitative"))}</th>
+              <th>${escapeHtml(t("qcLevel"))}</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${analyses.map((item) => `
+              <tr class="${item.id === state.selectedQCAnalysisId ? "active" : ""}" data-qc-analysis-id="${item.id}" data-qc-analysis-tag="${escapeHtml(item.analyte_tag || "")}">
+                <td>${escapeHtml(formatDate(item.created_at || bundle.record.created_at || bundle.record.run_date || "-"))}</td>
+                <td>
+                  <strong>${escapeHtml(item.analyte_name || item.analyte_tag || "-")}</strong>
+                </td>
+                <td>${escapeHtml(item.lot_no || "-")}</td>
+                <td>${escapeHtml(item.raw_value || "-")}</td>
+                <td>${escapeHtml(item.control_level || "-")}</td>
+              </tr>`).join("")}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+  [...els.qcDetails.querySelectorAll("[data-qc-analysis-id]")].forEach((row) => {
+    row.addEventListener("click", () => {
+      state.selectedQCAnalysisId = Number(row.dataset.qcAnalysisId || 0) || null;
+      state.selectedQCAnalysisTag = row.dataset.qcAnalysisTag || null;
+      renderQCDetails();
+      renderQCLayout();
+    });
+  });
+}
+
+function inferLayoutKind() {
+  return state.layoutKind || "simple_list";
+}
+
+async function api(url, options = {}) {
+  const response = await fetch(url, {
+    credentials: "same-origin",
+    ...options,
+    headers: { "Content-Type": "application/json", ...(options.headers || {}) },
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok || payload.ok === false) {
+    throw new Error(payload.error?.message || payload.error || payload.message || `Request failed with ${response.status}`);
+  }
+  return payload;
+}
+
+function readFileAsDataURL(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("Nu se poate citi fisierul selectat"));
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.readAsDataURL(file);
+  });
+}
+
+function formatDate(value) {
+  if (!value) return "-";
+  const dt = new Date(value);
+  if (Number.isNaN(dt.getTime())) return value;
+  return dt.toLocaleString(state.language === "en" ? "en-GB" : "ro-RO");
+}
+
+function formatLogPayload(payload) {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload) && payload.length === 0) {
+    return "";
+  }
+  try {
+    return JSON.stringify(payload, null, 2);
+  } catch (_) {
+    return "";
+  }
+}
+
+function t(key) {
+  return translations[state.language]?.[key] || translations.ro[key] || key;
+}
+
+function dataI18nKey(key) {
+  const explicit = {
+    nav_overview: "navOverview",
+    nav_daily_details: "navDailyDetails",
+    nav_analytes: "navSettings",
+    nav_orders: "navOrders",
+    nav_qc: "navQc",
+    nav_debug: "navDebug",
+    nav_help: "navHelp",
+    settings_analytes: "settingsAnalytes",
+    settings_daily_details: "settingsDailyDetails",
+    settings_qc: "settingsQc",
+    search: "search",
+    daily_details_day: "dailyDetailsDayTab",
+    daily_details_day_round: "dailyDetailsDayRoundTab",
+    daily_details_day_analyte: "dailyDetailsDayAnalyteTab",
+    daily_details_day_round_analyte: "dailyDetailsDayRoundAnalyteTab",
+    field_tag: "fieldTag",
+    field_code: "fieldCode",
+    field_name: "fieldName",
+    field_description: "fieldDescription",
+    field_result_type: "fieldResultType",
+    field_formatting: "fieldFormatting",
+    field_weighting: "fieldWeighting",
+    field_measure_unit: "fieldMeasureUnit",
+    field_reagents_set: "fieldReagentsSet",
+    field_active: "fieldActive",
+  };
+  return explicit[key] || key;
+}
+
+function syncLanguageControls() {
+  els.languageSelectLogin.value = state.language;
+  els.languageSelectDashboard.value = state.language;
+}
+
+function applyLanguage() {
+  document.documentElement.lang = state.language === "en" ? "en" : "ro";
+  document.getElementById("login-language-label").textContent = t("language");
+  document.getElementById("dashboard-language-label").textContent = t("language");
+  document.getElementById("login-eyebrow").textContent = t("localAdmin");
+  document.getElementById("reader-eyebrow").textContent = t("readerEyebrow");
+  els.readerIdentityLabel.textContent = t("readerCategory");
+  els.readerSummaryTitle.textContent = t("readerSummary");
+  document.getElementById("topbar-eyebrow").textContent = t("localHttp");
+  document.getElementById("login-title").textContent = t("loginTitle");
+  document.getElementById("login-subtitle").textContent = t("loginSubtitle");
+  document.getElementById("label-username").textContent = t("username");
+  document.getElementById("label-password").textContent = t("password");
+  document.getElementById("login-submit").textContent = t("login");
+  if (document.getElementById("reader-settings-title")) document.getElementById("reader-settings-title").textContent = t("settingsReader");
+  if (document.getElementById("repeat-mode-label")) document.getElementById("repeat-mode-label").textContent = t("repeatModeLabel");
+  if (document.getElementById("repeat-mode-help")) document.getElementById("repeat-mode-help").textContent = t("repeatModeHelp");
+  if (document.getElementById("delete-orders-preference-label")) document.getElementById("delete-orders-preference-label").textContent = t("deleteOrdersPreference");
+  if (document.getElementById("delete-orders-preference-toggle-label")) document.getElementById("delete-orders-preference-toggle-label").textContent = t("deleteOrdersPreferenceToggle");
+  if (document.getElementById("save-reader-settings")) document.getElementById("save-reader-settings").textContent = t("saveReaderSettings");
+  if (els.repeatModeSelect) {
+    const options = els.repeatModeSelect.querySelectorAll("option");
+    if (options[0]) options[0].textContent = t("repeatModeIndividual");
+    if (options[1]) options[1].textContent = t("repeatModeGrouped");
+  }
+  document.getElementById("session-label").textContent = t("sessionLabel");
+  document.getElementById("status-title").textContent = t("status");
+  document.getElementById("logs-title").textContent = t("recentLogs");
+  document.getElementById("log-polling-label").textContent = t("logPolling");
+  if (document.getElementById("analytes-title")) document.getElementById("analytes-title").textContent = t("navSettings");
+  const settingsLabels = {reader:t("settingsReader"), analytes:t("navAnalytes"), "daily-details":t("settingsDailyDetails"), "daily-analysis-filters":state.language === "en" ? "Filters" : "Filtre", "astm-specimens":state.language === "en" ? "Specimen types" : "Tipuri de probe", qc:t("settingsQc"), wss:"WSS"};
+  els.navSublinks.forEach(link => { const label=settingsLabels[link.dataset.settingsSubview]; if(label) link.textContent=label; });
+  if (els.debugNavLink) els.debugNavLink.textContent = t("navDebug");
+  document.getElementById("orders-title").textContent = t("navOrders");
+  if (document.getElementById("debug-title")) document.getElementById("debug-title").textContent = t("debugTitle");
+  if (document.getElementById("debug-description")) document.getElementById("debug-description").textContent = t("debugDescription");
+  if (document.getElementById("debug-result-title")) document.getElementById("debug-result-title").textContent = t("debugResultTitle");
+  if (els.refreshDebugTestsBtn) els.refreshDebugTestsBtn.textContent = t("refresh");
+  document.getElementById("qc-summary-title").textContent = t("qcToday");
+  document.getElementById("qc-period-label").textContent = t("westgardPeriod");
+  document.getElementById("qc-date-from-label").textContent = t("westgardDateFrom");
+  document.getElementById("qc-date-to-label").textContent = t("westgardDateTo");
+  document.getElementById("new-qc-record").textContent = t("qcAddManual");
+  document.getElementById("qc-record-title").textContent = t("qcManualTitle");
+  document.getElementById("qc-record-date-label").textContent = t("qcDate");
+  document.getElementById("qc-record-analyte-label").textContent = t("qcTargetAnalyte");
+  document.getElementById("qc-record-lot-label").textContent = t("lotNo");
+  document.getElementById("qc-record-level-label").textContent = t("qcTargetLevel");
+  document.getElementById("qc-record-label-label").textContent = t("qcControlLabel");
+  document.getElementById("qc-record-qualitative-label").textContent = t("analysisQualitative");
+  document.getElementById("qc-record-quantitative-label").textContent = t("analysisQuantitative");
+  document.getElementById("qc-record-interpretation-label").textContent = t("interpretation");
+  document.getElementById("qc-round-label").textContent = t("qcRound");
+  document.getElementById("qc-analyte-filter-label").textContent = t("westgardAnalyte");
+  document.getElementById("qc-target-title").textContent = t("qcTargetTitle");
+  document.getElementById("qc-target-filter-label").textContent = t("qcTargetAnalyte");
+  document.getElementById("qc-target-analyte-label").textContent = t("qcTargetAnalyte");
+  document.getElementById("qc-target-level-label").textContent = t("qcTargetLevel");
+  document.getElementById("qc-target-lot-label").textContent = t("qcTargetLot");
+  document.getElementById("qc-target-mean-label").textContent = t("qcTargetMean");
+  document.getElementById("qc-target-sd-label").textContent = t("qcTargetSD");
+  document.getElementById("qc-target-1sd-label").textContent = t("qcTargetOneSD");
+  document.getElementById("qc-target-2sd-label").textContent = t("qcTargetTwoSD");
+  document.getElementById("qc-target-3sd-label").textContent = t("qcTargetThreeSD");
+  document.getElementById("qc-target-cv-label").textContent = t("qcTargetCV");
+  document.getElementById("save-qc-target").textContent = t("saveQcTarget");
+  document.getElementById("delete-qc-target").textContent = t("deleteQcTarget");
+  document.getElementById("new-qc-target").textContent = t("new");
+  document.getElementById("qc-level-filter-label").textContent = t("qcControlType");
+  document.getElementById("qc-details-title").textContent = t("qcDetails");
+  document.getElementById("qc-westgard-title").textContent = t("westgardTitle");
+  document.getElementById("qc-westgard-period-label").textContent = t("westgardPeriod");
+  document.getElementById("qc-westgard-date-from-label").textContent = t("westgardDateFrom");
+  document.getElementById("qc-westgard-date-to-label").textContent = t("westgardDateTo");
+  els.qcOpenWestgardBtn.textContent = t("westgardTitle");
+  document.getElementById("order-details-title").textContent = t("orderDetails");
+  if (document.getElementById("daily-details-date-label")) document.getElementById("daily-details-date-label").textContent = t("orderDate");
+  if (document.getElementById("daily-details-round-label")) document.getElementById("daily-details-round-label").textContent = t("round");
+  if (document.getElementById("daily-details-analyte-label")) document.getElementById("daily-details-analyte-label").textContent = t("navAnalytes");
+  document.getElementById("order-date-label").textContent = t("orderDate");
+  document.getElementById("round-label").textContent = t("round");
+  document.getElementById("orders-select-all-label").textContent = t("selectAll");
+  if (document.getElementById("orders-received-filter-label")) document.getElementById("orders-received-filter-label").textContent = t("resultsFilter");
+  if (document.getElementById("orders-sent-filter-label")) document.getElementById("orders-sent-filter-label").textContent = t("wisemedSendFilter");
+  document.getElementById("import-orders").textContent = t("importFile");
+  document.getElementById("export-orders").textContent = t("exportFile");
+  document.getElementById("sync-orders-wisemed").textContent = t("syncToWiseMED");
+  document.getElementById("send-orders-wisemed").textContent = t("sendToBulletin");
+  renderOrderStatusFilters();
+  document.getElementById("worklist-orders").textContent = t("getWorklist");
+  document.getElementById("delete-orders").textContent = t("deleteSelection");
+  if (document.getElementById("orders-delete-title")) document.getElementById("orders-delete-title").textContent = t("deleteOrdersTitle");
+  if (document.getElementById("orders-delete-message")) document.getElementById("orders-delete-message").textContent = t("deleteOrdersConfirm");
+  if (document.getElementById("orders-delete-skip-confirm-label")) document.getElementById("orders-delete-skip-confirm-label").textContent = t("dontAskAgain");
+  if (document.getElementById("orders-delete-confirm")) document.getElementById("orders-delete-confirm").textContent = t("delete");
+  if (document.getElementById("orders-delete-cancel")) document.getElementById("orders-delete-cancel").textContent = t("cancel");
+  document.getElementById("new-round").textContent = t("newRound");
+  document.getElementById("editor-title").textContent = t("analyteEditor");
+  document.getElementById("help-title").textContent = t("howTo");
+  document.getElementById("today-chart-title").textContent = t("todayResults");
+  document.getElementById("trend-chart-title").textContent = t("dailyTrend");
+  document.getElementById("help-open").textContent = t("openSeparate");
+  document.getElementById("save-analyte").textContent = t("save");
+  document.getElementById("refresh-analytes").textContent = t("refresh");
+  document.getElementById("refresh-qc-targets").textContent = t("refresh");
+  if (document.getElementById("qc-select-all-label")) document.getElementById("qc-select-all-label").textContent = t("selectAll");
+  if (document.getElementById("delete-qc-records")) document.getElementById("delete-qc-records").textContent = t("deleteSelection");
+  if (document.getElementById("daily-details-print")) document.getElementById("daily-details-print").textContent = t("dailyWorksheet");
+  els.closeAnalyteModalBtn.textContent = t("close");
+  els.closeQCTargetModalBtn.textContent = t("close");
+  els.closeQCRecordModalBtn.textContent = t("close");
+  els.closeQCWestgardModalBtn.textContent = t("close");
+  els.appToastClose.setAttribute("aria-label", t("close"));
+  els.closeAnalyteModalBtn.setAttribute("aria-label", t("close"));
+  els.closeQCTargetModalBtn.setAttribute("aria-label", t("close"));
+  els.closeQCRecordModalBtn.setAttribute("aria-label", t("close"));
+  els.closeQCWestgardModalBtn.setAttribute("aria-label", t("close"));
+  setImportButtonState(els.importOrdersBtn.classList.contains("is-loading"));
+  setAnalyteRefreshButtonState(els.refreshAnalytesBtn.classList.contains("is-loading"));
+  renderReaderSidebar();
+  document.getElementById("analyte-search").placeholder = t("searchAnalytes");
+  if (els.dailyDetailDefinitionSearch) {
+    els.dailyDetailDefinitionSearch.placeholder = state.language === "en"
+      ? "Search by key or label"
+      : "Cauta dupa cheie sau eticheta";
+  }
+  if (els.dailyDetailsValueSearch) {
+    els.dailyDetailsValueSearch.placeholder = state.language === "en"
+      ? "Search by variable name"
+      : "Cauta dupa nume variabila";
+  }
+  document.querySelectorAll("[data-i18n]").forEach((node) => {
+    const key = dataI18nKey(node.dataset.i18n);
+    if (translations[state.language]?.[key] || translations.ro[key]) {
+      node.textContent = t(key);
+    }
+  });
+  syncQCWestgardPeriodControls();
+  renderTopbarTitle();
+  applyBarcodeOverviewLabels();
+  renderDebugTests();
+  renderDebugResult();
+  if(state.formatterMode) applyHTMLFormatterUI();
+}
+
+function applyBarcodeOverviewLabels() {
+  if (!state.barcodeMode) return;
+  const qcTitle = document.getElementById("qc-summary-title");
+  const todayTitle = document.getElementById("today-chart-title");
+  const trendTitle = document.getElementById("trend-chart-title");
+  if (qcTitle) qcTitle.textContent = "Tipariri azi";
+  if (todayTitle) todayTitle.textContent = "Status tipariri azi";
+  if (trendTitle) trendTitle.textContent = "Evolutie tipariri pe zile";
+}
+
+function toggleLogsAccess(canViewLogs) {
+  els.logsPanel.hidden = !canViewLogs;
+  if (!canViewLogs && state.logPollTimer) {
+    clearInterval(state.logPollTimer);
+    state.logPollTimer = null;
+  }
+}
+
+function updateConnectionPills(connections) {
+  if (state.formatterMode) { els.analyzerPill.hidden = true; return; }
+  const analyzerConnected = !!connections.analyzer_connected;
+  const analyzerLastPacketAt = String(connections.analyzer_last_packet_at || "").trim();
+  if (state.barcodeMode) {
+    els.analyzerPill.hidden = true;
+  } else {
+    els.analyzerPill.hidden = false;
+    els.analyzerPill.classList.toggle("connected", analyzerConnected);
+    els.analyzerPill.classList.toggle("disconnected", !analyzerConnected);
+  }
+  els.analyzerDot.classList.toggle("offline", !analyzerConnected);
+  els.analyzerStatusLabel.textContent = `${t("analyzer")} · ${analyzerConnected ? t("connected") : t("disconnected")}`;
+  if (analyzerLastPacketAt && analyzerLastPacketAt !== state.analyzerLastPacketAt) {
+    pulseAnalyzerIndicator();
+  }
+  state.analyzerLastPacketAt = analyzerLastPacketAt;
+}
+
+function pulseAnalyzerIndicator() {
+  if (!els.analyzerPill || !els.analyzerDot) return;
+  els.analyzerPill.classList.remove("pulse");
+  els.analyzerDot.classList.remove("pulse");
+  void els.analyzerPill.offsetWidth;
+  els.analyzerPill.classList.add("pulse");
+  els.analyzerDot.classList.add("pulse");
+  if (state.analyzerPulseTimer) {
+    clearTimeout(state.analyzerPulseTimer);
+  }
+  state.analyzerPulseTimer = setTimeout(() => {
+    els.analyzerPill.classList.remove("pulse");
+    els.analyzerDot.classList.remove("pulse");
+    state.analyzerPulseTimer = null;
+  }, 1800);
+}
+
+function inferReaderCategory(readerInfo = {}) {
+  const analyzerName = String(readerInfo.analyzer_name || "").toLowerCase();
+  const label = String(readerInfo.label || "").toLowerCase();
+  const haystack = `${analyzerName} ${label}`;
+  if (/(urine|urin|uro)/.test(haystack)) return { key: "readerCategoryUrine", theme: "theme-urine", icon: "U" };
+  if (/(hema|cbc|blood|hemat)/.test(haystack)) return { key: "readerCategoryHematology", theme: "theme-hematology", icon: "H" };
+  if (/(immun|elisa|clia|eclia)/.test(haystack)) return { key: "readerCategoryImmunology", theme: "theme-immunology", icon: "I" };
+  if (/(gas|chromat)/.test(haystack)) return { key: "readerCategoryGas", theme: "theme-gas", icon: "G" };
+  if (/(spectro|photomet|colorimet)/.test(haystack)) return { key: "readerCategorySpectro", theme: "theme-spectro", icon: "S" };
+  if (/(biochim|biochem|chemistry|chem)/.test(haystack)) return { key: "readerCategoryBiochemistry", theme: "theme-biochemistry", icon: "B" };
+  return { key: "readerCategoryGeneric", theme: "theme-biochemistry", icon: "R" };
+}
+
+function normalizedProtocolSubtype(readerInfo = {}) {
+  return String(readerInfo.protocol_subtype || state.readerSettings?.protocol_subtype || "").trim();
+}
+
+function formatProtocolSubtypeLabel(value) {
+  const normalized = String(value || "").trim();
+  if (!normalized || normalized.toLowerCase() === "auto") return "";
+  return normalized.toUpperCase();
+}
+
+function formatReaderAnalyzerDisplay(readerInfo = {}) {
+  const analyzerName = String(readerInfo.analyzer_name || "").trim() || t("readerCategoryGeneric");
+  const subtype = formatProtocolSubtypeLabel(normalizedProtocolSubtype(readerInfo));
+  return subtype ? `${analyzerName} · ${subtype}` : analyzerName;
+}
+
+function isShimadzuGenericReader(readerInfo = {}) {
+  return String(readerInfo.protocol || "").trim().toLowerCase() === "shimatzu-generic";
+}
+
+function formatReaderPrimaryLabel(readerInfo = {}) {
+  if (isShimadzuGenericReader(readerInfo)) return "SHIMATZU";
+  return String(readerInfo.label || "").trim() || "Reader";
+}
+
+function formatReaderSecondaryLabel(readerInfo = {}) {
+  if (isShimadzuGenericReader(readerInfo)) {
+    return formatProtocolSubtypeLabel(normalizedProtocolSubtype(readerInfo)) || String(readerInfo.analyzer_name || "").trim() || "-";
+  }
+  return `${formatReaderAnalyzerDisplay(readerInfo)} · ${readerInfo.id}`;
+}
+
+function renderReaderSidebar() {
+ if(state.formatterMode){
+  els.readerIdentityIcon.textContent="HTML";els.readerIdentityTitle.textContent="Utilitar";els.readerIdentitySubtitle.textContent="HTML Print Formatter";
+  els.readerSummaryList.textContent="Chromium headless · HTTP / WSS";return;
+ }
+  const reader = state.readerInfo || {};
+  const category = inferReaderCategory(reader);
+  const isShimadzuGeneric = isShimadzuGenericReader(reader);
+  const shimadzuSubtype = formatProtocolSubtypeLabel(normalizedProtocolSubtype(reader)) || String(reader.analyzer_name || "").trim() || "-";
+  els.readerIdentityBadge.className = `reader-identity-badge ${category.theme}`;
+  els.readerIdentityIcon.textContent = category.icon;
+  els.readerIdentityTitle.textContent = isShimadzuGeneric ? "SHIMATZU" : t(category.key);
+  els.readerIdentitySubtitle.textContent = isShimadzuGeneric ? shimadzuSubtype : formatReaderAnalyzerDisplay(reader);
+  const items = [
+    { label: t("medicalUnitLabel"), value: reader.medical_unit_id ?? "-" },
+    { label: t("equipmentTypeLabel"), value: reader.equipment_type_id ?? "-" },
+    { label: t("equipmentIdLabel"), value: reader.equipment_id ?? "-" },
+    { label: t("readerIdLabel"), value: reader.id || "-" },
+    { label: t("analyzerNameLabel"), value: formatReaderAnalyzerDisplay(reader) || "-" },
+    { label: t("protocolSubtypeLabel"), value: formatProtocolSubtypeLabel(normalizedProtocolSubtype(reader)) || "-" },
+  ];
+  els.readerSummaryList.innerHTML = items.map((item) => `
+    <div class="reader-summary-item">
+      <span class="label">${escapeHtml(item.label)}</span>
+      <span class="value">${escapeHtml(String(item.value))}</span>
+    </div>`).join("");
+}
+
+function localizeOrderStatus(status) {
+  const normalized = String(status || "").trim().toLowerCase();
+  const mapping = {
+    received: "statusReceived",
+    pending: "statusPending",
+    completed: "statusCompleted",
+    failed: "statusFailed",
+    processing: "statusProcessing",
+    imported: "statusImported",
+  };
+  return t(mapping[normalized] || normalized || "-");
+}
+
+function renderDonut(today) {
+  const withoutResult = Number(today.without_result || 0);
+  const withResult = Number(today.with_result || 0);
+  const total = Math.max(withoutResult + withResult, 1);
+  const withDeg = Math.round((withResult / total) * 360);
+  els.todayDonut.style.background = `conic-gradient(#2f6de1 0deg ${withDeg}deg, #ffb347 ${withDeg}deg 360deg)`;
+  if (state.barcodeMode) {
+    els.todayLegend.innerHTML = `
+      <div class="legend-item"><span class="legend-swatch" style="background:#2f6de1"></span><span>Tipariri OK: ${withResult}</span></div>
+      <div class="legend-item"><span class="legend-swatch" style="background:#ffb347"></span><span>Tipariri fail: ${withoutResult}</span></div>`;
+    return;
+  }
+  els.todayLegend.innerHTML = `
+    <div class="legend-item"><span class="legend-swatch" style="background:#2f6de1"></span><span>${escapeHtml(t("analysesWithResult"))}: ${withResult}</span></div>
+    <div class="legend-item"><span class="legend-swatch" style="background:#ffb347"></span><span>${escapeHtml(t("analysesWithoutResult"))}: ${withoutResult}</span></div>`;
+}
+
+function renderQCSummary(summary) {
+  if (state.barcodeMode) {
+    const cards = [
+      { label: "Joburi", value: Number(summary.results || 0) },
+      { label: "Etichete", value: Number(summary.numeric_results || 0) },
+      { label: "Fail", value: Number(summary.outside_3sd || 0) },
+    ];
+    els.qcSummary.innerHTML = cards.map((item) => `<div class="metric"><span class="muted small">${escapeHtml(item.label)}</span><strong>${escapeHtml(String(item.value))}</strong></div>`).join("");
+    return;
+  }
+  const cards = [
+    { label: t("qcResults"), value: Number(summary.results || 0) },
+    { label: t("numericResults"), value: Number(summary.numeric_results || 0) },
+    { label: t("outside2sd"), value: Number(summary.outside_2sd || 0) },
+    { label: t("outside3sd"), value: Number(summary.outside_3sd || 0) },
+  ];
+  els.qcSummary.innerHTML = cards.map((item) => `<div class="metric"><span class="muted small">${escapeHtml(item.label)}</span><strong>${escapeHtml(String(item.value))}</strong></div>`).join("");
+}
+
+function renderLineChart(series) {
+  if (!Array.isArray(series) || series.length === 0) {
+    els.lineChart.innerHTML = `<text x="320" y="130" text-anchor="middle" font-size="14" fill="#6d7b73">${escapeHtml(t("noOrders"))}</text>`;
+    els.lineLegend.innerHTML = "";
+    return;
+  }
+  const width = 640;
+  const height = 260;
+  const pad = 24;
+  const maxValue = Math.max(1, ...series.flatMap((p) => [p.orders || 0, p.analyses || 0, p.analyses_with_result || 0]));
+  const xStep = series.length > 1 ? (width - pad * 2) / (series.length - 1) : 0;
+  const toY = (value) => height - pad - ((value / maxValue) * (height - pad * 2));
+  const toPath = (key) => series.map((point, index) => `${index === 0 ? "M" : "L"} ${pad + xStep * index} ${toY(point[key] || 0)}`).join(" ");
+  const axes = `<line x1="${pad}" y1="${height - pad}" x2="${width - pad}" y2="${height - pad}" stroke="#a8b8ae" stroke-width="1"/><line x1="${pad}" y1="${pad}" x2="${pad}" y2="${height - pad}" stroke="#a8b8ae" stroke-width="1"/>`;
+  const labels = series.map((point, index) => `<text x="${pad + xStep * index}" y="${height - 6}" text-anchor="middle" font-size="11" fill="#6d7b73">${escapeHtml((point.day || "").slice(5))}</text>`).join("");
+  els.lineChart.innerHTML = `${axes}
+    <path d="${toPath("orders")}" fill="none" stroke="#2f6de1" stroke-width="3"/>
+    <path d="${toPath("analyses")}" fill="none" stroke="#198a78" stroke-width="3"/>
+    <path d="${toPath("analyses_with_result")}" fill="none" stroke="#d85c74" stroke-width="3"/>
+    ${labels}`;
+  els.lineLegend.innerHTML = `
+    <div class="legend-item"><span class="legend-swatch" style="background:#2f6de1"></span><span>${escapeHtml(t("orders"))}</span></div>
+    <div class="legend-item"><span class="legend-swatch" style="background:#198a78"></span><span>${escapeHtml(t("analytes"))}</span></div>
+    <div class="legend-item"><span class="legend-swatch" style="background:#d85c74"></span><span>${escapeHtml(t("results"))}</span></div>`;
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll("\"", "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+function applyESignatureUI() {
+  document.title='eSignature server';
+  for (const [id,text] of [['reader-eyebrow','UTILITAR'],['today-chart-title','Semnături astăzi'],['reader-summary-title','Rezumat utilitar'],['reader-identity-title','Semnătură electronică'],['reader-identity-icon','S']]) {const node=document.getElementById(id);if(node)node.textContent=text;}
+  for(const id of ['analyzer-pill','result-sync-pill']) {const node=document.getElementById(id);if(node)node.hidden=true;}
+
+  els.settingsSubmenu.hidden = false;
+  els.navSublinks.forEach(link => {
+    link.hidden = !['pad', 'demo', 'reader', 'wss'].includes(link.dataset.settingsSubview);
+    if (link.dataset.settingsSubview === 'reader') link.textContent = 'Server și update-uri';
+  });
+  for (const view of ['daily-details', 'qc']) { const node = barcodeNavButton(view); if(node) node.hidden = true; }
+  const history = barcodeNavButton('orders'); if(history) history.textContent = 'Istoric';
+  for (const node of [els.importOrdersBtn, els.exportOrdersBtn, els.worklistOrdersBtn, els.newRoundBtn, els.ordersSelectAllBox, els.orderDate?.parentElement, els.roundSelect?.parentElement]) { if(node) node.hidden=true; }
+  if(els.qcSummary?.closest('.panel')) els.qcSummary.closest('.panel').hidden=true;
+  document.getElementById('orders-title').textContent='Istoric semnături';
+}
+function activateESignatureSettings(name) {
+  const next = ['pad','demo','reader'].includes(name) ? name : 'pad';
+  if(next !== 'demo') closeESignatureDemo();
+  state.settingsSubView=next;
+  for(const node of document.querySelectorAll('[id^="settings-panel-"]')) node.hidden=true;
+  const panel=document.getElementById('settings-panel-esignature');
+  if(next==='reader') { els.settingsPanelReader.hidden=false; loadReaderSettings().catch(error=>showToast(error.message,'error')); }
+  else { panel.hidden=false; renderESignaturePanel(next).catch(error=>{panel.textContent=error.message;}); }
+  els.navSublinks.forEach(link=>link.classList.toggle('active',link.dataset.settingsSubview===next));
+  if(!els.views.analytes.hidden) { window.history.replaceState({view:'analytes'},'',pathForView('analytes')); renderTopbarTitle(); }
+}
+async function renderESignaturePanel(view) {
+  const panel=document.getElementById('settings-panel-esignature');
+  if(view==='demo') {
+    if(state.signatureSocket && panel.querySelector('#esignature-demo-status')) return;
+    panel.innerHTML=`<div class="panel-head"><h3>Demo semnătură</h3></div><p>Detectează pad-ul, începe captura și semnează pe dispozitiv. Confirmă pentru a vedea imaginea.</p>
+      <div class="orders-buttons">${[['devices','Detectează PAD'],['start','Începe'],['retry','Reia'],['confirm','Confirmă'],['cancel','Anulează']].map(([action,label])=>`<button class="ghost" type="button" data-signature-action="${action}">${label}</button>`).join('')}</div>
+      <p id="esignature-demo-status" role="status" aria-live="polite">Pregătit pentru test.</p><img id="esignature-demo-image" alt="Semnătura capturată" hidden style="max-width:100%;background:white">`;
+    panel.querySelectorAll('[data-signature-action]').forEach(button=>button.onclick=()=>sendESignatureDemo(button.dataset.signatureAction));
+    return;
+  }
+  const settings=await api('/api/esignature/settings');
+  if(state.settingsSubView!=='pad') return;
+  const modelOptions=['','Evolis Sig200','Signotec Omega'];
+  if(settings.model && !modelOptions.includes(settings.model)) modelOptions.push(settings.model);
+  panel.innerHTML=`<div class="panel-head"><h3>Setări PAD</h3></div>
+    <form id="esignature-settings-form" class="barcode-settings-grid">
+      <label>Firma producătoare<select name="manufacturer"><option value="signotec">Signotec</option></select></label>
+      <label>Tip PAD<select name="pad_type"><option value="omega">Omega</option></select></label>
+      <label>Model<select name="model">${modelOptions.map(model=>`<option value="${escapeHtml(model)}" ${settings.model===model?'selected':''}>${escapeHtml(model||'Nespecificat')}</option>`).join('')}</select></label>
+      <label>Conectare<input value="USB (HID / WinUSB)" readonly></label>
+      <label>Index dispozitiv<input name="device_index" type="number" min="0" max="31" value="${Number(settings.device_index||0)}" required><span class="small muted">0 = primul pad detectat</span></label>
+      <label>Durata maximă a sesiunii (secunde)<input name="session_timeout_seconds" type="number" min="1" max="600" value="${Number(settings.session_timeout_seconds||180)}" required></label>
+      <div class="orders-buttons"><button class="ghost" type="submit">Salvează</button></div><p id="esignature-save-status" role="status"></p>
+    </form>`;
+  const form=panel.querySelector('form');
+  form.elements.manufacturer.onchange=()=>{form.elements.pad_type.value='omega';form.elements.model.value='';};
+  form.elements.pad_type.onchange=()=>{form.elements.model.value='';};
+  form.onsubmit=async event=>{
+    event.preventDefault(); const button=form.querySelector('button');button.disabled=true;
+    const data=Object.fromEntries(new FormData(form));data.device_index=Number(data.device_index);data.session_timeout_seconds=Number(data.session_timeout_seconds);
+    try {await api('/api/esignature/settings',{method:'PUT',body:JSON.stringify(data)});panel.querySelector('#esignature-save-status').textContent='Salvat. Setările se aplică sesiunilor noi.';}
+    catch(error){panel.querySelector('#esignature-save-status').textContent=error.message;}
+    finally{button.disabled=false;}
+  };
+}
+function closeESignatureDemo() {
+  if (window.WSM_REMOTE && state.remoteSignatureSession) {
+    const sessionID = state.remoteSignatureSession; state.remoteSignatureSession = null;
+    api('/api/esignature/command', {method:'POST',body:JSON.stringify({id:crypto.randomUUID(),action:'cancel',session_id:sessionID})}).catch(() => {});
+  }
+  const socket=state.signatureSocket;state.signatureSocket=null;
+  if(socket) socket.close();
+  const image=document.getElementById('esignature-demo-image');if(image){image.hidden=true;image.removeAttribute('src');}
+}
+function sendESignatureDemo(action) {
+  const panel=document.getElementById('settings-panel-esignature');
+  const status=panel.querySelector('#esignature-demo-status');
+  if(!status || !state.session) return;
+  const buttons=[...panel.querySelectorAll('[data-signature-action]')];buttons.forEach(button=>button.disabled=true);
+  const send=socket=>{
+    if(['start','retry','cancel'].includes(action)){const image=panel.querySelector('img');image.hidden=true;image.removeAttribute('src');}
+    socket.send(JSON.stringify({id:String(Date.now()),action}));status.textContent='Se execută comanda…';
+  };
+  if (window.WSM_REMOTE) {
+    if (!state.remoteSignatureSession) state.remoteSignatureSession = crypto.randomUUID();
+    status.textContent = 'Se execută comanda prin WSS…';
+    api('/api/esignature/command', {method:'POST', body:JSON.stringify({id:crypto.randomUUID(), action, session_id:state.remoteSignatureSession})})
+      .then(data => {
+        if (data.ok !== false && ['confirm', 'cancel'].includes(action)) state.remoteSignatureSession = null;
+        status.textContent = data.ok === false ? data.message : (data.count !== undefined ? `Pad-uri detectate: ${data.count}` : ({start:'Semnează pe pad, apoi apasă Confirmă.',retry:'Semnează din nou.',confirm:'Semnătură capturată.',cancel:'Captură anulată.'}[action] || 'Comandă executată.'));
+        if (data.imageBase64) { const image = panel.querySelector('img'); image.src = `data:image/png;base64,${data.imageBase64}`; image.hidden = false; }
+      })
+      .catch(error => { status.textContent = error.message; })
+      .finally(() => buttons.forEach(button => button.disabled = false));
+    return;
+  }
+  if(state.signatureSocket?.readyState===WebSocket.OPEN){send(state.signatureSocket);return;}
+  const socket=new WebSocket(`${location.protocol==='https:'?'wss:':'ws:'}//${location.host}/ws/demo`);
+  state.signatureSocket=socket;
+  socket.onopen=()=>{if(state.signatureSocket===socket)send(socket);else socket.close();};
+  socket.onmessage=event=>{
+    if(state.signatureSocket!==socket)return;
+    const data=JSON.parse(event.data);buttons.forEach(button=>button.disabled=false);
+    status.textContent=data.ok ? (data.count!==undefined?`Pad-uri detectate: ${data.count}`:({start:'Semnează pe pad, apoi apasă Confirmă.',retry:'Semnează din nou.',confirm:'Semnătură capturată.',cancel:'Captură anulată.'}[data.action]||'Comandă executată.')) : data.message;
+    if(data.imageBase64){const image=panel.querySelector('img');image.src=`data:image/png;base64,${data.imageBase64}`;image.hidden=false;}
+  };
+  socket.onerror=()=>{status.textContent='Conexiunea cu serviciul nu a reușit.';};
+  socket.onclose=()=>{buttons.forEach(button=>button.disabled=false);if(state.signatureSocket===socket){state.signatureSocket=null;status.textContent='Sesiune închisă. Poți începe un test nou.';}};
+}
+async function loadESignatureHistory() {
+  const data=await api('/api/esignature/jobs');
+  els.ordersLayout.innerHTML=`<div class="table-wrap"><table class="data-table"><thead><tr><th>Data (UTC)</th><th>Operație</th><th>Rezultat</th><th>Mesaj</th></tr></thead><tbody>${(data.jobs||[]).map(row=>`<tr><td>${escapeHtml(row.created_at)}</td><td>${escapeHtml(row.action)}</td><td>${row.ok?'OK':'Eroare'}</td><td>${escapeHtml(row.message||'')}</td></tr>`).join('')}</tbody></table></div>`;
+}
+
+// The browser uses the authenticated local API; the runtime owns the WSS socket.
+function initWSSUI() {
+  state.wss = { snapshot: null, receivedAt: 0, loading: false, peers: [], windows: new Map() };
+  document.getElementById("wss-pill").addEventListener("click", () => {
+    if (window.WSM_REMOTE) { activateSettingsSubView("wss"); activateView("analytes"); return; }
+    const status = state.wss.snapshot?.status;
+    if ((Number(state.session?.user_type) || 0) <= 0 && status?.enabled && !status.connected) wssControl("reconnect").catch(error => wssNotice(error.message));
+    else { activateSettingsSubView("wss"); activateView("analytes"); }
+  });
+  window.addEventListener("message", async event => {
+    const entry = state.wss.windows.get(event.source);
+    if (!entry || event.origin !== entry.origin) return;
+    if (event.data?.type === "wsm-control-ready" && entry.ticket) {
+      event.source.postMessage({type:"wsm-control-auth", ticket:entry.ticket}, entry.origin);
+      entry.ticket = null;
+    } else if (["wsm-control-refresh", "wsm-control-ready"].includes(event.data?.type) && !entry.refreshing) {
+      entry.refreshing = true;
+      try {
+        const response = await api("/api/wss/open", {method:"POST", body:JSON.stringify({equipment_id:entry.equipmentID})});
+        if (new URL(response.url).origin !== entry.origin) throw new Error("Originea consolei s-a schimbat. Redeschide consola.");
+        event.source.postMessage({type:"wsm-control-auth",ticket:response.ticket}, entry.origin);
+      } catch (error) { wssNotice(`Reautentificare consolă: ${error.message}`); }
+      finally { entry.refreshing = false; }
+    }
+  });
+  setInterval(() => {
+    for (const child of state.wss.windows.keys()) if (child.closed) state.wss.windows.delete(child);
+    if (els.dashboardView.hidden) return;
+    renderWSSBadge();
+    if (!state.wss.loading && Date.now() - state.wss.receivedAt > 2000) loadWSSStatus().catch(() => {});
+  }, 1000);
+}
+
+function wssRetrySeconds(status, receivedAt, now = Date.now()) {
+  const deadline = Date.parse(status.next_retry_at || "");
+  if (Number.isFinite(deadline) && deadline > 0) return Math.max(0, Math.ceil((deadline - now) / 1000));
+  return Math.max(0, Math.ceil(Number(status.retry_in_seconds || 0) - (now - receivedAt) / 1000));
+}
+
+function renderWSSBadge() {
+  const status = state.wss.snapshot?.status;
+  const label = document.getElementById("wss-status-label");
+  const pill = document.getElementById("wss-pill");
+  const dot = document.getElementById("wss-dot");
+  if (!status || state.wss.statusError) { pill.classList.remove("connected"); pill.classList.add("disconnected"); label.textContent = "WSS: stare indisponibilă"; dot.style.backgroundColor = "var(--danger)"; return; }
+  const seconds = wssRetrySeconds(status, state.wss.receivedAt);
+  label.textContent = status.connected ? "WSS: conectat" : !status.enabled ? "WSS: neconfigurat" : status.paused ? "WSS: deconectat manual · reconectează" : status.phase === "connecting" ? "WSS: conectare…" : `WSS: deconectat · reîncercare în ${seconds}s`;
+  pill.classList.toggle("connected", !!status.connected);
+  pill.classList.toggle("disconnected", !status.connected);
+  dot.classList.toggle("ok", !!status.connected);
+  dot.style.backgroundColor = status.connected ? "var(--accent-deep)" : "var(--danger)";
+  pill.title = [status.url, status.equipment_id ? `Echipament ${status.equipment_id}` : "", status.last_error, status.connected ? "Deschide Debug WSS" : "Click pentru reîncercare imediată"].filter(Boolean).join(" · ");
+  const details = document.getElementById("wss-local-status");
+  if (details) details.textContent = JSON.stringify(status, null, 2);
+}
+
+async function loadWSSStatus() {
+  if (state.wss.loading) return;
+  state.wss.loading = true;
+  const revision = state.wss.controlRevision || 0;
+  try {
+    const snapshot = await api("/api/wss/status");
+    if (revision !== (state.wss.controlRevision || 0)) return;
+    state.wss.snapshot = snapshot;
+    state.wss.statusError = "";
+    state.wss.receivedAt = Date.now();
+    updateWSSReconnect(snapshot.status);
+    renderWSSBadge();
+    const form = document.getElementById("wss-settings-form");
+    if (form && !form.dataset.loaded) {
+      for (const [key, value] of Object.entries(snapshot.settings || {})) {
+        const field = form.elements.namedItem(key);
+        if (field && field.type !== "password") { if (field.type === "checkbox") field.checked = !!value; else field.value = Array.isArray(value) ? value.join(",") : value ?? ""; }
+      }
+      const secretField = form.elements.namedItem("device_secret");
+      if (secretField) {
+        secretField.value = "";
+        secretField.placeholder = snapshot.settings?.device_secret_configured ? "Cheie salvată · lasă gol pentru a o păstra" : "Lipește cheia generată în consola WSM";
+      }
+      loadWSSScopes(form, snapshot.settings?.scopes);
+      syncWSSAuthFields(form);
+      form.dataset.loaded = "true";
+    }
+    const trace = document.getElementById("wss-trace");
+    if (trace) trace.textContent = (snapshot.trace || []).slice(-150).map(entry => JSON.stringify(entry, null, 2)).join("\n\n") || "Nu există mesaje în sesiunea curentă.";
+  } catch (error) {
+    state.wss.receivedAt = Date.now();
+    state.wss.statusError = error.message;
+    document.getElementById("wss-status-label").textContent = "WSS: stare indisponibilă";
+    document.getElementById("wss-pill").title = error.message;
+    throw error;
+  } finally { state.wss.loading = false; }
+}
+
+function wssNotice(text, success = false) {
+  const notice = document.getElementById(state.currentView === "wsm" ? "wsm-notice" : "wss-notice");
+  if (notice) { notice.textContent = text; notice.classList.toggle("wss-error", !success); }
+  else showToast(text, success ? "success" : "error");
+}
+
+function wssReconnectBusy() {
+  const status = state.wss.snapshot?.status;
+  return state.wss.controlInFlight === "reconnect" || !!state.wss.reconnectPending ||
+    !!(status?.enabled && !status.connected && !status.paused);
+}
+
+function renderWSSReconnectButtons() {
+  const busy = wssReconnectBusy();
+  document.querySelectorAll('[data-wss-control="reconnect"]').forEach(button => {
+    if (busy && button.getAttribute("aria-busy") !== "true") setButtonLoading(button, true);
+    else if (!busy && button.getAttribute("aria-busy") === "true") setButtonLoading(button, false);
+  });
+}
+
+function updateWSSReconnect(status) {
+  const pending = state.wss.reconnectPending;
+  if (!state.wss.controlInFlight && pending && status &&
+      (status.paused || !status.enabled ||
+       (status.connected && (!pending.connectionID || status.connection_id !== pending.connectionID)))) {
+    state.wss.reconnectPending = null;
+  }
+  renderWSSReconnectButtons();
+}
+
+async function wssControl(action) {
+  if (window.WSM_REMOTE && action === "disconnect") throw new Error("Deconectarea permanentă a echipamentului nu este disponibilă din consola la distanță.");
+  if (action === "reconnect" && wssReconnectBusy()) return;
+  const revision = (state.wss.controlRevision || 0) + 1;
+  state.wss.controlRevision = revision;
+  state.wss.controlInFlight = action;
+  if (action === "reconnect") {
+    state.wss.reconnectPending = {connectionID: state.wss.snapshot?.status?.connection_id || ""};
+  }
+  renderWSSReconnectButtons();
+  try {
+    await api("/api/wss/control", {method:"POST", body:JSON.stringify({action})});
+    if (state.wss.controlRevision !== revision) return;
+    state.wss.controlRevision++;
+    state.wss.controlInFlight = null;
+    if (action === "disconnect") {
+      state.wss.reconnectPending = null;
+      if (state.wss.snapshot?.status) state.wss.snapshot.status = {...state.wss.snapshot.status, paused:true};
+    }
+    renderWSSReconnectButtons();
+    await loadWSSStatus();
+    wssNotice(action === "disconnect" ? "Conexiune oprită manual. Folosește Reconectare pentru reluare." : "Reconectare în curs…", true);
+  } catch (error) {
+    if (state.wss.controlRevision === revision) {
+      state.wss.controlRevision++;
+      state.wss.controlInFlight = null;
+      if (action === "reconnect") state.wss.reconnectPending = null;
+      renderWSSReconnectButtons();
+    }
+    throw error;
+  }
+}
+
+function wssScopeOptions() {
+  return [
+    [
+        "route:reply",
+        "Trimite răspunsuri la comenzile primite; necesar pentru controlul remote al aparatului.",
+        "Permite răspunsul la o comandă primită, folosind identificatorul de corelare al acesteia. Un reader răspunde către conexiunea solicitantului.",
+        "După device.ping, echipamentul trimite solicitantului rezultatul printr-un mesaj reply."
+    ],
+    [
+        "route:event",
+        "Trimite evenimente către alți clienți din tenant.",
+        "Permite publicarea evenimentelor fără o comandă prealabilă. Readerele pot publica numai pe propriile topicuri results:<reader_id> și logs:<reader_id>. Serviciile respectă regulile destinației, inclusiv route:broadcast pentru topicuri.",
+        "Readerul reader-1 publică un rezultat pe topicul results:reader-1."
+    ],
+    [
+        "route:command",
+        "Trimite comenzi; necesar împreună cu api:invoke pentru Deschide.",
+        "Permite trimiterea comenzilor către alți clienți din aceeași instanță WiseMED. Apelurile API cer și api:invoke; pentru un reader, comenzile de diagnostic cer și devices:debug.",
+        "Cu route:command și devices:debug, un reader poate cere ws.reconnect unui echipament selectat."
+    ],
+    [
+        "devices:debug",
+        "Trimite ping, reconnect și mesaje de diagnostic altor echipamente.",
+        "Permite unui reader să trimită device.ping, ws.reconnect și debug.message către un echipament, reader sau o conexiune. Necesită și route:command. Nu acordă acces general la API.",
+        "Cu route:command, butonul Ping client verifică răspunsul echipamentului selectat."
+    ],
+    [
+        "connections:read",
+        "Vede lista și starea online a echipamentelor din tenant.",
+        "Permite listarea conexiunilor și consultarea stării echipamentelor din propria instanță, prin list_connections, equipment.list sau equipment.status. Nu permite controlul lor.",
+        "Butonul Actualizează lista clienților afișează echipamentele conectate."
+    ],
+    [
+        "server:status",
+        "Citește starea serverului WSM.",
+        "Permite comanda server.status: identificarea serviciului WSM, instanța curentă, numărul de conexiuni din aceasta și ora serverului. Nu acordă acces la configurarea serverului.",
+        "O comandă server.status arată câte conexiuni sunt active în instanța ta."
+    ],
+    [
+        "api:invoke",
+        "Deschide console remote și apelează API-ul altor echipamente din același tenant, inclusiv operații care modifică date; necesită route:command.",
+        "Împreună cu route:command, permite api.request către API-ul unui echipament și obținerea unui tichet pentru consola remote. Include operații care pot modifica date; se aplică și regulile API-ului destinatar.",
+        "Deschide consola unui echipament sau apelează GET /api/status prin WSM."
+    ],
+    [
+        "api:admin",
+        "Permite și operațiile API administrative remote; necesită api:invoke și route:command. Nu acordă login în consola admin WSM.",
+        "Permite executarea operațiilor API care cer administrator pe echipamentul destinatar, prin adaptorul WSM. Necesită api:invoke și route:command. Nu acordă autentificare în consola administrativă a serverului WSM.",
+        "Salvează configurarea WSS a echipamentului prin PUT /api/wss/settings."
+    ],
+    [
+        "route:broadcast",
+        "Trimite către mai mulți destinatari din tenant; necesită dreptul corespunzător de comandă sau eveniment.",
+        "Permite rutarea către grupuri, toate conexiunile sau un tip de client din aceeași instanță. Necesită și dreptul mesajului trimis, de exemplu route:command. Nu elimină restricțiile rolului reader sau cerința api:invoke pentru apeluri API.",
+        "Un serviciu cu route:event și route:broadcast poate trimite un eveniment tuturor clienților de tip siui-bridge."
+    ],
+    [
+        "topics:subscribe",
+        "Permite abonarea și dezabonarea la topicuri și primirea mesajelor adresate acestora în același tenant.",
+        "Permite abonarea și dezabonarea la topicuri din propria instanță WiseMED, pentru primirea mesajelor publicate pe acestea. Nu acordă dreptul de a publica.",
+        "Un client se abonează la logs:reader-1 pentru a primi evenimentele de jurnal ale readerului."
+    ],
+    [
+        "wisemed:proxy",
+        "Permite comenzile WiseMED implementate de WSM către API-ul configurat pentru tenant; necesită upstream WiseMED configurat.",
+        "Permite comenzile WiseMED implementate de WSM către API-ul WiseMED configurat pentru instanță. Nu este un proxy către adrese arbitrare; necesită configurarea upstreamului WiseMED.",
+        "wisemed.fetch_file_for_analyzer solicită un fișier pentru echipamentul indicat, prin WSM."
+    ]
+];
+}
+
+function syncWSSAuthFields(form) {
+  const mode = form.elements.namedItem("auth_mode").value;
+  form.querySelectorAll("[data-wss-auth]").forEach(group => {
+    const applies = group.dataset.wssAuth.split(" ").includes(mode);
+    group.hidden = !applies;
+    group.querySelectorAll("input, select, textarea").forEach(field => { field.disabled = !applies; });
+  });
+}
+
+function loadWSSScopes(form, value) {
+  const selected = new Set((Array.isArray(value) ? value.join(",") : String(value || "route:reply,route:event,route:command,devices:debug,connections:read,server:status")).split(/[,\s]+/).filter(Boolean));
+  form.querySelectorAll("[data-wss-scope]").forEach(field => { field.checked = selected.has(field.value); });
+}
+
+function renderWSSPanel() {
+  const panel = document.getElementById("settings-panel-wss");
+  if (panel.dataset.ready) return;
+  panel.dataset.ready = "true";
+  panel.innerHTML = `
+    <div class="panel-head"><h3>WiseMED WSS · setări și conexiune</h3></div>
+    <p class="small muted">Conexiunea folosește ID-ul echipamentului înregistrat prin API WiseMED. Lista și comenzile sunt limitate la instanța WiseMED și permisiunile cheii curente.</p>
+    <p id="wss-notice" role="status" aria-live="polite"></p>
+    <form id="wss-settings-form" class="wss-grid">
+      <label class="wss-check"><input name="enabled" type="checkbox"> Activare WSS</label>
+      <label>Server WSS<input name="url" placeholder="wss://server.example/ws" spellcheck="false"></label>
+      <label>Autentificare<select name="auth_mode"><option value="device_key">Cheie echipament (JWT)</option><option value="token_file">Fișier JWT</option><option value="token_endpoint">Endpoint JWT WiseMED</option></select></label>
+      <label data-wss-auth="device_key">Instanță WiseMED / tenant<input name="tenant_id" autocomplete="off"></label>
+      <label data-wss-auth="device_key">ID cheie<input name="key_id" autocomplete="off"></label>
+      <label data-wss-auth="device_key">Emitent JWT<input name="issuer"></label>
+      <label data-wss-auth="device_key">Audiență JWT<input name="audience"></label>
+      <label data-wss-auth="device_key">Subiect JWT<input name="subject"></label>
+      <label>ID client<input name="client_id"></label>
+      <label data-wss-auth="device_key">Cheie WSS<input name="device_secret" type="password" autocomplete="new-password" spellcheck="false"><small>Cheia generată în consola WSM. Lasă gol pentru a păstra cheia salvată.</small></label>
+      <label data-wss-auth="device_key">Fișier cheie pe calculatorul echipamentului<input name="secret_file" autocomplete="off" spellcheck="false"></label>
+      <label data-wss-auth="token_file">Fișier JWT pe calculatorul echipamentului<input name="token_file" autocomplete="off" spellcheck="false"></label>
+      <label data-wss-auth="token_endpoint">Cale endpoint JWT<input name="token_path" spellcheck="false"></label>
+      <label>Fișier CA suplimentar (opțional)<input name="ca_file" spellcheck="false"></label>
+      <fieldset class="wss-wide" data-wss-auth="device_key"><legend>Permisiuni solicitate</legend>
+        <p class="small muted">Selectează permisiunile necesare. Cheia din WSM trebuie să permită fiecare permisiune selectată.</p>
+        <div class="wss-grid">${wssScopeOptions().map(([scope, label, description, example], index) => `<div class="wss-permission"><label class="wss-check" for="wss-permission-${index}"><input id="wss-permission-${index}" type="checkbox" data-wss-scope value="${scope}" aria-describedby="wss-permission-help-${index}"><span>${index + 1}. ${label}<small class="wss-permission-code">${scope}</small></span></label><details class="wss-permission-info"><summary aria-label="Informații despre ${label}" title="Explicație și exemplu">i</summary><div id="wss-permission-help-${index}" class="wss-permission-help"><p>${description}</p><p><strong>Exemplu:</strong> ${example}</p></div></details></div>`).join("")}</div>
+      </fieldset>
+      <p class="small muted wss-wide" data-wss-auth="token_file token_endpoint">Permisiunile sunt stabilite în JWT de emitentul acestuia.</p>
+      <div class="wss-wide orders-buttons"><button type="submit">Salvează și aplică</button></div>
+    </form>
+    <div class="orders-buttons wss-toolbar"><button data-wss-control="disconnect" type="button">Deconectare</button><button data-wss-control="reconnect" type="button">Reconectare acum</button></div>
+    <div id="wss-debug-content">
+    <div class="panel-head"><h3>WSM · diagnostic WSS</h3></div>
+    <p id="wsm-notice" role="status" aria-live="polite"></p>
+    <div class="orders-buttons wss-toolbar"><button data-wss-control="disconnect" type="button">Deconectare</button><button data-wss-control="reconnect" type="button">Reconectare acum</button><button data-wss-action="ping_server" type="button">Ping server</button><button data-wss-action="list" type="button">Actualizează lista clienților</button></div>
+    <details><summary>Starea conexiunii locale</summary><pre id="wss-local-status" class="wss-json"></pre></details>
+    <div id="wss-relay-debug">
+    <h4>Clienți conectați</h4><div id="wss-peers" class="wss-table-wrap"><p>Apasă „Actualizează lista clienților”.</p></div>
+    <div class="wss-grid"><label class="wss-wide">Client destinatar<select id="wss-target"><option value="">Selectează un client din listă</option></select></label><label class="wss-wide">Mesaj text<textarea id="wss-message" rows="2" maxlength="8192"></textarea></label></div>
+    <div class="orders-buttons wss-toolbar"><button data-wss-action="ping" type="button">Ping client</button><button data-wss-action="reconnect" type="button">Reconectează clientul</button><button data-wss-action="message" type="button">Trimite mesaj</button></div>
+    <details open><summary>Exemplu API prin WSS</summary><p class="small muted">Solicitarea este executată de același handler API al destinatarului. Se transmit numai date JSON. Operațiile de modificare se execută efectiv pe echipamentul selectat.</p>
+    <form id="wss-bridge-form" class="wss-grid"><label>Metodă<select name="method"><option>GET</option><option>POST</option><option>PUT</option><option>PATCH</option><option>DELETE</option></select></label><label>Cale API<input name="path" value="/api/status" required pattern="/api/.*" spellcheck="false"></label><label class="wss-wide">Corp JSON (opțional)<textarea name="body" rows="4" placeholder='{"example":"value"}' spellcheck="false"></textarea></label><div class="wss-wide"><button type="submit">Execută prin WSS</button></div></form></details>
+    <h4>Răspuns comandă</h4><pre id="wss-response" class="wss-json" aria-live="polite">Nicio comandă executată.</pre>
+    <details open><summary>Mesaje trimise / primite · ultimele 150 înregistrări</summary><pre id="wss-trace" class="wss-json">Se încarcă…</pre></details></div></div>`;
+  if (window.WSM_REMOTE) {
+    panel.querySelector("#wss-relay-debug").hidden = true;
+    panel.querySelectorAll("[data-wss-action], [data-wss-control='disconnect']").forEach(button => { button.hidden = true; });
+    panel.querySelectorAll("[data-wss-control='reconnect']").forEach(button => { button.textContent = "Reconectează echipamentul la WSS"; });
+    const note = document.createElement("p");
+    note.textContent = "Setările și reconectarea de aici afectează echipamentul. Reconectarea întrerupe temporar controlul; revine automat după reconectarea echipamentului. Butonul din bara albastră reconectează numai această fereastră.";
+    panel.prepend(note);
+  }
+  if ((Number(state.session?.user_type) || 0) > 0) {
+    panel.querySelector("#wss-settings-form").hidden = true;
+    panel.querySelector("#wss-relay-debug").hidden = true;
+    panel.querySelectorAll("[data-wss-control], [data-wss-action]").forEach(button => { button.hidden = true; });
+    wssNotice("Configurarea și comenzile WSS necesită un cont administrator. Starea conexiunii rămâne vizibilă.", true);
+  }
+  const settingsForm = panel.querySelector("#wss-settings-form");
+  settingsForm.elements.namedItem("auth_mode").addEventListener("change", () => syncWSSAuthFields(settingsForm));
+  syncWSSAuthFields(settingsForm);
+  panel.querySelector("#wss-settings-form").addEventListener("submit", async event => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const payload = Object.fromEntries(new FormData(form));
+    payload.enabled = form.elements.enabled.checked;
+    if (payload.auth_mode === "device_key") {
+      payload.scopes = Array.from(form.querySelectorAll("[data-wss-scope]:checked"), field => field.value).join(",");
+      if (!payload.scopes) { wssNotice("Selectează cel puțin o permisiune WSS."); return; }
+    }
+    await wssBusy(form.querySelector("button"), async () => {
+      await api("/api/wss/settings", {method:"PUT", body:JSON.stringify(payload)});
+      form.elements.namedItem("device_secret").value = "";
+      delete form.dataset.loaded;
+      await loadWSSStatus();
+      wssNotice("Setările WSS au fost salvate și aplicate.", true);
+    });
+  });
+  panel.querySelectorAll("[data-wss-control]").forEach(button => button.addEventListener("click", () => {
+    if (button.dataset.wssControl === "reconnect") wssControl("reconnect").catch(error => wssNotice(error.message));
+    else wssBusy(button, () => wssControl(button.dataset.wssControl));
+  }));
+  panel.querySelectorAll("[data-wss-action]").forEach(button => button.addEventListener("click", () => wssBusy(button, () => wssDebug(button.dataset.wssAction))));
+  panel.querySelector("#wss-bridge-form").addEventListener("submit", event => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    wssBusy(form.querySelector("button"), async () => {
+      const connectionID = wssSelectedTarget();
+      const payload = {connection_id:connectionID, method:form.elements.method.value, path:form.elements.path.value};
+      const raw = form.elements.body.value.trim();
+      if (raw) { try { payload.body = JSON.parse(raw); } catch { throw new Error("Corpul solicitării nu este JSON valid."); } }
+      const response = await api("/api/wss/bridge", {method:"POST", body:JSON.stringify(payload)});
+      document.getElementById("wss-response").textContent = JSON.stringify(response.data, null, 2);
+      wssNotice("Răspuns primit. Verifică statusul și corpul răspunsului de mai jos.", true);
+      await loadWSSStatus();
+    });
+  });
+  document.getElementById("wsm-debug-panel").replaceChildren(panel.querySelector("#wss-debug-content"));
+  renderWSSReconnectButtons();
+}
+
+async function wssBusy(button, action) {
+  if (button.disabled) return;
+  button.disabled = true;
+  try { await action(); } catch (error) { wssNotice(error.message); }
+  finally {
+    await loadWSSStatus().catch(() => {});
+    button.disabled = false;
+  }
+}
+function wssSelectedTarget() {
+  const connectionID = document.getElementById("wss-target").value;
+  if (!connectionID) throw new Error("Selectează mai întâi un client conectat.");
+  return connectionID;
+}
+async function wssDebug(action) {
+  if (window.WSM_REMOTE) throw new Error("Comenzile către alte echipamente se inițiază din consola locală.");
+  const payload = {action};
+  if (!["list", "ping_server"].includes(action)) payload.connection_id = wssSelectedTarget();
+  if (action === "message") {
+    payload.text = document.getElementById("wss-message").value;
+    if (!payload.text.trim()) throw new Error("Scrie mesajul înainte de trimitere.");
+  }
+  const response = await api("/api/wss/debug", {method:"POST", body:JSON.stringify(payload)});
+  document.getElementById("wss-response").textContent = JSON.stringify(response.data, null, 2);
+  if (action === "list") renderWSSPeers(response.data?.connections || response.data?.clients || (Array.isArray(response.data) ? response.data : []));
+  wssNotice("Comandă executată.", true);
+  await loadWSSStatus();
+}
+function renderWSSPeers(peers) {
+  state.wss.peers = peers;
+  const target = document.getElementById("wss-target");
+  const selected = target.value;
+  target.replaceChildren(new Option("Selectează un client din listă", ""));
+  const host = document.getElementById("wss-peers");
+  host.replaceChildren();
+  if (!peers.length) { host.textContent = "Nu există clienți vizibili pentru cheia curentă."; return; }
+  const table = document.createElement("table"); table.className = "data-table";
+  const head = table.createTHead().insertRow();
+  ["Client / conexiune", "Echipament", "IP", "Conectat la", "Acțiuni"].forEach(label => { const cell = document.createElement("th"); cell.textContent = label; head.append(cell); });
+  const body = table.createTBody();
+  for (const peer of peers) {
+    const id = String(peer.connection_id || peer.id || "");
+    target.add(new Option(`${peer.client_id || id} · ${peer.equipment_id || "fără echipament"}`, id));
+    const row = body.insertRow();
+    [peer.client_id ? `${peer.client_id} / ${id}` : id, peer.equipment_id, peer.remote_ip, peer.connected_at].forEach(value => { row.insertCell().textContent = String(value || "—"); });
+    const actions = row.insertCell();
+    const select = document.createElement("button"); select.type = "button"; select.textContent = "Selectează";
+    select.addEventListener("click", () => { target.value = id; }); actions.append(select);
+    if (peer.equipment_id) {
+      const open = document.createElement("button"); open.type = "button"; open.textContent = "↗ Deschide"; open.title = "Deschide consola echipamentului prin WSS";
+      open.addEventListener("click", () => openWSSControl(String(peer.equipment_id), open)); actions.append(open);
+    }
+  }
+  if (peers.some(peer => String(peer.connection_id || peer.id || "") === selected)) target.value = selected;
+  host.append(table);
+}
+async function openWSSControl(equipmentID, button) {
+  if (window.WSM_REMOTE) { wssNotice("Deschide echipamentele din consola locală."); return; }
+  const child = window.open("about:blank", "_blank");
+  if (!child) { wssNotice("Browserul a blocat fereastra. Permite ferestrele pop-up pentru consola WSS."); return; }
+  await wssBusy(button, async () => {
+    try {
+      const response = await api("/api/wss/open", {method:"POST", body:JSON.stringify({equipment_id:equipmentID})});
+      const url = new URL(response.url);
+      url.searchParams.set("opener_origin", window.location.origin);
+      if (!["https:", "http:"].includes(url.protocol) || !response.ticket) throw new Error("Serverul nu a returnat o adresă de consolă validă.");
+      if (child.closed) throw new Error("Fereastra consolei a fost închisă înainte de conectare.");
+      state.wss.windows.set(child, {origin:url.origin, ticket:response.ticket, equipmentID});
+      child.location.replace(url.href);
+      wssNotice("Consola echipamentului a fost deschisă într-o fereastră nouă.", true);
+    } catch (error) { child.close(); state.wss.windows.delete(child); throw error; }
+  });
+}
+
+function currentUIPath() {
+  return window.WSM_REMOTE?.route() || window.location.pathname;
+}
+
+function showRemoteHelp() {
+  const dialog = document.createElement("dialog");
+  const title = document.createElement("h2"); title.textContent = "Control la distanță prin WiseMED WSS";
+  const text = document.createElement("p");
+  text.textContent = "Această interfață operează echipamentul selectat prin mesaje JSON WSS. Modificările, importurile și comenzile se execută pe echipament. Bara albastră indică legătura acestei ferestre; indicatorul WSS din aplicație arată legătura echipamentului. Menține deschisă fereastra din care ai lansat controlul pentru reautentificare automată. Logout închide numai controlul la distanță. Documentația specifică analizorului rămâne disponibilă în meniul Help al aplicației locale.";
+  const close = document.createElement("button"); close.textContent = "Închide"; close.type = "button";
+  close.addEventListener("click", () => dialog.close());
+  dialog.addEventListener("close", () => dialog.remove());
+  dialog.append(title, text, close); document.body.append(dialog); dialog.showModal();
+}
+
+async function openRemotePrint(path, params) {
+  const preview = window.open("about:blank", "_blank");
+  if (!preview) { showToast("Permite ferestre pop-up pentru previzualizarea tipăririi.", "error"); return; }
+  try {
+    preview.opener = null;
+    preview.document.title = "Se pregătește documentul…";
+    params.set("format", "json");
+    const response = await api(`${path}?${params.toString()}`);
+    if (preview.closed) return;
+    if (!response.document || !Array.isArray(response.document.columns) || !Array.isArray(response.document.rows)) throw new Error("Echipamentul nu a returnat un document valid pentru tipărire.");
+    renderRemotePrintDocument(preview.document, response.document, () => preview.print());
+    preview.focus();
+  } catch (error) {
+    if (!preview.closed) {
+      preview.document.body.textContent = `Nu se poate pregăti documentul: ${error.message}`;
+    }
+    showToast(error.message, "error");
+  }
+}
+function renderRemotePrintDocument(doc, data, print) {
+  doc.title = String(data.title || "Document");
+  doc.documentElement.lang = "ro";
+  doc.body.replaceChildren();
+  const style = doc.createElement("style");
+  style.textContent = "body{font:14px Arial,sans-serif;margin:28px;color:#111}h1{font-size:23px}table{border-collapse:collapse;width:100%;margin:18px 0}th,td{border:1px solid #555;padding:7px;text-align:left;white-space:pre-wrap;overflow-wrap:anywhere}th{background:#eee}button{padding:10px 20px}p{white-space:pre-wrap}@media print{button{display:none}thead{display:table-header-group}tr{break-inside:avoid}body{margin:0}}";
+  doc.head.append(style);
+  const title = doc.createElement("h1"); title.textContent = String(data.title || "Document"); doc.body.append(title);
+  const meta = doc.createElement("p");
+  meta.textContent = [data.order_date, data.round_no ? `Runda ${data.round_no}` : "", data.scope_label, data.analyte_tag, data.form_code].filter(Boolean).join(" · "); doc.body.append(meta);
+  const button = doc.createElement("button"); button.type = "button"; button.textContent = "Tipărește"; button.addEventListener("click", print); doc.body.append(button);
+  if (data.details_title) { const heading = doc.createElement("h2"); heading.textContent = String(data.details_title); doc.body.append(heading); }
+  for (const detail of data.details || []) {
+    const line = doc.createElement("p");
+    line.textContent = `${detail.label || ""}: ${detail.value ?? ""}`;
+    doc.body.append(line);
+  }
+  const table = doc.createElement("table");
+  const head = table.createTHead().insertRow();
+  for (const label of data.columns) { const cell = doc.createElement("th"); cell.textContent = String(label); head.append(cell); }
+  const body = table.createTBody();
+  for (const values of data.rows) {
+    const row = body.insertRow();
+    for (const value of values) row.insertCell().textContent = String(value ?? "");
+  }
+  doc.body.append(table);
+  if (!data.rows.length) { const empty = doc.createElement("p"); empty.textContent = "Nu există înregistrări pentru selecția curentă."; doc.body.append(empty); }
+}
+
+// CNAS data calls use the same fetch/api adapter locally and in the WSM control UI.
+async function loadSIUIPanel() {
+ const panel=document.getElementById("settings-panel-siui");if(!panel)return;
+ panel.classList.remove("siui-error");panel.innerHTML="<p>Se încarcă setările CNAS…</p>";
+ try {
+  const admin=(Number(state.session?.user_type)||0)<=0;
+  if(!admin){panel.textContent="Configurarea CNAS necesită administrator. Serviciile sunt disponibile în Debug și prin API.";return;}
+  const [{settings},catalog]=await Promise.all([api("/api/siui/settings"),api("/api/siui/catalog")]);
+  let profiles=settings.certificate_profiles||[];
+  panel.innerHTML=`<h2>CNAS</h2><form id="siui-settings-form">
+   <div class="two-col"><label>Cod fiscal<input name="fiscal_code" value="${escapeHtml(settings.fiscal_code||"")}" pattern="[0-9]+" required></label>
+   <label>Cod CAS<select name="cas_code" required><option value="">Selectează CAS</option>${catalog.insurance_houses.map(h=>`<option value="${escapeHtml(h.code)}">${escapeHtml(h.code)} — ${escapeHtml(h.name)}</option>`).join("")}</select></label></div>
+   <p id="siui-username-preview"></p>
+   <label>Seria de licență<input name="licence" type="password" autocomplete="new-password" placeholder="Lasă gol pentru a păstra licența"></label>
+   <p id="siui-licence-info">${settings.licence_configured?"Licență salvată: "+escapeHtml(settings.licence_hint):"Licență neconfigurată"}</p>
+   <label>Certificatele contului<select name="certificate_store"><option value="CurrentUser">Utilizator curent / macOS Keychain</option><option value="LocalMachine">Calculator local (Windows)</option></select></label>
+   <label>Certificat / token USB<select name="certificate_thumbprint"><option value="">Selectează un certificat</option></select></label>
+   <button type="button" id="siui-certificates">Reîncarcă certificatele</button><p id="siui-cert-info"></p>
+   <fieldset id="siui-token-pin-section"><legend>PIN / parola tokenului</legend>
+   <p id="siui-token-pin-state" role="status">Se verifică starea PIN-ului…</p>
+   <label>PIN nou<input id="siui-token-pin-value" type="password" autocomplete="new-password" maxlength="256" placeholder="Lasă gol pentru a păstra PIN-ul salvat"></label>
+   <button type="button" id="siui-token-pin-save">Salvează PIN-ul criptat</button>
+   <button type="button" id="siui-token-pin-forget">Șterge PIN-ul salvat</button>
+   <button type="button" id="siui-token-pin-manual">Folosește PIN-ul temporar (150 secunde)</button>
+   <p>După o încercare nereușită, PIN-ul salvat nu mai este folosit automat până îl actualizezi. Câmpul gol păstrează parola. Salvează mai întâi certificatul selectat.</p>
+   <p id="siui-pkcs11-info"></p></fieldset>
+   <fieldset><legend>Conexiune pentru certificatul selectat</legend>
+   <label>Adresa CNAS<input name="base_url" type="url" value="${escapeHtml(settings.base_url)}" required></label>
+   <label>Port SIUI<input id="siui-port" type="number" min="1" max="65535" required></label>
+   <label>Adresa prescripție electronică (PE)<input name="pe_base_url" type="url" value="${escapeHtml(settings.pe_base_url||"https://sipe.siui.ro")}" required></label>
+   <fieldset><legend>Factură electronică CNAS (eFactura)</legend>
+   <label>URL eFactura<input name="einvoice_base_url" type="url" value="${escapeHtml(settings.einvoice_base_url||settings.base_url)}" required></label>
+   <label>Port eFactura<input id="siui-einvoice-port" type="number" min="1" max="65535" required></label></fieldset>
+   <label class="siui-checkbox"><input id="siui-allow-invalid-date" type="checkbox" ${settings.allow_invalid_server_certificate_date?"checked":""}> Permite certificatul CNAS expirat / încă nevalabil</label>
+   <label class="siui-checkbox"><input id="siui-allow-revoked" type="checkbox" ${settings.allow_revoked_server_certificate?"checked":""}> Permite certificatul serverului CNAS revocat (macOS)</label>
+   <p>Excepția pentru revocare păstrează verificarea numelui și lanțului CA.</p>
+   <p>Adresele, portul și excepția TLS se păstrează separat pentru fiecare certificat. Excepția ignoră numai perioada de valabilitate a certificatului serverului.</p></fieldset>
+   <button type="submit">Salvează configurarea CNAS</button>
+   <p>Nu se exportă fișiere CER. Licența se păstrează în deployments/config.yaml. Serviciile și testele sunt în Debug → GENERAL / CLINICE.</p>
+  </form>`;
+  const form=panel.querySelector("form"),port=panel.querySelector("#siui-port"),select=form.elements.certificate_thumbprint;
+  form.elements.cas_code.value=settings.cas_code||"";form.elements.certificate_store.value=settings.certificate_store||"CurrentUser";
+  const username=()=>{panel.querySelector("#siui-username-preview").textContent="Utilizator CNAS: "+form.elements.fiscal_code.value+"_"+form.elements.cas_code.value;};
+  form.elements.fiscal_code.addEventListener("input",username);form.elements.cas_code.addEventListener("change",username);username();
+  const syncPort=()=>{try{port.value=new URL(form.elements.base_url.value).port||"443";}catch{port.value="443";}};syncPort();
+  form.elements.base_url.addEventListener("change",syncPort);port.addEventListener("change",()=>{if(port.checkValidity()){const u=new URL(form.elements.base_url.value);u.port=port.value;form.elements.base_url.value=u.origin;}});
+  const invoicePort=panel.querySelector("#siui-einvoice-port");
+  const syncInvoicePort=()=>{try{invoicePort.value=new URL(form.elements.einvoice_base_url.value).port||"443";}catch{invoicePort.value="443";}};syncInvoicePort();
+  form.elements.einvoice_base_url.addEventListener("change",syncInvoicePort);invoicePort.addEventListener("change",()=>{if(invoicePort.checkValidity()){const u=new URL(form.elements.einvoice_base_url.value);u.port=invoicePort.value;form.elements.einvoice_base_url.value=u.origin;}});
+  const applyProfile=()=>{
+   const profile=profiles.find(p=>p.certificate_store===form.elements.certificate_store.value&&p.certificate_thumbprint.toUpperCase()===select.value.toUpperCase());
+   form.elements.base_url.value=profile?.base_url||"https://www.siui.ro";form.elements.pe_base_url.value=profile?.pe_base_url||"https://sipe.siui.ro";
+   form.elements.einvoice_base_url.value=profile?.einvoice_base_url||profile?.base_url||"https://www.siui.ro";syncInvoicePort();
+   panel.querySelector("#siui-allow-invalid-date").checked=!!profile?.allow_invalid_server_certificate_date;panel.querySelector("#siui-allow-revoked").checked=!!profile?.allow_revoked_server_certificate;syncPort();
+  };
+  const savedOptions=()=>{select.replaceChildren(new Option("Selectează un certificat",""));for(const p of profiles.filter(p=>p.certificate_store===form.elements.certificate_store.value)){select.add(new Option(p.certificate_thumbprint+" (profil salvat)",p.certificate_thumbprint));}};
+  savedOptions();select.value=settings.certificate_thumbprint||"";
+  select.addEventListener("change",applyProfile);
+  await setupSIUITokenPIN(panel,form,settings);
+  const reload=async()=>{const previous=select.value;const data=await api("/api/siui/certificates?store="+encodeURIComponent(form.elements.certificate_store.value));savedOptions();for(const c of data.certificates){let option=Array.from(select.options).find(o=>o.value===c.thumbprint);if(!option){option=new Option("",c.thumbprint);select.add(option);}option.textContent=(c.subject||c.thumbprint)+(c.valid&&c.has_private_key?"":" — indisponibil/expirat");option.disabled=!c.valid||!c.has_private_key;}select.value=previous;setSIUIResult(panel.querySelector("#siui-cert-info"),"Certificatele contului au fost reîncărcate.");};
+  bindAsyncClick(panel.querySelector("#siui-certificates"),reload);
+  reload().catch(e=>setSIUIResult(panel.querySelector("#siui-cert-info"),e.message,true));
+  form.elements.certificate_store.addEventListener("change",()=>{savedOptions();applyProfile();reload().catch(e=>showToast(e.message,"error"));});
+  bindAsyncSubmit(form,async event=>{event.preventDefault();await api("/api/siui/settings",{method:"PUT",body:JSON.stringify({...Object.fromEntries(new FormData(form)),allow_revoked_server_certificate:panel.querySelector("#siui-allow-revoked").checked,allow_invalid_server_certificate_date:panel.querySelector("#siui-allow-invalid-date").checked})});showToast("Configurarea CNAS a fost salvată.","success");await loadSIUIPanel();});
+ }catch(e){setSIUIResult(panel,e.message,true);throw e;}
+}
+async function setupSIUITokenPIN(panel,form,settings) {
+ const fieldset=panel.querySelector("#siui-token-pin-section"),input=panel.querySelector("#siui-token-pin-value"),output=panel.querySelector("#siui-token-pin-state");
+ const current=()=>!!settings.certificate_thumbprint&&form.elements.certificate_thumbprint.value===settings.certificate_thumbprint&&form.elements.certificate_store.value===settings.certificate_store;
+ const sync=()=>{fieldset.disabled=!current();input.value="";};
+ form.elements.certificate_thumbprint.addEventListener("change",sync);form.elements.certificate_store.addEventListener("change",sync);sync();
+ const refresh=async()=>{const data=await api("/api/siui/token-pin");setSIUIResult(output,data.configured?"PIN salvat: <hidden>"+(data.blocked?" — autentificare automată suspendată; folosește introducerea manuală sau actualizează PIN-ul.":""):"PIN nesalvat — introducere manuală.",!!data.blocked);panel.querySelector("#siui-pkcs11-info").textContent=data.manual_required?("Linux: "+(data.pkcs11_module||"configurează local pkcs11_module pentru driverul tokenului")+". PIN-ul temporar permite introducerea manuală fără salvare pe disc."):"";};
+ const update=async(mode)=>{if(!current())return;const pin=input.value;if(mode!=="forget"&&!pin){showToast("Introdu PIN-ul nou.","error");return;}try{await api("/api/siui/token-pin",{method:"PUT",body:JSON.stringify({pin:mode==="forget"?"":pin,forget:mode==="forget",manual:mode==="manual"})});await refresh();if(mode==="manual")setSIUIResult(output,"PIN temporar disponibil pentru 150 secunde; la primul eșec este eliminat.");}catch(e){setSIUIResult(output,e.message,true);throw e;}finally{input.value="";}};
+ bindAsyncClick(panel.querySelector("#siui-token-pin-save"),()=>update("save"));bindAsyncClick(panel.querySelector("#siui-token-pin-forget"),()=>update("forget"));bindAsyncClick(panel.querySelector("#siui-token-pin-manual"),()=>update("manual"));
+ try{await refresh();}catch(e){setSIUIResult(output,e.message,true);}
+}
+function setSIUIResult(element,text,error=false) {
+ element.textContent=text;
+ element.classList.toggle("siui-error",error);
+ element.setAttribute("role",error?"alert":"status");
+}
+let siuiDebugGeneration=0;
+async function loadSIUIDebug() {
+ const generation=++siuiDebugGeneration;let callGeneration=0;
+ const view=document.getElementById("view-debug");let panel=document.getElementById("siui-debug-panel");
+ if(!panel){panel=document.createElement("article");panel.id="siui-debug-panel";panel.className="panel full-span";view.append(panel);}
+ for(const child of view.children)child.hidden=child!==panel;
+ const catalog=await api("/api/siui/catalog");if(generation!==siuiDebugGeneration)return;
+ panel.innerHTML=`<h2>Servicii CNAS</h2><p>GENERAL și CLINICE — aceleași operații sunt disponibile prin HTTPS cu JWT și WSM.</p>
+  <div><button id="siui-debug-general" type="button">GENERAL</button> <button id="siui-debug-clinice" type="button">CLINICE</button> <button id="siui-debug-facturare" type="button">FACTURĂ ELECTRONICĂ</button></div>
+  <details><summary>Autentificare API HTTPS (JWT)</summary><button id="siui-issue-jwt" type="button">Generează JWT pentru 15 minute</button><pre id="siui-jwt-result" style="white-space:pre-wrap;overflow-wrap:anywhere"></pre><p>Tokenul API este diferit de sesiunea OCSP. Nu se salvează în browser.</p></details>
+  <details><summary>Documentație OpenAPI</summary><button id="siui-openapi" type="button">Descarcă OpenAPI JSON</button></details>
+  <div id="siui-operation-area"></div><pre id="siui-debug-result" style="white-space:pre-wrap;overflow-wrap:anywhere" role="status"></pre><div id="siui-download-area"></div>`;
+ const output=panel.querySelector("#siui-debug-result");
+ bindAsyncClick(panel.querySelector("#siui-issue-jwt"),async()=>{const data=await api("/api/siui/auth/token",{method:"POST",body:"{}"});panel.querySelector("#siui-jwt-result").textContent=data.access_token;});
+ bindAsyncClick(panel.querySelector("#siui-openapi"),async()=>{const data=await api("/api/siui/openapi.json");downloadSIUIBlob(new Blob([JSON.stringify(data,null,2)],{type:"application/json"}),"siui-openapi.json");});
+ const renderGroup=group=>{
+  callGeneration++;setSIUIResult(output,"");panel.querySelector("#siui-download-area").replaceChildren();
+  const ops=catalog.operations.filter(op=>op.group===group);const area=panel.querySelector("#siui-operation-area");
+  area.innerHTML=`<h3>${group.toUpperCase()}</h3>${group==="general"?`<button type="button" id="siui-ocsp-connect">Obține / reutilizează token OCSP</button> <button type="button" id="siui-local-test">Test local fără CNAS</button><p>Tokenul este reutilizat maximum 150 de secunde. După acest interval se obține unul nou; rezultatul arată vechimea tokenului.</p>`:""}<label>Operație<select id="siui-operation">${ops.map(op=>`<option value="${op.name}">${escapeHtml(op.label||op.name)} — ${op.name}</option>`).join("")}</select></label><div id="siui-operation-form"></div>`;
+  if(group==="general"){
+   bindAsyncClick(area.querySelector("#siui-ocsp-connect"),async()=>{setSIUIResult(output,"Autentificare OCSP…");try{const connection=await api("/api/siui/general/ocsp");setSIUIResult(output,"Parametri OCSP:\n"+JSON.stringify(connection.debug,null,2)+"\nConectare…");const session=await api("/api/siui/general/ocsp",{method:"POST",body:"{}"});setSIUIResult(output,JSON.stringify(session,null,2));}catch(e){setSIUIResult(output,output.textContent+"\n"+e.message,true);throw e;}});
+   bindAsyncClick(area.querySelector("#siui-local-test"),async()=>{output.textContent=JSON.stringify(await api("/api/siui/insured",{method:"POST",body:JSON.stringify({mode:"local"})}),null,2);});
+  }
+  const renderOperation=()=>{
+   callGeneration++;setSIUIResult(output,"");panel.querySelector("#siui-download-area").replaceChildren();
+   const op=ops.find(o=>o.name===area.querySelector("#siui-operation").value);
+   const fields=op.parameters.map(p=>{
+    const name=escapeHtml(p.name);let control;
+    if(/xml$/i.test(p.name))control=`<textarea name="${name}" rows="9" required spellcheck="false" placeholder="XML conform specificației CNAS"></textarea>`;
+    else if(p.name==="partnerCategory")control=`<select name="${name}">${["MF","PHM","CLIN","PARA","STOM","AMB","MD","HC","REC","SPT","NHP","DIA","SICK","CBRET"].map(c=>`<option>${c}</option>`).join("")}</select>`;
+    else if(p.name==="reportType")control=`<select name="${name}"><option value="CLIN">CLIN</option><option value="PARA">PARA</option></select>`;
+    else if(p.name==="requestType")control=`<select name="${name}"><option>RQ_CLIN_SRV</option><option>RQ_PARA_SRV</option></select>`;
+    else control=`<input name="${name}" type="text" value="${p.type==="dateTime"?new Date().toISOString().slice(0,19)+"Z":p.type==="int"?"0":""}" ${p.type==="dateTime"||p.type==="int"?"required":""}>`;
+    return `<label>${name} <span class="muted">(${escapeHtml(p.type)})</span>${control}</label>`;
+   }).join("");
+   area.querySelector("#siui-operation-form").innerHTML=`<p><code>POST /api/siui/${op.group}/${op.name}</code></p><p>${escapeHtml(op.service)} — ${op.mutating?"Trimite / validează / modifică date în CNAS. Verifică parametrii înainte de executare.":"Operație de preluare date."}</p><form><label>ID operație<input name="operation_id" value="${crypto.randomUUID()}" required></label>${fields}<button type="submit">${op.mutating?"Trimite la CNAS":"Execută"} — ${escapeHtml(op.name)}</button><button id="siui-next-operation" type="button">Cerere nouă (alt ID)</button></form><p>O repetare cu același ID urmărește execuția existentă. Starea completed indică primirea răspunsului; verifică rezultatul CNAS.</p>`;
+   const form=area.querySelector("form");
+   form.querySelector("#siui-next-operation").onclick=()=>{form.elements.operation_id.value=crypto.randomUUID();};
+   if(op.name==="validateReport")form.elements.reportType.addEventListener("change",()=>{form.elements.requestType.value="RQ_"+form.elements.reportType.value+"_SRV";});
+   bindAsyncSubmit(form,async event=>{
+    event.preventDefault();const activeCall=++callGeneration;const data=Object.fromEntries(new FormData(form));const id=data.operation_id;delete data.operation_id;
+    setSIUIResult(output,"Trimitere cerere…");panel.querySelector("#siui-download-area").replaceChildren();
+    try{const response=await api("/api/siui/"+op.group+"/"+op.name,{method:"POST",body:JSON.stringify({operation_id:id,parameters:data})});
+     const poll=async()=>{if(generation!==siuiDebugGeneration||activeCall!==callGeneration||state.currentView!=="debug")return;const result=await api("/api/siui/calls/"+encodeURIComponent(response.call.id));if(generation!==siuiDebugGeneration||activeCall!==callGeneration)return;setSIUIResult(output,(result.call.error?result.call.error+"\n\n":"")+JSON.stringify(result.call,null,2),["failed","unknown"].includes(result.call.status));
+      if(["queued","running"].includes(result.call.status)){setTimeout(()=>poll().catch(e=>{setSIUIResult(output,e.message,true);}),1500);}
+      else if(result.call.result?.file){const button=document.createElement("button");button.textContent="Descarcă fișierul CNAS";panel.querySelector("#siui-download-area").replaceChildren(button);bindAsyncClick(button,async()=>{await downloadSIUIFile(result.call.result.file);});}
+     };await poll();
+    }catch(e){setSIUIResult(output,e.message,true);throw e;}
+   });
+  };
+  area.querySelector("#siui-operation").addEventListener("change",renderOperation);renderOperation();
+ };
+ panel.querySelector("#siui-debug-facturare").onclick=()=>{const activeCall=++callGeneration;setSIUIResult(output,"");panel.querySelector("#siui-download-area").replaceChildren();renderInvoiceDashboard(panel.querySelector("#siui-operation-area"),{api,escapeHtml,downloadSIUIBlob,downloadSIUIFile,setButtonLoading,alive:()=>generation===siuiDebugGeneration&&activeCall===callGeneration&&state.currentView==="debug"}).catch(e=>{setSIUIResult(output,e.message,true)})};
+ panel.querySelector("#siui-debug-general").onclick=()=>renderGroup("general");panel.querySelector("#siui-debug-clinice").onclick=()=>renderGroup("clinice");renderGroup("general");
+}
+function downloadSIUIBlob(blob,name) {const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
+async function downloadSIUIFile(file) {
+ const chunks=[];let offset=0;
+ while(offset<file.size){const data=await api(file.path+"?offset="+offset);const bytes=Uint8Array.from(atob(data.data_base64),c=>c.charCodeAt(0));if(!bytes.length||data.next_offset!==offset+bytes.length)throw new Error("Fragment descărcare invalid");chunks.push(bytes);offset=data.next_offset;}
+ downloadSIUIBlob(new Blob(chunks,{type:file.content_type}),file.filename);
+}
+async function loadSIUIHistory() {
+ const data=await api("/api/siui/validations"); const list=document.getElementById("siui-history");if(!list)return;
+ list.replaceChildren();
+ for(const job of data.jobs||[]) {const button=document.createElement("button");button.type="button";button.textContent=`${job.created_at} | ${job.operation_id} | ${job.status}`;button.onclick=()=>showSIUIJob(job.id).catch(e=>showToast(e.message,"error"));list.append(button);}
+}
+let siuiPollGeneration=0;
+async function showSIUIJob(id) {
+ const generation=++siuiPollGeneration;
+ const poll=async()=>{
+  const data=await api("/api/siui/validations/"+encodeURIComponent(id));
+  if(generation!==siuiPollGeneration)return;
+  setSIUIResult(document.getElementById("siui-result"),(data.job.error?data.job.error+"\n\n":"")+JSON.stringify(data.job,null,2),["failed","unknown"].includes(data.job.status));
+  if(["queued","running"].includes(data.job.status)&&state.settingsSubView==="siui"&&state.currentView==="analytes")setTimeout(()=>poll().catch(e=>showToast(e.message,"error")),2000);
+ };
+ await poll();
+}

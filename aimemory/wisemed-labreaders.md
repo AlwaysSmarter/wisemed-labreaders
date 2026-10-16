@@ -507,3 +507,58 @@ macOS transport now uses dialCNAS: max3 TCP dials,10s each,500ms gap, only typed
 - Studiu PIN token multiplatformă documentat în readersv3/apps/siui-bridge/docs/API.md, secțiunea „Studiu: PIN prin driver”. Neimplementat. Preferă CSP/KSP Windows și LAContext smartCardPIN + kSecUseAuthenticationContext macOS față de automatizarea ferestrelor. Evenimentele de prezență nu sunt cereri PIN. După o încercare respinsă/incertă, suspendă automatizarea până la intervenția utilizatorului, fără retry pe alt backend. Teste obligatorii cu middleware real înainte de a promite protecția contra blocării.
 
 - Implementare PIN multiplatformă SIUI: token_pin*.go, token_secret*.go și token_transport.go. Stare separată per certificat în siui-token-pins.json; DPAPI Windows, AES-GCM + cheie 0600 pe Unix. API /api/siui/token-pin admin-only, numai status <hidden>; PIN niciodată returnat. Suspendare persistentă înainte de predarea PIN către driver; reactivare numai după semnătură verificată. Manual temporar 150 secunde, eliminat la eșec, nu reactivează PIN-ul salvat. macOS LAContext smartCardPIN + identity query authentication context; Windows signer CSP/KSP silent (fără cache partajat), fallback clasic la următoarea operație; Linux PKCS#11 bibliotecă aleasă numai din config local, RSA/ECDSA TLS/CMS, fără CKA_ALWAYS_AUTHENTICATE. SoftHSM Linux: teste reale semnare/mTLS/CMS și PIN incorect → manual trecute. Windows compilat; tokenurile fizice Win/Mac încă necesită verificare. Studiul anterior a fost înlocuit de implementare în API.md.
+
+## Unified WSM permission order (2026-10-16)
+
+Audited all 11 ValidScope values against admin and shared reader/utility UI.
+Added wisemed:proxy as admin permission 11; topics:subscribe remains 10.
+Shared localhttp UI lists all permissions in admin order with visible 1–11 labels;
+checkbox values and existing selections/defaults remain unchanged. Cross-module
+Node regression compares UI order to the admin catalog and catalog completeness
+to ValidScope. Shared embedded UI applies to all WSM-enabled readers/utilities
+when rebuilt; remote control assets must also be refreshed when packaging WSM.
+No installed binaries, runtime permissions or secrets changed in this update.
+
+## Consistent permission text (2026-10-16)
+
+Preserved admin permission descriptions as the common titles for all 11 rights.
+Shared reader/utility checkbox labels now use these exact titles. Admin catalog
+adds info and example fields copied from reader help; rights prints both below
+each numbered title. Cross-module UI regression verifies all four fields match.
+Requires rebuilding installed applications and refreshing central control assets.
+
+## SIUIBridge browser wrapper (2026-10-16)
+
+WSM embeds /sdk/siui-bridge.js, a wrapper over an existing WSMServer (no extra
+socket/fetch). SIUIBridge.create returns null for no matching online bridge,
+rejects ambiguity, and pins equipment/client identity across discovery refreshes.
+All 34 WSDL-derived operations have grouped and flat methods; 23 auxiliary
+method/route combinations cover settings, certificates, PIN, OCSP, invoices,
+legacy validations, token issuance, status/catalog/OpenAPI and call/file reads.
+Operations require stable operationId, submit once and poll by default. Explicit
+wait:false, waitCall/waitValidation and chunked downloads supported. AbortSignal
+abandons only local waiting; never claims to cancel remote CNAS work. Failed and
+unknown remain errors; completed does not imply insured/business success.
+
+Docs: wsm-server/docs/siui-browser-wrapper.md. Tests compare SOAP catalog and
+explicit handler routes, exercise all methods, polling/abort/deadline/identity and
+file chunk behavior. Existing TLS WSS wire test now exercises wrapper discovery
+and status through a simulated SIUI peer. No real CNAS or physical token calls.
+
+Shared apibridge now permits 130s for POST /api/siui/general/ocsp, /ocsp-test and
+/invoice/package (previous generic30s undercut OCSP120s); other deadlines stay
+unchanged and parent cancellation remains effective. SIUI binary rebuild needed
+for these long operations. WSM build refreshed at output/wsm-browser-sdk; active
+installations not replaced. Validation: 18 SDK Node tests, WSM race suite/vet,
+reader apibridge + ws race tests passed.
+
+## Consistent WSM naming (2026-10-17)
+
+Canonical browser API is WSMServer, example instance objWSM, asset /sdk/wsm.js.
+PHP helper is examples/browser/wsm-token.php and function wsmBrowserToken.
+SIUIBridge consumes WSMServer; SDK tests/imports, embedded route and all technical
+examples/docs use these names. Shared reader/utility diagnostics use WSM labels,
+DOM IDs and /debug/wsm. Integrating pages must use the new names and asset path.
+Staged output/wsm-browser-sdk rebuilt; active installations need normal updates.
+Go WSM suite and reader localhttp tests passed, 31 SDK/shared UI Node tests passed;
+optional DOM suite skipped because jsdom is unavailable. PHP syntax check passed.

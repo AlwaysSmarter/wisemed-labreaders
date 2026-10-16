@@ -40,19 +40,23 @@ func DeviceScopes() []string {
 type DevicePermission struct {
 	ID          string `json:"id"`
 	Description string `json:"description"`
+	Info        string `json:"info"`
+	Example     string `json:"example"`
 }
 
 func DevicePermissionCatalog() []DevicePermission {
 	return []DevicePermission{
-		{"route:reply", "Trimite răspunsuri la comenzile primite; necesar pentru controlul remote al aparatului."},
-		{"route:event", "Trimite evenimente către alți clienți din tenant."},
-		{"route:command", "Trimite comenzi; necesar împreună cu api:invoke pentru Deschide."},
-		{"devices:debug", "Trimite ping, reconnect și mesaje de diagnostic altor echipamente."},
-		{"connections:read", "Vede lista și starea online a echipamentelor din tenant."},
-		{"server:status", "Citește starea serverului WSM."},
-		{"api:invoke", "Deschide console remote și apelează API-ul altor echipamente din același tenant, inclusiv operații care modifică date; necesită route:command."},
-		{"api:admin", "Permite și operațiile API administrative remote; necesită api:invoke și route:command. Nu acordă login în consola admin WSM."},
-		{"route:broadcast", "Trimite către mai mulți destinatari din tenant; necesită dreptul corespunzător de comandă sau eveniment."},
+		{"route:reply", "Trimite răspunsuri la comenzile primite; necesar pentru controlul remote al aparatului.", "Permite răspunsul la o comandă primită, folosind identificatorul de corelare al acesteia. Un reader răspunde către conexiunea solicitantului.", "După device.ping, echipamentul trimite solicitantului rezultatul printr-un mesaj reply."},
+		{"route:event", "Trimite evenimente către alți clienți din tenant.", "Permite publicarea evenimentelor fără o comandă prealabilă. Readerele pot publica numai pe propriile topicuri results:<reader_id> și logs:<reader_id>. Serviciile respectă regulile destinației, inclusiv route:broadcast pentru topicuri.", "Readerul reader-1 publică un rezultat pe topicul results:reader-1."},
+		{"route:command", "Trimite comenzi; necesar împreună cu api:invoke pentru Deschide.", "Permite trimiterea comenzilor către alți clienți din aceeași instanță WiseMED. Apelurile API cer și api:invoke; pentru un reader, comenzile de diagnostic cer și devices:debug.", "Cu route:command și devices:debug, un reader poate cere ws.reconnect unui echipament selectat."},
+		{"devices:debug", "Trimite ping, reconnect și mesaje de diagnostic altor echipamente.", "Permite unui reader să trimită device.ping, ws.reconnect și debug.message către un echipament, reader sau o conexiune. Necesită și route:command. Nu acordă acces general la API.", "Cu route:command, butonul Ping client verifică răspunsul echipamentului selectat."},
+		{"connections:read", "Vede lista și starea online a echipamentelor din tenant.", "Permite listarea conexiunilor și consultarea stării echipamentelor din propria instanță, prin list_connections, equipment.list sau equipment.status. Nu permite controlul lor.", "Butonul Actualizează lista clienților afișează echipamentele conectate."},
+		{"server:status", "Citește starea serverului WSM.", "Permite comanda server.status: identificarea serviciului WSM, instanța curentă, numărul de conexiuni din aceasta și ora serverului. Nu acordă acces la configurarea serverului.", "O comandă server.status arată câte conexiuni sunt active în instanța ta."},
+		{"api:invoke", "Deschide console remote și apelează API-ul altor echipamente din același tenant, inclusiv operații care modifică date; necesită route:command.", "Împreună cu route:command, permite api.request către API-ul unui echipament și obținerea unui tichet pentru consola remote. Include operații care pot modifica date; se aplică și regulile API-ului destinatar.", "Deschide consola unui echipament sau apelează GET /api/status prin WSM."},
+		{"api:admin", "Permite și operațiile API administrative remote; necesită api:invoke și route:command. Nu acordă login în consola admin WSM.", "Permite executarea operațiilor API care cer administrator pe echipamentul destinatar, prin adaptorul WSM. Necesită api:invoke și route:command. Nu acordă autentificare în consola administrativă a serverului WSM.", "Salvează configurarea WSS a echipamentului prin PUT /api/wss/settings."},
+		{"route:broadcast", "Trimite către mai mulți destinatari din tenant; necesită dreptul corespunzător de comandă sau eveniment.", "Permite rutarea către grupuri, toate conexiunile sau un tip de client din aceeași instanță. Necesită și dreptul mesajului trimis, de exemplu route:command. Nu elimină restricțiile rolului reader sau cerința api:invoke pentru apeluri API.", "Un serviciu cu route:event și route:broadcast poate trimite un eveniment tuturor clienților de tip siui-bridge."},
+		{"topics:subscribe", "Permite abonarea și dezabonarea la topicuri și primirea mesajelor adresate acestora în același tenant.", "Permite abonarea și dezabonarea la topicuri din propria instanță WiseMED, pentru primirea mesajelor publicate pe acestea. Nu acordă dreptul de a publica.", "Un client se abonează la logs:reader-1 pentru a primi evenimentele de jurnal ale readerului."},
+		{"wisemed:proxy", "Permite comenzile WiseMED implementate de WSM către API-ul configurat pentru tenant; necesită upstream WiseMED configurat.", "Permite comenzile WiseMED implementate de WSM către API-ul WiseMED configurat pentru instanță. Nu este un proxy către adrese arbitrare; necesită configurarea upstreamului WiseMED.", "wisemed.fetch_file_for_analyzer solicită un fișier pentru echipamentul indicat, prin WSM."},
 	}
 }
 func (d Device) EffectiveScopes() []string {
@@ -200,7 +204,7 @@ func (c *Config) WithDevices(devices map[string]Device) (*Config, error) {
 			d.Scopes = &scopes
 		}
 		next.Devices[id] = d
-		next.Security.Keys[id] = Key{TenantID: d.TenantID, EquipmentID: d.EquipmentID, ReaderID: d.ReaderID, Subject: d.Subject, Secret: d.Secret, Roles: []string{"reader"}, Scopes: d.EffectiveScopes()}
+		next.Security.Keys[id] = Key{TenantID: d.TenantID, EquipmentID: d.EquipmentID, ReaderID: d.ReaderID, Subject: d.Subject, Secret: d.Secret, Roles: []string{"reader", "service"}, Scopes: d.EffectiveScopes()}
 	}
 	secrets := map[string]string{}
 	for _, key := range next.Security.Keys {

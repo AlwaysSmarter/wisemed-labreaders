@@ -108,7 +108,10 @@ Variabila `html` acceptă HTML cu ghilimele și linii multiple; pentru un link c
 Folosiți Send and Download pentru salvarea răspunsului. Nu distribuiți colecția cu
 secrete completate. Exemplul PHP complet este `examples/pdf.php`: setați
 `HTML_PRINT_JWT_SECRET`, `HTML_PRINT_JWT_KEY_ID`, opțional `HTML_PRINT_URL`, apoi
-rulați `php examples/pdf.php report.html`. Variabilele acestea sunt ale clientului PHP.
+serviți scriptul prin PHP cu `report.html` în același director. Scriptul semnează JWT-ul,
+apelează `/pdf` și trimite PDF-ul direct în browser, fără salvare pe disc. Pentru
+descărcare înlocuiți `inline` cu `attachment` în Content-Disposition. Din CLI,
+`php examples/pdf.php report.html` scrie PDF-ul binar la stdout. Variabilele acestea sunt ale clientului PHP.
 Pentru comenzile curl de mai jos, setați `JWT_TOKEN` la un token semnat conform acestui contract.
 
 ## Utilitar independent și autentificare administrativă

@@ -107,9 +107,63 @@ test('WSS secret is a write-only masked field and status never populates it', as
   const secretField = {type:'password',value:'typed-but-never-returned'};
   const form = {dataset:{},elements:{namedItem:key=>key==='device_secret'?secretField:null}};
   const state = {wss:{loading:false}};
-  const scope = context(['loadWSSStatus'],{state,renderWSSBadge(){},api:async()=>({settings:{device_secret:'must-not-display',device_secret_configured:true},trace:[]}),document:{getElementById:id=>id==='wss-settings-form'?form:null}});
+  const scope = context(['loadWSSStatus'],{loadWSSScopes(){},syncWSSAuthFields(){},updateWSSReconnect(){},state,renderWSSBadge(){},api:async()=>({settings:{device_secret:'must-not-display',device_secret_configured:true},trace:[]}),document:{getElementById:id=>id==='wss-settings-form'?form:null}});
   await scope.loadWSSStatus();
   assert.equal(secretField.value,'');
   assert.match(secretField.placeholder,/Cheie salvată/);
   assert.match(source,/await api\("\/api\/wss\/settings"[^\n]+\n\s+form.elements.namedItem\("device_secret"\).value = "";/);
+});
+
+test('WSS authentication hides and disables irrelevant fields without clearing values', () => {
+  const groups = ['device_key', 'token_file', 'token_endpoint', 'token_file token_endpoint'].map(mode => ({
+    dataset:{wssAuth:mode}, hidden:false, field:{value:'preserved',disabled:false},
+    querySelectorAll(){return [this.field];}
+  }));
+  let mode = 'device_key';
+  const form = {elements:{namedItem:()=>({value:mode})},querySelectorAll:()=>groups};
+  const scope = context(['syncWSSAuthFields']);
+  for (mode of ['device_key','token_file','token_endpoint','device_key']) {
+    scope.syncWSSAuthFields(form);
+    for (const group of groups) {
+      const expected = !group.dataset.wssAuth.split(' ').includes(mode);
+      assert.equal(group.hidden,expected);
+      assert.equal(group.field.disabled,expected);
+      assert.equal(group.field.value,'preserved');
+    }
+  }
+});
+test('WSS permissions load saved selection and show all server scopes', () => {
+  const scope = context(['wssScopeOptions','loadWSSScopes']);
+  const options = scope.wssScopeOptions();
+  assert.equal(options.length,11);
+  const catalogSource = fs.readFileSync(__dirname + '/../../../../wsm-server/internal/config/devices.go', 'utf8');
+  const catalog = catalogSource.split('func DevicePermissionCatalog()')[1].split('func (d Device)')[0];
+  const orderedIDs = [...catalog.matchAll(/\{"([a-z:]+)",/g)].map(match => match[1]);
+  assert.deepEqual(Array.from(options, ([id]) => id), orderedIDs, 'all shared reader/utility permissions must match admin order');
+  const adminTexts = [...catalog.matchAll(/\{("[^"\n]*", "[^"\n]*", "[^"\n]*", "[^"\n]*")\}/g)].map(match => JSON.parse('[' + match[1] + ']'));
+  assert.deepEqual(JSON.parse(JSON.stringify(options)), adminTexts, 'titles, info and examples must match admin exactly');
+  const validationSource = fs.readFileSync(__dirname + '/../../../../wsm-server/internal/config/config.go', 'utf8');
+  const validScopes = validationSource.split('func ValidScope(')[1].split('func Load(')[0];
+  const recognized = [...validScopes.matchAll(/"([a-z:]+)"/g)].map(match => match[1]);
+  assert.deepEqual([...orderedIDs].sort(), recognized.sort(), 'admin must expose every recognized scope');
+  assert.ok(functionSource('renderWSSPanel').includes('${index + 1}. ${label}'), 'display permission numbers without changing scope values');
+  const fields = Array.from(options, ([value])=>({value,checked:false}));
+  const form = {querySelectorAll:()=>fields};
+  scope.loadWSSScopes(form,'route:reply,api:invoke');
+  assert.deepEqual(fields.filter(f=>f.checked).map(f=>f.value),['route:reply','api:invoke']);
+  scope.loadWSSScopes(form,undefined);
+  assert.equal(fields.filter(f=>f.checked).length,6);
+  assert.equal(fields.find(f=>f.value==='api:admin').checked,false);
+});
+
+test('WSM debug route is independent of analyzer debug in every app mode', () => {
+  for (const mode of ['reader','siui','formatter','barcode','signature']) {
+    const scope=context(['currentUIPath','viewFromLocation','pathForView'],{
+      state:{formatterMode:mode==='formatter',barcodeMode:mode==='barcode'},
+      isSIUIMode:()=>mode==='siui',isESignatureMode:()=>mode==='signature',
+      window:{location:{pathname:'/debug/wsm'}}
+    });
+    assert.equal(scope.viewFromLocation(),'wsm',mode);
+    assert.equal(scope.pathForView('wsm'),'/debug/wsm',mode);
+  }
 });

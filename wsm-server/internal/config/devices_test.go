@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -35,6 +36,13 @@ tenants:
 		t.Fatal(e)
 	}
 	records := map[string]Device{"device-1": {TenantID: "a", EquipmentID: "42", Subject: "device-1", Secret: strings.Repeat("d", 43)}}
+	scopes := append(DeviceScopes(), "topics:subscribe")
+	if err := ValidateDeviceScopes(scopes); err != nil {
+		t.Fatal("topic subscription must be grantable", err)
+	}
+	device := records["device-1"]
+	device.Scopes = &scopes
+	records["device-1"] = device
 	if e = WriteDevices(c.Security.DeviceKeysFile, records); e != nil {
 		t.Fatal(e)
 	}
@@ -42,11 +50,17 @@ tenants:
 	if e != nil {
 		t.Fatal(e)
 	}
-	if loaded.Security.Keys["device-1"].EquipmentID != "42" || loaded.Security.Keys["device-1"].Secret != records["device-1"].Secret || len(loaded.Security.Keys["device-1"].Roles) != 1 || loaded.Security.Keys["device-1"].Roles[0] != "reader" {
+	if loaded.Security.Keys["device-1"].EquipmentID != "42" || loaded.Security.Keys["device-1"].Secret != records["device-1"].Secret || !slices.Equal(loaded.Security.Keys["device-1"].Roles, []string{"reader", "service"}) {
 		t.Fatal("registry auth key not restored")
 	}
 	if strings.Contains(strings.Join(loaded.Security.Keys["device-1"].Scopes, ","), "api:") {
 		t.Fatal("device unexpectedly privileged")
+	}
+	if !slices.Contains(loaded.Security.Keys["device-1"].Scopes, "topics:subscribe") {
+		t.Fatal("topic subscription grant lost on restart")
+	}
+	if slices.Contains(DeviceScopes(), "topics:subscribe") {
+		t.Fatal("topic subscription must remain opt-in")
 	}
 	saved, _ := os.ReadFile(path)
 	if string(saved) != body {

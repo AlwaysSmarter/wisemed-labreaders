@@ -63,7 +63,7 @@ func (h *Hub) Register(c *Connection, hello HelloPayload) bool {
 	}
 	// One reader identity per tenant avoids ambiguous execution of 1:1 commands.
 	for _, other := range h.connections {
-		if c.TenantID == other.TenantID && hello.ClientType == "reader" && (other.ReaderID == hello.ReaderID || c.EquipmentID != "" && other.EquipmentID == c.EquipmentID) {
+		if c.TenantID == other.TenantID && (hello.ClientType == "reader" || hello.ClientType == "siui-bridge") && (other.ReaderID == hello.ReaderID || c.EquipmentID != "" && other.EquipmentID == c.EquipmentID) {
 			return false
 		}
 	}

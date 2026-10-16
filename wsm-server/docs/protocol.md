@@ -1,5 +1,7 @@
 # Protocol WSM v1 — integrare WiseMED
 
+SDK oficial fără dependențe: `/sdk/wsm.js`. Vezi [SDK browser și JWT PHP](browser-sdk.md) pentru clasa `WSMServer` și exemple.
+
 Vezi și [controlul remote și adaptorul API–WSS](remote-control.md), inclusiv
 `equipment.status`, `api.request` și `control.ticket`.
 
