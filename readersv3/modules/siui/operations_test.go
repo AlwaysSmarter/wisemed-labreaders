@@ -60,6 +60,8 @@ func sampleParameters(op Operation) map[string]string {
 		switch p.Type {
 		case "dateTime":
 			v = "2026-10-05T00:00:00+03:00"
+		case "boolean":
+			v = "false"
 		case "int":
 			v = "0"
 		}
@@ -75,8 +77,8 @@ func sampleParameters(op Operation) map[string]string {
 	return args
 }
 func TestEveryRequestedSOAPOperation(t *testing.T) {
-	if len(operations()) != 34 {
-		t.Fatal("expected 34 SOAP operations")
+	if len(operations()) != 40 {
+		t.Fatal("expected 40 SOAP operations")
 	}
 	for _, op := range operations() {
 		t.Run(op.Name, func(t *testing.T) {
@@ -118,7 +120,7 @@ func TestEveryRequestedSOAPOperation(t *testing.T) {
 			}
 		})
 	}
-	for _, name := range []string{"validateEnlisted", "validatePharmacyDrugs", "processIssuedPrescription"} {
+	for _, name := range []string{"validateEnlisted", "validatePharmacyDrugs"} {
 		for _, op := range operations() {
 			if op.Name == name {
 				t.Fatal("excluded operation exposed")

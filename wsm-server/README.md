@@ -25,6 +25,7 @@ pentru descoperire, mesagerie și API-uri remote.
 
 ## Documentație
 
+- [Backend PHP: descoperire generică și comenzi prin HTTP](docs/http-commands.md)
 - [Consolă admin WiseMED: add / list / key / edit / delete / rights](docs/admin-console.md)
 
 0. [Control remote, echipamente și adaptorul API–WSS](docs/remote-control.md)
@@ -150,3 +151,5 @@ Actualizare automată pe EC2: [update-wsm.sh — instalare, verificare și rollb
 Pe Apple Silicon, etapa de compilare Docker rulează pe BUILDPLATFORM (ARM64),
 iar GOOS/TARGETOS și GOARCH/TARGETARCH produc binarele pentru platforma selectată
 (de exemplu linux/amd64). Astfel compilatorul Go nu rulează sub emulare AMD64.
+
+[Ghid practic objWSMSIUI: JavaScript lizibil, progres și callwmapi](docs/siui-browser-quickstart.md).

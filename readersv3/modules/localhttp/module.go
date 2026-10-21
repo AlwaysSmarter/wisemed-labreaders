@@ -216,6 +216,7 @@ func (m *Module) Init(rt module.Runtime) error {
 	m.rt.RegisterService("daily-analysis-send-filters", m)
 	m.rt.AddMenu(module.MenuEntry{ID: "overview", Group: "core", Label: "Acasa", Path: "/", Order: 10})
 	m.rt.Handle("/", m.withNoCache(http.HandlerFunc(m.handleIndex)))
+	m.rt.Handle("/settings/history", m.withNoCache(http.HandlerFunc(m.handleIndex)))
 	m.rt.Handle("/settings/siui", m.withNoCache(http.HandlerFunc(m.handleIndex)))
 	m.rt.Handle("/settings/pad", m.withNoCache(http.HandlerFunc(m.handleIndex)))
 	m.rt.Handle("/settings/demo", m.withNoCache(http.HandlerFunc(m.handleIndex)))
@@ -223,6 +224,8 @@ func (m *Module) Init(rt module.Runtime) error {
 	m.rt.Handle("/settings", m.withNoCache(http.HandlerFunc(m.handleIndex)))
 	m.rt.Handle("/orders", m.withNoCache(http.HandlerFunc(m.handleIndex)))
 	m.rt.Handle("/qc", m.withNoCache(http.HandlerFunc(m.handleIndex)))
+	m.rt.Handle("/history", m.withNoCache(http.HandlerFunc(m.handleIndex)))
+	m.rt.Handle("/operations", m.withNoCache(http.HandlerFunc(m.handleIndex)))
 	m.rt.Handle("/debug", m.withNoCache(http.HandlerFunc(m.handleIndex)))
 	m.rt.Handle("/wss-remote.js", m.withNoCache(http.HandlerFunc(m.handleStaticAsset("ui/wss-remote.js", "application/javascript; charset=utf-8"))))
 	m.rt.Handle("/siui-invoice.js", m.withNoCache(http.HandlerFunc(m.handleStaticAsset("ui/siui-invoice.js", "application/javascript; charset=utf-8"))))
@@ -584,7 +587,7 @@ func (m *Module) handleIndex(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	switch r.URL.Path {
-	case "/settings/siui", "/settings/wss", "/", "/daily-details", "/settings", "/settings/pad", "/settings/demo", "/settings/reader", "/settings/analytes", "/settings/qc", "/settings/daily-details", "/settings/daily-analysis-filters", "/orders", "/qc", "/debug", "/debug/wsm":
+	case "/history", "/operations", "/settings/history", "/settings/siui", "/settings/wss", "/", "/daily-details", "/settings", "/settings/pad", "/settings/demo", "/settings/reader", "/settings/analytes", "/settings/qc", "/settings/daily-details", "/settings/daily-analysis-filters", "/orders", "/qc", "/debug", "/debug/wsm":
 	default:
 		http.NotFound(w, r)
 		return
@@ -2639,7 +2642,7 @@ func (m *Module) appendAuditLog(r *http.Request, eventType, message string, meta
 }
 
 func (m *Module) sessionSecret() []byte {
-	if m.analyzerSetting("protocol", "") == "siui" || m.loginOnlyUtility() {
+	if m.analyzerSetting("protocol", "") == "siui" || m.analyzerSetting("protocol", "") == "siui-history" || m.analyzerSetting("protocol", "") == "siui-data" || m.loginOnlyUtility() {
 		return m.utilitySessionKey
 	}
 	return []byte("wisemed-local-session:" + m.rt.ReaderID())
@@ -3792,7 +3795,7 @@ func (m *Module) supportedCommTypes() []string {
 			add("serial")
 		case "seegene-excel", "beosl-csv", "cfx96-quantitation", "cary60-uvvis", "analytikjena-plasmaquantms-elite", "shimatzu-tocl", "shimatzu-generic", "biosan-hipo-mpp96", "gammavision", "tricarb-5110-tr", "anatolia-geneworks", "generic-file":
 			add("file")
-		case "barcodeprinter", "anaf-docsmart", "signing-pad", "html-print-formatter":
+		case "barcodeprinter", "anaf-docsmart", "signing-pad", "siui", "siui-history", "siui-data", "html-print-formatter":
 			add("utility")
 		}
 	}

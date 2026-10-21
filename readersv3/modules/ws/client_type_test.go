@@ -18,12 +18,12 @@ func (r clientTypeRuntime) Service(name string) (interface{}, bool) {
 }
 func TestClientType(t *testing.T) {
 	for _, tc := range []struct{ protocol, want string }{
-		{"siui", "siui-bridge"}, {" SIUI ", "siui-bridge"},
+		{"siui-history", "siui-bridge-history"}, {"siui", "siui-bridge"}, {" SIUI ", "siui-bridge"},
 		{"barcodeprinter", "reader"}, {"", "reader"},
 	} {
 		m := &Module{rt: clientTypeRuntime{protocol: tc.protocol}}
 		wantRole := "reader"
-		if tc.want == "siui-bridge" {
+		if tc.want == "siui-bridge" || tc.want == "siui-bridge-history" {
 			wantRole = "service"
 		}
 		if got := m.clientRole(); got != wantRole {

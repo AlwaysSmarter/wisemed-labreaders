@@ -1,0 +1,250 @@
+# API SIUI Bridge History
+
+Prefix: `/api/history/`. JSON: `success: true/false`, `error` la eșec, coduri HTTP relevante.
+Toate rutele folosesc același handler prin HTTP/HTTPS și WSM `api.request`.
+Bridge folosește HTTPS și `Authorization: Bearer <cheie emisă de History>`.
+Cheia este opacă, limitată la un tenant și un bridge; nu este cheia AWS și nu este tokenul CNAS.
+Administrarea folosește sesiunea web existentă sau principalul WSM administrator al tenantului configurat.
+
+## Rute
+
+| Metodă | Rută | Scop |
+|---|---|---|
+| GET | `/identity` | Identitatea autentificată tenant/bridge |
+| GET / PUT | `/settings` | Configurație, numai administrator; secretele nu se returnează |
+| POST | `/test-db` | Conectare MySQL și inițializare tabele |
+| POST | `/test-storage` | Scriere test și încercare ștergere |
+| GET / POST | `/keys` | Listare bridge-uri / emitere cheie (`{"bridge":"bridge-01"}`) |
+| DELETE | `/keys?bridge=bridge-01` | Revocare toate cheile bridge-ului în tenantul curent |
+| POST | `/calls` | Rezervare idempotentă manifest, răspuns cu offseturi |
+| GET | `/calls` | Interogare, maximum 100 rezultate/pagină |
+| GET | `/calls/{call_id}` | Manifest, detalii extrase, parse_error și progres |
+| PUT | `/calls/{call_id}/files/{name}?offset=N` | Fragment binar, maximum 262144 bytes |
+| POST | `/calls/{call_id}/commit` | Verificare hash, salvare și confirmare arhivă |
+| GET | `/calls/{call_id}/files/{name}?offset=N` | Fragment binar al originalului arhivat |
+
+La acces administrativ la un apel specific, adaugă `?bridge=bridge-01` (sau `&bridge=...`).
+La salvare prin sesiune/WSM administrator, `POST /calls?bridge=bridge-01` selectează bridge-ul.
+Cheia de mașină stabilește bridge-ul din credențiale și ignoră orice încercare de schimbare prin query.
+WSM cere un principal administrator din același tenant pentru accesul direct la History.
+Un utilizator normal poate continua să ceară operații SIUI; workerul Bridge livrează rezultatul
+cu cheia sa de mașină, independent de rolul utilizatorului sau de prezența browserului.
+
+Filtre GET `/calls`: `bridge` (administrator), `operation`, `operation_id`, `call_id`, `pid`, `cid`,
+`from`, `to` (timestamp ISO 8601 UTC), `offset` numeric. Limitele sunt incluse, validate ca RFC 3339 și comparate în UTC, inclusiv fracțiunile de secundă și offseturile de fus orar. Răspunsul are `calls`, `next_offset`, `has_more`.
+Fiecare apel include `bridge`, `owner`, `source_ip`, `operation_status` și `artifacts`; `status` rămâne starea de arhivare. `has_more: false` marchează sfârșitul. Lista se ordonează descrescător după `created_at`.
+PID/CID filtrează numai operațiile pentru care History are parser (în prezent verificările asiguratului).
+
+## Manifest
+
+```json
+{
+  "call_id": "call-001",
+  "operation_id": "operation-001",
+  "operation": "getInsured",
+  "owner": "operator-authenticated-in-bridge",
+  "source_ip": "wss:connection-id",
+  "created_at": "2026-10-18T10:00:01Z",
+  "started_at": "2026-10-18T10:00:02Z",
+  "completed_at": "2026-10-18T10:00:03Z",
+  "status": "completed",
+  "artifacts": [
+    {"name":"record-gzip", "size":1234, "sha256":"<64 caractere hex ale fișierului gzip>"}
+  ]
+}
+```
+
+`status` reprezintă starea CNAS (`completed`, `failed`, `unknown`), distinctă de starea
+History (`pending`, `archived`). `record-gzip` conține JSON gzip:
+
+```json
+{
+  "parameters": {"pid":"<CNP>","requestDate":"2026-10-18"},
+  "result": {"values":["<insuredResponse>...</insuredResponse>"]},
+  "error": ""
+}
+```
+
+Nu trimite PIN/licență/tokenuri/login în manifest sau în artefacte.
+Numele artefactelor și call_id: `[A-Za-z0-9_-]`, 1–128 caractere.
+Maximum 8 artefacte, maximum 4 GiB fiecare, manifest maximum 1 MiB.
+Bridge standard produce `record-gzip` și opțional `download`, cu hashuri reale.
+Limita actuală de descărcare CNAS din SIUI Bridge rămâne 64 MiB pentru fișierul primit
+(de exemplu ZIP); History nu îl dezarhivează, chiar dacă XML-ul din interior are sute de MiB.
+
+Răspuns de rezervare/reluare:
+
+```json
+{"success":true,"status":"pending","offsets":{"record-gzip":262144,"download":0}}
+```
+
+Trimite de la offsetul primit. Un offset depășit produce 409; recitește manifestul prin
+POST `/calls` și reia de la offsetul confirmat. Un transfer complet urmat de pierderea
+confirmării este sigur de retrimis: `commit` este idempotent. Nu refolosi `call_id` pentru alt conținut.
+La commit verificarea fiecărui fișier precedă confirmarea `archived`.
+
+## Interogare HTTPS
+
+```sh
+curl --fail --cacert history-ca.pem \
+  -H "Authorization: Bearer $HISTORY_TOKEN" \
+  'https://history.example/api/history/calls?operation=getInsured&offset=0'
+
+curl --fail --cacert history-ca.pem \
+  -H "Authorization: Bearer $HISTORY_TOKEN" \
+  'https://history.example/api/history/calls/call-001'
+```
+
+## WSM
+
+Folosește comanda generică existentă `api.request`, adresată clientului
+`siui-bridge-history`. Corpul comenzii este cel de mai jos; envelope-ul de routing,
+`target_client_id` și trimiterea sunt cele ale SDK-ului WSM folosit de aplicație:
+
+```javascript
+const query = {
+  method: "GET",
+  path: "/api/history/calls?operation=getInsured&pid=" + encodeURIComponent(cnp)
+};
+
+const inspectCall = {
+  method: "GET",
+  path: "/api/history/calls/" + encodeURIComponent(callId)
+      + "?bridge=" + encodeURIComponent(bridgeId)
+};
+
+const readOriginalChunk = {
+  method: "GET",
+  path: "/api/history/calls/" + encodeURIComponent(callId)
+      + "/files/record-gzip?bridge=" + encodeURIComponent(bridgeId)
+      + "&offset=0"
+};
+```
+
+Adaptorul WSM returnează `status`, `body` pentru JSON și `body_base64` pentru binar.
+La upload WSM, folosește `body_base64` și `content_type: "application/octet-stream"`.
+Nu pune cheia de mașină în browser: WSM transmite identitatea verificată a administratorului.
+
+## Descărcare completă prin API
+
+API-ul returnează fragmente pentru a funcționa și prin WSM fără a încărca tot fișierul în memorie.
+Folosește dimensiunea și SHA-256 din `record.artifacts`, scrie fragmentele în ordine,
+incrementează offset cu numărul real de bytes primiți, apoi verifică hashul complet.
+HTTPS include `X-Artifact-Size` și `X-Artifact-SHA256`; prin WSM folosește manifestul,
+deoarece adaptorul poate filtra headerele. `record-gzip` se decomprimă cu gzip după transfer.
+Originalele nu primesc URL S3 public și nu se livrează chei AWS către client.
+
+## SIUI Bridge — configurare și monitorizare sincronizare
+
+Prefix `/api/siui-history-sync/`, autentificare administrator prin sesiunea comună sau WSM:
+
+- GET/PUT `settings`: `enabled`, `url`, `token`, `ca_file`, `retry_seconds`.
+- POST `test`: verifică TLS/identitatea History fără operație CNAS.
+- GET `status`: `counts` și `last_error`.
+- POST `retry`: devansează trimiterile în așteptare, fără repetarea CNAS.
+
+Răspunsul apelului SIUI include separat:
+
+```json
+{"history":{"status":"pending","attempts":2,"error":"History HTTP 503: ..."}}
+```
+
+Eșecul de arhivare nu modifică rezultatul CNAS sau starea `callwmapi`.
+
+## Interfață Istoric și Debug
+
+Meniul **Istoric** (`/history`) oferă un interval de date și ore început–final,
+în fusul browserului, filtre după Bridge, operație și ID operație, paginare și detalii.
+Fișierele arhivate se descarcă integral în fragmente, local și prin WSM.
+Pentru fragmente JSON, adaugă `format=json` rutei de fișier: răspunsul include
+`data_base64` și `next_offset`; păstrează parametrul `bridge` la fiecare fragment.
+
+**Debug → Cereri Bridge** (`/debug`) afișează ultimele 1000 de cereri Bearer
+către `identity`/`calls`, de la pornirea serviciului, actualizate la 3 secunde:
+ora, Bridge, IP, metoda/ruta, offset, bytes primiți, HTTP, durata, operația și eroarea.
+API: `GET /api/history/debug/requests?bridge=bridge-01`, numai administratorul
+tenantului; funcționează și dacă MySQL este indisponibil. Cheile, query-urile arbitrare
+și conținutul fișierelor nu se înregistrează. Sumarul apare și în logul serviciului.
+Cererile sunt afișate la terminarea răspunsului; jurnalul interfeței este temporar.
+
+Testul de conexiune al Bridge verifică identitatea și poate reuși cu sincronizarea
+oprită. `test` și `status` returnează acum `enabled` și un mesaj explicit:
+cu `enabled: false`, operațiile pending nu sunt trimise. Activează sincronizarea
+și salvează configurația Bridge pentru livrare; `retry` singur nu o activează.
+
+## Dashboard operațional
+
+`GET /api/history/dashboard?from=<RFC3339>&to=<RFC3339>` este disponibil numai
+administratorului tenantului, local și prin WSM. Finalul este exclusiv; intervalul
+maxim este de 366 zile. Activitatea din interval folosește **received_at** (primirea
+manifestului), astfel încât trimiterea azi a unor operații SIUI vechi este vizibilă azi.
+
+Răspunsul conține:
+
+- `counts`: rezultate SIUI completed/failed/unknown din interval; `hourly`: grafic
+  orar pentru maximum 48 ore, zilnic pentru intervale mai lungi.
+- `totals`: apeluri, arhivate, pending, număr originale arhivate, `payload_bytes`,
+  `manifest_bytes` și `pending_bytes` (originale declarate, încă neconfirmate).
+  Aceste totaluri acoperă întreaga arhivă a tenantului, independent de interval.
+- `bridges`: ID, autorizare, rezultate în interval, pending global, bytes arhivați
+  global, ultima primire de manifest și ultima activitate observată.
+- `authorized_bridges`: ID-uri distincte cu chei active, nu numărul cheilor;
+  `observed_bridges`: activitate în ultimele 15 minute, nu conexiuni persistente;
+  `sending_bridges`: bridge-uri cu manifeste primite în interval.
+- `queue`: maximum 50 de transferuri pending, cele mai vechi după primirea
+  manifestului. Operațiile încă netrimise din coada locală a Bridge nu sunt cunoscute.
+- `traffic`: cereri, erori HTTP și bytes citiți în ultimele 5 minute, din jurnalul
+  temporar de maximum 1000 de cereri; `recent_errors`: ultimele 6 erori din jurnal.
+
+Dimensiunile arhivei sunt logice, calculate din manifeste confirmate și originalele
+lor; nu includ spațiul SQL, loguri, staging sau backup. Nu reprezintă spațiul liber
+al discului sau ocuparea totală a bucketului S3.
+
+Dashboardul (`/`) se actualizează la 15 secunde. O eroare de actualizare păstrează
+ultimele date cu o avertizare; nu afișează zero drept înlocuitor pentru o eroare.
+
+Jurnalul `/calls` acceptă și `status` (pending/archived), `operation_status`
+(completed/failed/unknown) și `to_exclusive=1`. Fără ultimul parametru limita `to`
+rămâne inclusivă pentru compatibilitate. Interfața Istoric folosește limita exclusivă,
+perioade prestabilite și filtre separate pentru rezultatul SIUI și arhivare.
+
+Filtrul `time_field=received_at` al `/calls` folosește primirea în History pentru
+interval și ordonare; implicit `time_field=created_at`. Navigarea din graficele
+Dashboard către Istoric păstrează aceeași bază de timp.
+
+Artefactele pot include `filename` și `content_type`. `filename` păstrează parametrul
+`fileName` al URL-ului CNAS, cu extensia `.zip` sau `.xml` detectată din conținut.
+Aceste câmpuri sunt metadate de prezentare; `name` rămâne identificatorul artefactului
+pentru transfer și acces API. Descărcările binare includ `Content-Disposition` cu
+numele corect. Răspunsurile cu `format=json` includ și `filename`, `content_type`.
+La citirea arhivelor vechi, numele se recuperează din răspunsul original gzip și
+semnătura fișierului, fără modificarea manifestului stocat sau a hashurilor.
+
+
+## Cererea SIUI și fișierele trimise
+
+Operations (Bridge) și Istoric (History) oferă parametrii cererii, separat de rezultat/eroare.
+Parametrii aplicației sunt păstrați integral în `record.json.gz`; pentru apelurile noi,
+copia din SQLite nu mai este golită după arhivare. Nu se adaugă PIN-ul, cheia privată
+sau tokenurile de autentificare în această secțiune.
+
+Câmpurile XML (`xml`, `reportXML`, `reportXml`, `requestXml`) se arhivează și separat,
+cu nume `request-<parametru>`, păstrând exact octeții textului primit. `invoiceFile`
+Base64 se decodează în `invoiceFile.zip` fără modificarea arhivei semnate.
+Fișierele au dimensiune și SHA-256 în manifest și folosesc transferul reluabil existent.
+Un fișier asociat unui apel queued/failed dovedește conținutul cererii, nu că SIUI l-a primit;
+verifică starea și răspunsul operației.
+
+- Bridge: `GET /api/siui/operations/{id}/request?name=request-reportXML`
+  descarcă fișierul local; `offset` cere fragmente JSON Base64 pentru WSM.
+  Metadatele de download sunt în `call.request_files`.
+- History: `GET /api/history/calls/{id}/request?bridge=<bridge>` afișează parametrii
+  din arhiva confirmată. Parametrul bridge este necesar pentru administrator.
+- Prin Bridge: `GET /api/siui/operations/{id}/history/request` citește aceeași cerere
+  fără expunerea credențialelor History. Fișierele folosesc rutele de download existente.
+
+Previzualizarea limitează fiecare valoare la 4096 octeți; datele originale rămân intacte.
+History limitează citirea pentru previzualizare la 64 MiB decomprimați; peste această
+limită se descarcă arhiva integrală. Pentru arhivele mai vechi cererea rămâne în
+`record.json.gz`; fișierele separate nu sunt generate retroactiv. Dacă vechiul Bridge
+a golit copia locală, folosește „Vezi cererea arhivată” din detaliile History.

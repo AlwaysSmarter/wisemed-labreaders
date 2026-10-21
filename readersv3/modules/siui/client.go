@@ -137,6 +137,15 @@ func (c *client) sessionHeaders(ctx context.Context) (resultHeaders http.Header,
 			return ocspHeaders(h, c.session.token), nil
 		}
 		c.session.token = ""
+		if c.session.key != ocspConfigKey(c.cfg) {
+			c.session.acquired = time.Time{}
+		}
+		c.session.key = ocspConfigKey(c.cfg)
+		c.session.lastAttempt = time.Now()
+		defer func() {
+			c.session.lastFailed = err != nil
+			c.session.lastDurationMS = time.Since(started).Milliseconds()
+		}()
 	}
 	httpStatus := 0
 	if deadline, ok := ctx.Deadline(); ok && c.logf != nil {

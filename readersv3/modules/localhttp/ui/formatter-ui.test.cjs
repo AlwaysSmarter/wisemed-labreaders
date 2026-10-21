@@ -9,7 +9,7 @@ function scope(names, globals) {
     assert.ok(start >= 0);
     return source.slice(source.slice(start-6, start) === 'async ' ? start-6 : start, source.indexOf('\n}', start)+2);
   });
-  const ctx = vm.createContext(globals);
+  const ctx = vm.createContext({isHistoryMode:()=>false,isSIUIMode:()=>false,...globals});
   vm.runInContext(functions.join('\n'), ctx);
   return ctx;
 }

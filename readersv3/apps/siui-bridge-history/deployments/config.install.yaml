@@ -1,0 +1,80 @@
+reader:
+  id: siui-bridge-history
+  label: SIUI Bridge History
+  analyzer_name: WiseMED SIUI History Utility
+  analyzer_code: siui-bridge-history
+  db_name: siui-bridge-history.db
+logging:
+  verbose_level: 0
+local_http:
+  enabled: true
+  address: 127.0.0.1:19113
+  language: ro
+  tls: true
+wisemed_ws:
+  enabled: false
+  url: wss://wslocal.wisemed.eu/ws
+  heartbeat_ms: 15000
+  reconnect_delay_ms: 30000
+analyzer:
+  comm_type: utility
+  protocol: siui-history
+modules:
+  local-http:
+    enabled: true
+    address: 127.0.0.1:19113
+    language: ro
+    tls: true
+    cors_allowed_origins: ""
+  events:
+    enabled: true
+  help:
+    help_dir: ./help
+  app-updates:
+    enabled: true
+    app_id: siui-bridge-history
+    channel: stable
+    base_url: http://127.0.0.1:19090
+    auto_download: true
+    download_dir: ./updates
+  wisemed-api:
+    cfg_wisemed_protocol: https
+    cfg_wisemed_ip: ""
+    cfg_wisemed_port: "443"
+    cfg_wisemed_path: /wisemed-api/apiv2
+    cfg_wisemed_key: ""
+  wisemed-ws:
+    enabled: false
+    url: wss://wslocal.wisemed.eu/ws
+    auth_mode: device_key
+    tenant_id: ""
+    key_id: ""
+    issuer: ""
+    audience: wsm-server
+    subject: ""
+    secret_file: ""
+    token_file: ""
+    token_path: ""
+    ca_file: ""
+    heartbeat_ms: 15000
+    reconnect_delay_ms: 30000
+  siui-history:
+    tenant: ""
+    mysql_host: 127.0.0.1
+    mysql_port: "3306"
+    mysql_database: ""
+    mysql_user: ""
+    mysql_password: ""
+    mysql_tls: "false"
+    storage: local
+    base_path: ./history
+    staging_path: ./history-staging
+    s3_endpoint: s3.amazonaws.com
+    s3_bucket: ""
+    s3_region: ""
+    s3_prefix: siui-history
+    s3_access_key: ""
+    s3_secret_key: ""
+    s3_session_token: ""
+    s3_insecure: false
+    bridge_keys: []

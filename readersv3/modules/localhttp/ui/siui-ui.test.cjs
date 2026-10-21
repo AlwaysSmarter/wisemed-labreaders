@@ -9,7 +9,7 @@ function fn(name) {
  return source.slice(source.slice(start-6,start)==='async '?start-6:start,source.indexOf('\n}',start)+2);
 }
 function scope(names,globals) {
- const ctx=vm.createContext(globals);
+ const ctx=vm.createContext({isSIUIDataMode:()=>false,isHistoryMode:()=>false,isSIUIMode:()=>false,isESignatureMode:()=>false,...globals});
  vm.runInContext(names.map(fn).join('\n'),ctx);
  return ctx;
 }
@@ -110,7 +110,7 @@ test('token PIN settings mask status, clear submitted secrets and preserve blank
  const sent=[],notices=[];
  const ctx=scope(['setupSIUITokenPIN','setSIUIResult'],{api:async(path,options)=>{if(options){sent.push(JSON.parse(options.body));return {ok:true};}return {configured:true,blocked:false,manual_required:false};},bindAsyncClick:(button,fn)=>button.click=fn,showToast:(...args)=>notices.push(args)});
  await ctx.setupSIUITokenPIN(panel,form,{certificate_thumbprint:'ABC',certificate_store:'CurrentUser'});
- assert.equal(el('#siui-token-pin-state').textContent,'PIN salvat: <hidden>');
+ assert.equal(el('#siui-token-pin-state').textContent,'PIN salvat: <hidden> — respingeri: 0/3');
  assert.equal(el('#siui-token-pin-value').value,'');
  await el('#siui-token-pin-save').click();assert.equal(sent.length,0);
  el('#siui-token-pin-value').value='test-secret';await el('#siui-token-pin-save').click();
@@ -118,4 +118,41 @@ test('token PIN settings mask status, clear submitted secrets and preserve blank
  assert.ok(!el('#siui-token-pin-state').textContent.includes('test-secret'));
  el('#siui-token-pin-value').value='manual-secret';await el('#siui-token-pin-manual').click();assert.equal(sent[1].manual,true);assert.equal(el('#siui-token-pin-value').value,'');
  form.elements.certificate_thumbprint.value='OTHER';form.elements.certificate_thumbprint.handlers.change();assert.equal(el('#siui-token-pin-section').disabled,true);
+});
+
+test('History routes and Debug work locally and through WSM',()=>{
+ for(const remote of [false,true]) for(const view of ['history','debug']) {
+  const path='/'+view;
+  const ctx=scope(['currentUIPath','viewFromLocation','pathForView'],{state:{},isHistoryMode:()=>true,window:{location:{pathname:remote?'/control/':path},WSM_REMOTE:remote?{route:()=>path}:null}});
+  assert.equal(ctx.viewFromLocation(),view); assert.equal(ctx.pathForView(view),path);
+ }
+});
+test('History interval spans dates and preserves local hours; invalid intervals fail',()=>{
+ class Fields {constructor(form){this.form=form} get(key){return this.form[key]}}
+ const ctx=scope(['centralHistoryPeriod'],{FormData:Fields,URLSearchParams,Date});
+ const q=ctx.centralHistoryPeriod({from:'2026-10-20T21:30',to:'2026-10-21T08:15',bridge:' bridge-01 ',operation:'getInsured',operation_id:''});
+ assert.equal(q.get('from'),new Date('2026-10-20T21:30').toISOString());assert.equal(q.get('to'),new Date('2026-10-21T08:15').toISOString());assert.equal(q.get('bridge'),'bridge-01');
+ assert.throws(()=>ctx.centralHistoryPeriod({from:'2026-10-21T08:15',to:'2026-10-20T21:30'}),/interval valid/);
+});
+test('archive download preserves bridge and JSON chunk query on every request',async()=>{
+ const calls=[],saved=[];
+ const ctx=scope(['downloadSIUIFile'],{Uint8Array,Blob,atob,api:async path=>{calls.push(path);return path.endsWith('=0')?{data_base64:btoa('abc'),next_offset:3}:{data_base64:btoa('de'),next_offset:5}},downloadSIUIBlob:(blob,name)=>saved.push({blob,name})});
+ await ctx.downloadSIUIFile({path:'/api/history/calls/id/files/download?bridge=b1&format=json',size:5,filename:'result.zip'});
+ assert.deepEqual(calls,['/api/history/calls/id/files/download?bridge=b1&format=json&offset=0','/api/history/calls/id/files/download?bridge=b1&format=json&offset=3']);assert.equal(await saved[0].blob.text(),'abcde');
+});
+
+test('SIUI home is the utility dashboard, Operations keeps its deep link',()=>{
+ for(const path of ['/','/operations']){
+  const ctx=scope(['currentUIPath','viewFromLocation'],{state:{},isSIUIMode:()=>true,window:{location:{pathname:path}}});
+  assert.equal(ctx.viewFromLocation(),path==='/'?'overview':'operations');
+ }
+});
+test('SIUI presets use local day boundaries and Monday week start',()=>{
+ const ctx=scope(['siuiPresetRange'],{});
+ const now=new Date(2026,9,21,15,30);
+ const today=ctx.siuiPresetRange('today',now),yesterday=ctx.siuiPresetRange('yesterday',now),week=ctx.siuiPresetRange('week',now),seven=ctx.siuiPresetRange('seven',now),month=ctx.siuiPresetRange('month',now);
+ assert.equal(today.from.getHours(),0);assert.equal(today.to.getDate(),22);
+ assert.equal(yesterday.from.getDate(),20);assert.equal(yesterday.to.getDate(),21);
+ assert.equal(week.from.getDay(),1);assert.equal(week.from.getDate(),19);
+ assert.equal(seven.from.getDate(),15);assert.equal(month.from.getDate(),1);
 });

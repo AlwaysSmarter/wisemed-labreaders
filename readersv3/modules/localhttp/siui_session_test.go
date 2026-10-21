@@ -7,7 +7,7 @@ import (
 )
 
 func TestSIUISessionSigningUsesPrivateRuntimeKey(t *testing.T) {
-	for _, protocol := range []string{"siui", "html-print-formatter"} {
+	for _, protocol := range []string{"siui", "siui-history", "siui-data", "html-print-formatter"} {
 		t.Run(protocol, func(t *testing.T) {
 			rt := &wssSecretRuntime{services: map[string]interface{}{"analyzer-config": map[string]interface{}{"protocol": protocol}}}
 			first := &Module{rt: rt, utilitySessionKey: bytes.Repeat([]byte{1}, 32)}
@@ -33,5 +33,13 @@ func TestSIUISessionSigningUsesPrivateRuntimeKey(t *testing.T) {
 				t.Fatal("predictable legacy signing key accepted for SIUI")
 			}
 		})
+	}
+}
+
+func TestHistoryUsesEquipmentSetup(t *testing.T) {
+	rt := &wssSecretRuntime{services: map[string]interface{}{"analyzer-config": map[string]interface{}{"protocol": "siui-history"}}}
+	m := &Module{rt: rt}
+	if m.loginOnlyUtility() {
+		t.Fatal("History must expose equipment setup for WSM credentials")
 	}
 }

@@ -69,15 +69,15 @@ func (a *securityAPI) clientCertificate(cfg settings) (tls.Certificate, func(), 
 	}
 	auth, cleanAuth, err := macPINContext(a, pin)
 	if err != nil {
-		finish(false)
+		finish(pinUnrelated)
 		return empty, noop, err
 	}
 	var authOnce sync.Once
-	endAuth := func(success bool) { authOnce.Do(func() { cleanAuth(); finish(success) }) }
+	endAuth := func(outcome pinOutcome) { authOnce.Do(func() { cleanAuth(); finish(outcome) }) }
 	handedOff := false
 	defer func() {
 		if !handedOff {
-			endAuth(false)
+			endAuth(pinUnrelated)
 		}
 	}()
 	identities, err := a.identitiesWithContext(cfg.Store, auth)
@@ -136,7 +136,7 @@ func (a *securityAPI) clientCertificate(cfg settings) (tls.Certificate, func(), 
 			return empty, noop, errors.New("macOS: token driver offers no supported TLS signing algorithm")
 		}
 		handedOff = true
-		return tls.Certificate{Certificate: a.clientChain(der), PrivateKey: signer, Leaf: cert, SupportedSignatureAlgorithms: signatureAlgorithms}, func() { endAuth(false); a.release(key) }, nil
+		return tls.Certificate{Certificate: a.clientChain(der), PrivateKey: signer, Leaf: cert, SupportedSignatureAlgorithms: signatureAlgorithms}, func() { endAuth(pinUnrelated); a.release(key) }, nil
 	}
 	return empty, noop, errors.New("macOS: selected certificate not found in Keychain / CryptoTokenKit; reconnect token and reload certificates")
 }

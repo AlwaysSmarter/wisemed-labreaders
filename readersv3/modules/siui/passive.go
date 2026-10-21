@@ -220,7 +220,18 @@ func (m *Module) personalizationHTTP(w http.ResponseWriter, r *http.Request) {
 	defer release()
 	ctx, cancel := context.WithTimeout(r.Context(), 25*time.Second)
 	defer cancel()
+	callID, err := m.beginPassiveHistory(r, "getProviderInfo", map[string]string{"start": in.Start, "stop": in.Stop, "partnerCategory": "PARA"})
+	if err != nil {
+		fail(w, 500, "cannot persist History outbox")
+		return
+	}
+	c.callID = callID
+	w.Header().Set("X-SIUI-Call-ID", callID)
 	file, err := c.personalization(ctx, in.Start, in.Stop)
+	if e := m.finishPassiveHistory(callID, map[string]any{"legacy_file": file}, err); e != nil {
+		fail(w, 500, "cannot persist CNAS result")
+		return
+	}
 	if err != nil {
 		fail(w, 502, err.Error())
 		return

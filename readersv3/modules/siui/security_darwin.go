@@ -54,6 +54,8 @@ type securityAPI struct {
 	sign                func(uintptr, uintptr, uintptr, *uintptr) uintptr
 	supports            func(uintptr, int64, uintptr) bool
 	errorCode           func(uintptr) int64
+	errorDomain         func(uintptr) uintptr
+	equal               func(uintptr, uintptr) bool
 }
 
 var macSecurity struct {
@@ -80,7 +82,7 @@ func securityFramework() (*securityAPI, error) {
 		}{
 			{&a.readPointer, purego.RTLD_DEFAULT, "memcpy"}, {&a.release, a.cf, "CFRelease"}, {&a.retain, a.cf, "CFRetain"}, {&a.dictionaryCreate, a.cf, "CFDictionaryCreateMutable"}, {&a.dictionarySet, a.cf, "CFDictionarySetValue"},
 			{&a.arrayCreate, a.cf, "CFArrayCreateMutable"}, {&a.arrayAppend, a.cf, "CFArrayAppendValue"}, {&a.arrayCount, a.cf, "CFArrayGetCount"}, {&a.arrayValue, a.cf, "CFArrayGetValueAtIndex"},
-			{&a.dataCreate, a.cf, "CFDataCreate"}, {&a.dataLength, a.cf, "CFDataGetLength"}, {&a.dataPointer, a.cf, "CFDataGetBytePtr"}, {&a.stringCreate, a.cf, "CFStringCreateWithCString"}, {&a.errorCode, a.cf, "CFErrorGetCode"},
+			{&a.dataCreate, a.cf, "CFDataCreate"}, {&a.dataLength, a.cf, "CFDataGetLength"}, {&a.dataPointer, a.cf, "CFDataGetBytePtr"}, {&a.stringCreate, a.cf, "CFStringCreateWithCString"}, {&a.errorCode, a.cf, "CFErrorGetCode"}, {&a.errorDomain, a.cf, "CFErrorGetDomain"}, {&a.equal, a.cf, "CFEqual"},
 			{&a.itemCopy, a.sec, "SecItemCopyMatching"}, {&a.identityCertificate, a.sec, "SecIdentityCopyCertificate"}, {&a.identityKey, a.sec, "SecIdentityCopyPrivateKey"},
 			{&a.certificateData, a.sec, "SecCertificateCopyData"}, {&a.certificateCreate, a.sec, "SecCertificateCreateWithData"}, {&a.policySSL, a.sec, "SecPolicyCreateSSL"}, {&a.policyBasic, a.sec, "SecPolicyCreateBasicX509"},
 			{&a.copyAnchors, a.sec, "SecTrustCopyAnchorCertificates"}, {&a.trustCreate, a.sec, "SecTrustCreateWithCertificates"}, {&a.trustOptions, a.sec, "SecTrustSetOptions"}, {&a.trustEvaluate, a.sec, "SecTrustEvaluateWithError"}, {&a.trustChain, a.sec, "SecTrustCopyCertificateChain"},
@@ -176,7 +178,7 @@ func (a *securityAPI) identityDER(identity uintptr) ([]byte, error) {
 }
 
 type macSigner struct {
-	pinFinish func(bool)
+	pinFinish func(pinOutcome)
 	api       *securityAPI
 	key       uintptr
 	public    crypto.PublicKey
@@ -210,12 +212,13 @@ func (s *macSigner) algorithm(opts crypto.SignerOpts) (string, error) {
 	return "", errors.New("unsupported token key type")
 }
 func (s *macSigner) Sign(_ io.Reader, digest []byte, opts crypto.SignerOpts) (signature []byte, err error) {
+	pinRejected := false
 	if s.pinFinish != nil {
 		defer func() {
 			if err == nil {
 				err = verifyTokenSignature(s.public, digest, signature, opts)
 			}
-			s.pinFinish(err == nil)
+			s.pinFinish(signingPINOutcome(pinRejected, err))
 		}()
 	}
 	algorithm, err := s.algorithm(opts)
@@ -241,8 +244,9 @@ func (s *macSigner) Sign(_ io.Reader, digest []byte, opts crypto.SignerOpts) (si
 		if failure != 0 {
 			code = s.api.errorCode(failure)
 		}
-		if s.pinFinish != nil {
-			return nil, fmt.Errorf("macOS token signing failed (code %d); PIN automat suspendat. Reluați operația pentru introducere manuală sau actualizați PIN-ul în Setări CNAS", code)
+		pinRejected = s.api.isPINRejection(failure)
+		if s.pinFinish != nil && pinRejected {
+			return nil, fmt.Errorf("macOS token signing failed (code %d); PIN respins; suspendare automată după 3 respingeri consecutive. Verificați PIN-ul în Setări CNAS", code)
 		}
 		return nil, fmt.Errorf("macOS token signing failed (code %d); check the PIN/authorization dialog in your desktop session", code)
 	}
@@ -424,4 +428,15 @@ func verifyChainWithoutRevocation(leafDER []byte, intermediateDER, rootDER [][]b
 		return fmt.Errorf("CNAS TLS verification with revocation exception: %w", err)
 	}
 	return nil
+}
+
+// CryptoTokenKit distinguishes AuthenticationFailed (-5) from communication (-2),
+// cancellation (-4), missing token (-7) and AuthenticationNeeded (-9).
+func (a *securityAPI) isPINRejection(failure uintptr) bool {
+	if failure == 0 || a.errorCode(failure) != -5 {
+		return false
+	}
+	domain := a.stringCreate(0, "CryptoTokenKit", 0x08000100)
+	defer a.release(domain)
+	return a.equal(a.errorDomain(failure), domain)
 }

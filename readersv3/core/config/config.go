@@ -77,6 +77,7 @@ func Default() *Config {
 }
 
 func (c *Config) ApplyDefaults() {
+	c.migrateSIUIDataSettings()
 	if c.Modules == nil {
 		c.Modules = map[string]map[string]interface{}{}
 	}
@@ -131,7 +132,14 @@ func (c *Config) Save() error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(c.path, blob, 0o644)
+	mode := os.FileMode(0o644)
+	if c.Analyzer.Protocol == "siui-data" {
+		mode = 0o600
+		if err := os.Chmod(c.path, mode); err != nil && !os.IsNotExist(err) {
+			return err
+		}
+	}
+	return os.WriteFile(c.path, blob, mode)
 }
 
 func syncLocalHTTPMirror(c *Config) {

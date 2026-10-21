@@ -1085,6 +1085,8 @@ const els = {
     orders: document.getElementById("view-orders"),
     qc: document.getElementById("view-qc"),
     debug: document.getElementById("view-debug"),
+    history: document.getElementById("view-history"),
+    operations: document.getElementById("view-operations"),
     wsm: document.getElementById("view-wsm"),
     help: document.getElementById("view-help"),
   },
@@ -1236,11 +1238,11 @@ function bindEvents() {
   els.closeAnalyteModalBtn.addEventListener("click", closeAnalyteModal);
   els.navLinks.forEach((link) => link.addEventListener("click", () => {
     if (link.dataset.view === "analytes") {
-      state.settingsSubView = isSIUIMode() ? "siui" : isESignatureMode() ? "pad" : "reader";
+      state.settingsSubView = isHistoryMode()?"history":isSIUIMode() ? "siui" : isESignatureMode() ? "pad" : "reader";
       if(isSIUIMode()) window.history.replaceState({},"","/settings/siui");
       if(isESignatureMode()) window.history.replaceState({},"","/settings/pad");
     }
-    if (link.dataset.view === "debug" && !state.debugEnabled) {
+    if (link.dataset.view === "debug" && !isHistoryMode() && !isSIUIMode() && !isSIUIDataMode() && !state.debugEnabled) {
       activateView("wsm"); return;
     }
     activateView(link.dataset.view);
@@ -1428,6 +1430,8 @@ async function renderHTMLFormatter(waitForPrintReady = true) {
   finally { setButtonLoading(button, false); otherButton.disabled = false; }
 }
 
+function isSIUIDataMode(){return state.readerInfo?.protocol === "siui-data";}
+function isHistoryMode(){return state.readerInfo?.protocol === "siui-history";}
 function isSIUIMode() { return state.readerInfo?.protocol === "siui"; }
 
 function isESignatureMode() {
@@ -1456,18 +1460,31 @@ function barcodeNavButton(viewName) {
 }
 
 function applyBarcodeModeUI() {
+ for(const id of ["siui-data-versions-nav","siui-data-setup-nav"]){const link=document.getElementById(id);if(link)link.hidden=!isSIUIDataMode()||!!window.WSM_REMOTE;}
+ if(isSIUIDataMode()) {
+  state.utilityMode=true;state.barcodeMode=false;
+  for(const name of ["orders","qc","daily-details"]) {const link=barcodeNavButton(name);if(link)link.hidden=true;}
+  for(const id of ["reader-summary-card","analyzer-pill","result-sync-pill","debug-communication-link"]) {const node=document.getElementById(id);if(node)node.hidden=true;}
+  document.querySelectorAll("#settings-panel-reader .settings-section-transport, #settings-panel-reader .settings-section-results").forEach(node=>node.hidden=true);
+  if(els.settingsSubmenu)els.settingsSubmenu.hidden=false;
+  els.navSublinks.forEach(link=>{if(link.dataset.settingsSubview)link.hidden=!["reader","wss"].includes(link.dataset.settingsSubview);});
+  return;
+ }
+ if(isSIUIMode()||isHistoryMode()){document.getElementById("reader-eyebrow").textContent=isHistoryMode()?"ARHIVĂ CENTRALĂ":"UTILITAR CNAS";const summary=document.getElementById("reader-summary-card");if(summary)summary.hidden=true;}
+ document.getElementById("operations-nav-link").hidden=!isSIUIMode();
+ document.getElementById("history-nav-link").hidden=!isHistoryMode();
  if (state.readerInfo?.protocol === "html-print-formatter") {
   state.formatterMode = true; state.utilityMode = true; state.barcodeMode = false;
   applyHTMLFormatterUI(); return;
  }
- if (isSIUIMode()) {
+ if (isSIUIMode() || isHistoryMode()) {
   state.utilityMode = true; state.barcodeMode = false;
  document.querySelectorAll("#settings-panel-reader .settings-section-transport, #settings-panel-reader .settings-section-results").forEach(node=>node.hidden=true);
- const debugLabel=document.getElementById("debug-communication-link");if(debugLabel)debugLabel.textContent="GENERAL / CLINICE";
+ const debugLabel=document.getElementById("debug-communication-link");if(debugLabel)debugLabel.textContent=isHistoryMode()?"Cereri Bridge":"GENERAL / CLINICE";
   for(const id of ["analyzer-pill","result-sync-pill"]) {const node=document.getElementById(id);if(node)node.hidden=true;}
   for (const name of ["orders", "qc", "daily-details"]) { const link=barcodeNavButton(name); if(link) link.hidden=true; }
   if(els.settingsSubmenu) els.settingsSubmenu.hidden=false;
-  els.navSublinks.forEach(link => { if(link.dataset.settingsSubview) link.hidden=!["siui","reader","wss"].includes(link.dataset.settingsSubview); });
+  els.navSublinks.forEach(link => { if(link.dataset.settingsSubview) link.hidden=!(isHistoryMode()?["history","reader","wss"]:["siui","history","reader","wss"]).includes(link.dataset.settingsSubview); });
   els.navSublinks.forEach(link=>{if(link.dataset.settingsSubview==="reader")link.textContent=state.language==="en"?"Server and updates":"Server și actualizări";});
   return;
  }
@@ -1521,7 +1538,7 @@ async function onLanguageChange(event) {
   if (!els.dashboardView.hidden) {
     if (state.formatterMode) {
       await Promise.all([loadStatus(), loadLogs(), loadReaderSettings()]);
-    } else if (isSIUIMode()) {
+    } else if (isSIUIMode() || isHistoryMode()) {
       await Promise.all([loadStatus(), loadLogs(), loadReaderSettings()]);
     } else if (isESignatureMode()) {
       applyESignatureUI(); await Promise.all([loadStatus(), loadLogs(), loadDashboard()]);
@@ -1772,8 +1789,8 @@ async function mountDashboard(sessionResp) {
   activateView(viewFromLocation(), false);
   if (state.formatterMode) {
     await Promise.all([loadStatus(), loadLogs(), loadReaderSettings()]);
-  } else if (isSIUIMode()) {
-    await refreshSIUICertificatesAfterLogin();
+  } else if (isSIUIMode() || isHistoryMode()) {
+    if(isSIUIMode()) await refreshSIUICertificatesAfterLogin();
     await Promise.all([loadStatus(), loadLogs(), loadReaderSettings()]);
   } else if (isESignatureMode()) {
     await Promise.all([loadStatus(), loadLogs(), loadDashboard()]);
@@ -1822,7 +1839,7 @@ async function refreshAppUpdateStatus(force = false) {
 
 function syncDebugNavVisibility() {
   if (!els.debugNavLink) return;
-  const enabled = (isSIUIMode() || !!state.debugEnabled) && (Number(state.session?.user_type) || 0) <= 0;
+  const enabled = (isSIUIMode() || isHistoryMode() || isSIUIDataMode() || !!state.debugEnabled) && (Number(state.session?.user_type) || 0) <= 0;
   const admin = (Number(state.session?.user_type) || 0) <= 0;
   els.debugNavLink.hidden = !admin;
   document.getElementById("debug-submenu").hidden = !admin;
@@ -1834,7 +1851,9 @@ function syncDebugNavVisibility() {
 }
 
 async function loadDebugTests() {
+ if(isSIUIDataMode()){state.debugEnabled=true;syncDebugNavVisibility();const view=document.getElementById("view-debug");let panel=document.getElementById("siui-data-debug-panel");if(!panel){panel=document.createElement("article");panel.id="siui-data-debug-panel";panel.className="panel full-span";view.append(panel)}for(const child of view.children)child.hidden=child!==panel;panel.replaceChildren();const frame=document.createElement("iframe");frame.title="Explorator API SIUI Data";if(window.WSM_REMOTE){frame.srcdoc=(await api("/api/siui-data/debug")).data.html}else{frame.src="/siui-data-debug?embedded=1"}frame.style.cssText="width:100%;height:85vh;min-height:720px;border:0";panel.append(frame);return;}
  if(state.formatterMode){state.debugEnabled=false;syncDebugNavVisibility();return;}
+ if(isHistoryMode()){state.debugEnabled=true;syncDebugNavVisibility();await loadHistoryDebug();return;}
  if(isSIUIMode()){state.debugEnabled=true;syncDebugNavVisibility();await loadSIUIDebug();return;}
   if ((Number(state.session?.user_type) || 0) > 0) {
     state.debugEnabled = false;
@@ -1981,6 +2000,8 @@ function onAppUpdateIndicatorClick(event) {
 }
 
 function activateView(name, pushHistory = true) {
+ if(name==="history"&&!isHistoryMode()) name="overview";
+ if(name==="operations"&&!isSIUIMode()) name="overview";
  if(state.formatterMode && ["orders","qc","daily-details","debug"].includes(name)) name="overview";
  if (isESignatureMode() && name !== "analytes") closeESignatureDemo();
   if (name === "help") {
@@ -1989,7 +2010,7 @@ function activateView(name, pushHistory = true) {
     if (helpTab) helpTab.opener = null;
     return;
   }
-  if (name === "debug" && ((!isSIUIMode() && !state.debugEnabled) || (Number(state.session?.user_type) || 0) > 0)) {
+  if (name === "debug" && ((!isSIUIMode() && !isHistoryMode() && !state.debugEnabled) || (Number(state.session?.user_type) || 0) > 0)) {
     name = "overview";
   }
   if (state.utilityMode && name === "qc") {
@@ -2014,6 +2035,11 @@ function activateView(name, pushHistory = true) {
       window.history.pushState({ view: name }, "", path);
     }
   }
+  if(name === "history") {loadCentralHistory();return;}
+  if(name === "overview" && isSIUIDataMode()) {mountSIUIDataDashboard();return;}
+  if(name === "overview" && isHistoryMode()) {mountArchiveDashboard();return;}
+  if(name === "overview" && isSIUIMode()) {mountSIUIDashboard();return;}
+  if(name === "operations") {loadSIUIOperations();return;}
   if (name === "wsm") {
     renderWSSPanel();
     loadWSSStatus().catch(error => wssNotice(error.message));
@@ -2021,7 +2047,7 @@ function activateView(name, pushHistory = true) {
   }
   if (name === "analytes") {
     if (state.formatterMode) {activateSettingsSubView(state.settingsSubView);if(state.settingsSubView==="reader")loadReaderSettings().catch(error=>showToast(error.message,"error"));return;}
-    if (isSIUIMode()) {activateSettingsSubView(state.settingsSubView);if(state.settingsSubView==="reader")loadReaderSettings().catch(error=>showToast(error.message,"error"));return;}
+    if (isSIUIMode() || isHistoryMode()) {activateSettingsSubView(state.settingsSubView);if(state.settingsSubView==="reader")loadReaderSettings().catch(error=>showToast(error.message,"error"));return;}
     if (isESignatureMode()) {activateSettingsSubView(state.settingsSubView); return;}
     if (state.settingsSubView === "wss") { activateSettingsSubView("wss"); return; }
     if (state.barcodeMode) {
@@ -2058,6 +2084,10 @@ function activateView(name, pushHistory = true) {
 }
 
 function renderTopbarTitle() {
+ if(isHistoryMode()&&state.currentView==="overview"){document.getElementById("dashboard-title").textContent="Dashboard SIUI Bridge History";return;}
+ if(isSIUIMode()&&state.currentView==="overview"){document.getElementById("dashboard-title").textContent="Dashboard SIUI Bridge";return;}
+ if(state.currentView==="history"){document.getElementById("dashboard-title").textContent="Istoric";return;}
+ if(state.currentView==="operations"){document.getElementById("dashboard-title").textContent="Operations";return;}
  if(state.currentView === "wsm"){document.getElementById("dashboard-title").textContent="Debug · WSM";return;}
  if(state.formatterMode){document.getElementById("dashboard-title").textContent=state.currentView==="analytes" ? (state.settingsSubView==="wss" ? "WSS" : "Server și actualizări") : "HTML Print Formatter";return;}
   if (state.currentView === "analytes" && state.settingsSubView === "wss") { document.getElementById("dashboard-title").textContent = "WSS"; return; }
@@ -2114,7 +2144,8 @@ function renderTopbarTitle() {
 function viewFromLocation() {
  if(currentUIPath() === "/debug/wsm") return "wsm";
  if(state.formatterMode) return currentUIPath().startsWith("/settings") ? "analytes" : "overview";
- if(isSIUIMode()) return currentUIPath()==="/debug" ? "debug" : "analytes";
+ if(isHistoryMode()) return currentUIPath()==="/history" ? "history" : currentUIPath()==="/debug" ? "debug" : currentUIPath().startsWith("/settings") ? "analytes" : "overview";
+ if(isSIUIMode()) return currentUIPath()==="/operations" ? "operations" : currentUIPath()==="/debug" ? "debug" : currentUIPath().startsWith("/settings") ? "analytes" : "overview";
   if (currentUIPath() === "/settings/wss") return "analytes";
  if(isESignatureMode() && currentUIPath().startsWith("/settings")) return "analytes";
   const path = currentUIPath() || "/";
@@ -2136,6 +2167,8 @@ function viewFromLocation() {
 }
 
 function settingsSubViewFromLocation() {
+ if(currentUIPath()==="/settings/history")return "history";
+ if(isHistoryMode()) return currentUIPath()==="/settings/wss"?"wss":currentUIPath()==="/settings/reader"?"reader":"history";
  if(state.formatterMode) return currentUIPath()==="/settings/wss" ? "wss" : "reader";
  if(isSIUIMode()) return currentUIPath()==="/settings/wss" ? "wss" : currentUIPath()==="/settings/reader" ? "reader" : "siui";
   if (currentUIPath() === "/settings/wss") return "wss";
@@ -2150,6 +2183,9 @@ function settingsSubViewFromLocation() {
 }
 
 function pathForView(name) {
+ if(name==="history") return "/history";
+ if(name==="operations") return "/operations";
+ if(name==="analytes"&&state.settingsSubView==="history")return "/settings/history";
  if(name === "wsm") return "/debug/wsm";
  if(state.formatterMode) return name==="analytes" ? (state.settingsSubView==="wss" ? "/settings/wss" : "/settings/reader") : "/";
  if(isSIUIMode() && name==="analytes" && state.settingsSubView==="siui") return "/settings/siui";
@@ -2180,6 +2216,7 @@ function pathForView(name) {
 }
 
 function activateSettingsSubView(name) {
+ if(name==="history" && (isSIUIMode()||isHistoryMode())){state.settingsSubView="history";document.querySelectorAll('[id^="settings-panel-"]').forEach(p=>p.hidden=p.id!=="settings-panel-siui");els.navSublinks.forEach(link=>link.classList.toggle("active",link.dataset.settingsSubview==="history"));window.history.replaceState({view:"analytes"},"","/settings/history");loadHistoryPanel().catch(e=>showToast(e.message,"error"));return;}
  if(state.formatterMode && !["reader","wss"].includes(name)) name="reader";
  const siuiPanel=document.getElementById("settings-panel-siui");
  if(siuiPanel) siuiPanel.hidden=name!=="siui";
@@ -2409,7 +2446,7 @@ async function loadStatus() {
 
 async function loadDashboard() {
  if(state.formatterMode) return;
- if(isSIUIMode()) return;
+ if(isSIUIMode()||isHistoryMode()) return;
  if(isESignatureMode()) {
  const data=await api("/api/esignature/stats/daily");
  const rows=data.stats||[];const today=rows.find(row=>row.date===new Date().toISOString().slice(0,10))||{};
@@ -6353,7 +6390,7 @@ function applyLanguage() {
   document.getElementById("login-language-label").textContent = t("language");
   document.getElementById("dashboard-language-label").textContent = t("language");
   document.getElementById("login-eyebrow").textContent = t("localAdmin");
-  document.getElementById("reader-eyebrow").textContent = t("readerEyebrow");
+  document.getElementById("reader-eyebrow").textContent = isSIUIMode() ? "UTILITAR CNAS" : t("readerEyebrow");
   els.readerIdentityLabel.textContent = t("readerCategory");
   els.readerSummaryTitle.textContent = t("readerSummary");
   document.getElementById("topbar-eyebrow").textContent = t("localHttp");
@@ -6593,6 +6630,9 @@ function formatReaderSecondaryLabel(readerInfo = {}) {
 }
 
 function renderReaderSidebar() {
+ if(isHistoryMode()){
+  els.readerIdentityIcon.textContent="H";els.readerIdentityTitle.textContent="Arhivă centrală";els.readerIdentitySubtitle.textContent="SIUI Bridge History";return;
+ }
  if(state.formatterMode){
   els.readerIdentityIcon.textContent="HTML";els.readerIdentityTitle.textContent="Utilitar";els.readerIdentitySubtitle.textContent="HTML Print Formatter";
   els.readerSummaryList.textContent="Chromium headless · HTTP / WSS";return;
@@ -7319,7 +7359,7 @@ async function loadSIUIPanel() {
    <button type="button" id="siui-token-pin-save">Salvează PIN-ul criptat</button>
    <button type="button" id="siui-token-pin-forget">Șterge PIN-ul salvat</button>
    <button type="button" id="siui-token-pin-manual">Folosește PIN-ul temporar (150 secunde)</button>
-   <p>După o încercare nereușită, PIN-ul salvat nu mai este folosit automat până îl actualizezi. Câmpul gol păstrează parola. Salvează mai întâi certificatul selectat.</p>
+   <p>Folosirea automată se suspendă după 3 respingeri explicite ale PIN-ului. Autentificarea reușită resetează contorul. Lipsa tokenului, anularea și erorile de conexiune nu suspendă PIN-ul. Câmpul gol păstrează parola. Salvează mai întâi certificatul selectat.</p>
    <p id="siui-pkcs11-info"></p></fieldset>
    <fieldset><legend>Conexiune pentru certificatul selectat</legend>
    <label>Adresa CNAS<input name="base_url" type="url" value="${escapeHtml(settings.base_url)}" required></label>
@@ -7366,8 +7406,8 @@ async function setupSIUITokenPIN(panel,form,settings) {
  const current=()=>!!settings.certificate_thumbprint&&form.elements.certificate_thumbprint.value===settings.certificate_thumbprint&&form.elements.certificate_store.value===settings.certificate_store;
  const sync=()=>{fieldset.disabled=!current();input.value="";};
  form.elements.certificate_thumbprint.addEventListener("change",sync);form.elements.certificate_store.addEventListener("change",sync);sync();
- const refresh=async()=>{const data=await api("/api/siui/token-pin");setSIUIResult(output,data.configured?"PIN salvat: <hidden>"+(data.blocked?" — autentificare automată suspendată; folosește introducerea manuală sau actualizează PIN-ul.":""):"PIN nesalvat — introducere manuală.",!!data.blocked);panel.querySelector("#siui-pkcs11-info").textContent=data.manual_required?("Linux: "+(data.pkcs11_module||"configurează local pkcs11_module pentru driverul tokenului")+". PIN-ul temporar permite introducerea manuală fără salvare pe disc."):"";};
- const update=async(mode)=>{if(!current())return;const pin=input.value;if(mode!=="forget"&&!pin){showToast("Introdu PIN-ul nou.","error");return;}try{await api("/api/siui/token-pin",{method:"PUT",body:JSON.stringify({pin:mode==="forget"?"":pin,forget:mode==="forget",manual:mode==="manual"})});await refresh();if(mode==="manual")setSIUIResult(output,"PIN temporar disponibil pentru 150 secunde; la primul eșec este eliminat.");}catch(e){setSIUIResult(output,e.message,true);throw e;}finally{input.value="";}};
+ const refresh=async()=>{const data=await api("/api/siui/token-pin");setSIUIResult(output,data.configured?"PIN salvat: <hidden> — respingeri: "+(data.failed_attempts||0)+"/"+(data.max_attempts||3)+(data.blocked?" — autentificare automată suspendată; folosește introducerea manuală sau actualizează PIN-ul.":""):"PIN nesalvat — introducere manuală.",!!data.blocked);panel.querySelector("#siui-pkcs11-info").textContent=data.manual_required?("Linux: "+(data.pkcs11_module||"configurează local pkcs11_module pentru driverul tokenului")+". PIN-ul temporar permite introducerea manuală fără salvare pe disc."):"";};
+ const update=async(mode)=>{if(!current())return;const pin=input.value;if(mode!=="forget"&&!pin){showToast("Introdu PIN-ul nou.","error");return;}try{await api("/api/siui/token-pin",{method:"PUT",body:JSON.stringify({pin:mode==="forget"?"":pin,forget:mode==="forget",manual:mode==="manual"})});await refresh();if(mode==="manual")setSIUIResult(output,"PIN temporar disponibil pentru 150 secunde; la respingerea explicită a PIN-ului este eliminat.");}catch(e){setSIUIResult(output,e.message,true);throw e;}finally{input.value="";}};
  bindAsyncClick(panel.querySelector("#siui-token-pin-save"),()=>update("save"));bindAsyncClick(panel.querySelector("#siui-token-pin-forget"),()=>update("forget"));bindAsyncClick(panel.querySelector("#siui-token-pin-manual"),()=>update("manual"));
  try{await refresh();}catch(e){setSIUIResult(output,e.message,true);}
 }
@@ -7393,7 +7433,7 @@ async function loadSIUIDebug() {
  bindAsyncClick(panel.querySelector("#siui-openapi"),async()=>{const data=await api("/api/siui/openapi.json");downloadSIUIBlob(new Blob([JSON.stringify(data,null,2)],{type:"application/json"}),"siui-openapi.json");});
  const renderGroup=group=>{
   callGeneration++;setSIUIResult(output,"");panel.querySelector("#siui-download-area").replaceChildren();
-  const ops=catalog.operations.filter(op=>op.group===group);const area=panel.querySelector("#siui-operation-area");
+  const ops=catalog.operations.filter(op=>op.group===group||(group==="clinice"&&["getPrescriptionSeriesInfo","generatePrescriptionSeries"].includes(op.name)));const area=panel.querySelector("#siui-operation-area");
   area.innerHTML=`<h3>${group.toUpperCase()}</h3>${group==="general"?`<button type="button" id="siui-ocsp-connect">Obține / reutilizează token OCSP</button> <button type="button" id="siui-local-test">Test local fără CNAS</button><p>Tokenul este reutilizat maximum 150 de secunde. După acest interval se obține unul nou; rezultatul arată vechimea tokenului.</p>`:""}<label>Operație<select id="siui-operation">${ops.map(op=>`<option value="${op.name}">${escapeHtml(op.label||op.name)} — ${op.name}</option>`).join("")}</select></label><div id="siui-operation-form"></div>`;
   if(group==="general"){
    bindAsyncClick(area.querySelector("#siui-ocsp-connect"),async()=>{setSIUIResult(output,"Autentificare OCSP…");try{const connection=await api("/api/siui/general/ocsp");setSIUIResult(output,"Parametri OCSP:\n"+JSON.stringify(connection.debug,null,2)+"\nConectare…");const session=await api("/api/siui/general/ocsp",{method:"POST",body:"{}"});setSIUIResult(output,JSON.stringify(session,null,2));}catch(e){setSIUIResult(output,output.textContent+"\n"+e.message,true);throw e;}});
@@ -7405,6 +7445,8 @@ async function loadSIUIDebug() {
    const fields=op.parameters.map(p=>{
     const name=escapeHtml(p.name);let control;
     if(/xml$/i.test(p.name))control=`<textarea name="${name}" rows="9" required spellcheck="false" placeholder="XML conform specificației CNAS"></textarea>`;
+    else if(p.nullable)control=`<input name="${name}" type="text" placeholder="Fără subunitate: lasă gol (null)">`;
+    else if(p.type==="boolean")control=`<select name="${name}"><option value="true">true</option><option value="false">false</option></select>`;
     else if(p.name==="partnerCategory")control=`<select name="${name}">${["MF","PHM","CLIN","PARA","STOM","AMB","MD","HC","REC","SPT","NHP","DIA","SICK","CBRET"].map(c=>`<option>${c}</option>`).join("")}</select>`;
     else if(p.name==="reportType")control=`<select name="${name}"><option value="CLIN">CLIN</option><option value="PARA">PARA</option></select>`;
     else if(p.name==="requestType")control=`<select name="${name}"><option>RQ_CLIN_SRV</option><option>RQ_PARA_SRV</option></select>`;
@@ -7416,7 +7458,7 @@ async function loadSIUIDebug() {
    form.querySelector("#siui-next-operation").onclick=()=>{form.elements.operation_id.value=crypto.randomUUID();};
    if(op.name==="validateReport")form.elements.reportType.addEventListener("change",()=>{form.elements.requestType.value="RQ_"+form.elements.reportType.value+"_SRV";});
    bindAsyncSubmit(form,async event=>{
-    event.preventDefault();const activeCall=++callGeneration;const data=Object.fromEntries(new FormData(form));const id=data.operation_id;delete data.operation_id;
+    event.preventDefault();const activeCall=++callGeneration;const data=Object.fromEntries(new FormData(form));const id=data.operation_id;delete data.operation_id;for(const p of op.parameters){if(p.nullable&&data[p.name]==="")data[p.name]=null;}
     setSIUIResult(output,"Trimitere cerere…");panel.querySelector("#siui-download-area").replaceChildren();
     try{const response=await api("/api/siui/"+op.group+"/"+op.name,{method:"POST",body:JSON.stringify({operation_id:id,parameters:data})});
      const poll=async()=>{if(generation!==siuiDebugGeneration||activeCall!==callGeneration||state.currentView!=="debug")return;const result=await api("/api/siui/calls/"+encodeURIComponent(response.call.id));if(generation!==siuiDebugGeneration||activeCall!==callGeneration)return;setSIUIResult(output,(result.call.error?result.call.error+"\n\n":"")+JSON.stringify(result.call,null,2),["failed","unknown"].includes(result.call.status));
@@ -7434,7 +7476,7 @@ async function loadSIUIDebug() {
 function downloadSIUIBlob(blob,name) {const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 async function downloadSIUIFile(file) {
  const chunks=[];let offset=0;
- while(offset<file.size){const data=await api(file.path+"?offset="+offset);const bytes=Uint8Array.from(atob(data.data_base64),c=>c.charCodeAt(0));if(!bytes.length||data.next_offset!==offset+bytes.length)throw new Error("Fragment descărcare invalid");chunks.push(bytes);offset=data.next_offset;}
+ while(offset<file.size){const data=await api(file.path+(file.path.includes("?")?"&":"?")+"offset="+offset);const bytes=Uint8Array.from(atob(data.data_base64),c=>c.charCodeAt(0));if(!bytes.length||data.next_offset!==offset+bytes.length)throw new Error("Fragment descărcare invalid");chunks.push(bytes);offset=data.next_offset;}
  downloadSIUIBlob(new Blob(chunks,{type:file.content_type}),file.filename);
 }
 async function loadSIUIHistory() {
@@ -7452,4 +7494,391 @@ async function showSIUIJob(id) {
   if(["queued","running"].includes(data.job.status)&&state.settingsSubView==="siui"&&state.currentView==="analytes")setTimeout(()=>poll().catch(e=>showToast(e.message,"error")),2000);
  };
  await poll();
+}
+
+// History uses the shared API adapter, including authenticated WSM remote control.
+async function loadHistoryPanel(){
+ const panel=document.getElementById("settings-panel-siui"), central=isHistoryMode();
+ const prefix=central?"/api/history/":"/api/siui-history-sync/";
+ panel.textContent="Se încarcă History…";
+ const cfg=await api(prefix+"settings");
+ const fields=central?[
+ ["tenant","Identificator organizație (tenant)"],["mysql_host","Server MySQL"],["mysql_port","Port MySQL"],["mysql_database","Baza de date (creată în prealabil)"],["mysql_user","Utilizator MySQL"],["mysql_password","Parolă MySQL","password"],["mysql_tls","TLS MySQL","select",["false","true"]],
+ ["storage","Stocare originale","select",["local","s3"]],["base_path","Calea de bază locală","text",null,"local"],["staging_path","Cale locală pentru transferuri în curs"],
+ ["s3_endpoint","Endpoint S3 (fără https://)","text",null,"s3"],["s3_bucket","Bucket S3","text",null,"s3"],["s3_region","Regiune S3","text",null,"s3"],["s3_prefix","Prefix în bucket","text",null,"s3"],["s3_access_key","Access key","text",null,"s3"],["s3_secret_key","Secret key","password",null,"s3"],["s3_session_token","Session token (opțional)","password",null,"s3"]
+ ]:[["enabled","Sincronizare activă","checkbox"],["url","URL HTTPS SIUI Bridge History"],["token","Cheie emisă de History pentru acest Bridge","password"],["ca_file","Fișier CA PEM (opțional, pentru autoritate privată)"],["retry_seconds","Interval inițial reîncercare (secunde)","number"]];
+ panel.innerHTML='<h2>'+ (central?'SIUI Bridge History':'Sincronizare SIUI Bridge History')+'</h2><p>Parolele lăsate goale păstrează valorile salvate. Testele folosesc configurația salvată.</p><form id="history-form"></form><p id="history-status" role="status"></p><pre id="history-result" style="white-space:pre-wrap;overflow-wrap:anywhere"></pre>';
+ const form=panel.querySelector("form");
+ for(const [key,label,type="text",options,storage] of fields){const wrap=document.createElement("label");wrap.style.display="block";wrap.style.margin="12px 0";wrap.textContent=label+" ";if(storage)wrap.dataset.storage=storage;const input=document.createElement(type==="select"?"select":"input");input.name=key;if(type==="select"){for(const value of options){const option=document.createElement("option");option.value=value;option.textContent=value;input.append(option)}}else input.type=type;input.value=cfg[key]??"";if(type==="checkbox")input.checked=!!cfg[key];if(type==="password")input.autocomplete="new-password";wrap.append(input);form.append(wrap)}
+ const save=document.createElement("button");save.textContent="Salvează";form.append(save);
+ const show=v=>panel.querySelector("#history-result").textContent=JSON.stringify(v,null,2);
+ const run=async(button,fn)=>{button.disabled=true;panel.querySelector("#history-status").textContent="Se procesează…";try{show(await fn());panel.querySelector("#history-status").textContent="Finalizat"}catch(e){panel.querySelector("#history-status").textContent=e.message}finally{button.disabled=false}};
+ form.onsubmit=e=>{e.preventDefault();run(save,async()=>{const data={...cfg};for(const [key,,type] of fields){const el=form.elements.namedItem(key);data[key]=type==="checkbox"?el.checked:type==="number"?Number(el.value):el.value}return api(prefix+"settings",{method:"PUT",body:JSON.stringify(data)})})};
+ function button(label,fn){const b=document.createElement("button");b.type="button";b.textContent=label;b.style.margin="8px";b.onclick=()=>run(b,fn);panel.append(b)}
+ if(central){const storage=form.elements.namedItem("storage");const toggle=()=>form.querySelectorAll("[data-storage]").forEach(el=>el.style.display=el.dataset.storage!==storage.value?"none":"block");storage.onchange=toggle;toggle();
+ button("Testează MySQL",()=>api(prefix+"test-db",{method:"POST"}));button("Testează scrierea și ștergerea",()=>api(prefix+"test-storage",{method:"POST"}));
+ const bridge=document.createElement("input");bridge.placeholder="ID Bridge unic, ex clinica-bridge-01";panel.append(bridge);button("Emite cheie Bridge",()=>api(prefix+"keys",{method:"POST",body:JSON.stringify({bridge:bridge.value})}));button("Listează bridge-uri autorizate",()=>api(prefix+"keys"));button("Revocă cheile acestui Bridge",()=>api(prefix+"keys?bridge="+encodeURIComponent(bridge.value),{method:"DELETE"}));
+ const filters=document.createElement("input");filters.placeholder="operation_id pentru căutare (opțional)";panel.append(filters);button("Interoghează ultimele 100 de apeluri",()=>api(prefix+"calls?operation_id="+encodeURIComponent(filters.value)));
+ }else{button("Testează conexiunea",()=>api(prefix+"test",{method:"POST"}));button("Starea cozii",()=>api(prefix+"status"));button("Reîncearcă acum",()=>api(prefix+"retry",{method:"POST"}))}
+}
+
+
+let siuiOperationsGeneration=0;
+function loadSIUIOperations() {
+ const generation=++siuiOperationsGeneration;
+ const alive=()=>generation===siuiOperationsGeneration&&state.currentView==="operations";
+ const view=document.getElementById("view-operations");
+ const now=new Date(), day=new Date(now.getTime()-now.getTimezoneOffset()*60000).toISOString().slice(0,10);
+ view.innerHTML=`<article class="panel full-span siui-workspace"><div class="siui-heading"><div><h2>Operations</h2><p>Jurnalul apelurilor CNAS · HTTP / WSM · ore locale</p></div><span class="siui-live">● Actualizare automată</span></div>${siuiPresetsHTML()}
+ <form id="siui-operations-filter" class="siui-filter-grid"><label>Din data <input name="day" type="date" value="${day}" required></label>
+ <label>Ora de început <input name="from" type="time" value="00:00" required></label><label>Până la data <input name="end_day" type="date" value="${day}" required></label><label>Ora finală (gol = ziua completă) <input name="to" type="time"></label>
+ <label class="wide">Operation ID <input name="operation_id" placeholder="Toate"></label><label>Operație <input name="operation" placeholder="getCatalogues"></label>
+ <label>Stare <select name="status"><option value="">Toate</option>${["queued","running","completed","failed","unknown"].map(s=>`<option>${s}</option>`).join("")}</select></label><div class="siui-filter-actions"><button type="submit" class="primary">Aplică filtrele</button><button type="button" id="siui-operations-reset">Resetează</button></div></form>
+ <div class="archive-summary"><p id="siui-operations-status" role="status"></p><div id="siui-operations-summary" class="siui-toolbar"></div></div><div class="siui-table-wrap"><table><thead><tr><th>Data / ora</th><th>Operație / ID</th><th>Execuție SIUI</th><th>Apelant / conexiune</th><th>Arhivare History</th><th>Detalii</th></tr></thead><tbody id="siui-operations-rows"></tbody></table></div>
+ <div class="siui-pagination"><span class="siui-subtle">100 de apeluri / pagină · click Detalii pentru cerere și răspuns</span><div class="siui-toolbar"><button id="siui-operations-prev">← Anterior</button><button id="siui-operations-next">Următor →</button></div></div>
+ <section id="siui-operation-details" class="siui-detail"></section></article>`;
+ const form=view.querySelector("form"),notice=view.querySelector("#siui-operations-status"),body=view.querySelector("tbody"),details=view.querySelector("#siui-operation-details");
+ let offset=0,busy=false,selected="",detailSequence=0,selectedStatus="",revision=0,rerun=false,appliedQuery=siuiOperationsQuery(form,0);
+ const dateText=v=>v?new Date(v).toLocaleString():"—";
+ const esc=v=>escapeHtml(String(v??""));
+ const showDetails=async id=>{
+  selected=id;const sequence=++detailSequence;
+  body.querySelectorAll("[data-call]").forEach(button=>button.closest("tr").classList.toggle("is-selected",button.dataset.call===id));
+  try {
+   const data=await api("/api/siui/operations/"+encodeURIComponent(id));if(!alive()||sequence!==detailSequence)return;
+   const c=data.call;selectedStatus=c.status;
+   details.innerHTML=`<h3>${esc(c.operation)} · ${esc(c.operation_id)}</h3><p>Call ID: ${esc(c.id)} · ${siuiTag(c.status)} · ${esc(c.owner)}</p>
+   <p>Sursă: ${esc(c.source.transport)} · utilizator/subiect: ${esc(c.source.subject||c.owner)} · IP: ${esc(c.source.ip||"indisponibil")} · conexiune: ${esc(c.source.connection_id||"—")}</p>
+   <ol>${(c.events||[]).map(e=>`<li>${siuiTag(e.status)} — ${e.snapshot?"stare existentă înaintea activării jurnalului; ora tranziției necunoscută":esc(dateText(e.at))}${e.error?": "+esc(e.error):""}</li>`).join("")}</ol>
+   <div class="siui-json-grid"><details open><summary>Cererea primită</summary><pre style="white-space:pre-wrap;overflow-wrap:anywhere">${esc(JSON.stringify(c.parameters,null,2))}</pre></details>
+   <details open><summary>Rezultat / eroare</summary><pre style="white-space:pre-wrap;overflow-wrap:anywhere">${esc(JSON.stringify({result:c.result,error:c.error},null,2))}</pre></details></div>
+   <p>History: ${siuiTag(c.history.status)} · încercări ${esc(c.history.attempts)} · ${esc(c.history.error||"")}</p>
+   <button id="siui-operation-history">Deschide istoricul și fișierele</button><div id="siui-operation-archive"></div>`;
+   for(const file of c.request_files||[]){const button=document.createElement("button");button.textContent="Descarcă cererea: "+file.filename;button.onclick=()=>downloadSIUIFile(file).catch(e=>showToast(e.message,"error"));details.append(button);}
+   const file=c.result?.file;
+   if(file?.path){const button=document.createElement("button");button.textContent="Descarcă fișierul local";button.onclick=()=>downloadSIUIFile({...file,path:"/api/siui/operations/"+encodeURIComponent(c.id)+"/file"}).catch(e=>showToast(e.message,"error"));details.append(button);}
+   details.querySelector("#siui-operation-history").onclick=async()=>{
+    const area=details.querySelector("#siui-operation-archive");area.textContent="Se încarcă History…";
+    try {const h=await api(c.history_path);if(!alive()||sequence!==detailSequence)return;
+     area.innerHTML=`<pre style="white-space:pre-wrap;overflow-wrap:anywhere">${esc(JSON.stringify(h,null,2))}</pre>`;
+     const requestButton=document.createElement("button");requestButton.textContent="Vezi cererea arhivată";requestButton.onclick=async()=>{try{const request=await api(c.history_path+"/request");const pre=document.createElement("pre");pre.style.whiteSpace="pre-wrap";pre.textContent=JSON.stringify(request.parameters,null,2);area.append(pre);}catch(e){showToast(e.message,"error");}};area.append(requestButton);
+     for(const a of h.record?.artifacts||[]){const link=document.createElement("a");link.textContent="Descarcă "+(a.filename||a.name)+" ("+a.size+" bytes)";link.href=c.history_path+"/"+encodeURIComponent(a.name);link.style.display="block";
+      if(window.WSM_REMOTE){link.onclick=event=>{event.preventDefault();downloadSIUIFile({path:link.getAttribute("href"),filename:a.filename||(a.name==="record-gzip"?"record.json.gz":a.name),size:a.size,content_type:a.content_type,chunk_size:262144}).catch(e=>showToast(e.message,"error"));};}area.append(link);}
+    }catch(e){area.textContent=e.message;}
+   };
+  }catch(e){if(alive())details.textContent=e.message;}
+ };
+ const refresh=async()=>{
+  if(!alive())return;if(busy){rerun=true;return;}busy=true;const version=revision;
+  try{const q=new URLSearchParams(appliedQuery);q.set("offset",String(offset));
+   const data=await api("/api/siui/operations?"+q);if(!alive()||version!==revision)return;
+   notice.textContent=`${data.total} apeluri · ${data.calls.length?offset+1:0}–${offset+data.calls.length} · actualizare automată la 3 secunde`;
+   view.querySelector("#siui-operations-summary").innerHTML=siuiOperationSummary(data.calls);
+   body.innerHTML=data.calls.map(c=>`<tr class="${selected===c.id?"is-selected":""}"><td>${esc(dateText(c.created_at))}</td><td><strong>${esc(c.operation)}</strong><code title="${esc(c.operation_id)}">${esc(c.operation_id)}</code>${c.error?`<span class="siui-inline-error" title="${esc(c.error)}">${esc(c.error)}</span>`:""}</td><td>${siuiTag(c.status)}</td><td><div class="siui-toolbar">${siuiTag("",c.source.transport)}<span>${esc(c.source.subject||c.owner)}</span></div><div class="siui-subtle">${esc(c.source.ip||"IP indisponibil")}</div><code title="${esc(c.source.connection_id||"")}">${esc(c.source.connection_id||"")}</code></td><td>${siuiTag(c.history.status)}<div class="siui-subtle">${c.history.attempts||0} încercări</div>${c.history.error?`<span class="siui-inline-error" title="${esc(c.history.error)}">${esc(c.history.error)}</span>`:""}</td><td><button data-call="${esc(c.id)}">Detalii ↗</button></td></tr>`).join("")||'<tr><td colspan="6" class="siui-empty">Niciun apel pentru filtrele selectate.</td></tr>';
+   body.querySelectorAll("[data-call]").forEach(b=>b.onclick=()=>showDetails(b.dataset.call));
+   view.querySelector("#siui-operations-prev").disabled=offset===0;view.querySelector("#siui-operations-next").disabled=data.next_offset>=data.total;
+   if(selected&&["queued","running"].includes(selectedStatus))await showDetails(selected);
+  }catch(e){if(alive())notice.textContent=e.message;}finally{busy=false;if(rerun&&alive()){rerun=false;refresh();}}
+ };
+ const applyFilters=()=>{try{appliedQuery=siuiOperationsQuery(form,0);offset=0;selected="";++detailSequence;details.textContent="";revision++;refresh();}catch(error){notice.textContent=error.message;}};
+ const choosePeriod=key=>{if(key!=="custom"){const range=siuiPresetRange(key);form.elements.namedItem("day").value=siuiLocalDay(range.from);form.elements.namedItem("end_day").value=siuiLocalDay(new Date(range.to-1));form.elements.namedItem("from").value="00:00";form.elements.namedItem("to").value="";applyFilters();}view.querySelectorAll("[data-period]").forEach(b=>b.classList.toggle("active",b.dataset.period===key));};
+ view.querySelectorAll("[data-period]").forEach(button=>button.onclick=()=>choosePeriod(button.dataset.period));
+ form.onchange=event=>{if(["day","end_day","from","to"].includes(event.target.name))view.querySelectorAll("[data-period]").forEach(b=>b.classList.toggle("active",b.dataset.period==="custom"));};
+ view.querySelector("#siui-operations-reset").onclick=()=>{form.reset();choosePeriod("today");};
+ form.onsubmit=e=>{e.preventDefault();applyFilters();};
+ view.querySelector("#siui-operations-prev").onclick=()=>{if(busy)return;offset=Math.max(0,offset-100);revision++;refresh();};
+ view.querySelector("#siui-operations-next").onclick=()=>{if(busy)return;offset+=100;revision++;refresh();};
+ const tick=async()=>{await refresh();if(alive())setTimeout(tick,3000);};tick();
+}
+
+let centralHistoryGeneration = 0;
+function centralHistoryPeriod(form) {
+ const fields = new FormData(form), from = new Date(fields.get("from")), to = new Date(fields.get("to"));
+ if (!Number.isFinite(from.getTime()) || !Number.isFinite(to.getTime()) || from >= to) throw new Error("Selectează un interval valid: începutul trebuie să fie înainte de final.");
+ const query = new URLSearchParams({from: from.toISOString(), to: to.toISOString(), to_exclusive:"1"});
+ for (const key of ["bridge", "operation", "operation_id", "call_id", "status", "operation_status", "time_field"]) if (String(fields.get(key) || "").trim()) query.set(key, String(fields.get(key)).trim());
+ return query;
+}
+function loadCentralHistory() {
+ const generation = ++centralHistoryGeneration;
+ const alive = () => generation === centralHistoryGeneration && state.currentView === "history";
+ const view = document.getElementById("view-history"), now = new Date();
+ const selection=centralHistorySelection;centralHistorySelection=null;
+ const local = date => new Date(date.getTime() - date.getTimezoneOffset()*60000).toISOString().slice(0,19);
+ const start = new Date(now); start.setHours(0,0,0,0);
+ view.innerHTML = `<article class="panel full-span siui-workspace"><div class="siui-heading"><div><h2>Istoric operații</h2><p>Operații și fișiere primite de la bridge-uri · ore locale</p></div><span class="siui-subtle">Rezultatul SIUI și arhivarea sunt afișate separat</span></div>${siuiPresetsHTML()}
+ <form id="central-history-filter" class="siui-filter-grid"><label class="wide">Început <input name="from" type="datetime-local" step="1" value="${local(start)}" required></label>
+ <label class="wide">Final (exclusiv) <input name="to" type="datetime-local" step="1" value="${local(new Date(start.getFullYear(),start.getMonth(),start.getDate()+1))}" required></label>
+ <label>ID Bridge <input name="bridge" placeholder="Toate"></label><label>Operație <input name="operation" placeholder="Toate"></label><label class="wide">ID operație <input name="operation_id" placeholder="Toate"></label>
+ <label>Rezultat SIUI <select name="operation_status"><option value="">Toate</option><option value="completed">Reușit · completed</option><option value="failed">Eșuat · failed</option><option value="unknown">Incert · unknown</option></select></label>
+ <label>Arhivare <select name="status"><option value="">Toate</option><option value="archived">Arhivat</option><option value="pending">În transfer</option></select></label>
+ <label>Data folosită <select name="time_field"><option value="created_at">Data operației SIUI</option><option value="received_at">Primirea în History</option></select></label><input name="call_id" type="hidden"><div class="siui-filter-actions"><button type="submit" class="primary">Aplică filtrele</button><button type="button" id="central-history-reset">Resetează</button></div></form>
+ <div class="archive-summary"><p id="central-history-status" role="status"></p><span class="siui-subtle">100 apeluri / pagină</span></div><div class="siui-table-wrap"><table><thead><tr><th>Data / ora</th><th>Bridge / apelant</th><th>Operație / ID</th><th>Rezultat SIUI</th><th>Arhivare</th><th>Fișiere</th><th></th></tr></thead><tbody></tbody></table></div>
+ <div class="siui-pagination"><span class="siui-subtle">Selectează un apel pentru detalii și fișiere</span><div class="siui-toolbar"><button id="central-history-prev" disabled>← Anterior</button><button id="central-history-next" disabled>Următor →</button></div></div><section id="central-history-details" class="siui-detail"></section></article>`;
+ const form = view.querySelector("form"), notice = view.querySelector("#central-history-status"), body = view.querySelector("tbody"), details = view.querySelector("#central-history-details");
+ const prev = view.querySelector("#central-history-prev"), next = view.querySelector("#central-history-next");
+ const esc = value => escapeHtml(String(value ?? ""));
+ if(selection){for(const key of ["bridge","call_id","time_field"])if(selection[key])form.elements.namedItem(key).value=selection[key];if(selection.from)form.elements.from.value=local(selection.from);if(selection.to)form.elements.to.value=local(selection.to);view.querySelectorAll("[data-period]").forEach(b=>b.classList.toggle("active",b.dataset.period==="custom"));}
+ let offset = 0, query = centralHistoryPeriod(form), busy = false, detailSequence = 0,revision=0,rerun=null;
+ const show = async call => {
+  const sequence = ++detailSequence; details.textContent = "Se încarcă detaliile…";
+  body.querySelectorAll("[data-index]").forEach(button=>button.closest("tr").classList.toggle("is-selected",button.dataset.callId===call.call_id&&button.dataset.bridge===call.bridge));
+  const path = "/api/history/calls/" + encodeURIComponent(call.call_id), bridge = "?bridge=" + encodeURIComponent(call.bridge);
+  try {
+   const data = await api(path + bridge); if (!alive() || sequence !== detailSequence) return;
+   const rec = data.record;
+   details.innerHTML = `<h3>${esc(rec.operation)} · ${esc(rec.operation_id)}</h3><p>Bridge: ${esc(call.bridge)} · apelant: ${esc(rec.owner || "indisponibil")} · sursă: ${esc(rec.source_ip || "indisponibil")}</p>
+   <div class="archive-summary"><span>Call ID: ${esc(rec.call_id)}</span>${siuiTag(rec.status)}${siuiTag(data.delivery.status)}</div><h4>Fișiere</h4><div id="central-history-files"></div>
+   <details><summary>Manifest și detalii</summary><pre style="white-space:pre-wrap;overflow-wrap:anywhere">${esc(JSON.stringify(data,null,2))}</pre></details>`;
+   const requestSection=document.createElement("details");requestSection.open=true;requestSection.innerHTML='<summary>Cererea trimisă către SIUI</summary><button type="button">Afișează parametrii cererii</button><pre style="white-space:pre-wrap;overflow-wrap:anywhere;max-height:420px;overflow:auto"></pre>';details.prepend(requestSection);
+   requestSection.querySelector("button").onclick=async()=>{const pre=requestSection.querySelector("pre");try{const request=await api(path+"/request"+bridge);if(sequence===detailSequence)pre.textContent=JSON.stringify(request.parameters,null,2);}catch(e){pre.textContent=e.message;}};
+   const files = details.querySelector("#central-history-files");
+   if (!rec.artifacts?.length) files.textContent = "Nu sunt fișiere asociate.";
+   for (const artifact of rec.artifacts || []) {
+    const button = document.createElement("button");
+    button.className="archive-file-button";button.textContent = `Descarcă ${artifact.filename||artifact.name} (${archiveBytes(artifact.size)})`;
+    button.disabled = data.delivery.status !== "archived";
+    if (button.disabled) button.title = "Transferul către arhivă nu este încă finalizat.";
+    button.onclick = async () => {
+     button.disabled = true;
+     try { await downloadSIUIFile({path:path+"/files/"+encodeURIComponent(artifact.name)+bridge+"&format=json", size:artifact.size, filename:artifact.filename||(rec.call_id+"-"+artifact.name+(artifact.name==="record-gzip"?".json.gz":"")), content_type:artifact.content_type||"application/octet-stream"}); }
+     catch (error) { showToast(error.message,"error"); } finally { button.disabled = false; }
+    };
+    files.append(button);
+   }
+  } catch (error) { if (alive() && sequence === detailSequence) details.textContent = error.message; }
+ };
+ const refresh = async target => {
+  if(!alive())return;if(busy){rerun=target;return;}busy=true;const version=revision;prev.disabled=next.disabled=true;form.querySelector("button").disabled=true;
+  notice.textContent = "Se încarcă istoricul…";
+  try {
+   const params = new URLSearchParams(query); params.set("offset", String(target));
+   const data = await api("/api/history/calls?" + params); if (!alive()||version!==revision) return;
+   offset = target; details.textContent = ""; ++detailSequence;
+   notice.textContent = data.calls.length ? `Apeluri ${offset+1}–${offset+data.calls.length}` : "Nicio operație în intervalul selectat.";
+   body.innerHTML = data.calls.map((call,index) => `<tr><td>${esc(formatDate(query.get("time_field")==="received_at"?call.received_at:call.created_at))}</td><td><strong>${esc(call.bridge)}</strong><div class="siui-subtle">${esc(call.owner || "indisponibil")}</div></td><td><strong>${esc(call.operation)}</strong><code title="${esc(call.operation_id)}">${esc(call.operation_id)}</code></td><td>${siuiTag(call.operation_status)}</td><td>${siuiTag(call.status)}</td><td>${call.artifacts?.length || 0}<div class="siui-subtle">${archiveBytes((call.artifacts||[]).reduce((n,a)=>n+a.size,0))}</div></td><td><button data-index="${index}" data-call-id="${esc(call.call_id)}" data-bridge="${esc(call.bridge)}">Detalii ↗</button></td></tr>`).join("")||'<tr><td colspan="7" class="siui-empty">Nicio operație pentru filtrele selectate.</td></tr>';
+   body.querySelectorAll("[data-index]").forEach(button => button.onclick = () => show(data.calls[Number(button.dataset.index)]));
+   prev.disabled = offset === 0; next.disabled = !data.has_more;
+   if(selection?.call_id&&query.get("call_id")===selection.call_id&&target===0)await show({bridge:selection.bridge,call_id:selection.call_id});
+  } catch (error) { if (alive()) { notice.textContent = error.message; body.textContent = ""; details.textContent = ""; ++detailSequence; } }
+  finally { busy = false; form.querySelector("button").disabled = false;if(rerun!==null&&alive()){const target=rerun;rerun=null;refresh(target);} }
+ };
+ const apply=()=>{try{query=centralHistoryPeriod(form);revision++;refresh(0);}catch(error){notice.textContent=error.message;}};
+ form.onsubmit=event=>{event.preventDefault();apply();};
+ form.oninput=event=>{if(["from","to"].includes(event.target.name))view.querySelectorAll("[data-period]").forEach(b=>b.classList.toggle("active",b.dataset.period==="custom"));};
+ const choosePeriod=key=>{view.querySelectorAll("[data-period]").forEach(b=>b.classList.toggle("active",b.dataset.period===key));if(key==="custom"){form.elements.from.focus();return;}const period=siuiPresetRange(key);form.elements.from.value=local(period.from);form.elements.to.value=local(period.to);form.elements.call_id.value="";apply();};
+ view.querySelectorAll("[data-period]").forEach(button=>button.onclick=()=>choosePeriod(button.dataset.period));
+ view.querySelector("#central-history-reset").onclick=()=>{form.reset();form.elements.call_id.value="";choosePeriod("today");};
+ prev.onclick = () => refresh(Math.max(0,offset-100)); next.onclick = () => refresh(offset+100);
+ refresh(0);
+}
+
+let historyDebugGeneration = 0;
+async function loadHistoryDebug() {
+ const generation = ++historyDebugGeneration, view = document.getElementById("view-debug");
+ let panel = document.getElementById("history-debug-panel");
+ if (!panel) { panel = document.createElement("article"); panel.id = "history-debug-panel"; panel.className = "panel full-span"; view.append(panel); }
+ for (const child of view.children) child.hidden = child !== panel;
+ panel.innerHTML = `<h2>Cereri primite de la bridge-uri</h2><p>Ultimele 1000 de cereri, de la pornirea History. Actualizare la 3 secunde. Testele de identitate nu confirmă transferul sau accesul MySQL/stocare. Dacă nu apar cereri, verifică sincronizarea activă, încercările și eroarea din coada Bridge.</p>
+ <label>ID Bridge <input id="history-debug-bridge" placeholder="Toate"></label><p role="status"></p><div style="overflow:auto"><table><thead><tr><th>Data / ora</th><th>Bridge / IP</th><th>Cerere</th><th>HTTP / durată</th><th>Detalii</th></tr></thead><tbody></tbody></table></div>`;
+ const alive = () => generation === historyDebugGeneration && state.currentView === "debug" && isHistoryMode();
+ const tick = async () => {
+  try {
+   const data = await api("/api/history/debug/requests?bridge="+encodeURIComponent(panel.querySelector("input").value.trim()));
+   if (!alive()) return;
+   panel.querySelector("p[role]").textContent = `${data.requests.length} cereri · jurnal temporar; cheile și conținutul fișierelor nu sunt înregistrate`;
+   const esc = value => escapeHtml(String(value ?? ""));
+   panel.querySelector("tbody").innerHTML = data.requests.map(req => `<tr><td>${esc(formatDate(req.at))}</td><td>${esc(req.bridge || "neautentificat")}<br>${esc(req.ip)}</td><td>${esc(req.method)} ${esc(req.path)}<br>${req.offset ? "offset="+esc(req.offset) : ""}</td><td>${req.status} · ${req.duration_ms} ms</td><td>${esc(req.error || "")}<br>${esc(req.operation || "")} ${esc(req.operation_id || "")}<br>${req.bytes} bytes primiți</td></tr>`).join("");
+  } catch (error) { if (alive()) panel.querySelector("p[role]").textContent = error.message; }
+  if (alive()) setTimeout(tick,3000);
+ };
+ await tick();
+}
+
+function siuiTag(status,label) {
+ const known=["queued","running","completed","failed","unknown","pending","sending","delivered","archived","expired","cached","authenticating","online","offline","error"];
+ return `<span class="siui-tag ${known.includes(status)?status:""}">${escapeHtml(String(label||status||"—"))}</span>`;
+}
+function siuiLocalDay(date=new Date()){return new Date(date.getTime()-date.getTimezoneOffset()*60000).toISOString().slice(0,10);}
+function siuiPresetRange(preset,now=new Date()) {
+ const start=new Date(now.getFullYear(),now.getMonth(),now.getDate()),end=new Date(start);end.setDate(end.getDate()+1);
+ if(preset==="yesterday"){start.setDate(start.getDate()-1);end.setDate(end.getDate()-1);}
+ if(preset==="week")start.setDate(start.getDate()-(start.getDay()+6)%7);
+ if(preset==="seven")start.setDate(start.getDate()-6);
+ if(preset==="month")start.setDate(1);
+ return {from:start,to:end};
+}
+function siuiPresetsHTML(){return `<div class="siui-presets">${[["today","Azi"],["yesterday","Ieri"],["week","Săptămâna curentă"],["seven","Ultimele 7 zile"],["month","Luna curentă"],["custom","Personalizat"]].map(([key,label])=>`<button type="button" data-period="${key}" class="${key==="today"?"active":""}">${label}</button>`).join("")}</div>`;}
+function siuiChartSVG(rows,from,to) {
+ const colors={completed:"#269c78",failed:"#e06b71",unknown:"#dca74a",queued:"#b9c8c0",running:"#5797ce"};
+ const width=720,height=210,pad=32,bottom=27,count=Math.max(1,Math.ceil((new Date(to)-new Date(from))/3600000));
+ const group=count>48?24:1,n=Math.ceil(count/group),values=Array.from({length:n},()=>({}));
+ for(const row of rows){const i=Math.floor((new Date(row.at)-new Date(from))/3600000/group);if(i>=0&&i<n)values[i][row.status]=(values[i][row.status]||0)+row.count;}
+ const max=Math.max(1,...values.map(v=>Object.values(v).reduce((a,b)=>a+b,0))),chartH=height-bottom-12,barW=(width-pad-8)/n;
+ let svg=`<svg class="siui-chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="Apeluri pe interval, grupate după starea curentă">`;
+ for(let i=0;i<4;i++){const y=12+chartH*i/3;svg+=`<line x1="${pad}" x2="${width}" y1="${y}" y2="${y}" stroke="#e6eee9"/><text x="0" y="${y+4}">${Math.round(max*(1-i/3))}</text>`;}
+ values.forEach((v,i)=>{let y=height-bottom;const date=new Date(new Date(from).getTime()+i*group*3600000);for(const [s,color]of Object.entries(colors)){const h=(v[s]||0)/max*chartH;y-=h;if(h)svg+=`<rect x="${pad+i*barW+2}" y="${y}" width="${Math.max(1,barW-5)}" height="${h}" rx="2" fill="${color}"><title>${escapeHtml(date.toLocaleString())} · ${s}: ${v[s]}</title></rect>`;}if(i%Math.max(1,Math.ceil(n/12))===0)svg+=`<text x="${pad+i*barW+barW/2}" y="${height-7}" text-anchor="middle">${group===1?String(date.getHours()).padStart(2,"0")+":00":date.getDate()+"/"+(date.getMonth()+1)}</text>`;});return svg+"</svg>";
+}
+let siuiDashboardGeneration=0;
+function mountSIUIDashboard(){
+ const generation=++siuiDashboardGeneration,view=els.views.overview;
+ let panel=document.getElementById("siui-dashboard");if(!panel){panel=document.createElement("article");panel.id="siui-dashboard";panel.className="full-span siui-workspace";view.append(panel);}
+ for(const child of view.children)child.hidden=child!==panel;
+ panel.innerHTML=`<div class="siui-heading"><div><h2>SIUI Bridge</h2><p>Centru operațional · CNAS / PIAS</p></div><div class="siui-toolbar"><span id="siui-dashboard-live" class="siui-live">Se încarcă…</span><button id="siui-dashboard-operations">Operations ↗</button></div></div>${siuiPresetsHTML()}<div class="siui-toolbar" id="siui-dashboard-custom" hidden><label>De la <input type="date" id="siui-dash-from"></label><label>Până la <input type="date" id="siui-dash-to"></label><button id="siui-dash-apply">Aplică</button></div><div id="siui-dashboard-notice" role="status"></div><div id="siui-dashboard-cards" class="siui-dashboard-grid"></div>`;
+ const alive=()=>generation===siuiDashboardGeneration&&state.currentView==="overview"&&!els.dashboardView.hidden;
+ let period=siuiPresetRange("today"),busy=false,probing=false,ocspTesting=false,lastProbe=0,data=null,storage=null,storageBusy=false,storageLoaded=false;
+ const esc=v=>escapeHtml(String(v??"")),date=v=>v?new Date(v).toLocaleString():"—";
+ const notice=panel.querySelector("#siui-dashboard-notice"),cards=panel.querySelector("#siui-dashboard-cards"),live=panel.querySelector("#siui-dashboard-live");
+ panel.querySelector("#siui-dashboard-operations").onclick=()=>activateView("operations");
+ const probe=async()=>{if(probing)return;probing=true;lastProbe=Date.now();const btn=cards.querySelector("[data-check]");if(btn)setButtonLoading(btn,true);try{await api("/api/siui/dashboard/checks",{method:"POST",body:"{}"});}catch(e){if(alive())notice.textContent="Verificare HTTPS: "+e.message;}finally{probing=false;if(alive())refresh();}};
+ const rowButtons=()=>cards.querySelectorAll("[data-open-call]").forEach(btn=>btn.onclick=()=>{const record=[...(data.queue||[]),...(data.recent_failures||[])].find(c=>c.id===btn.dataset.openCall);activateView("operations");const form=document.getElementById("siui-operations-filter");if(record&&form){const day=siuiLocalDay(new Date(record.created_at));form.elements.namedItem("day").value=day;form.elements.namedItem("end_day").value=day;form.elements.namedItem("operation_id").value=record.operation_id;form.requestSubmit();}});
+ const loadStorage=async(clean=false)=>{
+  if(storageBusy)return;
+  if(clean&&!window.confirm("Ștergi copiile locale confirmate în History? Fișierele nearchivate sau necesare callbackurilor vor fi păstrate."))return;
+  storageBusy=true;render();
+  try{const response=await api("/api/siui/downloads/storage",clean?{method:"POST",body:JSON.stringify({confirm:true})}:{});storage=response;
+   if(clean){notice.textContent=`Șterse ${response.storage.removed_files} fișiere (${(response.storage.removed_bytes/1e6).toFixed(1)} MB). ${(response.storage.errors||[]).join("; ")}`;storage=await api("/api/siui/downloads/storage");}
+  }catch(e){notice.textContent=e.message;}finally{storageBusy=false;if(alive())render();}
+ };
+ const render=()=>{
+  const c=data.counts||{},total=Object.values(c).reduce((a,b)=>a+b,0),done=c.completed||0,failed=c.failed||0,unknown=c.unknown||0,finished=done+failed+unknown,rate=finished?Math.round(done/finished*100):null;
+  const rt=data.runtime,oc=data.ocsp,active=data.queue||[],queue=active.filter(c=>c.status==="queued");
+  const oldest=queue.length?Math.max(0,Math.round((Date.now()-new Date(queue[0].created_at))/1000)):0;
+  const age=s=>s>=3600?(s/3600).toFixed(1)+" h":s>=60?Math.round(s/60)+" min":s+" sec";
+  const ocLabels={cached:"Sesiune OCSP activă",expired:"Sesiune expirată",not_tested:"Netestat în acest proces",failed:"Autentificare eșuată",authenticating:"Autentificare în curs"};
+  const history=data.deliveries.siui_history_outbox||{},callbacks=data.deliveries.siui_wm_callbacks||{},ws=state.wss?.snapshot?.status;
+  const byOp={};for(const r of data.by_operation){const o=byOp[r.operation]||(byOp[r.operation]={total:0,completed:0,failed:0,unknown:0,ms:0,measured:0});o.total+=r.count;o[r.status]=(o[r.status]||0)+r.count;if(r.average_seconds){o.ms+=r.average_seconds*r.count;o.measured+=r.count;}}
+  const breakdown=Object.entries(byOp).sort((a,b)=>b[1].total-a[1].total).slice(0,8);
+  const legend=`<div class="siui-legend"><span><i style="background:#269c78"></i>Completed</span><span><i style="background:#e06b71"></i>Failed</span><span><i style="background:#dca74a"></i>Unknown</span><span><i style="background:#5797ce"></i>Running</span><span><i style="background:#b9c8c0"></i>Queued</span></div>`;
+  const percent=rt.capacity?Math.round(rt.queued/rt.capacity*100):0;
+  cards.innerHTML=`<div class="siui-dashboard-banner"><div><h3>${data.configured?"Configurare CNAS completă":"Configurarea CNAS trebuie completată"}</h3><p>${data.scope==="all"?"Toate apelurile bridge-ului":"Statistici pentru apelurile tale"} · ${date(data.from)} — ${date(data.to)} (exclusiv)</p></div>${siuiTag(rt.active?"running":"online",rt.active?"Bridge activ":"Bridge disponibil")}</div>
+  <article class="siui-card kpi"><span class="siui-kpi-label">APELURI ÎN INTERVAL</span><p class="siui-kpi-number">${total}</p><small>${c.queued||0} queued · ${c.running||0} running în selecție</small></article>
+  <article class="siui-card kpi"><span class="siui-kpi-label">EXECUȚII REUȘITE</span><p class="siui-kpi-number siui-good">${done}</p><small>Completed · răspuns primit și procesat</small></article>
+  <article class="siui-card kpi"><span class="siui-kpi-label">EXECUȚII EȘUATE</span><p class="siui-kpi-number siui-bad">${failed}</p><small>${unknown} cu rezultat incert (unknown)</small></article>
+  <article class="siui-card kpi"><span class="siui-kpi-label">RATA DE FINALIZARE CU SUCCES</span><p class="siui-kpi-number">${rate===null?"—":rate+"%"}</p><small>Completed / (completed + failed + unknown)</small></article>
+  <article class="siui-card half"><div class="siui-card-head"><h3>Activitate în timp</h3><small>După data creării</small></div>${siuiChartSVG(data.hourly,data.from,data.to)}${legend}${total?"":"<p class='siui-subtle'>Niciun apel în perioada selectată.</p>"}</article>
+  <article class="siui-card half"><div class="siui-card-head"><h3>Distribuția stărilor</h3><small>${total} apeluri</small></div><div class="siui-ring-layout"><div class="siui-ring" style="background:conic-gradient(#269c78 0 ${total?done/total*100:0}%,#e06b71 0 ${total?(done+failed)/total*100:0}%,#dca74a 0 ${total?(done+failed+unknown)/total*100:0}%,#5797ce 0 ${total?(done+failed+unknown+(c.running||0))/total*100:0}%,#b9c8c0 0 100%)"><strong>${rate===null?"—":rate+"%"}</strong></div><div>${["completed","failed","unknown","running","queued"].map(s=>`<div class="siui-stat-row">${siuiTag(s)}<strong>${c[s]||0}</strong></div>`).join("")}</div></div><p class="siui-subtle" style="margin-top:16px">Completed nu garantează acceptarea medicală sau decontarea; verifică erorile de business din răspunsul CNAS.</p></article>
+  <article class="siui-card"><div class="siui-card-head"><h3>Încărcare bridge</h3>${siuiTag(rt.active?"running":"online",rt.active?"În lucru":"Liber")}</div><p class="siui-kpi-number">${rt.active}<small> în execuție</small></p><div class="siui-stat-row"><span>Cozi în memorie (global)</span><strong>${rt.queued} / ${rt.capacity}</strong></div><div class="siui-meter"><span style="width:${percent}%"></span></div><small>${percent}% din capacitatea cozilor · ${rt.pending} operații active + în așteptare</small><div class="siui-stat-row"><span>Cea mai veche așteptare vizibilă</span><strong>${queue.length?age(oldest):"—"}</strong></div><small>Încărcarea se referă la operații, nu la utilizarea CPU.</small></article>
+  <article class="siui-card"><div class="siui-card-head"><h3>Autentificare OCSP</h3>${siuiTag(oc.state,ocLabels[oc.state])}</div><div class="siui-stat-row"><span>Ultimul succes</span><strong>${date(oc.last_success)}</strong></div><div class="siui-stat-row"><span>Ultima încercare</span><strong>${date(oc.last_attempt)}</strong></div><div class="siui-stat-row"><span>Sesiune reutilizabilă</span><strong>${oc.remaining_seconds!==undefined?oc.remaining_seconds+" sec":"—"}</strong></div><div class="siui-stat-row"><span>PIN salvat</span>${siuiTag(data.pin.suspended?"failed":"",data.pin.suspended?"Suspendat":data.pin.saved?"Configurat":"Manual")}</div><button data-ocsp ${!data.admin||ocspTesting||rt.pending?"disabled":""}>${ocspTesting?"Autentificare în curs…":"Testează autentificarea OCSP"}</button><p class="siui-subtle" style="margin-top:10px">Test manual; poate solicita PIN. Sesiunea expirată nu înseamnă că OCSP este indisponibil.</p></article>
+  <article class="siui-card"><div class="siui-card-head"><h3>WSM & livrări</h3>${siuiTag(ws?.connected?"online":"unknown",ws?.connected?"WSM conectat":ws?.phase||"Stare WSM indisponibilă")}</div><div class="siui-stat-row"><span>History</span><strong>${data.history_enabled?"Activ":"Dezactivat"}</strong></div><div class="siui-stat-row"><span>În așteptare History</span><strong>${history.pending||0}</strong></div><div class="siui-stat-row"><span>Arhivări livrate</span><strong>${history.archived||0}</strong></div><div class="siui-stat-row"><span>Callback WiseMED în așteptare</span><strong>${(callbacks.pending||0)+(callbacks.sending||0)}</strong></div><div class="siui-stat-row"><span>Callback WiseMED eșuat</span><strong class="siui-bad">${callbacks.failed||0}</strong></div><small>Cozile de livrare sunt independente de intervalul selectat. ${esc(ws?.last_error||"")}</small></article>
+  ${data.admin?`<article class="siui-card full"><div class="siui-card-head"><div><h3>Spațiu local · descărcări SIUI</h3><small>Procent din totalul descărcărilor locale, nu din capacitatea discului</small></div><button data-storage-refresh ${storageBusy?"disabled":""}>${storageBusy?"Se procesează…":"Actualizează spațiul"}</button></div>${storage?(()=>{const s=storage.storage,fmt=b=>b>=1e9?(b/1e9).toFixed(2)+" GB":(b/1e6).toFixed(2)+" MB",p=storage.percent_archived;return `<div class="siui-ring-layout"><div class="siui-ring" style="background:conic-gradient(#269c78 0 ${p}%,#dca74a 0 100%)"><strong>${p.toFixed(1)}%</strong></div><div><p><strong>${fmt(s.bytes)}</strong> · ${s.files} fișiere locale</p><p class="siui-good">Eliberabil: ${fmt(s.archived_bytes)} · ${s.archived_files} fișiere (${p.toFixed(1)}%)</p><p>Protejat / nearchivat: ${fmt(s.protected_bytes)} (${s.bytes?(100-p).toFixed(1):"0"}%)</p><button data-storage-clean ${storageBusy||!s.archived_files?"disabled":""}>Șterge copiile locale arhivate</button></div></div><p class="siui-subtle">${esc(storage.root)} / AN / LUNĂ / AAAA-LL-ZZ · fișierele vechi sunt reorganizate automat. ${(s.errors||[]).map(esc).join("; ")}</p>`})():"<p>Se încarcă informațiile despre spațiu…</p>"}<p class="siui-subtle">Se verifică arhivarea, callbackurile și SHA-256 înainte de ștergere. Istoricul și cererile rămân disponibile; fișierele eliminate se descarcă ulterior din History.</p></article>`:""}
+  <article class="siui-card full"><div class="siui-card-head"><div><h3>Endpointuri CNAS</h3><p class="siui-subtle">Sonde HTTPS fără certificat client · verificare strictă TLS · nu folosesc PIN-ul</p></div><button data-check ${!data.admin||probing?"disabled":""}>${probing?"Se verifică…":"Verifică URL-urile"}</button></div><div class="siui-health-grid">${data.endpoints.map(e=>{const evidence=data.endpoint_evidence[e.service]||{};const state=!e.checked_at?"unknown":e.reachable?(e.http_status>=500?"failed":e.http_status>=300?"unknown":"online"):"failed";return `<div class="siui-endpoint"><div class="siui-stat-row"><strong>${esc(e.service)}</strong>${siuiTag(state,!e.checked_at?"Netestat":e.reachable?"HTTP "+e.http_status:"Conexiune neconfirmată")}</div><div class="siui-url">${esc(e.url)}</div><div class="siui-subtle">Sondă: ${date(e.checked_at)} ${e.checked_at?"· "+e.latency_ms+" ms":""}</div>${e.error?`<p class="siui-subtle siui-bad">${esc(e.error)}</p>`:""}<div class="siui-subtle">Ultima operație completed: ${date(evidence.last_completed)} · failed/unknown: ${date(evidence.last_failed)}</div></div>`}).join("")}</div><div class="siui-notice">HTTP 401/403/405 confirmă că serverul răspunde, nu că autentificarea sau SOAP funcționează. Un eșec TLS fără certificat client poate coexista cu operații native reușite. Istoricul operațiilor nu este un test live al URL-ului configurat acum.</div></article>
+  <article class="siui-card full"><div class="siui-card-head"><h3>În execuție & lista de așteptare</h3><small>În timp real, indiferent de perioada selectată</small></div><div class="siui-table-wrap"><table><thead><tr><th>Operație</th><th>Stare</th><th>Apelant</th><th>Creat la</th><th></th></tr></thead><tbody>${active.map(c=>`<tr><td><strong>${esc(c.operation)}</strong><code title="${esc(c.operation_id)}">${esc(c.operation_id)}</code></td><td>${siuiTag(c.status)}</td><td>${esc(c.source.subject||c.owner)}</td><td>${date(c.created_at)}</td><td><button data-open-call="${esc(c.id)}">Operations ↗</button></td></tr>`).join("")||'<tr><td colspan="5" class="siui-empty">Nicio operație în așteptare sau în execuție.</td></tr>'}</tbody></table></div></article>
+  <article class="siui-card half"><div class="siui-card-head"><h3>Volum pe operație</h3><small>Primele 8 · interval selectat</small></div>${breakdown.map(([name,o])=>`<div class="siui-stat-row"><strong>${esc(name)}</strong><span>${o.total} apeluri · ${o.failed+o.unknown} probleme</span></div><div class="siui-meter"><span style="width:${total?o.total/total*100:0}%"></span></div><small>${o.measured?"Durată medie de execuție: "+(o.ms/o.measured).toFixed(1)+" sec":"Durată indisponibilă"}</small>`).join("")||'<p class="siui-subtle">Nu există apeluri în interval.</p>'}</article>
+  <article class="siui-card half"><div class="siui-card-head"><h3>Ultimele probleme</h3><small>Din întregul istoric</small></div>${data.recent_failures.map(c=>`<div class="siui-endpoint"><div class="siui-stat-row"><strong>${esc(c.operation)}</strong>${siuiTag(c.status)}</div><small>${date(c.created_at)}</small><p class="siui-subtle" style="margin:6px 0;overflow-wrap:anywhere">${esc((c.error||" ").slice(0,280))}</p><button data-open-call="${esc(c.id)}">Vezi apelul</button></div>`).join("")||'<p class="siui-subtle">Nicio eroare înregistrată.</p>'}</article>`;
+  const storageRefresh=cards.querySelector("[data-storage-refresh]");if(storageRefresh)storageRefresh.onclick=()=>loadStorage();
+  const storageClean=cards.querySelector("[data-storage-clean]");if(storageClean)storageClean.onclick=()=>loadStorage(true);
+  cards.querySelector("[data-check]").onclick=probe;
+  cards.querySelector("[data-ocsp]").onclick=async()=>{if(ocspTesting)return;ocspTesting=true;render();notice.textContent="Autentificare OCSP în curs…";try{const result=await api("/api/siui/general/ocsp",{method:"POST",body:"{}"});if(alive())notice.textContent=result.authenticated?"Autentificare OCSP reușită.":"Verifică răspunsul OCSP.";}catch(e){if(alive())notice.textContent=e.message;}finally{ocspTesting=false;if(alive())refresh();}};
+  rowButtons();
+ };
+ const refresh=async()=>{if(!alive()||busy)return;busy=true;try{const q=new URLSearchParams({from:period.from.toISOString(),to:period.to.toISOString()});const response=await api("/api/siui/dashboard?"+q);if(!alive())return;data=response;render();if(data.admin&&!storageLoaded){storageLoaded=true;loadStorage();}live.textContent="Actualizat "+new Date().toLocaleTimeString();if(data.admin&&Date.now()-lastProbe>60000)probe();}catch(e){if(alive()){notice.textContent=e.message;live.textContent="Datele nu au putut fi actualizate";}}finally{busy=false;}};
+ panel.querySelectorAll("[data-period]").forEach(button=>button.onclick=()=>{panel.querySelectorAll("[data-period]").forEach(b=>b.classList.toggle("active",b===button));const custom=button.dataset.period==="custom";panel.querySelector("#siui-dashboard-custom").hidden=!custom;if(!custom){period=siuiPresetRange(button.dataset.period);refresh();}else{panel.querySelector("#siui-dash-from").value=siuiLocalDay(period.from);panel.querySelector("#siui-dash-to").value=siuiLocalDay(new Date(period.to-1));}});
+ panel.querySelector("#siui-dash-apply").onclick=()=>{const from=new Date(panel.querySelector("#siui-dash-from").value+"T00:00"),to=new Date(panel.querySelector("#siui-dash-to").value+"T00:00");to.setDate(to.getDate()+1);if(!Number.isFinite(+from)||!Number.isFinite(+to)||to<=from){notice.textContent="Selectează o perioadă validă.";return;}period={from,to};refresh();};
+ const tick=async()=>{await refresh();if(alive())setTimeout(tick,5000);};tick();
+}
+
+function archiveBytes(value) {
+ const n=Number(value)||0,units=["B","KiB","MiB","GiB","TiB"];
+ const i=n>0?Math.min(4,Math.floor(Math.log(n)/Math.log(1024))):0;
+ return (n/1024**i).toLocaleString("ro-RO",{maximumFractionDigits:i?1:0})+" "+units[i];
+}
+function archiveDashboardHTML(data) {
+ const esc=value=>escapeHtml(String(value??"")), t=data.totals,c=data.counts;
+ const total=Object.values(c).reduce((a,b)=>a+b,0),rate=total?Math.round((c.completed||0)/total*100):null;
+ const stored=t.payload_bytes+t.manifest_bytes,traffic=data.traffic;
+ const kpi=(label,value,caption,tone="")=>`<article class="siui-card kpi"><span class="siui-kpi-label">${label}</span><p class="siui-kpi-number ${tone}">${value}</p><small>${caption}</small></article>`;
+ const legend=`<div class="siui-legend"><span><i style="background:#269c78"></i>Reușite</span><span><i style="background:#e06b71"></i>Eșuate</span><span><i style="background:#dca74a"></i>Incerte</span></div>`;
+ const senders=data.bridges.filter(b=>b.calls>0).slice(0,8),max=Math.max(1,...senders.map(b=>b.calls));
+ return `<div class="siui-dashboard-banner"><div><h3>Arhivă centrală · SIUI Bridge History</h3><p>${esc(formatDate(data.from))} — ${esc(formatDate(data.to))} (final exclusiv)</p></div>${siuiTag(t.pending?"pending":"online",t.pending?t.pending+" transferuri de finalizat":"Arhiva este la zi")}</div>
+ <div class="archive-section-title"><h3>Stocare și cozi · situația curentă</h3><span>Total arhivă, indiferent de perioada selectată</span></div>
+ ${kpi("FIȘIERE ARHIVATE",archiveBytes(stored),`${t.files} originale + ${t.archived} manifeste · ${esc(data.storage==='local'?'stocare locală':'stocare S3')}`)}
+ ${kpi("BRIDGE-URI AUTORIZATE",data.authorized_bridges,"ID-uri distincte cu cel puțin o cheie activă")}
+ ${kpi("OBSERVATE RECENT",data.observed_bridges,"Activitate în ultimele 15 minute; nu conexiuni persistente")}
+ ${kpi("TRANSFERURI ÎN AȘTEPTARE",t.pending,`${archiveBytes(t.pending_bytes)} volum declarat de originale`,t.pending?"siui-bad":"")}
+ <div class="archive-section-title"><h3>Activitate în perioada selectată</h3><span>După primirea manifestului în History</span></div>
+ ${kpi("APELURI PRIMITE",total,`${data.sending_bridges} bridge-uri au trimis operații în interval`)}
+ ${kpi("OPERAȚII REUȘITE",c.completed||0,"Rezultat SIUI completed","siui-good")}
+ ${kpi("OPERAȚII EȘUATE",c.failed||0,`${c.unknown||0} operații cu rezultat incert (unknown)`,"siui-bad")}
+ ${kpi("RATĂ DE SUCCES",rate===null?"—":rate+"%","Reușite / toate operațiile din interval")}
+ <article class="siui-card half"><div class="siui-card-head"><h3>Volum de operații în timp</h3><small>${total} apeluri</small></div>${siuiChartSVG(data.hourly,data.from,data.to)}${legend}${total?"":"<p class='siui-subtle'>Nu sunt operații în perioada selectată.</p>"}</article>
+ <article class="siui-card half"><div class="siui-card-head"><h3>Reușite vs. eșecuri SIUI</h3><small>Independent de arhivare</small></div><div class="siui-ring-layout"><div class="siui-ring" role="img" aria-label="Rata de succes: ${rate===null?'fără date':rate+'%'}" style="background:${total?`conic-gradient(#269c78 0 ${(c.completed||0)/total*100}%,#e06b71 0 ${((c.completed||0)+(c.failed||0))/total*100}%,#dca74a 0 100%)`:'#e8f0eb'}"><strong>${rate===null?"—":rate+"%"}</strong></div><div>${[["completed","Reușite"],["failed","Eșuate"],["unknown","Incerte"]].map(([s,label])=>`<div class="siui-stat-row">${siuiTag(s,label)}<strong>${c[s]||0}</strong></div>`).join("")}</div></div><p class="siui-subtle archive-note">Un apel SIUI eșuat poate fi arhivat complet. Acceptarea medicală se verifică în răspunsul operației.</p></article>
+ <article class="siui-card half"><div class="siui-card-head"><h3>Încărcare pe Bridge</h3><small>Top 8 · apeluri în interval</small></div>${senders.map(b=>`<button class="archive-bar-row" data-archive-bridge="${esc(b.id)}"><span class="archive-bar-label">${esc(b.id)}</span><span class="archive-bar-track"><span style="width:${b.calls/max*100}%"><i style="width:${b.completed/b.calls*100}%;background:#269c78"></i><i style="width:${b.failed/b.calls*100}%;background:#e06b71"></i><i style="width:${b.unknown/b.calls*100}%;background:#dca74a"></i></span></span><strong>${b.calls}</strong></button>`).join("")||'<p class="siui-empty">Niciun Bridge în acest interval.</p>'}${legend}</article>
+ <article class="siui-card half"><div class="siui-card-head"><h3>Trafic primit · ultimele 5 minute</h3>${siuiTag(traffic.errors?"failed":"online",traffic.errors?"Erori de transfer / acces":"Fără erori observate")}</div><div class="siui-health-grid"><div><p class="siui-kpi-number">${traffic.requests}</p><small>Cereri HTTP primite</small></div><div><p class="siui-kpi-number">${archiveBytes(traffic.received_bytes)}</p><small>Volum citit de History</small></div></div><div class="siui-stat-row"><span>Cereri cu HTTP ≥ 400</span><strong>${traffic.errors}</strong></div><p class="siui-subtle">Eșantion din ultimele ${traffic.sample_limit} cereri, de la pornirea serviciului; include testele de identitate și fragmentele de fișier. Nu reprezintă utilizarea CPU.</p></article>
+ <article class="siui-card"><div class="siui-card-head"><h3>Grad de arhivare</h3><small>${t.calls} apeluri în total</small></div><p class="siui-kpi-number">${t.calls?(t.archived/t.calls*100).toLocaleString("ro-RO",{maximumFractionDigits:1})+"%":"—"}</p><div class="siui-meter"><span style="width:${t.calls?t.archived/t.calls*100:0}%"></span></div><div class="siui-stat-row">${siuiTag("archived","Arhivate")}<strong>${t.archived}</strong></div><div class="siui-stat-row">${siuiTag("pending","În transfer")}<strong>${t.pending}</strong></div></article>
+ <article class="siui-card"><div class="siui-card-head"><h3>Spațiu ocupat de arhivă</h3></div><div class="siui-stat-row"><span>Originale</span><strong>${archiveBytes(t.payload_bytes)}</strong></div><div class="siui-stat-row"><span>Manifeste JSON</span><strong>${archiveBytes(t.manifest_bytes)}</strong></div><div class="siui-stat-row"><span>Total confirmat</span><strong>${archiveBytes(stored)}</strong></div><p class="siui-subtle">Dimensiuni logice din manifestele confirmate. Nu includ MySQL, loguri, copii de siguranță sau fișiere temporare; nu reprezintă spațiul liber pe disc.</p></article>
+ <article class="siui-card"><div class="siui-card-head"><h3>Transferul cel mai vechi</h3></div><p class="siui-kpi-number">${data.queue.length?archiveWait(data.queue[0].received_at):"—"}</p><small>De la primirea manifestului în History</small><p class="archive-note siui-subtle">${data.queue.length?esc(data.queue[0].bridge)+' · '+esc(data.queue[0].operation):'Niciun transfer anunțat nu așteaptă finalizarea.'}</p></article>
+ <article class="siui-card full"><div class="siui-card-head"><h3>Bridge-uri · volum și stocare</h3><small>Apeluri în interval / stocare totală</small></div><div class="siui-table-wrap"><table><thead><tr><th>ID Bridge</th><th>Acces</th><th>Apeluri</th><th>Rezultat SIUI</th><th>În transfer</th><th>Stocare totală</th><th>Ultima activitate</th></tr></thead><tbody>${data.bridges.map(b=>`<tr><td><button data-archive-bridge="${esc(b.id)}">${esc(b.id)} ↗</button></td><td>${siuiTag(b.authorized?"online":"offline",b.authorized?"Autorizat":"Cheie revocată")}</td><td><strong>${b.calls}</strong></td><td><div class="siui-toolbar">${siuiTag("completed",b.completed+" reușite")}${siuiTag("failed",b.failed+" eșuate")}${b.unknown?siuiTag("unknown",b.unknown+" incerte"):""}</div></td><td>${siuiTag(b.pending?"pending":"archived",b.pending?String(b.pending):"La zi")}</td><td>${archiveBytes(b.archived_bytes)}</td><td>${esc(formatDate(b.last_seen))}</td></tr>`).join("")||'<tr><td colspan="7" class="siui-empty">Niciun Bridge configurat sau observat.</td></tr>'}</tbody></table></div></article>
+ <article class="siui-card full"><div class="siui-card-head"><h3>Coada de arhivare</h3><small>Cele mai vechi ${data.queue.length} din ${t.pending} transferuri</small></div><div class="siui-notice">Sunt vizibile doar transferurile cu manifest primit la History. Operațiile rămase exclusiv în coada locală a unui Bridge nu sunt cunoscute serverului.</div><div class="siui-table-wrap"><table><thead><tr><th>Bridge</th><th>Operație / Call ID</th><th>Manifest primit</th><th>Așteptare</th><th>Stare</th><th></th></tr></thead><tbody>${data.queue.map((q,i)=>`<tr><td>${esc(q.bridge)}</td><td>${esc(q.operation)}<code title="${esc(q.call_id)}">${esc(q.call_id)}</code></td><td>${esc(formatDate(q.received_at))}</td><td>${archiveWait(q.received_at)}</td><td>${siuiTag("pending","Transfer incomplet")}</td><td><button data-archive-queue="${i}">Detalii și fișiere ↗</button></td></tr>`).join("")||'<tr><td colspan="6" class="siui-empty">Nu sunt transferuri în așteptare.</td></tr>'}</tbody></table></div></article>
+ <article class="siui-card full"><div class="siui-card-head"><h3>Ultimele erori de primire</h3><button data-archive-debug>Deschide Debug ↗</button></div>${data.recent_errors.map(e=>`<div class="siui-endpoint"><div class="siui-stat-row"><strong>${esc(e.bridge||"Neautentificat")} · ${esc(e.method)} ${esc(e.path)}</strong>${siuiTag("failed","HTTP "+e.status)}</div><p class="siui-subtle">${esc(formatDate(e.at))} · ${esc(e.error)}</p></div>`).join("")||'<p class="siui-subtle">Nicio eroare în jurnalul de cereri al procesului curent.</p>'}</article>`;
+}
+function archiveWait(value) {
+ const seconds=Math.max(0,Math.round((Date.now()-new Date(value))/1000));
+ if(!Number.isFinite(seconds))return "—";
+ return seconds>=86400?(seconds/86400).toFixed(1)+" zile":seconds>=3600?(seconds/3600).toFixed(1)+" h":seconds>=60?Math.floor(seconds/60)+" min":seconds+" sec";
+}
+let archiveDashboardGeneration=0;
+let centralHistorySelection=null;
+function openArchiveHistory(selection) { centralHistorySelection=selection;activateView("history"); }
+function mountArchiveDashboard() {
+ const generation=++archiveDashboardGeneration,view=els.views.overview;
+ let panel=document.getElementById("archive-dashboard");
+ if(!panel){panel=document.createElement("article");panel.id="archive-dashboard";panel.className="full-span siui-workspace";view.append(panel);}
+ for(const child of view.children)child.hidden=child!==panel;
+ panel.innerHTML=`<div class="siui-heading"><div><h2>SIUI Bridge History</h2><p>Monitorizare centrală · trafic, arhivă și bridge-uri</p></div><div class="siui-toolbar"><span id="archive-live" class="siui-live" role="status">Se încarcă…</span><button id="archive-refresh">Actualizează</button><button id="archive-history">Istoric ↗</button></div></div>${siuiPresetsHTML()}<form class="siui-filter-grid" id="archive-period"><label class="wide">Început <input name="from" type="datetime-local" required></label><label class="wide">Final (exclusiv) <input name="to" type="datetime-local" required></label><div class="siui-filter-actions"><button type="submit" class="primary">Aplică perioada</button></div></form><div id="archive-notice" role="alert"></div><div id="archive-cards" class="siui-dashboard-grid"></div>`;
+ const alive=()=>generation===archiveDashboardGeneration&&state.currentView==="overview"&&!els.dashboardView.hidden&&isHistoryMode();
+ const form=panel.querySelector("form"),cards=panel.querySelector("#archive-cards"),live=panel.querySelector("#archive-live"),notice=panel.querySelector("#archive-notice");
+ const local=d=>new Date(+d-d.getTimezoneOffset()*60000).toISOString().slice(0,16);
+ let period=siuiPresetRange("today"),busy=false,revision=0,rerun=false;
+ const setFields=()=>{form.elements.from.value=local(period.from);form.elements.to.value=local(period.to);};setFields();
+ const refresh=async()=>{
+  if(!alive())return;if(busy){rerun=true;return;}busy=true;const version=revision;
+  panel.querySelector("#archive-refresh").disabled=true;
+  try {
+   const q=new URLSearchParams({from:period.from.toISOString(),to:period.to.toISOString()});
+   const data=await api("/api/history/dashboard?"+q);if(!alive()||version!==revision)return;
+   cards.innerHTML=archiveDashboardHTML(data);notice.textContent="";notice.className="";live.textContent="Actualizat "+new Date(data.generated_at).toLocaleTimeString()+" · automat la 15 secunde";
+   cards.querySelectorAll("[data-archive-bridge]").forEach(button=>button.onclick=()=>openArchiveHistory({bridge:button.dataset.archiveBridge,from:period.from,to:period.to,time_field:"received_at"}));
+   cards.querySelectorAll("[data-archive-queue]").forEach(button=>button.onclick=()=>{const item=data.queue[Number(button.dataset.archiveQueue)];openArchiveHistory({bridge:item.bridge,call_id:item.call_id,from:new Date(item.created_at),to:new Date()});});
+   cards.querySelector("[data-archive-debug]").onclick=()=>activateView("debug");
+  }catch(error){if(alive()&&version===revision){notice.textContent=error.message;notice.className="siui-notice";live.textContent="Actualizare eșuată · datele afișate pot fi vechi";}}
+  finally {busy=false;panel.querySelector("#archive-refresh").disabled=false;if(rerun&&alive()){rerun=false;refresh();}}
+ };
+ panel.querySelectorAll("[data-period]").forEach(button=>button.onclick=()=>{panel.querySelectorAll("[data-period]").forEach(b=>b.classList.toggle("active",b===button));if(button.dataset.period==="custom"){form.elements.from.focus();return;}period=siuiPresetRange(button.dataset.period);setFields();revision++;refresh();});
+ form.oninput=()=>panel.querySelectorAll("[data-period]").forEach(b=>b.classList.toggle("active",b.dataset.period==="custom"));
+ form.onsubmit=event=>{event.preventDefault();const from=new Date(form.elements.from.value),to=new Date(form.elements.to.value);if(!Number.isFinite(+from)||!Number.isFinite(+to)||to<=from||to-from>366*86400000){notice.textContent="Selectează un interval valid de maximum 366 zile.";return;}period={from,to};revision++;refresh();};
+ panel.querySelector("#archive-refresh").onclick=refresh;
+ panel.querySelector("#archive-history").onclick=()=>openArchiveHistory({from:period.from,to:period.to,time_field:"received_at"});
+ const tick=async()=>{await refresh();if(alive())setTimeout(tick,15000);};tick();
+}
+
+function siuiOperationSummary(calls) {
+ const counts={};for(const call of calls)counts[call.status]=(counts[call.status]||0)+1;
+ return '<span class="siui-subtle">În pagina curentă:</span>'+Object.entries(counts).map(([status,count])=>siuiTag(status,count+" "+status)).join("");
+}
+
+function siuiOperationsQuery(form,offset=0) {
+ const fields=new FormData(form),from=new Date(fields.get("day")+"T"+fields.get("from"));
+ const to=new Date(fields.get("end_day")+"T"+(fields.get("to")||"00:00"));
+ if(!fields.get("to"))to.setDate(to.getDate()+1);
+ if(!Number.isFinite(+from)||!Number.isFinite(+to)||to<=from)throw new Error("Sfârșitul intervalului trebuie să fie după început.");
+ const query=new URLSearchParams({from:from.toISOString(),to:to.toISOString(),offset:String(offset)});
+ for(const key of ["operation_id","operation","status"])if(String(fields.get(key)||"").trim())query.set(key,String(fields.get(key)).trim());
+ return query;
+}
+
+let siuiDataDashboardGeneration=0;
+function mountSIUIDataDashboard(){
+ const generation=++siuiDataDashboardGeneration,view=els.views.overview;
+ let panel=document.getElementById("siui-data-dashboard");
+ if(!panel){panel=document.createElement("article");panel.id="siui-data-dashboard";panel.className="panel full-span";view.append(panel);}
+ for(const child of view.children)child.hidden=child!==panel;
+ if(!window.WSM_REMOTE){panel.style.padding="0";panel.style.overflow="hidden";panel.innerHTML='<iframe title="Nomenclatoare CNAS" src="/siui-data-dashboard?embedded=1" style="display:block;width:100%;height:calc(100vh - 190px);min-height:680px;border:0;border-radius:16px"></iframe>';return;}
+ panel.innerHTML=`<h2>WiseMED SIUI Data</h2><p>Nomenclatoare CLIN și PARA · catalog valid la data importului</p><p data-notice role="status"></p><div class="stats-grid"><article><h3>CPU proces</h3><strong data-cpu>—</strong><p>100% = un nucleu</p></article><article><h3>Memorie rezidentă RSS</h3><strong data-memory>—</strong></article><article><h3>Servicii disponibile</h3><strong data-count>—</strong></article></div><p data-meta></p><label>Tip <select data-catalogue-type><option>CLIN</option><option>PARA</option></select></label><label>Cod serviciu <input data-code placeholder="Cod serviciu"></label><button data-lookup>Caută</button><pre data-service style="white-space:pre-wrap;overflow-wrap:anywhere"></pre><p data-import><a href="/siui-data-dashboard" target="_blank" rel="noopener">Import ZIP și căutare avansată ↗</a></p>`;
+ if(window.WSM_REMOTE)panel.querySelector("[data-import]").textContent="Import nomenclatoare: folosiți endpointul HTTPS direct al utilitarului (WSM acceptă maximum 4 MiB).";
+ const alive=()=>generation===siuiDataDashboardGeneration&&state.currentView==="overview"&&!els.views.overview.hidden;
+ const text=(selector,value)=>panel.querySelector(selector).textContent=value;
+ panel.querySelector("[data-lookup]").onclick=async()=>{try{const response=await api("/api/siui-data/services/"+encodeURIComponent(panel.querySelector("[data-code]").value)+"?type="+panel.querySelector("[data-catalogue-type]").value);if(alive())text("[data-service]",JSON.stringify(response.data,null,2));}catch(e){if(alive())text("[data-service]",e.message);}};
+ const refresh=async()=>{if(!alive())return;try{const value=(await api("/api/siui-data/status")).data;if(!alive())return;text("[data-cpu]",value.process.cpuPercent==null?"—":value.process.cpuPercent.toFixed(1)+"%");text("[data-memory]",value.process.rssBytes==null?"—":(value.process.rssBytes/1048576).toFixed(1)+" MiB");text("[data-count]",Object.entries(value.catalogues||{}).map(([type,c])=>type+": "+c.services).join(" · ")||"0");text("[data-meta]",value.ready?"Validitate evaluată la "+value.asOf+(value.stale?" · Este recomandat un import nou.":""):"Niciun catalog importat.");text("[data-notice]","");}catch(e){if(alive())text("[data-notice]",e.message);}finally{if(alive())setTimeout(refresh,3000);}};
+ refresh();
 }

@@ -21,6 +21,7 @@ const MaxBody = 4 * 1024 * 1024
 type Principal struct {
 	Subject      string
 	TenantID     string
+	SourceIP     string
 	ConnectionID string
 	Admin        bool
 }
@@ -101,6 +102,9 @@ func Invoke(ctx context.Context, handler http.Handler, p Principal, in Request) 
 	// Keep a bounded WSS deadline consistent with the local API.
 	if method == "POST" && (u.Path == "/api/siui/general/ocsp" || u.Path == "/api/siui/ocsp-test" || u.Path == "/api/siui/invoice/package") {
 		timeout = 130 * time.Second
+	}
+	if method == "POST" && strings.HasPrefix(u.Path, "/api/history/calls/") && strings.HasSuffix(u.Path, "/commit") {
+		timeout = 310 * time.Second
 	}
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()

@@ -399,8 +399,11 @@ func (m *Module) runSession(ctx context.Context, settings map[string]interface{}
 		return errors.New("WSS hello send failed")
 	}
 	var ack Envelope
-	if e = conn.ReadJSON(&ack); e != nil || ack.Type != "hello_ack" {
-		return errors.New("WSS hello not accepted")
+	if e = conn.ReadJSON(&ack); e != nil {
+		return fmt.Errorf("WSS hello not accepted: %w", e)
+	}
+	if ack.Type != "hello_ack" {
+		return fmt.Errorf("WSS hello not accepted: expected hello_ack, received %q", ack.Type)
 	}
 	if asString(ack.Payload["equipment_id"]) != equipment {
 		return errors.New("WSS equipment identity mismatch")
@@ -522,7 +525,7 @@ func (m *Module) handleCommandContext(ctx context.Context, msg Envelope) error {
 		}
 		if e == nil {
 			var result apibridge.Response
-			result, e = apibridge.Invoke(ctx, m.rt.Mux(), apibridge.Principal{Subject: asString(msg.Payload["sender_subject"]), TenantID: asString(msg.Payload["sender_tenant_id"]), ConnectionID: asString(msg.Payload["sender_connection_id"]), Admin: scopes["api:admin"]}, request)
+			result, e = apibridge.Invoke(ctx, m.rt.Mux(), apibridge.Principal{Subject: asString(msg.Payload["sender_subject"]), TenantID: asString(msg.Payload["sender_tenant_id"]), ConnectionID: asString(msg.Payload["sender_connection_id"]), SourceIP: asString(msg.Payload["sender_ip"]), Admin: scopes["api:admin"]}, request)
 			if e == nil {
 				b, _ := json.Marshal(result)
 				e = json.Unmarshal(b, &resp)
@@ -691,6 +694,9 @@ func handshakeError(resp *http.Response) error {
 
 func (m *Module) clientType() string {
 	if service, ok := m.rt.Service("analyzer-config"); ok {
+		if settings, ok := service.(map[string]interface{}); ok && strings.EqualFold(strings.TrimSpace(asString(settings["protocol"])), "siui-history") {
+			return "siui-bridge-history"
+		}
 		if settings, ok := service.(map[string]interface{}); ok && strings.EqualFold(strings.TrimSpace(asString(settings["protocol"])), "siui") {
 			return "siui-bridge"
 		}
@@ -699,7 +705,7 @@ func (m *Module) clientType() string {
 }
 
 func (m *Module) clientRole() string {
-	if m.clientType() == "siui-bridge" {
+	if m.clientType() == "siui-bridge" || m.clientType() == "siui-bridge-history" {
 		return "service"
 	}
 	return "reader"

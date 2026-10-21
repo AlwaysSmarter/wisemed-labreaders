@@ -46,3 +46,36 @@ func TestSIUIInstallationUsesSharedUpdater(t *testing.T) {
 		t.Fatal("SIUI skipped the shared updater")
 	}
 }
+
+func TestHistoryInstallationUsesSharedUpdater(t *testing.T) {
+	cfg, err := config.Load("../siui-bridge-history/deployments/config.install.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	settings := cfg.ModuleSettings("app-updates")
+	if !boolSetting(settings, "enabled") || !boolSetting(settings, "auto_download") || strSetting(settings, "app_id") != "siui-bridge-history" || strSetting(settings, "channel") != "stable" || strSetting(settings, "base_url") == "" {
+		t.Fatal("History updater defaults missing")
+	}
+	if defaultCommType(cfg) != "utility" {
+		t.Fatal("History must be a utility")
+	}
+}
+
+func TestHistoryBootstrapRequiresEquipmentConfiguration(t *testing.T) {
+	cfg, err := config.Load("../siui-bridge-history/deployments/config.install.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ws := cfg.Modules["wisemed-api"]
+	ws["cfg_wisemed_ip"] = "example.test"
+	ws["cfg_wisemed_key"] = "test-key"
+	if !needsBootstrap(cfg) {
+		t.Fatal("History skipped equipment configuration")
+	}
+	for _, key := range []string{"unitate_medicala_id", "tip_de_echipament_id", "cod_echipament", "producator_echipament", "numar_serial_echipament", "nume_pe_raport_final", "nr_rackuri", "pozitii_pe_rack"} {
+		ws[key] = "1"
+	}
+	if needsBootstrap(cfg) {
+		t.Fatal("complete History configuration was rejected")
+	}
+}

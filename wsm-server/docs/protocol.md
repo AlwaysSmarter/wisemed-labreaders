@@ -303,10 +303,12 @@ ceilalți clienți continuă independent. Nu sunt disponibile toate API-urile Wi
 | `GET /api/equipment/{id}` | Bearer + connections:read | Prezența unui echipament din tenant |
 | `GET /control/` și assets | Public, numai fișiere statice | UI; datele cer separat autentificare WSS |
 
-Nu există REST pentru trimiterea comenzilor sau managementul cheilor. WS este
-API-ul de mesagerie; administrarea se face local prin configurație/CLI. Nu este
-activat CORS HTTP cross-origin: browserul poate folosi `list_connections` prin WS,
-iar backendul poate folosi GET cu Bearer.
+Backendurile pot lista conexiunile cu filtrul opțional `?client_type=siui-bridge`
+(sau orice alt tip) și trimite comenzi 1:1 prin
+`POST /api/connections/{id}/commands`. HTTP așteaptă răspunsul efectiv prin WSS,
+cu timeout, corelare și aceleași drepturi JWT. Vezi
+[contractul HTTP și wrapperul PHP](http-commands.md).
+Nu este activat CORS HTTP cross-origin; browserul poate continua să folosească WS.
 
 ## Erori și reconectare
 
@@ -325,3 +327,16 @@ reconectează, trimite hello, reface abonamentele și reinteroghează starea.
 Transportul comun readersv3 și consola remote folosesc o pauză fixă de 30 secunde
 cu countdown și retry manual imediat. Clienții externi pot adopta propriul backoff
 cu jitter, respectând limitele serverului. Nu reutilizați un token expirat.
+
+### SIUI Bridge History
+
+`client_type: siui-bridge-history` uses JWT `role: service`. Its `client_id`,
+`reader_id` and `equipment_id` must match the signed identity. It supports the
+same client-type routing and duplicate equipment checks as `siui-bridge`.
+Older WSM servers that only allow the `siui-bridge` subtype must be updated before
+History can receive `hello_ack`; changing the device key alone does not fix this.
+
+`sender_ip` is stamped by the server on routed messages from the authenticated
+connection's network peer (also for HTTP command connections). Client-supplied
+values are overwritten. Behind a proxy it is the proxy peer IP. Readers may use
+it as audit metadata; it is not an authorization claim.

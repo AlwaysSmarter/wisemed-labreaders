@@ -138,7 +138,18 @@ func (m *Module) insuredHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer release()
+	callID, err := m.beginPassiveHistory(r, "getInsured", map[string]string{"pid": in.CNP, "requestDate": in.Date})
+	if err != nil {
+		fail(w, 500, "cannot persist History outbox")
+		return
+	}
+	c.callID = callID
+	w.Header().Set("X-SIUI-Call-ID", callID)
 	result, err := c.getInsured(ctx, in.CNP, in.Date)
+	if e := m.finishPassiveHistory(callID, map[string]any{"values": []string{result.XML}}, err); e != nil {
+		fail(w, 500, "cannot persist CNAS result")
+		return
+	}
 	if err != nil {
 		fail(w, 502, err.Error())
 		return

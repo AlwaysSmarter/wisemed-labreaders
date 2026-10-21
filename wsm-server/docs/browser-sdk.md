@@ -497,3 +497,17 @@ HTTPS WSM și `connect-src` originea WSS. Nu loga tokenul sau secretul.
 Pentru toate endpointurile SIUI și polling-ul operațiilor CNAS, încarcă
 `/sdk/siui-bridge.js` și folosește `await SIUIBridge.create(objWSM, {equipmentID:"18"})`.
 [Documentație, inventar complet și anularea așteptării](siui-browser-wrapper.md).
+
+
+SIUIBridge gestionează reconectarea limitată (connectAttempts/connectTimeout),
+descărcarea automată și procesarea opțională XML/ZIP/XSD; nu preceda crearea lui cu
+un await objWSM.ready nelimitat. Pentru actualizări WiseMED independente de browser,
+transmite options.callwmapi cu lt opțional.
+[Contract și exemple complete](siui-browser-wrapper.md).
+
+
+Pentru SIUI folosește singletonul global objWSMSIUI, disponibil automat după
+includerea siui-bridge.js, fără configurare; detectează objWSM din pagină. Returnează success:true/data sau success:false/error (string),
+fără Promise respins. Vezi începutul documentației siui-browser-wrapper.md.
+
+[Ghid practic objWSMSIUI: JavaScript lizibil, progres și callwmapi](siui-browser-quickstart.md).

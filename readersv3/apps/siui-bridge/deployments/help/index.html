@@ -46,6 +46,13 @@ Sesiunea OCSP CNAS este separată de JWT-ul API. Operațiile obțin automat o se
 
 ## WSM
 
+Pentru pagini WiseMED există wrapperul `SIUIBridge(objWSM, options)`, servit de WSM
+la `/sdk/siui-bridge.js`. Acoperă toate cele 40 de operații CNAS și endpointurile
+auxiliare, inclusiv polling, descărcări fragmentate și anularea așteptării locale.
+[Integrare și inventarul metodelor](../../../../wsm-server/docs/siui-browser-wrapper.md).
+
+SIUI Bridge trimite `client_type: &quot;siui-bridge&quot;` în mesajul `hello`. JWT-ul folosește rolul de autorizare `service`; cheia WSM trebuie să permită `service`. Identificatorii `reader_id` și `equipment_id` rămân pentru rutarea și legarea echipamentului. Pentru token_endpoint, emitentul trebuie să emită rolul solicitat `service`; token_file trebuie reemis cu acest rol. Actualizează și WSM pentru acceptarea acestui tip; rutarea după tip folosește `target: {&quot;mode&quot;:&quot;client_type&quot;,&quot;client_type&quot;:&quot;siui-bridge&quot;}` și necesită dreptul `route:broadcast`. Rutarea directă după echipament rămâne disponibilă.
+
 Aceleași metode și corpuri JSON sunt accesibile prin comanda comună `api.request`, cu identitatea atestată de WSM. Nu se trimite JWT-ul local în acest mesaj. Exemplu de payload pentru adaptorul comun:
 
 ```json
@@ -742,7 +749,7 @@ Operație SIUI pentru rețete, distinctă de processPrescribedPrescription din P
 - `GET /api/siui/certificates?store=CurrentUser`: administrator; inventarul tokenurilor/certificatelor. `LocalMachine` este alternativa.
 - Vechile rute `/insured`, `/ocsp-test`, `/personalization`, `/validations` rămân pentru compatibilitate. `/validations` rămâne PARA; noul `/general/validateReport` suportă CLIN și PARA. `/ocsp-test` nu divulgă tokenul, `/general/ocsp` îl întoarce administratorului.
 
-Excluse conform cerinței: validateEnlisted, validatePharmacyDrugs, processIssuedPrescription; nu sunt expuse în catalog, Debug sau dispatcher. Nu este implementat SDK-ul cardului pacientului.
+Excluse conform cerinței: validateEnlisted, validatePharmacyDrugs; nu sunt expuse în catalog, Debug sau dispatcher. Nu este implementat SDK-ul cardului pacientului.
 
 ## Validare XML și interpretarea răspunsurilor
 
@@ -922,13 +929,13 @@ SIUI poate returna pentru `getEInvoiceId` trei valori: `[număr înregistrare SI
 
 În Setări → CNAS → PIN / parola tokenului se poate salva sau șterge PIN-ul certificatului activ. Interfața afișează numai `&lt;hidden&gt;` dacă există un PIN salvat. Câmpul de înlocuire este gol; salvarea setărilor generale nu modifică PIN-ul. Salvați mai întâi certificatul selectat. API-ul nu returnează nici PIN-ul, nici valoarea criptată.
 
-`GET /api/siui/token-pin` (administrator) întoarce `configured`, `hint`, `blocked`, `manual_required` și `pkcs11_module`. `PUT` acceptă `{ &quot;pin&quot;: &quot;...&quot; }` pentru înlocuire, `{ &quot;forget&quot;: true }` pentru ștergere, sau `{ &quot;pin&quot;: &quot;...&quot;, &quot;manual&quot;: true }` pentru un PIN temporar, fără salvare pe disc. Nu introduceți valoarea literală `&lt;hidden&gt;` ca PIN. Câmpul gol din interfață nu trimite o modificare. Operațiile active pe token blochează schimbarea PIN-ului.
+`GET /api/siui/token-pin` (administrator) întoarce `configured`, `hint`, `blocked`, `failed_attempts`, `max_attempts` (3), `manual_required` și `pkcs11_module`. `PUT` acceptă `{ &quot;pin&quot;: &quot;...&quot; }` pentru înlocuire, `{ &quot;forget&quot;: true }` pentru ștergere, sau `{ &quot;pin&quot;: &quot;...&quot;, &quot;manual&quot;: true }` pentru un PIN temporar, fără salvare pe disc. Nu introduceți valoarea literală `&lt;hidden&gt;` ca PIN. Câmpul gol din interfață nu trimite o modificare. Operațiile active pe token blochează schimbarea PIN-ului.
 
-PIN-ul temporar este disponibil în memorie timp de maximum 150 secunde, astfel încât aceeași acțiune să poată realiza OCSP, semnarea CMS și conexiunea SOAP. La prima eroare este eliminat. Folosirea lui suspendă PIN-ul salvat; succesul manual nu reactivează un PIN vechi care poate fi greșit.
+PIN-ul temporar este disponibil în memorie timp de maximum 150 secunde, astfel încât aceeași acțiune să poată realiza OCSP, semnarea CMS și conexiunea SOAP. La respingerea explicită a PIN-ului este eliminat. Folosirea lui suspendă PIN-ul salvat; succesul manual nu reactivează un PIN vechi care poate fi greșit.
 
 Stocarea folosește `siui-token-pins.json`, în directorul bazei de date SIUI, cu înregistrări legate de magazinul certificatului, amprentă și biblioteca PKCS#11. Pe Windows se folosește DPAPI în contextul contului aplicației. Pe macOS/Linux se folosește AES-256-GCM cu o cheie de instalare separată (`siui-token-pins.json.key`), accesibilă numai contului aplicației (0600). PIN-ul nu este scris în YAML, baza de date a operațiilor, loguri sau argumentele proceselor. Un backup care conține atât depozitul Unix, cât și cheia acestuia permite decriptarea și trebuie protejat. Schimbarea contului Windows necesită reconfigurarea PIN-ului DPAPI.
 
-Înainte ca un PIN salvat să fie predat driverului, depozitul este marcat persistent ca suspendat. Numai o semnătură reușită, verificată cu certificatul selectat, reactivează înregistrarea respectivă. La eroare, anulare înainte de confirmare sau oprirea procesului, suspendarea rămâne inclusiv după restart/reconectare. Nu există retry automat al PIN-ului prin alt backend și nu se retransmite automat factura. Eșecul poate fi de PIN, autorizare sau driver; mesajul nu pretinde că orice eroare este un PIN greșit. Pentru reactivare se salvează din nou PIN-ul corect.
+Încercările automate sunt serializate în memorie. Contorul respingerilor se păstrează pe certificat inclusiv după restart. O semnătură reușită și verificată resetează contorul la zero; erorile fără legătură cu PIN-ul nu îl modifică. Se permite o nouă încercare la următorul apel, fără repetarea automată a operației CNAS. PIN-ul salvat este suspendat persistent la a treia respingere explicită de PIN/autentificare: CryptoTokenKit AuthenticationFailed pe macOS, SCARD_W_WRONG_CHV/SCARD_W_CHV_BLOCKED pe Windows, respectiv PIN incorrect/invalid/length-range/locked prin PKCS#11. Tokenul absent, anularea, erorile de comunicare cu driverul, de certificat, TLS sau rețea și repornirea procesului nu suspendă PIN-ul. Nu există retry automat al PIN-ului prin alt backend și nu se retransmite automat factura. Pentru reactivarea unei înregistrări deja suspendate se salvează din nou PIN-ul corect; suspendările existente nu sunt resetate automat la actualizare.
 
 - macOS: `LAContext.setCredential` cu `smartCardPIN`, asociat identității CryptoTokenKit prin `kSecUseAuthenticationContext`. Încercarea automată interzice dialogurile interactive și elimină credentialul/invalidează contextul la încheiere. Fără PIN automat disponibil, operația următoare folosește fluxul clasic macOS. Suportul PIN-ului furnizat depinde de driver.
 - Windows: cheia certificatului este accesată prin CSP (`PP_SIGNATURE_PIN` / `PP_KEYEXCHANGE_PIN`) sau KSP (`NCRYPT_PIN_PROPERTY`), în mod silent pentru încercarea automată. Handle-urile partajate sunt refuzate pentru a evita păstrarea credentialului într-un context extern. În modul PIN furnizat, TLS și CMS folosesc signerul nativ în același proces; TLS folosește transportul Go cu verificarea CA/nume și excepția de dată configurată. Fără PIN disponibil, rămân WinHTTP și PowerShell/SignedCms pentru introducerea clasică. KSP suportă RSA/ECDSA; CSP suportă RSA.
@@ -939,4 +946,466 @@ Nu sunt implementate hook-uri în ferestre și nici un eveniment universal de so
 Verificări: teste pentru criptare, legarea de certificat, o singură încercare concurentă, suspendare după restart, expirarea PIN-ului temporar, răspunsuri API mascate și UI; test macOS al contextului LocalAuthentication fără accesarea unui token; compilare Windows; teste Linux cu SoftHSM izolat pentru semnare, TLS mutual, CMS, respingerea PIN-ului și recuperare manuală. Compatibilitatea cu fiecare middleware fizic Windows/macOS trebuie verificată separat. Nu s-a introdus un PIN pe tokenul fizic al utilizatorului și nu s-au transmis facturi către CNAS.
 
 Referințe: [Microsoft PIN property](https://learn.microsoft.com/en-us/windows/win32/seccng/key-storage-property-identifiers), [Microsoft smart card architecture](https://learn.microsoft.com/en-us/windows/security/identity-protection/smart-cards/smart-card-architecture), [Apple smartCardPIN](https://developer.apple.com/documentation/localauthentication/lacredentialtype/smartcardpin), [OASIS PKCS#11](https://docs.oasis-open.org/pkcs11/pkcs11-base/v2.40/cos01/pkcs11-base-v2.40-cos01.html).
+
+
+## Răspuns structurat pentru calitatea de asigurat
+
+Operațiile `getInsured` și `getInsuredByCID` păstrează XML-ul original în
+`call.result.values` și adaugă `call.result.insured`, identic prin HTTP/JWT și WSM:
+
+```json
+{
+  &quot;insured&quot;: {
+    &quot;pid&quot;: &quot;1000000000000&quot;,
+    &quot;cid&quot;: &quot;12345678901234567890&quot;,
+    &quot;state&quot;: &quot;1&quot;,
+    &quot;categories&quot;: [{&quot;code&quot;: &quot;3&quot;, &quot;validFrom&quot;: &quot;2017-04-04&quot;}],
+    &quot;states&quot;: [{&quot;code&quot;: &quot;SAL&quot;, &quot;validFrom&quot;: &quot;2017-04-04&quot;}]
+  }
+}
+```
+
+PID/CNP, CID și codurile rămân șiruri; nu convertiți CID în număr JavaScript.
+Toate intrările din categories și states sunt păstrate, inclusiv atributele
+`validFrom`, `validTo` când există și orice alte atribute returnate de CNAS.
+Listele absente devin `[]`. Atributele absente nu sunt inventate.
+Codul `state` este transmis exact ca în XML (exemple: `1` asigurat,
+`0` neasigurat, `3` decedat); codurile necunoscute sunt păstrate.
+Aceste coduri nu sunt confundate cu lista `states` (de exemplu `SAL`).
+
+Dacă valoarea returnată nu este un insuredResponse XML valid cu un singur
+element insured, răspunsul păstrează `values` și adaugă `parse_error`, fără
+`insured`. Verificați eroarea și răspunsul CNAS, nu interpretați lipsa datelor
+ca neasigurat. Structurarea se aplică apelurilor noi; rezultatele deja salvate
+nu sunt rescrise.
+
+## Callback persistent către WiseMED: callwmapi
+
+Toate cele 40 de operații asincrone din catalog (general, clinice, facturare)
+acceptă opțional callwmapi, prin HTTP/JWT sau WSM api.request, inclusiv pentru
+utilizatori obișnuiți autentificați. WiseMED verifică drepturile de scriere.
+Restricțiile operației CNAS inițiale rămân aplicabile.
+Endpointurile auxiliare/sincrone și cele vechi /insured, /personalization,
+/jobs nu acceptă acest obiect; folosește operația corespunzătoare din catalog.
+
+Exemplu pentru POST /api/siui/general/getInsured (CNP fictiv):
+
+~~~json
+{
+  &quot;operation_id&quot;: &quot;insured-patient-20261018-001&quot;,
+  &quot;parameters&quot;: {
+    &quot;pid&quot;: &quot;1000000000000&quot;,
+    &quot;requestDate&quot;: &quot;2026-10-18T10:00:00+03:00&quot;
+  },
+  &quot;callwmapi&quot;: {
+    &quot;lt&quot;: &quot;TOKEN_LOGIN_WISEMED_OPTIONAL&quot;,
+    &quot;apipath&quot;: &quot;/pacient/{cnp_pacient}&quot;,
+    &quot;method&quot;: &quot;POST&quot;,
+    &quot;transform_path&quot;: [
+      {&quot;from_field&quot;: &quot;cnp&quot;, &quot;to_field&quot;: &quot;cnp_pacient&quot;}
+    ],
+    &quot;body&quot;: {
+      &quot;verificare_la_data&quot;: &quot;2026-10-18 10:00:00&quot;,
+      &quot;transform_result&quot;: [
+        {&quot;from_field&quot;: &quot;cid&quot;, &quot;to_field&quot;: &quot;cid_pacient&quot;},
+        {&quot;from_field&quot;: &quot;state&quot;, &quot;to_field&quot;: &quot;stare_asigurare_cas&quot;}
+      ]
+    }
+  }
+}
+~~~
+
+După un rezultat CNAS valid, bridge-ul trimite POST /pacient/1000000000000
+la baza API WiseMED configurată (de exemplu /api), cu Authorization: Bearer
+JWT generat cu cheia existentă și Idempotency-Key: siui-&lt;call.id&gt;.
+
+~~~json
+{
+  &quot;verificare_la_data&quot;: &quot;2026-10-18 10:00:00&quot;,
+  &quot;cid_pacient&quot;: &quot;12345678901234567890&quot;,
+  &quot;stare_asigurare_cas&quot;: 1
+}
+~~~
+
+Nu se transmite cheia în callwmapi, în coadă sau în răspuns. Livrarea nu depinde
+de cookie-ul sau de menținerea deschisă a clientului inițiator. Sunt acceptate
+POST și PUT. URL-urile externe, query-stringurile, traversarea directoarelor
+și redirecționările HTTP sunt refuzate.
+
+Tokenul opțional callwmapi.lt este transmis exclusiv în claim-ul lt din JWT-ul
+Authorization către WiseMED, fără login prealabil. În absența lui, apelul este
+trimis fără lt; sesiunea globală a ultimului utilizator logat nu este folosită.
+Bridge-ul nu poate determina anticipat dacă endpointul acceptă lt; WiseMED
+decide și poate refuza cererea. HTTP 401/403 marchează livrarea failed, fără
+reîncercare automată sau eliminarea tokenului. Tokenul nu apare în status sau
+loguri. Specificațiile care conțin lt sunt criptate la salvare: DPAPI pe Windows,
+respectiv cheia locală &lt;database&gt;.wm-callback.key pe macOS/Linux. Păstrează cheia
+la restaurarea bazei de date; pe Windows este necesar același context DPAPI.
+
+### Transformări
+
+- transform_path citește parametrii inițiali. cnp este alias pentru pid.
+  Sunt acceptate și pid sau parameters.pid. to_field identifică placeholderul
+  din cale, nu numele parametrului original.
+- body păstrează câmpurile fixe ca valori JSON; transform_result este o
+  instrucțiune și nu se trimite la WiseMED. Data furnizată de client nu este
+  recalculată la momentul livrării.
+- transform_result.from_field acceptă căi precum result.insured.cid,
+  insured.cid, cid, insured.categories, values.0 sau insured.categories.0.code.
+  Aliasurile cid, pid, state, categories și states provin din result.insured.
+- to_field este cheia de nivel superior din body; transformarea înlocuiește
+  un eventual câmp fix cu aceeași cheie.
+- Tipul JSON se păstrează. Starea asiguratului (state, insured.state sau
+  result.insured.state) este implicit convertită în integer. CID/CNP rămân
+  șiruri pentru a evita pierderea preciziei.
+- Mapările rezultatului pot specifica type: string, integer, number sau boolean.
+  type nu este utilizat la maparea căii.
+- Câmpurile sursă lipsă, conversiile invalide sau result.parse_error opresc
+  livrarea cu failed; nu se trimite un body incomplet.
+- Pentru celelalte servicii CNAS, completed indică primirea răspunsului,
+  nu interpretarea automată a tuturor erorilor de business din values.
+
+### Coada și recuperarea
+
+Configurația callback-ului este salvată împreună cu rezervarea apelului.
+Rezultatul CNAS și body-ul pregătit sunt salvate într-o tranzacție înainte
+de trimitere. Închiderea clientului sau repornirea bridge-ului nu pierde
+livrările în așteptare.
+
+GET /api/siui/calls/{id} întoarce separat starea CNAS și starea livrării:
+
+~~~json
+{
+  &quot;call&quot;: {
+    &quot;status&quot;: &quot;completed&quot;,
+    &quot;callwmapi&quot;: {
+      &quot;status&quot;: &quot;delivered&quot;,
+      &quot;attempts&quot;: 1,
+      &quot;http_status&quot;: 204
+    }
+  }
+}
+~~~
+
+Stările callback-ului sunt waiting (așteaptă CNAS), pending (așteaptă livrarea),
+sending, delivered (HTTP 2xx), failed (transformare, respingere sau încercări
+epuizate), skipped (CNAS a eșuat sau rezultatul este necunoscut).
+Eroarea livrării este disponibilă în call.callwmapi.error.
+
+Maximum 5 încercări automate, timeout 30 secunde, pauze 30/60/120/240 secunde
+pentru erori de transport, HTTP 429 și 5xx. Celelalte răspunsuri non-2xx sunt
+definitive. Un HTTP 2xx este considerat livrat; răspunsul de business WiseMED
+nu este interpretat. Coada folosește workerul bridge-ului, astfel că operațiile
+CNAS în curs pot întârzia livrarea. Schimbarea bazei API împiedică trimiterea
+callback-urilor vechi către noua instanță WiseMED.
+
+**Livrarea este at-least-once, nu exactly-once.** Dacă WiseMED aplică modificarea,
+dar confirmarea se pierde, bridge-ul poate retransmite aceeași cerere.
+**Endpointul WiseMED trebuie să deduplice atomic după Idempotency-Key** și să
+returneze rezultatul primei cereri pentru aceeași cheie. Implementarea de aici
+nu modifică proiectul PHP. Body-ul și cheia sunt stabile la reîncercare.
+
+Același operation_id cu aceeași cerere nu repetă operația CNAS sau callback-ul.
+Schimbarea callwmapi pentru același ID produce HTTP 409.
+
+Proprietarul autentificat al apelului poate relua exclusiv livrarea eșuată, cu body deja pregătit:
+POST /api/siui/calls/{id}/callwmapi/retry. Aceasta resetează bugetul încercărilor,
+păstrează cheia de idempotency și nu reapelază CNAS. Se aplică izolarea pe
+proprietarul apelului.
+
+Dacă bridge-ul se oprește înainte de salvarea rezultatului CNAS, apelul devine
+unknown și callback-ul skipped; CNAS nu este reapelat automat. Mecanismul nu
+poate recupera un răspuns CNAS care nu a fost încă salvat.
+
+## Procesarea fișierelor descărcate prin HTTP și WSM
+
+GET /api/siui/calls/{id}/file acceptă, pe lângă offset, unzip=true|false,
+entry (nume exact din ZIP), format=bytes|xml|json și validateXSD=false (dezactivează XSD).
+Răspunsul rămâne JSON cu data_base64, offset, next_offset, eof. Offseturile se
+referă la rezultatul procesat; păstrează aceleași opțiuni la toate fragmentele.
+Ordine: extragere ZIP → validare XSD implicit activă → conversie → fragmentare.
+Parametrii absenți păstrează descărcarea originală. ZIP cu mai multe fișiere
+necesită entry. Erorile de procesare întorc HTTP 422, fără modificarea rezultatului
+CNAS salvat. Limita intrării/fișierului extras/ieșirii este 64 MiB. Procesarea este
+recalculată la fiecare fragment; pentru fișiere mari este preferabil bytes fără
+procesare. Nicio intrare ZIP nu este scrisă pe disc.
+XML/JSON interzic DTD și adâncimi peste 40. JSON păstrează arborele:
+name, namespace, attributes:[{name,namespace,value}], content:[text|nod,...].
+Identificatorii rămân șiruri. Serverul alege schema și folosește validatorul existent și limita XSD
+de 1 MiB; schema necunoscută sau validatorul indisponibil produce eroare, nu succes.
+Un PDF nu poate fi convertit în XML/JSON prin acest endpoint.
+
+Wrapperul WSM siui-bridge.js descarcă automat fișierele pentru operațiile așteptate
+și poate solicita procesarea prin options.file. Trimite callback-ul WiseMED prin
+options.callwmapi, inclusiv lt. Documentația și exemplele complete:
+[SIUI browser wrapper](../../../../wsm-server/docs/siui-browser-wrapper.md).
+
+### callwmapi.file: personalizare XML → JSON înainte de update WiseMED
+
+callwmapi poate include file:{unzip:true,entry:&quot;numele-real.xml&quot;}.
+Toate câmpurile sunt opționale; omiterea entry este permisă doar dacă ZIP-ul are
+un singur fișier. Validarea XSD este implicit activă; validateXSD:false o dezactivează. Prezența file cere
+procesare pe server și conversie XML → JSON; rezultatul este disponibil în
+transform_result prin from_field:&quot;file_json&quot;. De exemplu:
+~~~json
+{
+  &quot;callwmapi&quot;:{
+    &quot;apipath&quot;:&quot;/cnas/personalisation&quot;,
+    &quot;method&quot;:&quot;POST&quot;,
+    &quot;file&quot;:{&quot;unzip&quot;:true},
+    &quot;body&quot;:{&quot;transform_result&quot;:[{&quot;from_field&quot;:&quot;file_json&quot;,&quot;to_field&quot;:&quot;personalisation&quot;}]}
+  }
+}
+~~~
+lt poate fi adăugat opțional. Body-ul final (cu JSON) se salvează în aceeași
+tranzacție cu rezultatul CNAS și se reutilizează la retrimitere. Fișierul original
+nu este modificat. Eroarea de procesare marchează callback-ul failed; operația
+CNAS completed rămâne distinctă. Conversia nu depinde de browser.
+Nu există retry pentru transformare eșuată prin ruta de retry a livrării
+(aceasta cere body deja pregătit).
+Exemplele complete pentru asigurat, personalizare și validare 72h sunt în
+[wrapperul browser](../../../../wsm-server/docs/siui-browser-wrapper.md#trei-exemple-complete-pentru-aplicația-wisemed).
+
+
+### Alegerea XSD pe server și compatibilitatea cu actualizările CNAS
+
+Clientul nu transmite numele XSD. Procesarea XML validează implicit cu schema
+selectată de bridge din operația salvată și parametrii ei (ex. partnerCategory).
+Pentru personalizare sunt incluse definițiile MF, CLIN, PARA, STOM, AMB, MD, HC,
+SPT, NHP, DIA, SICK, CBRET. PHM și REC au variante diferite: fără o identificare
+neambiguă serverul refuză validarea, nu ghicește. Fișierele vechi fără contextul
+schemei produc aceeași eroare. Descărcarea originalului ZIP/PDF fără procesare
+rămâne neschimbată.
+
+Dacă CNAS actualizează XML/XSD înaintea bridge-ului, se poate cere explicit:
+~~~js
+file: {unzip:true, format:&#x27;json&#x27;, validateXSD:false}
+~~~
+Pentru callback: callwmapi.file:{unzip:true,validateXSD:false}.
+False dezactivează doar verificarea XSD; XML-ul malformat, DTD și limitele de
+procesare rămân verificate. Nu există fallback automat după o eroare XSD.
+Această opțiune privește procesarea fișierelor de răspuns, nu dezactivează
+validările existente ale XML-ului de raportare trimis către CNAS.
+
+
+### Exemple browser actualizate
+[Ghid practic objWSMSIUI și callwmapi](../../../../wsm-server/docs/siui-browser-quickstart.md):
+cod JavaScript lizibil pentru asigurat, personalizare și validare 72h, progres,
+confirmarea livrării și ajustări locale. Numele implementat este callwmapi;
+callwsapi nu este o opțiune implementată.
+
+## Arhivare asincronă SIUI Bridge History
+
+Apelurile noi sunt înregistrate în outbox local și livrate când sincronizarea este activă.
+`call.history` expune `{status, attempts, error}` separat de rezultatul CNAS și `callwmapi`.
+Administrator: `/api/siui-history-sync/settings` GET/PUT, `/status` GET, `/test` POST, `/retry` POST.
+Sunt accesibile și prin WSM `api.request`. Vezi
+[contractul complet History](../../siui-bridge-history/docs/API.md).
+
+## Operations — jurnal local și acces History
+
+Meniul principal **Operations** (`/operations`), la același nivel cu Settings,
+afișează apelurile din `siui_calls` și validările din `siui_jobs`. Include și
+operațiile pasive înregistrate de Bridge. Implicit selectează ziua curentă în
+fusul browserului, cu intervalul complet; se pot filtra orele, operația, starea
+și `operation_id`. Lista se reîncarcă la 3 secunde, cu pagini de 100 de apeluri.
+Administratorul vede toate apelurile; ceilalți utilizatori văd numai apelurile
+identității autentificate. Un utilizator HTTP și un subiect WSM nu sunt uniți
+automat doar pentru că au aceeași denumire.
+
+Endpointuri disponibile prin HTTP(S) autentificat și WSM `api.request`:
+
+- `GET /api/siui/operations?from=&lt;RFC3339&gt;&amp;to=&lt;RFC3339&gt;&amp;operation_id=...&amp;operation=...&amp;status=...&amp;offset=0`
+  — `calls`, `total`, `offset`, `next_offset`; `to` este exclusiv. Fără from/to,
+  API-ul folosește întreaga zi curentă în fusul serverului.
+- `GET /api/siui/operations/{id}` — cerere (`parameters`), rezultat/eroare,
+  apelant, IP, conexiune WSM, timpi, evoluția stărilor și starea sincronizării History.
+- `GET /api/siui/operations/{id}/file?offset=0` — fișierul local, în fragmente,
+  cu aceleași reguli de acces ca detaliile apelului.
+- `GET /api/siui/operations/{id}/history` — înregistrarea din History, prin proxy
+  autentificat server–server. Cheia History nu ajunge în browser.
+- `GET /api/siui/operations/{id}/history/{artifact}` — descărcare din History,
+  transmisă în flux; cu `?offset=0` întoarce JSON `data_base64`, `next_offset`,
+  `size`, în fragmente de maximum 256 KiB, inclusiv prin WSM.
+
+Stările reale sunt `queued`, `running`, `completed`, `failed`, `unknown`.
+`completed` înseamnă încheierea execuției; rezultatul poate conține erori de
+business CNAS. Evenimentele noi sunt salvate tranzacțional în
+`siui_operation_events`. Pentru apelurile anterioare actualizării se păstrează
+starea existentă cu `snapshot=true`, fără a inventa timestampul tranziției.
+Metadatele apelantului sunt în `siui_operation_sources`. Cererea, rezultatul,
+sursa și evenimentele sunt incluse și în `record-gzip` pentru arhivările noi.
+Nu este o captură de trafic TLS/SOAP; sunt datele cererii și rezultatului păstrate
+de Bridge. Fișierele descărcate rămân fișiere, fără conversie implicită în JSON.
+
+IP-ul HTTP este peer-ul conexiunii (poate fi un proxy). IP-ul WSM este adăugat
+de WSM Server în `sender_ip`, suprascriind orice valoare furnizată de client.
+Necesită actualizarea serverului WSM pentru această metadată. Cu un server vechi
+sau pentru apeluri vechi, IP-ul poate fi indisponibil; conexiunea și proprietarul
+sunt afișate când există. Nu se deduce IP-ul utilizatorului din antete neverificate.
+Linkurile History funcționează numai pentru destinația/identitatea la care s-a
+trimis apelul. Indisponibilitatea History nu blochează lista sau detaliile locale.
+
+
+## Dashboard operațional și filtre Operations
+
+Pagina principală SIUI Bridge prezintă apelurile completed/failed/unknown, rata de finalizare,
+graficele de activitate și distribuție, volumul pe operație, încărcarea cozilor, OCSP, WSM,
+livrările History/callwmapi, operațiile active și ultimele erori. Actualizare la 5 secunde.
+Completed înseamnă finalizare tehnică, nu acceptare medicală/decontare.
+
+Dashboard și Operations oferă Azi, Ieri, Săptămâna curentă (de luni), Ultimele 7 zile,
+Luna curentă și Personalizat. Săptămâna/luna se termină la sfârșitul zilei curente.
+Operations permite zile și ore diferite de început/final, Operation ID, operație și stare.
+Ora finală goală include întreaga zi finală; altfel ora finală este exclusivă.
+Datele sunt interpretate în fusul browserului, apoi transmise API în RFC3339.
+Implicit este selectată întreaga zi curentă. Lista se actualizează la 3 secunde.
+Taguri: completed/archived verde, running albastru, queued/pending/unknown galben,
+failed roșu. Detalii păstrează tranzițiile, cererea/răspunsul și accesul History/fișiere.
+
+### API dashboard
+
+- `GET /api/siui/dashboard?from=&lt;RFC3339&gt;&amp;to=&lt;RFC3339&gt;`: maxim 31 zile calendaristice;
+  implicit ziua serverului. Returnează counts, hourly, by_operation, queue,
+  recent_failures, deliveries, runtime, ocsp, endpoints și endpoint_evidence.
+- `POST /api/siui/dashboard/checks`: administrator; sonde HEAD pe adresele configurate,
+  timeout 6 secunde/URL, maximum 4 simultan, cache 60 secunde. Dashboardul le cere
+  automat cel mult o dată pe minut. Nu folosesc tokenul sau PIN-ul.
+- Rutele sunt disponibile și prin transportul WSM API existent, cu aceleași drepturi.
+
+Statisticile apelurilor și livrările respectă proprietarul: administratorul vede întregul
+bridge; utilizatorul obișnuit vede apelurile proprii. Încărcarea runtime este globală.
+Coada activă (primele 100), livrările și ultimele erori sunt independente de interval.
+Dashboardul citește metadatele locale fără să descarce arhive/parseze XML-uri mari.
+
+Sondele verifică strict TLS, fără excepțiile transportului nativ și fără certificat client.
+HTTP 401/403/405 arată doar că serverul răspunde, nu confirmă funcționarea SOAP.
+Erorile TLS ale sondelor pot coexista cu apeluri native reușite. Fiecare serviciu afișează
+separat ultima operație completed și ultima failed/unknown: observații istorice, nu teste
+live ale adresei configurate acum.
+
+OCSP afișează sesiunea procesului curent, ultima încercare/reușită și timpul rămas pentru
+reutilizare, fără a expune tokenul. Expirarea cache-ului nu indică indisponibilitate.
+Testul OCSP este manual, pentru administrator, și poate declanșa dialogul PIN.
+
+Numele fișierelor descărcate folosește parametrul `fileName` din URL-ul CNAS,
+cu extensia `.zip` sau `.xml` detectată din conținutul original. Exemplu:
+`/svapntws/download?fileName=7pf6aug8hu06t1k5ff9gnc` produce
+`7pf6aug8hu06t1k5ff9gnc.zip` pentru ZIP sau `.xml` pentru XML.
+Metadatele `result.file.filename` și `content_type` sunt păstrate și în arhiva History.
+
+
+## Cererea SIUI și fișierele trimise
+
+Operations (Bridge) și Istoric (History) oferă parametrii cererii, separat de rezultat/eroare.
+Parametrii aplicației sunt păstrați integral în `record.json.gz`; pentru apelurile noi,
+copia din SQLite nu mai este golită după arhivare. Nu se adaugă PIN-ul, cheia privată
+sau tokenurile de autentificare în această secțiune.
+
+Câmpurile XML (`xml`, `reportXML`, `reportXml`, `requestXml`) se arhivează și separat,
+cu nume `request-&lt;parametru&gt;`, păstrând exact octeții textului primit. `invoiceFile`
+Base64 se decodează în `invoiceFile.zip` fără modificarea arhivei semnate.
+Fișierele au dimensiune și SHA-256 în manifest și folosesc transferul reluabil existent.
+Un fișier asociat unui apel queued/failed dovedește conținutul cererii, nu că SIUI l-a primit;
+verifică starea și răspunsul operației.
+
+- Bridge: `GET /api/siui/operations/{id}/request?name=request-reportXML`
+  descarcă fișierul local; `offset` cere fragmente JSON Base64 pentru WSM.
+  Metadatele de download sunt în `call.request_files`.
+- History: `GET /api/history/calls/{id}/request?bridge=&lt;bridge&gt;` afișează parametrii
+  din arhiva confirmată. Parametrul bridge este necesar pentru administrator.
+- Prin Bridge: `GET /api/siui/operations/{id}/history/request` citește aceeași cerere
+  fără expunerea credențialelor History. Fișierele folosesc rutele de download existente.
+
+Previzualizarea limitează fiecare valoare la 4096 octeți; datele originale rămân intacte.
+History limitează citirea pentru previzualizare la 64 MiB decomprimați; peste această
+limită se descarcă arhiva integrală. Pentru arhivele mai vechi cererea rămâne în
+`record.json.gz`; fișierele separate nu sunt generate retroactiv. Dacă vechiul Bridge
+a golit copia locală, folosește „Vezi cererea arhivată” din detaliile History.
+
+
+## Administrare spațiu local
+
+Dashboard → Spațiu local · descărcări SIUI (administrator) arată dimensiunea în MB/GB,
+numărul de fișiere și procentul eliberabil față de totalul descărcărilor locale, nu față
+de capacitatea discului. „Actualizează spațiul” rescanează directorul fără a citi conținutul
+arhivelor. „Șterge copiile locale arhivate” cere confirmare și verifică SHA-256 înainte
+să elimine fiecare fișier. Sunt păstrate fișierele fără confirmare History, cele cu hash
+necorespunzător și cele asociate callbackurilor care nu sunt delivered (inclusiv failed,
+pentru a permite reîncercarea). Cererile, metadatele și istoricul nu sunt șterse.
+
+Fișierele noi sunt în `&lt;director SQLite&gt;/siui-downloads/AN/LUNA/AAAA-LL-ZZ/&lt;call_id&gt;`,
+folosind data UTC a descărcării. La verificarea spațiului, fișierele vechi din rădăcină
+sunt mutate folosind data UTC a apelului (data fișierului dacă apelul nu mai există).
+Citirea acceptă ambele structuri în timpul migrării. Nu se suprascriu fișiere existente.
+Fișierele deschise/transferurile sunt protejate prin lock; dacă sunt ocupate, administrarea
+răspunde 409 și poate fi reîncercată. Curățarea este manuală, fără retenție automată.
+
+API HTTP/WSM, administrator:
+- `GET /api/siui/downloads/storage`: statistici și migrare a structurii vechi.
+- `POST /api/siui/downloads/storage` cu `{&quot;confirm&quot;:true}`: curățare; întoarce
+  `removed_files`, `removed_bytes` și `errors` în obiectul `storage`.
+
+După curățare, descărcarea originalului prin API Bridge este preluată din History,
+folosind destinația autorizată a apelului. History trebuie să fie disponibil. Procesarea
+locală ulterioară (unzip/XSD/JSON) pe un fișier eliminat întoarce o eroare explicită;
+nu întoarce în locul rezultatului procesat arhiva brută. Originalul rămâne descărcabil din History.
+
+
+## Prescripții: carnete, prescriere și eliberare
+
+Catalogul include toate cele 13 operații din `EPrescriptionWS`, cele două operații de carnete din `SiuiWS` și `getPrescription` / `validatePrescription` din `SiuiValidateWS`. Metodele adăugate:
+
+| Metodă singleton | Parametri WSDL, în ordine | Modifică CNAS |
+| --- | --- | --- |
+| `general.generatePrescriptionSeries` | `categoryCode` (string), `orgUnitCode` (string), `uic` (string), `subUnitCode` (string), `validFrom` (dateTime), `isOnLine` (boolean), `quantity` (int) | Da |
+| `general.getPrescriptionSeriesInfo` | `categoryCode` (string), `orgUnitCode` (string), `uic` (string), `subUnitCode` (string) | Nu |
+| `clinice.processIssuedPrescription` | `reportXml` (string) | Da |
+| `clinice.cancelReleasedPrescription` | `providerCode` (string), `workplaceCode` (string), `insuranceHouseCode` (string), `series` (string), `no` (string), `fractionNo` (int), `cancellationReason` (string) | Da |
+| `clinice.updateInvoices` | `requestXml` (string) | Da |
+| `clinice.getReleasedPrescription` | `providerCode` (string), `workplaceCode` (string), `insuranceHouseCode` (string), `series` (string), `no` (string), `fractionNo` (int) | Nu |
+
+Toți parametrii se trimit ca șiruri JSON, cu excepția parametrilor declarați nullable. Pentru cele două operații de carnete, `subUnitCode` acceptă și JSON `null`, transmis SOAP ca `xsi:nil=&quot;true&quot;`. Acesta este cazul unității cu personalitate juridică și contract direct cu CAS. Pentru o subunitate, se transmite `partnerCode` din personalizare. Nu folosi textul `&quot;null&quot;`. Un câmp nullable gol în Debug este trimis ca null; API-ul distinge între null și șirul gol. `isOnLine` acceptă exact `&quot;true&quot;`, `&quot;false&quot;`, `&quot;1&quot;`, `&quot;0&quot;`; `quantity` și `fractionNo` sunt șiruri de întregi pe 32 de biți. Carnetele sunt în GENERAL deoarece acesta este serviciul lor CNAS. Nu există parametru `stencilNo` la aceste două operații: `categoryCode`, `orgUnitCode`, `uic` și `subUnitCode` trebuie completate conform identității contractuale CNAS, fără a presupune că `subUnitCode` este parafa medicului.
+
+`getPrescriptionSeriesInfo` interoghează carnetele existente la CNAS pentru parametrii furnizați, inclusiv cele generate prin altă aplicație dacă sunt accesibile aceleiași identități. WSDL-ul nu garantează că aceasta este lista tuturor carnetelor unui medic, indiferent de furnizor/contract. `generatePrescriptionSeries` generează carnete cu `validFrom`, `isOnLine` și `quantity`. Conform specificației PIAS §5.20, cele două valori din `result.data.result.values` sunt URL-ul fișierului de răspuns și dimensiunea lui. Backend-ul descarcă fișierul de pe aceeași origine HTTPS CNAS; singletonul returnează implicit conținutul ca `result.data.download.data` / `bytes` (Uint8Array), cu metadate în `result.data.result.file`. `download:false` oprește transferul browserului, fără a anula descărcarea backend-ului. Conținutul fișierului trebuie interpretat pentru a extrage carnetele; valorile SOAP nu sunt lista de carnete.
+
+- Prescriere/validare PE: `clinice.processPrescribedPrescription({reportXml}, options)`, cu verificare locală `PhysicianDrugPERequest.xsd` înainte de trimitere.
+- Preluare/anulare prescriere: `clinice.getPrescribedPrescription` / `clinice.cancelPrescribedPrescription`.
+- Eliberare la farmacie: `clinice.processIssuedPrescription`, `clinice.getReleasedPrescription`, `clinice.cancelReleasedPrescription`. „Issued/released” desemnează eliberarea, nu prescrierea de către medic.
+- Spitalizare: `clinice.processHospitalPrescription`, `clinice.getReleasedHospitalPrescription`, `clinice.cancelReleasedHospitalPrescription`.
+- Consultare/rapoarte: `clinice.getStatusForPrescriptions`, `clinice.getPrescribedPrescriptionsForCid`, `clinice.downloadNotReportedPrescriptionsReport`; `clinice.updateInvoices` actualizează facturile în serviciul PE.
+- Prescripții SIUI clasice: `clinice.getPrescription` și `clinice.validatePrescription` (distincte de PE).
+
+### Online și offline
+
+`isOnLine:&quot;false&quot;` generează un carnet pentru fluxul offline; apelul de generare în sine necesită conexiune CNAS. În schema PE inclusă, atributul rețetei `reportedOnline=&quot;0&quot;` înseamnă prescriere offline de medic și validare online de farmacie; `reportedOnline=&quot;1&quot;` înseamnă prescriere și validare online de medic. Schema cererii permite și `senderType=&quot;M&quot;` / `&quot;F&quot;`, precum și `isCancelled` pe rețetă. Aceste câmpuri nu înlocuiesc operațiile SOAP de anulare și nu garantează acceptarea de CNAS a oricărei combinații.
+
+Emiterea fără conexiune, alegerea și consumul unui număr din carnet, stocarea rețetei, tipărirea și sincronizarea ulterioară sunt responsabilitatea aplicației WiseMED. Bridge-ul nu implementează registrul local de carnete și nu rezervă automat numere pentru mai multe stații. Nu există validare de business CNAS fără conexiune și nici retrimitere automată a rețetelor la reconectare.
+
+`processIssuedPrescription` și `updateInvoices` verifică XML-ul sintactic; în resursele incluse nu există XSD-uri de cerere pentru aceste două operații. Nu se aplică schema medicului la eliberarea farmaciei. Regulile de business se evaluează de CNAS. `success:true` / `completed` confirmă primirea răspunsului, nu acceptarea rețetei/carnetului; verifică valorile/XML-ul CNAS.
+
+Folosește un `operationId` stabil pentru fiecare intenție de modificare. După timeout sau `unknown`, urmărește apelul existent și reconciliază prin operațiile de preluare înainte de a iniția altă modificare. Nu genera un ID nou doar pentru a repeta generarea carnetului.
+
+Exemplele cu spinner, callback și `$.aceOverWatch` sunt în `examples/browser/siui-prescriptions.js` din pachetul WSM (în repository: `wsm-server/examples/browser/siui-prescriptions.js`).
+
+```js
+const parameters = {categoryCode: &quot;...&quot;, orgUnitCode: &quot;...&quot;, uic: &quot;...&quot;, subUnitCode: null};
+await SIUIPrescriptions.getPrescriptionSeriesSIUI(target, parameters,
+    function(responseReceived, values, errorMsg, call) {
+        if (!responseReceived) return;
+        console.log(values); // interpretează răspunsul real CNAS
+    });
+
+// Creează și păstrează împreună acest ID și acești parametri pentru aceeași intenție.
+const generationId = crypto.randomUUID();
+const generationParameters = {...parameters,
+    validFrom: moment().format(&quot;YYYY-MM-DDTHH:mm:ssZ&quot;),
+    isOnLine: &quot;false&quot;, quantity: &quot;1&quot;
+};
+await SIUIPrescriptions.generatePrescriptionSeriesSIUI(target, generationParameters,
+    generationId, function(responseReceived, values, errorMsg, call) {
+        if (!responseReceived) return;
+        console.log(values); // verifică acceptarea CNAS înainte de mesajul de succes
+    });
+```
 </pre></html>

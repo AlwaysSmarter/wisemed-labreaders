@@ -46,11 +46,12 @@ func (s *windowsPINSigner) Sign(_ io.Reader, digest []byte, opts crypto.SignerOp
 	if len(pin) == 0 {
 		return nil, errors.New("PIN automat suspendat; reluați operația cu introducere manuală")
 	}
+	pinRejected := false
 	defer func() {
 		if err == nil {
 			err = verifyTokenSignature(s.public, digest, sig, opts)
 		}
-		finish(err == nil)
+		finish(signingPINOutcome(pinRejected, err))
 	}()
 	var key windows.Handle
 	var spec uint32
@@ -69,7 +70,7 @@ func (s *windowsPINSigner) Sign(_ io.Reader, digest []byte, opts crypto.SignerOp
 		}()
 	}
 	if !free {
-		return nil, errors.New("Driver returned a shared key; automatic PIN disabled to avoid retaining credentials")
+		return nil, errors.New("Driver returned a shared key; cannot supply PIN for this operation without retaining credentials")
 	}
 	if spec == windows.CERT_NCRYPT_KEY_SPEC {
 		p, e := windows.UTF16FromString(string(pin))
@@ -80,6 +81,7 @@ func (s *windowsPINSigner) Sign(_ io.Reader, digest []byte, opts crypto.SignerOp
 		result, _, _ := nSet.Call(uintptr(key), uintptr(unsafe.Pointer(wide("SmartCardPin"))), uintptr(unsafe.Pointer(&p[0])), uintptr(len(p)*2), 0x40)
 		runtime.KeepAlive(p)
 		if result != 0 {
+			pinRejected = windowsPINRejected(uint32(result))
 			return nil, fmt.Errorf("Token PIN configuration failed (0x%x); use manual authentication", result)
 		}
 		name := ""
@@ -113,14 +115,16 @@ func (s *windowsPINSigner) Sign(_ io.Reader, digest []byte, opts crypto.SignerOp
 		var size uint32
 		result, _, _ = nSign.Call(uintptr(key), info, uintptr(unsafe.Pointer(&digest[0])), uintptr(len(digest)), 0, 0, uintptr(unsafe.Pointer(&size)), flags|0x40)
 		if result != 0 || size == 0 || size > 16384 {
-			return nil, errors.New("Token signing initialization failed; automatic PIN suspended")
+			pinRejected = windowsPINRejected(uint32(result))
+			return nil, fmt.Errorf("Token signing initialization failed (0x%x)", result)
 		}
 		out := make([]byte, size)
 		result, _, _ = nSign.Call(uintptr(key), info, uintptr(unsafe.Pointer(&digest[0])), uintptr(len(digest)), uintptr(unsafe.Pointer(&out[0])), uintptr(size), uintptr(unsafe.Pointer(&size)), flags|0x40)
 		runtime.KeepAlive(padding)
 		runtime.KeepAlive(digest)
 		if result != 0 {
-			return nil, fmt.Errorf("Token signing failed (0x%x); automatic PIN suspended, use manual authentication", result)
+			pinRejected = windowsPINRejected(uint32(result))
+			return nil, fmt.Errorf("Token signing failed (0x%x); check token/PIN status", result)
 		}
 		out = out[:size]
 		if _, ok := s.public.(*ecdsa.PublicKey); ok {
@@ -143,10 +147,11 @@ func (s *windowsPINSigner) Sign(_ io.Reader, digest []byte, opts crypto.SignerOp
 	if spec == windows.AT_KEYEXCHANGE {
 		param = 32
 	}
-	r, _, _ := cSet.Call(uintptr(key), param, uintptr(unsafe.Pointer(&p[0])), 0)
+	r, _, lastErr := cSet.Call(uintptr(key), param, uintptr(unsafe.Pointer(&p[0])), 0)
 	runtime.KeepAlive(p)
 	if r == 0 {
-		return nil, errors.New("CSP PIN configuration failed; use manual authentication")
+		pinRejected = windowsPINErrorRejected(lastErr)
+		return nil, fmt.Errorf("CSP PIN configuration failed: %v", lastErr)
 	}
 	var alg uintptr
 	switch opts.HashFunc() {
@@ -171,14 +176,16 @@ func (s *windowsPINSigner) Sign(_ io.Reader, digest []byte, opts crypto.SignerOp
 		return nil, errors.New("CSP hash setup failed")
 	}
 	var size uint32
-	r, _, _ = cHashSign.Call(hash, uintptr(spec), 0, 0, 0, uintptr(unsafe.Pointer(&size)))
+	r, _, lastErr = cHashSign.Call(hash, uintptr(spec), 0, 0, 0, uintptr(unsafe.Pointer(&size)))
 	if r == 0 || size == 0 || size > 16384 {
-		return nil, errors.New("CSP signature initialization failed")
+		pinRejected = windowsPINErrorRejected(lastErr)
+		return nil, fmt.Errorf("CSP signature initialization failed: %v", lastErr)
 	}
 	out := make([]byte, size)
-	r, _, _ = cHashSign.Call(hash, uintptr(spec), 0, 0, uintptr(unsafe.Pointer(&out[0])), uintptr(unsafe.Pointer(&size)))
+	r, _, lastErr = cHashSign.Call(hash, uintptr(spec), 0, 0, uintptr(unsafe.Pointer(&out[0])), uintptr(unsafe.Pointer(&size)))
 	if r == 0 {
-		return nil, errors.New("Token PIN/signature rejected; automatic PIN suspended, use manual authentication")
+		pinRejected = windowsPINErrorRejected(lastErr)
+		return nil, fmt.Errorf("Token signing failed: %v", lastErr)
 	}
 	out = out[:size]
 	for i, j := 0, len(out)-1; i < j; i, j = i+1, j-1 {

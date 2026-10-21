@@ -567,11 +567,14 @@ func TestEquipmentStatusAndScopedControlTickets(t *testing.T) {
 	send(t, ws, Envelope{Type: "hello", Payload: map[string]interface{}{"client_type": "browser", "client_id": "control"}})
 	readType(t, ws, "hello_ack")
 	req := command("api-1", &Target{Mode: "equipment", EquipmentID: "device-42"})
-	req.Payload = map[string]interface{}{"command": "api.request", "args": map[string]interface{}{"method": "GET", "path": "/api/status"}, "sender_subject": "spoof", "sender_scopes": []string{"root"}}
+	req.Payload = map[string]interface{}{"command": "api.request", "args": map[string]interface{}{"method": "GET", "path": "/api/status"}, "sender_subject": "spoof", "sender_ip": "forged", "sender_scopes": []string{"root"}}
 	send(t, ws, req)
 	received := readType(t, reader, "command")
 	if received.Payload["sender_subject"] != "operator" {
 		t.Fatal("untrusted subject forwarded")
+	}
+	if received.Payload["sender_ip"] != "127.0.0.1" {
+		t.Fatalf("untrusted/missing source IP: %v", received.Payload["sender_ip"])
 	}
 	req.RequestID = "escape"
 	req.Target.EquipmentID = "other-device"

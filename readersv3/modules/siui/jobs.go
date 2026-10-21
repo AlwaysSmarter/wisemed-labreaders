@@ -79,12 +79,27 @@ func insertJob(db *sql.DB, owner, op, xml string) (Job, bool, error) {
 	}
 	id := hex.EncodeToString(random)
 	now := time.Now().UTC().Format(time.RFC3339Nano)
-	result, e := db.Exec(`INSERT INTO siui_jobs(id,owner,operation_id,digest,status,created_at,updated_at) VALUES(?,?,?,?,'queued',?,?) ON CONFLICT(owner,operation_id) DO NOTHING`, id, owner, op, digest, now, now)
+	tx, e := db.Begin()
+	if e != nil {
+		return Job{}, false, e
+	}
+	defer tx.Rollback()
+	result, e := tx.Exec(`INSERT INTO siui_jobs(id,owner,operation_id,digest,status,created_at,updated_at) VALUES(?,?,?,?,'queued',?,?) ON CONFLICT(owner,operation_id) DO NOTHING`, id, owner, op, digest, now, now)
 	if e != nil {
 		return Job{}, false, e
 	}
 	count, e := result.RowsAffected()
 	if e != nil {
+		return Job{}, false, e
+	}
+	if count == 1 {
+		parameters, _ := json.Marshal(map[string]string{"xml": xml, "reportType": "PARA", "requestType": "RQ_PARA_SRV"})
+		_, e = tx.Exec(`INSERT INTO siui_history_outbox(call_id,parameters) VALUES(?,?)`, id, string(parameters))
+		if e != nil {
+			return Job{}, false, e
+		}
+	}
+	if e = tx.Commit(); e != nil {
 		return Job{}, false, e
 	}
 	if count == 0 {

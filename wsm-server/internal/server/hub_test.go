@@ -89,3 +89,21 @@ func TestHubDuplicateAndBackpressure(t *testing.T) {
 		t.Fatal("not removed")
 	}
 }
+
+func TestHistoryDuplicateIdentityAndTypeRouting(t *testing.T) {
+	h := NewHub()
+	c := h.NewConnection(nil, "a", 8)
+	c.EquipmentID = "19"
+	if !h.Register(c, HelloPayload{ClientType: "siui-bridge-history", ClientID: "history", ReaderID: "siui-bridge-history"}) {
+		t.Fatal("history rejected")
+	}
+	other := h.NewConnection(nil, "a", 8)
+	other.EquipmentID = "19"
+	if h.Register(other, HelloPayload{ClientType: "siui-bridge-history", ClientID: "duplicate", ReaderID: "other-history"}) {
+		t.Fatal("duplicate equipment accepted")
+	}
+	browser := hubClient(h, "a", "browser", "browser", "")
+	if n := h.Route(Envelope{Type: "command", Target: &Target{Mode: "client_type", ClientType: "siui-bridge-history"}}, browser); n != 1 {
+		t.Fatalf("routed to %d histories", n)
+	}
+}

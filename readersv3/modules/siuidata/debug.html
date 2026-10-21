@@ -1,0 +1,146 @@
+<!doctype html><html lang="ro"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>SIUI Data · Debug API</title>
+<style>[hidden]{display:none!important}body{font:15px system-ui;background:#edf3f6;color:#142d40;margin:0}main{max-width:1200px;margin:auto;padding:24px}section{background:white;border:1px solid #dce7ed;padding:24px;border-radius:16px;margin:18px 0}label{display:block;margin:12px 0;color:#506a7c}input,select,textarea,button{font:inherit;padding:10px;border:1px solid #cbdbe3;border-radius:8px;box-sizing:border-box}input,select,textarea{width:100%;background:white;color:#142d40}textarea,pre,code{font-family:ui-monospace,monospace}button{background:#087f83;color:white;cursor:pointer;margin:4px 8px 4px 0}button:disabled{opacity:.5}.query-row{display:grid;grid-template-columns:1fr 2fr auto;align-items:start;gap:10px;margin:10px 0}.toolbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap}pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:650px;overflow:auto;background:#f4f8fa;padding:16px;border-radius:10px}a{color:#087f83}#request-url{word-break:break-all}#status{white-space:pre-wrap}.embedded nav{display:none}.embedded main{padding:0}@media(max-width:600px){.query-row{grid-template-columns:1fr}section{padding:14px}}</style>
+<main><nav><a href="/">← WiseMED</a> · <a href="/siui-data-dashboard">Nomenclatoare</a> · <a href="/siui-data-versions">Versiuni</a></nav><h1>Debug · Explorator API</h1><p>Construiește și execută cereri SIUI Data cu sesiunea curentă. Pentru mai multe valori introdu un array JSON, de exemplu <code>["CARD", "DERM"]</code>. Valorile unui filtru se combină prin OR; filtrele diferite prin AND.</p>
+<section><label>Endpoint<select id="endpoint"></select></label><label id="path-label" hidden>Cod / tip înregistrare / importId<input id="path-value"></label><h2>Query</h2><div id="query"></div><button id="add" type="button">+ Parametru</button><label id="json-label" hidden>Body JSON<textarea id="body" rows="7">{}</textarea></label><label id="file-label" hidden>Arhivă ZIP<input id="file" type="file" accept=".zip,application/zip"></label><h2>URL final</h2><div class="toolbar"><strong id="method"></strong><code id="request-url"></code></div><p><button id="copy" type="button">Copiază URL</button><button id="run" type="button">Execută cererea</button></p></section>
+<section><h2>Răspuns</h2><p id="status" role="status">Nicio cerere executată.</p><pre id="response"></pre></section></main>
+<script>
+const $=id=>document.getElementById(id);
+if(window.parent!==window||new URLSearchParams(location.search).has('embedded'))document.documentElement.classList.add('embedded');
+const endpoints=[
+ ['GET','categories','Categorii',null,[['limit','50'],['start','0']]],['GET','status','Status'],['GET','debug','Definiție explorator Debug'],
+ ['GET','services','Servicii complete',null,[['type','CLIN'],['specialties','["CARD", "DERM"]'],['limit','50'],['start','0']]],
+ ['GET','targeted_services/{value}','Servicii țintite pe CUI','7991962',[['atDate',''],['limit','50'],['start','0']]],
+ ['GET','targeted-simple-services/{value}','Servicii țintite plate pe CUI','7991962',[['atDate',''],['limit','50'],['start','0']]],
+ ['GET','simple-services','Servicii simplificate',null,[['type','CLIN'],['limit','50'],['start','0']]],
+ ['GET','physicians','Medici cu specialități și contracte',null,[['source','CNAS'],['name','popescu'],['limit','50'],['start','0']]],
+ ['GET','simple-physicians','Medici și contracte în rânduri plate',null,[['source','CNAS'],['contractType','CLN'],['limit','50'],['start','0']]],
+ ['GET','physicians/{value}','Medic după parafă','A72003',[['source','CNAS']]],
+ ['HEAD','physicians/{value}','Existență medic după parafă','A72003',[['source','CNAS']]],
+ ['GET','physician-catalogues','Nomenclatoare de medici',null,[['limit','50'],['start','0']]],
+ ['GET','physician-records/{value}','Înregistrări brute de medici','PhysicianSpeciality',[['source','CNAS'],['limit','50'],['start','0']]],
+ ['GET','drugs','Medicamente complete',null,[['type','CLIN'],['name','paracetamol'],['limit','50'],['start','0']]],
+ ['GET','simple-drugs','Medicamente simplificate',null,[['type','CLIN'],['limit','50'],['start','0']]],
+ ['GET','drugs/{value}','Medicament după cod','W65330001',[['type','CLIN']]],
+ ['HEAD','drugs/{value}','Existență medicament','W65330001',[['type','CLIN']]],
+ ['GET','drug-compensations','Compensări și prețuri pe medicament',null,[['type','CLIN'],['copaymentListType','C1'],['maxPriceMin','10'],['maxPriceMax','100'],['limit','50'],['start','0']]],
+ ['GET','drug-relations','Toate relațiile medicamentelor',null,[['type','PHM'],['limit','50'],['start','0']]],
+ ['GET','drug-catalogues','Nomenclatoare de medicamente',null,[['type','PHM'],['limit','50'],['start','0']]],
+ ['GET','drug-records/{value}','Dicționar de medicamente','ActiveSubstance',[['type','PHM'],['limit','50'],['start','0']]],
+ ['GET','services/{value}','Serviciu după cod','001',[['type','CLIN']]],
+ ['HEAD','services/{value}','Existență serviciu','001',[['type','CLIN']]],
+ ['GET','catalogues','Tipuri de nomenclatoare',null,[['type','CLIN'],['limit','50'],['start','0']]],
+ ['GET','records/{value}','Înregistrări brute','Speciality',[['type','CLIN'],['limit','50'],['start','0']]],
+ ['GET','versions','Versiuni și verificări WSM',null,[['partnerCategory','CLIN'],['limit','50'],['start','0']]],
+ ['GET','imports/{value}','Status import',''],['DELETE','imports/{value}','Șterge versiune inactivă',''],
+ ['GET','settings','Configurație PostgreSQL'],['PUT','settings','Modifică configurația',null,[],{}],
+ ['GET','bridge/connections','Bridge-uri WSM',null,[['limit','50'],['start','0']]],
+ ['POST','bridge/sync','Preia și importă din WSM',null,[],{partnerCategory:'CLIN',connection_id:''}],
+ ['POST','auth/token','Emite token JWT (browser intern)',null,[],{cui:''}],
+ ['POST','/upload','Upload ZIP direct',null,[['type','CLIN']],'file'],
+ ['POST','upload','Upload ZIP prin API',null,[['type','CLIN']],'file'],
+ ['POST','import','Import ZIP prin API',null,[['type','CLIN']],'file']
+];
+function selected(){return endpoints[Number($('endpoint').value)]}
+const parameterHelp={
+ type:'Categoria sursei: CLIN, PARA, PHM sau PHYS (medici). Implicit CLIN. Pentru mai multe categorii folosește un array.',
+ partnerCategory:'Categoria CNAS. La versiuni acceptă toate cele 14 categorii; la căutare: CLIN, PARA, PHM; PHYS pentru medici.',
+ code:'Cod exact. Un array selectează oricare dintre coduri, fără duplicate în aceeași categorie.',
+ name:'Denumirea medicamentului, căutare parțială fără diferențe de majuscule sau diacritice.',
+ q:'Text liber. Maximum 8 cuvinte, minimum 2 caractere pe cuvânt. Cuvintele aceleiași expresii sunt obligatorii; array-ul oferă expresii alternative.',
+ specialty:'Cod exact de specialitate. Se returnează serviciile din oricare dintre specialitățile cerute.',
+ specialties:'Un cod de specialitate sau un array de coduri, de exemplu ["CARD", "DERM"]. Echivalent cu specialty.',
+ specialtyName:'Fragment din denumirea specialității, fără diferențe de majuscule/diacritice.',
+ group:'Cod exact al grupei serviciului.',package:'Cod exact al pachetului de servicii.',serviceType:'Tipul serviciului paraclinic, exact ca în sursa XML.',
+ activeSubstance:'Substanța activă (DCI), căutare parțială fără diferențe de majuscule/diacritice.',
+ activeSubstanceCode:'Codul DCI exact din nomenclator (de regulă numele substanței).',
+ concentration:'Fragment din concentrație, de exemplu 500 mg. Pentru egalitate exactă folosește concentrationCode.',
+ concentrationCode:'Concentrația exactă din nomenclator.',
+ pharmaceuticalForm:'Forma farmaceutică, de exemplu COMPR. sau CAPS.; căutare parțială.',
+ pharmaceuticalFormCode:'Codul exact al formei farmaceutice.',
+ presentationMode:'Modul de prezentare / ambalare: cutie, blister, flacon etc.; căutare parțială.',
+ company:'Producătorul, căutare parțială.',country:'Cod exact al țării de origine, de exemplu ROM.',
+ atc:'Cod ATC exact.',atcPrefix:'Prefix din ierarhia ATC, de exemplu N02.',
+ prescriptionMode:'Modul de prescriere din sursă, de exemplu OTC.',
+ isNarcotic:'Codul original CNAS pentru stupefiante. Este un string de clasificare, nu un boolean; de exemplu 0 sau 2.',
+ copaymentListType:'Codul listei de compensare, de exemplu A, B, C1. Se aplică pe aceeași asociere cu prețul, programul și aprobarea.',
+ copaymentListName:'Fragment din descrierea listei de compensare.',nhpCode:'Codul programului național (PNS), de exemplu 3 sau 9.1.',
+ nationalProgramName:'Fragment din descrierea programului național.',
+ diseaseCode:'Codul categoriei de boală din asocierea de compensare, de exemplu G15. Nu este codul ICD10 numeric.',
+ diseaseName:'Fragment din descrierea categoriei de boală / diagnosticului specific asocierii.',
+ diagnosisCode:'Cod ICD10 legat explicit de substanța activă prin ActSubstICD10.',diagnosisName:'Fragment din numele diagnosticului ICD10 legat de substanța activă.',
+ hgIcd10:'Codul hgIcd10 specific asocierii de compensare.',
+ needApproval:'Comisie/aprobare: 0 = fără, M = Ministerul Sănătății, P = Ministerul Sănătății Publice, S = specialist, N = CNAS, J = CJAS, A = ANT.',
+ commission:'Alias pentru needApproval. Codul aprobării/comisiei: 0, M, P, S, N, J sau A.',commissionName:'Fragment din denumirea aprobării/comisiei.',
+ contractCv:'Tip contract: 0 = fără, V = cost-volum, R = cost-volum-rezultat.',classifInsulin:'Clasificarea CNAS pentru insulină: I, A, T sau 0.',
+ sourceKind:'Originea relației: CopaymentListDrug, CopaymentListActiveSubst, CopaymentListProtocolTherapeutic sau NHP_DRUG.',
+ kind:'Tipul înregistrării CNAS: Drug, ActiveSubstance, Concentration, PharmaceuticalForm, CopaymentListDrug etc.',
+ includeInactive:'true include și istoricul, datele viitoare și perioadele invalide. Implicit false. O singură valoare.',
+ limit:'Numărul maxim de elemente din pagină: 1–1000, implicit 50. O singură valoare.',
+ start:'Offset de la zero: 0 pentru prima pagină, 50 pentru a doua la limit=50. O singură valoare.',
+ after:'Cursor alternativ pentru servicii/înregistrări dintr-o singură categorie. Nu îl combina cu start > 0.',
+ supported:'true pentru categorii cu import implementat; false pentru cele planificate.',
+ 'attr.*':'Egalitate pe un atribut original al serviciului/medicamentului/înregistrării. Completează numele atributului în câmpul suplimentar.',
+ 'compensation.attr.*':'Egalitate pe atributul unei relații medicamentoase. Se combină cu celelalte filtre de preț/listă/program pe aceeași relație.'
+};
+for(const name of ['isExam','opRoom','isConnectedService','highLevel','recByPC','formula','inClinic','isSpecial','isBrand','isFractional','hasBioEchiv','specialLaw','needSpecialty','overValue','openCircuit'])parameterHelp[name]=({isSpecial:'Medicament special.',isBrand:'Medicament de marcă.',isFractional:'Medicament fracționabil.',hasBioEchiv:'Are bioechivalență.',specialLaw:'Eliberare în baza unei legi speciale.',needSpecialty:'Necesită recomandare de la medic specialist.',openCircuit:'Decontare în circuit deschis.',overValue:'Poate depăși plafonul listei.',isExam:'Serviciu de consultație/examinare.',opRoom:'Serviciu asociat sălii de operație.',isConnectedService:'Serviciu conex.'}[name]||'Flag CNAS '+name+'.')+' Valori true / false (sau 1 / 0).';
+for(const [name,description] of [['maxPrice','Preț maximal din asocierea listei de compensare'],['referencePrice','Preț de referință din asocierea listei de compensare'],['maxPriceUT','Preț maximal UT, exact cum este denumit în sursa CNAS'],['pricePerPackage','Preț pe ambalaj din definiția medicamentului']]){
+ parameterHelp[name]=description+'. Egalitate numerică; separator zecimal punct. Nu se combină valorile din asocieri diferite.';
+ parameterHelp[name+'Min']=description+': limita inferioară inclusivă a intervalului. O singură valoare, de exemplu 10.50.';
+ parameterHelp[name+'Max']=description+': limita superioară inclusivă a intervalului. O singură valoare, de exemplu 100.00.';
+}
+const serviceParameters=['type','partnerCategory','code','name','nameAll','q','qAll','specialties','specialty','specialtyName','specialtyNameAll','group','package','serviceType','isExam','opRoom','isConnectedService','highLevel','recByPC','formula','inClinic','attr.*','limit','start','after'];
+const physicianParameters=['source','stencil','name','nameAll','q','qAll','specialties','specialtyName','specialtyNameAll','contractType','contractNo','physicianType','insuranceHouse','insuranceHouseName','insuranceHouseNameAll','insuranceHouseType','attr.*','association.attr.*','limit','start'];
+const medicineTextParameters=['name','activeSubstance','concentration','pharmaceuticalForm','presentationMode','company','diseaseName','nationalProgramName','copaymentListName','commissionName','diagnosisName'];
+const medicineParameters=['qAll','type','partnerCategory','code','name','q','activeSubstance','activeSubstanceCode','concentration','concentrationCode','pharmaceuticalForm','pharmaceuticalFormCode','presentationMode','company','country','atc','atcPrefix','prescriptionMode','isNarcotic','isSpecial','isFractional','isBrand','hasBioEchiv','copaymentListType','copaymentListName','nhpCode','nationalProgramName','diseaseCode','diseaseName','diagnosisCode','diagnosisName','hgIcd10','needApproval','commission','commissionName','contractCv','classifInsulin','sourceKind','specialLaw','needSpecialty','overValue','openCircuit','maxPrice','maxPriceMin','maxPriceMax','referencePrice','referencePriceMin','referencePriceMax','maxPriceUT','maxPriceUTMin','maxPriceUTMax','pricePerPackage','pricePerPackageMin','pricePerPackageMax','attr.*','compensation.attr.*',...medicineTextParameters.map(name=>name+'All'),'limit','start'];
+function endpointParameters(){const route=selected()[1];
+ if(route.startsWith('targeted'))return ['atDate','code','name','nameAll','q','qAll','specialties','specialtyName','specialtyNameAll','group','package','isExam','opRoom','isConnectedService','attr.*','limit','start'];
+ if(['physicians','simple-physicians'].includes(route))return physicianParameters;
+ if(route==='physicians/{value}')return ['source'];
+ if(route==='physician-catalogues')return ['kind','limit','start'];
+ if(route.startsWith('physician-records/'))return ['source','code','name','nameAll','q','qAll','attr.*','includeInactive','limit','start'];
+ if(['drugs','simple-drugs','drug-compensations','drug-relations'].includes(route))return medicineParameters;
+ if(route==='simple-services')return serviceParameters.filter(name=>name!=='after');
+ if(route==='services')return serviceParameters;
+ if(route.includes('/{value}')&&(route.startsWith('services/')||route.startsWith('drugs/')))return ['type'];
+ if(route.startsWith('records/')||route.startsWith('drug-records/'))return ['type','partnerCategory','code','name','nameAll','q','qAll','attr.*','includeInactive','limit','start','after'];
+ if(route==='catalogues'||route==='drug-catalogues')return ['type','partnerCategory','kind','limit','start'];
+ if(route==='versions')return ['partnerCategory','type','limit','start'];
+ if(route==='categories')return ['code','partnerCategory','name','group','supported','limit','start'];
+ if(route==='bridge/connections')return ['limit','start'];
+ if(['/upload','upload','import'].includes(route))return ['type'];
+ return [];
+}
+
+function parameterDescription(name){const base=name.endsWith('All')?name.slice(0,-3):name;const help=baseParameterDescription(base);if(endpointParameters().includes(base+'All'))return help+(name.endsWith('All')?' Toate fragmentele sunt obligatorii (AND), fără ordine impusă.':' Array-ul selectează oricare dintre fragmente (OR); pentru toate fragmentele folosește '+base+'All.');return help}
+function baseParameterDescription(name){const route=selected()[1];if(name==='atDate')return 'Data profilului de client, YYYY-MM-DD. Implicit azi în Europe/Bucharest. Filtrele obligatorii din personalizarea CLIN nu pot fi lărgite prin query.';if(route.includes('physician')){const help={source:'Sursa medicilor: CNAS sau OPSNAJ. Parafa se identifică împreună cu sursa.',stencil:'Parafa exactă a medicului.',name:'Fragment din numele medicului, fără diferențe de majuscule sau diacritice.',contractType:'Tipul exact de contract din SIUI: CLN, SPT, CMG, STM, PAR, PNS etc.',contractNo:'Numărul exact al contractului.',physicianType:'Tipul exact al medicului din SIUI: A, H, F, P, S.',insuranceHouse:'Codul casei de asigurări, de exemplu CAS-BV sau AOPSNAJ.',insuranceHouseName:'Fragment din numele casei de asigurări.',insuranceHouseType:'Tipul casei de asigurări, de exemplu CJAS.', 'association.attr.*':'Atribut XML original al asocierii medic–specialitate–contract.'};if(help[name])return help[name];}if(['simple-services','simple-drugs','simple-physicians','targeted-simple-services/{value}'].includes(route)){if(name==='start')return 'Poziția primului rând plat după expandarea relațiilor (0, 50, 100…).';if(name==='limit')return 'Numărul maxim de rânduri plate returnate pe pagină (implicit 50).';}if(route==='categories'){if(name==='name')return 'Denumirea exactă a categoriei CNAS.';if(name==='group')return 'Grupul categoriei, de exemplu Asistență medicală sau Medicamente.';if(name==='code')return 'Codul categoriei: MF, PHM, CLIN, PARA etc.'}if((route.startsWith('records/')||route.startsWith('drug-records/'))&&name==='q')return 'Fragment din denumirea sau descrierea înregistrării, fără diferențe de majuscule sau diacritice.';if(name==='type'&&(['upload','import','/upload'].includes(route)||route.startsWith('drugs/')||route.startsWith('services/')))return 'Un singur tip de nomenclator: CLIN, PARA, PHM sau PHYS (medici).';return parameterHelp[name]||'Valoare exactă din nomenclator.'}
+function addRow(name='',value=''){
+ const names=endpointParameters();if(!names.length)return;
+ const row=document.createElement('div');row.className='query-row';
+ const field=document.createElement('div'),key=document.createElement('select'),custom=document.createElement('input'),help=document.createElement('small'),val=document.createElement('input'),remove=document.createElement('button');
+ key.setAttribute('aria-label','Variabilă query');val.setAttribute('aria-label','Valoare query');custom.setAttribute('aria-label','Nume atribut original');
+ for(const name of names){const option=document.createElement('option');option.value=name;option.textContent=name;key.append(option)}
+ key.value=names.includes(name)?name:names[0];val.value=value;custom.placeholder='Nume atribut original, ex. company';custom.hidden=true;help.style.cssText='display:block;font-size:12px;color:#61778a;line-height:1.5;margin-top:6px';val.placeholder='String simplu sau ["A", "B"]';
+ row.parameterSelect=key;row.valueInput=val;row.customAttribute=custom;
+ const describe=()=>{custom.hidden=!key.value.endsWith('.*');help.textContent=parameterDescription(key.value);if(!['limit','start','after','includeInactive','atDate'].includes(key.value)&&!key.value.endsWith('Min')&&!key.value.endsWith('Max')&&!(key.value==='type'&&(['upload','import','/upload'].includes(selected()[1])||selected()[1].includes('/{value}'))))help.textContent+=' Acceptă string sau array JSON.';preview()};
+ key.onchange=describe;remove.textContent='Șterge';remove.type='button';remove.onclick=()=>{row.remove();preview()};field.append(key,custom,help);row.append(field,val,remove);$('query').append(row);describe();
+}
+function requestURL(){
+ const endpoint=selected(),path=endpoint[1].replace('{value}',encodeURIComponent($('path-value').value));
+ const url=new URL(path==='/upload'?'/upload':'/api/siui-data/'+path,window.parent!==window?window.parent.location.origin:location.origin);
+ for(const row of $('query').children){let name=row.parameterSelect.value;const raw=row.valueInput.value;if(name.endsWith('.*')){const attribute=row.customAttribute.value.trim();if(!attribute){if(raw==='')continue;throw Error('Completează numele atributului original.')}name=name.slice(0,-1)+attribute}if(!name||raw==='')continue;
+  if(raw.trim().startsWith('[')){const array=JSON.parse(raw);if(!Array.isArray(array)||array.some(v=>typeof v!=='string'))throw Error('Array-ul trebuie să conțină string-uri: '+name);for(const value of array)url.searchParams.append(name+'[]',value)}else url.searchParams.append(name,raw)
+ }
+ return url
+}
+function preview(){try{$('method').textContent=selected()[0];$('request-url').textContent=requestURL().href;$('run').disabled=false}catch(e){$('request-url').textContent=e.message;$('run').disabled=true}}
+function choose(){const e=selected();$('path-label').hidden=!e[1].includes('{value}');$('path-value').value=e[3]||'';$('query').replaceChildren();for(const [k,v] of e[4]||[])addRow(k,v);$('add').disabled=endpointParameters().length===0;$('file-label').hidden=e[5]!=='file';$('json-label').hidden=!e[5]||e[5]==='file';$('body').value=JSON.stringify(e[5]&&e[5]!=='file'?e[5]:{},null,2);preview()}
+for(const [i,e] of endpoints.entries()){const o=document.createElement('option');o.value=i;o.textContent=e[0]+' /'+(e[1].startsWith('/')?'': 'api/siui-data/')+e[1].replace(/^\//,'')+' · '+e[2];$('endpoint').append(o)}
+$('endpoint').onchange=choose;$('add').onclick=()=>{addRow();preview()};$('query').oninput=preview;$('path-value').oninput=preview;
+$('copy').onclick=async()=>{try{await navigator.clipboard.writeText(requestURL().href);$('status').textContent='URL copiat.'}catch(e){$('status').textContent=e.message}};
+$('run').onclick=async()=>{const e=selected();let url;try{url=requestURL();if(e[1].includes('{value}')&&!$('path-value').value)throw Error('Completează codul / tipul / importId.');const options={method:e[0],headers:{}};
+ if(e[5]==='file'){if(!$('file').files[0])throw Error('Selectează arhiva ZIP.');options.body=$('file').files[0];options.headers['Content-Type']='application/zip';options.headers['X-Catalogue-Filename']=$('file').files[0].name}else if(e[5]){options.body=JSON.stringify(JSON.parse($('body').value));options.headers['Content-Type']='application/json'}
+ $('run').disabled=true;$('status').textContent='Cerere în curs…';$('response').textContent='';const start=performance.now();const transport=window.parent!==window?window.parent.fetch.bind(window.parent):fetch;const response=await transport(url.pathname+url.search,options);const text=await response.text();$('status').textContent='HTTP '+response.status+' '+response.statusText+' · '+Math.round(performance.now()-start)+' ms';
+ if(!text){$('response').textContent='(fără body)'}else{try{$('response').textContent=JSON.stringify(JSON.parse(text),null,2)}catch{$('response').textContent=text}}
+ }catch(error){$('status').textContent=error.message}finally{$('run').disabled=false}};
+const initialEndpoint=new URLSearchParams(location.search).get('endpoint')||'services';const initialIndex=endpoints.findIndex(e=>e[1]===initialEndpoint);$('endpoint').value=String(initialIndex>=0?initialIndex:endpoints.findIndex(e=>e[1]==='services'));choose();
+</script></html>

@@ -13,6 +13,9 @@ import (
 )
 
 func ensureBootstrap(cfg *config.Config, reconfigure bool) (bool, error) {
+	if cfg.Analyzer.Protocol == "siui-data" {
+		return ensureSIUIDataBootstrap(cfg, reconfigure)
+	}
 	if !reconfigure && !needsBootstrap(cfg) {
 		cfg.ApplyDefaults()
 		return false, nil
@@ -140,6 +143,18 @@ func ensureBootstrap(cfg *config.Config, reconfigure bool) (bool, error) {
 		promptString(reader, "Certificate thumbprint (or select in the CNAS settings UI)", section, "certificate_thumbprint", "")
 		cfg.Modules["siui"] = section
 	}
+	if cfg.Analyzer.Protocol == "siui-history" && reconfigure {
+		section := cfg.ModuleSettings("siui-history")
+		promptString(reader, "History tenant", section, "tenant", "")
+		promptString(reader, "MySQL host", section, "mysql_host", "127.0.0.1")
+		promptString(reader, "MySQL port", section, "mysql_port", "3306")
+		promptString(reader, "MySQL database", section, "mysql_database", "")
+		promptString(reader, "MySQL user", section, "mysql_user", "")
+		promptChoice(reader, "Storage", section, "storage", []string{"local", "s3"}, "local")
+		promptString(reader, "Local storage base path", section, "base_path", "./history")
+		fmt.Println("Parola MySQL și credențialele S3 se introduc în Setări → History.")
+		cfg.Modules["siui-history"] = section
+	}
 	bootstrapModuleSettings(reader, cfg, reconfigure)
 	cfg.Modules["wisemed-api"] = settings
 	syncModuleMirrors(cfg)
@@ -176,6 +191,9 @@ func bootstrapModuleSettings(reader *bufio.Reader, cfg *config.Config, reconfigu
 	}
 	if reconfigure || strSetting(cfg.Modules["app-updates"], "download_dir") == "" {
 		promptString(reader, "Update download directory", cfg.Modules["app-updates"], "download_dir", "./updates")
+	}
+	if cfg.Analyzer.Protocol == "siui-history" || cfg.Analyzer.Protocol == "siui-data" {
+		return
 	}
 	if reconfigure || cfg.ModuleSettings("storage-sqlite")["path"] == nil {
 		if _, ok := cfg.Modules["storage-sqlite"]; !ok {
@@ -369,10 +387,13 @@ func promptMedicalUnitSelection(reader *bufio.Reader, client *wisemedapi.Bootstr
 	current := strSetting(settings, "unitate_medicala_id")
 	for {
 		fmt.Printf("Select medical unit number (%s): ", current)
-		text, _ := reader.ReadString('\n')
+		text, readErr := reader.ReadString('\n')
 		text = strings.TrimSpace(text)
 		if text == "" && current != "" {
 			return nil
+		}
+		if readErr != nil && text == "" {
+			return fmt.Errorf("medical unit selection requires input: %w", readErr)
 		}
 		idx, err := strconv.Atoi(text)
 		if err == nil && idx >= 1 && idx <= len(items) {
@@ -398,10 +419,13 @@ func promptEquipmentTypeSelection(reader *bufio.Reader, client *wisemedapi.Boots
 	current := strSetting(settings, "tip_de_echipament_id")
 	for {
 		fmt.Printf("Select equipment type number (%s): ", current)
-		text, _ := reader.ReadString('\n')
+		text, readErr := reader.ReadString('\n')
 		text = strings.TrimSpace(text)
 		if text == "" && current != "" {
 			return nil
+		}
+		if readErr != nil && text == "" {
+			return fmt.Errorf("equipment type selection requires input: %w", readErr)
 		}
 		idx, err := strconv.Atoi(text)
 		if err == nil && idx >= 1 && idx <= len(items) {
@@ -434,6 +458,12 @@ func registerEquipment(cfg *config.Config, client *wisemedapi.BootstrapClient) e
 	resp, err := client.RegisterEquipment(payload)
 	if err != nil {
 		return fmt.Errorf("register equipment in WiseMED: %w", err)
+	}
+	if cfg.Analyzer.Protocol == "siui-data" {
+		id, err := strconv.Atoi(itemString(resp, "echipament_id", "equipment_id"))
+		if err != nil || id <= 0 {
+			return fmt.Errorf("WiseMED registration did not return a valid equipment ID")
+		}
 	}
 	if value := itemString(resp, "echipament_id", "equipment_id"); value != "" {
 		settings["echipament_id"] = value
@@ -669,7 +699,7 @@ func defaultCommType(cfg *config.Config) string {
 		return "tcpip"
 	case "hl7", "simple":
 		return "tcpip"
-	case "barcodeprinter", "siui", "html-print-formatter":
+	case "barcodeprinter", "siui", "siui-history", "siui-data", "html-print-formatter":
 		return "utility"
 	default:
 		return "file"
@@ -759,7 +789,7 @@ func supportedCommTypes(cfg *config.Config) []string {
 			add("tcpip")
 		case "seegene-excel", "beosl-csv", "beoslcsv", "cfx96-quantitation", "cary60-uvvis", "analytikjena-plasmaquantms-elite", "shimatzu-tocl", "shimatzu-generic", "biosan-hipo-mpp96", "gammavision", "tricarb-5110-tr", "anatolia-geneworks", "generic-file":
 			add("file")
-		case "barcodeprinter", "anaf-docsmart", "siui", "html-print-formatter":
+		case "barcodeprinter", "anaf-docsmart", "siui", "siui-history", "siui-data", "html-print-formatter":
 			add("utility")
 		}
 	}

@@ -204,6 +204,76 @@
     "label": "Rambursare factură"
   },
   {
+    "name": "generatePrescriptionSeries",
+    "group": "general",
+    "service": "SiuiWS",
+    "namespace": "http://webservices.utils.svapnt.siveco.ro",
+    "style": "document",
+    "parameters": [
+      {
+        "name": "categoryCode",
+        "type": "string"
+      },
+      {
+        "name": "orgUnitCode",
+        "type": "string"
+      },
+      {
+        "name": "uic",
+        "type": "string"
+      },
+      {
+        "name": "subUnitCode",
+        "type": "string",
+        "nullable": true
+      },
+      {
+        "name": "validFrom",
+        "type": "dateTime"
+      },
+      {
+        "name": "isOnLine",
+        "type": "boolean"
+      },
+      {
+        "name": "quantity",
+        "type": "int"
+      }
+    ],
+    "mutating": true,
+    "download": true,
+    "label": "Generare carnete de rețete online / offline"
+  },
+  {
+    "name": "getPrescriptionSeriesInfo",
+    "group": "general",
+    "service": "SiuiWS",
+    "namespace": "http://webservices.utils.svapnt.siveco.ro",
+    "style": "document",
+    "parameters": [
+      {
+        "name": "categoryCode",
+        "type": "string"
+      },
+      {
+        "name": "orgUnitCode",
+        "type": "string"
+      },
+      {
+        "name": "uic",
+        "type": "string"
+      },
+      {
+        "name": "subUnitCode",
+        "type": "string",
+        "nullable": true
+      }
+    ],
+    "mutating": false,
+    "download": true,
+    "label": "Preluare carnete de rețete existente"
+  },
+  {
     "name": "getPhysicianCatalogues",
     "group": "general",
     "service": "SiuiWS",
@@ -457,6 +527,114 @@
     "mutating": true,
     "download": false,
     "label": "Validare raport la 72h — CLIN / PARA"
+  },
+  {
+    "name": "processIssuedPrescription",
+    "group": "clinice",
+    "service": "EPrescriptionWS",
+    "namespace": "http://processPrescription.webservices.utils.svapnt.siveco.ro",
+    "style": "rpc",
+    "parameters": [
+      {
+        "name": "reportXml",
+        "type": "string"
+      }
+    ],
+    "mutating": true,
+    "download": false,
+    "label": "Procesare eliberare rețetă electronică (farmacie)"
+  },
+  {
+    "name": "cancelReleasedPrescription",
+    "group": "clinice",
+    "service": "EPrescriptionWS",
+    "namespace": "http://processPrescription.webservices.utils.svapnt.siveco.ro",
+    "style": "rpc",
+    "parameters": [
+      {
+        "name": "providerCode",
+        "type": "string"
+      },
+      {
+        "name": "workplaceCode",
+        "type": "string"
+      },
+      {
+        "name": "insuranceHouseCode",
+        "type": "string"
+      },
+      {
+        "name": "series",
+        "type": "string"
+      },
+      {
+        "name": "no",
+        "type": "string"
+      },
+      {
+        "name": "fractionNo",
+        "type": "int"
+      },
+      {
+        "name": "cancellationReason",
+        "type": "string"
+      }
+    ],
+    "mutating": true,
+    "download": false,
+    "label": "Anulare eliberare rețetă electronică"
+  },
+  {
+    "name": "updateInvoices",
+    "group": "clinice",
+    "service": "EPrescriptionWS",
+    "namespace": "http://processPrescription.webservices.utils.svapnt.siveco.ro",
+    "style": "rpc",
+    "parameters": [
+      {
+        "name": "requestXml",
+        "type": "string"
+      }
+    ],
+    "mutating": true,
+    "download": false,
+    "label": "Actualizare facturi prescripții electronice"
+  },
+  {
+    "name": "getReleasedPrescription",
+    "group": "clinice",
+    "service": "EPrescriptionWS",
+    "namespace": "http://processPrescription.webservices.utils.svapnt.siveco.ro",
+    "style": "rpc",
+    "parameters": [
+      {
+        "name": "providerCode",
+        "type": "string"
+      },
+      {
+        "name": "workplaceCode",
+        "type": "string"
+      },
+      {
+        "name": "insuranceHouseCode",
+        "type": "string"
+      },
+      {
+        "name": "series",
+        "type": "string"
+      },
+      {
+        "name": "no",
+        "type": "string"
+      },
+      {
+        "name": "fractionNo",
+        "type": "int"
+      }
+    ],
+    "mutating": false,
+    "download": false,
+    "label": "Preluare rețetă electronică eliberată"
   },
   {
     "name": "processPrescribedPrescription",

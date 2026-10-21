@@ -27,20 +27,26 @@ type sessionGuard interface {
 	SessionIdentity(*http.Request) (string, bool, bool)
 }
 type Module struct {
-	ocspSession     ocspSession
-	ready           chan struct{}
-	jwtKey          []byte
-	calls           chan serviceWork
-	rt              module.Runtime
-	guard           sessionGuard
-	db              *sql.DB
-	mu              sync.Mutex
-	cfg             settings
-	pending         int
-	checking        bool
-	nativeSupported bool
-	queue           chan work
-	factory         func(settings) backend
+	dashboardMu       sync.Mutex
+	dashboardChecks   []endpointCheck
+	dashboardChecked  time.Time
+	dashboardChecking bool
+	dashboardKey      [32]byte
+	history           *historySync
+	ocspSession       ocspSession
+	ready             chan struct{}
+	jwtKey            []byte
+	calls             chan serviceWork
+	rt                module.Runtime
+	guard             sessionGuard
+	db                *sql.DB
+	mu                sync.Mutex
+	cfg               settings
+	pending           int
+	checking          bool
+	nativeSupported   bool
+	queue             chan work
+	factory           func(settings) backend
 }
 
 func New() module.Module     { return &Module{} }
@@ -118,6 +124,7 @@ func (m *Module) Init(rt module.Runtime) error {
 		m.factory = func(s settings) backend { return nativeBackend{cfg: s, logf: rt.Logf} }
 		m.nativeSupported = (runtime.GOOS == "windows" || runtime.GOOS == "darwin" || runtime.GOOS == "linux")
 	}
+	m.initHistory()
 	rt.Handle("/api/siui/", m.authenticate(http.HandlerFunc(m.handle)))
 	rt.AddMenu(module.MenuEntry{ID: "siui", Group: "settings", Label: "CNAS", Path: "/settings/siui", Order: 35})
 	return nil
@@ -152,11 +159,19 @@ func (m *Module) Start(ctx context.Context) error {
 	defer m.db.Close()
 	// A missing token must not prevent the application from starting.
 	_ = m.reloadCertificates("startup")
+	historyCtx, historyCancel := context.WithCancel(ctx)
+	historyDone := make(chan struct{})
+	go func() { defer close(historyDone); m.historyWorker(historyCtx) }()
+	defer func() { historyCancel(); <-historyDone }()
 	close(m.ready)
+	callbackTicker := time.NewTicker(time.Second)
+	defer callbackTicker.Stop()
 	for {
 		select {
 		case <-ctx.Done():
 			return nil
+		case <-callbackTicker.C:
+			m.deliverCallback(ctx)
 		case job := <-m.calls:
 			m.runServiceWork(ctx, job)
 		case job := <-m.queue:
@@ -169,6 +184,7 @@ func (m *Module) Start(ctx context.Context) error {
 				m.finished()
 				continue
 			}
+			_, _ = m.db.Exec(`UPDATE siui_history_outbox SET started_at=? WHERE call_id=?`, time.Now().UTC().Format(time.RFC3339Nano), job.ID)
 			m.rt.Logf("SIUI validation started job=%s", job.ID)
 			callCtx, cancel := context.WithTimeout(ctx, 90*time.Second)
 			c := client{cfg: job.Config, backend: m.factory(job.Config), logf: m.rt.Logf, session: &m.ocspSession, operation: "validate", callID: job.ID}
@@ -189,6 +205,7 @@ func (m *Module) Start(ctx context.Context) error {
 			if e != nil {
 				m.rt.Logf("SIUI result persistence failed job=%s", job.ID)
 			} else {
+				_, _ = m.db.Exec(`UPDATE siui_history_outbox SET completed_at=? WHERE call_id=?`, time.Now().UTC().Format(time.RFC3339Nano), job.ID)
 				m.rt.Logf("SIUI validation finished job=%s status=%s", job.ID, state)
 			}
 			m.finished()
@@ -258,6 +275,14 @@ func (m *Module) handle(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	switch {
+	case route == "dashboard":
+		m.dashboardHTTP(w, r, owner, admin)
+	case route == "downloads/storage":
+		m.downloadStorageHTTP(w, r, admin)
+	case route == "dashboard/checks":
+		m.dashboardChecksHTTP(w, r, admin)
+	case route == "operations" || strings.HasPrefix(route, "operations/"):
+		m.operationsHTTP(w, r, route, owner, admin)
 	case route == "auth/token" && r.Method == "POST":
 		m.tokenHTTP(w, r, subject, owner, admin)
 	case route == "catalog" && r.Method == "GET":
@@ -352,11 +377,14 @@ func (m *Module) handle(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if created {
+			_, _ = m.db.Exec(`UPDATE siui_history_outbox SET source_ip=? WHERE call_id=?`, r.RemoteAddr, job.ID)
+			_ = m.saveOperationSource(m.db, r, job.ID)
 			select {
 			case m.queue <- work{job.ID, in.XML, m.cfg}:
 				m.pending++
 			default:
 				m.db.Exec(`UPDATE siui_jobs SET status='failed',error='Local queue full; nothing sent to CNAS' WHERE id=?`, job.ID)
+				_, _ = m.db.Exec(`UPDATE siui_history_outbox SET completed_at=? WHERE call_id=?`, time.Now().UTC().Format(time.RFC3339Nano), job.ID)
 				fail(w, 503, "local queue full; nothing sent to CNAS")
 				return
 			}

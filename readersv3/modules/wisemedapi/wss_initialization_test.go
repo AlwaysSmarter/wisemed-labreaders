@@ -301,3 +301,43 @@ func TestEquipmentInitializationRequiresIDInResponse(t *testing.T) {
 		t.Fatal("failed registration changed credentials")
 	}
 }
+
+func TestHistoryRegistersEquipmentAndPersistsCredential(t *testing.T) {
+	calls := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		if r.Method != "PUT" || r.URL.Path != "/api/administrative/analyzer" {
+			t.Errorf("unexpected route: %s %s", r.Method, r.URL.Path)
+		}
+		fmt.Fprint(w, `{"echipament_id":321,"api_key_echipament":"history-test-device-key"}`)
+	}))
+	defer server.Close()
+	m, rt := newEquipmentTestModule(t, server.URL)
+	rt.services["analyzer-config"] = map[string]interface{}{"protocol": "siui-history"}
+	if m.LoginOnly() {
+		t.Fatal("History must register equipment")
+	}
+	if _, err := m.EnsureEquipmentInitialized(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := m.EnsureEquipmentInitialized(); err != nil {
+		t.Fatal(err)
+	}
+	if calls != 1 || !m.HasEquipmentID() {
+		t.Fatalf("calls=%d registered=%v", calls, m.HasEquipmentID())
+	}
+	data, err := os.ReadFile(rt.path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var persisted struct {
+		Modules map[string]map[string]interface{} `yaml:"modules"`
+	}
+	if err = yaml.Unmarshal(data, &persisted); err != nil {
+		t.Fatal(err)
+	}
+	saved := persisted.Modules["wisemed-api"]
+	if saved["echipament_id"] != "321" || saved["api_key_echipament"] != "history-test-device-key" {
+		t.Fatal("History identity/credential not persisted")
+	}
+}

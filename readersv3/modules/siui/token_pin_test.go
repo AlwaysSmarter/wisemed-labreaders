@@ -42,12 +42,17 @@ func TestPINEncryptedBoundAndSuspendedAcrossRestart(t *testing.T) {
 	if e != nil || string(p) != secret {
 		t.Fatal("cannot decrypt", e)
 	}
+	finish(pinRejected)
+	for i := 0; i < 2; i++ {
+		_, next, _ := v.begin(s)
+		next(pinRejected)
+	} // Third rejection persists across restart.
 	restarted := &pinVault{path: v.path}
 	p2, _, e := restarted.begin(s)
 	if e != nil || p2 != nil {
 		t.Fatal("attempt replayed after restart", e)
 	}
-	finish(false)
+	finish(pinRejected)
 	if !bytes.Equal(p, make([]byte, len(p))) {
 		t.Fatal("PIN buffer not cleared")
 	}
@@ -58,7 +63,7 @@ func TestPINEncryptedBoundAndSuspendedAcrossRestart(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	finish(true)
+	finish(pinSuccess)
 	_, blocked, e = v.status(s)
 	if e != nil || blocked {
 		t.Fatal("successful signing not restored", e)
@@ -79,6 +84,7 @@ func TestPINOnlyOneConcurrentAttempt(t *testing.T) {
 	var wg sync.WaitGroup
 	var mu sync.Mutex
 	count := 0
+	var complete func(pinOutcome)
 	for i := 0; i < 12; i++ {
 		wg.Add(1)
 		go func() {
@@ -90,8 +96,8 @@ func TestPINOnlyOneConcurrentAttempt(t *testing.T) {
 			if len(p) > 0 {
 				mu.Lock()
 				count++
+				complete = finish
 				mu.Unlock()
-				finish(false)
 			}
 		}()
 	}
@@ -99,6 +105,7 @@ func TestPINOnlyOneConcurrentAttempt(t *testing.T) {
 	if count != 1 {
 		t.Fatal(count)
 	}
+	complete(pinRejected)
 }
 func TestPINManualNeverRearmsSavedSecret(t *testing.T) {
 	v, s := testPIN(t)
@@ -108,12 +115,12 @@ func TestPINManualNeverRearmsSavedSecret(t *testing.T) {
 	if e != nil || string(p) != "new-manual-value" {
 		t.Fatal(e)
 	}
-	finish(true)
+	finish(pinSuccess)
 	p, finish, e = v.begin(s)
 	if e != nil || string(p) != "new-manual-value" {
 		t.Fatal("manual session not reused", e)
 	}
-	finish(false)
+	finish(pinRejected)
 	p, _, _ = v.begin(s)
 	if len(p) > 0 {
 		t.Fatal("wrong manual PIN replayed or saved PIN reactivated")
@@ -168,10 +175,96 @@ func TestPINOldAttemptCannotReenableReplacement(t *testing.T) {
 	_, oldDone, _ := v.begin(s)
 	_ = v.save(s, "new-pin", false, false)
 	_, newDone, _ := v.begin(s)
-	newDone(false)
-	oldDone(true)
+	newDone(pinRejected)
+	for i := 0; i < 2; i++ {
+		_, next, _ := v.begin(s)
+		next(pinRejected)
+	}
+	oldDone(pinSuccess)
 	_, blocked, _ := v.status(s)
 	if !blocked {
 		t.Fatal("old attempt reenabled replacement")
+	}
+}
+
+func TestPINUnrelatedFailureAndInterruptedAttemptRemainEnabled(t *testing.T) {
+	v, s := testPIN(t)
+	if err := v.save(s, "test-pin", false, false); err != nil {
+		t.Fatal(err)
+	}
+	_, done, err := v.begin(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p, _, err := v.begin(s); err != nil || len(p) != 0 {
+		t.Fatal("concurrent attempt allowed", err)
+	}
+	// Simulate restart before completion: no credential rejection was received.
+	restarted := &pinVault{path: v.path}
+	p, restartedDone, err := restarted.begin(s)
+	if err != nil || string(p) != "test-pin" {
+		t.Fatal("interruption suspended PIN", err)
+	}
+	restartedDone(pinSuccess)
+	done(pinUnrelated) // Missing token / cancellation / TLS error, not a rejected PIN.
+	p, done, err = v.begin(s)
+	if err != nil || string(p) != "test-pin" {
+		t.Fatal("unrelated error suspended PIN", err)
+	}
+	done(pinSuccess)
+}
+
+func TestNativePINErrorClassification(t *testing.T) {
+	for _, code := range []uint32{0x8010006b, 0x8010006c} {
+		if !windowsPINRejected(code) {
+			t.Fatalf("PIN error missed: %x", code)
+		}
+	}
+	for _, code := range []uint32{0, 0x8010000c, 0x80100069, 0x8010006e, 12175} {
+		if windowsPINRejected(code) {
+			t.Fatalf("unrelated Windows error: %x", code)
+		}
+	}
+	for _, code := range []uint64{0xa0, 0xa1, 0xa2, 0xa4} {
+		if !pkcs11PINRejected(code) {
+			t.Fatalf("PIN error missed: %x", code)
+		}
+	}
+	for _, code := range []uint64{0, 5, 0x30, 0x32, 0xe0, 0xe1, 0x101} {
+		if pkcs11PINRejected(code) {
+			t.Fatalf("unrelated PKCS11 error: %x", code)
+		}
+	}
+}
+
+func TestPINThreeRejectionsResetOnlyOnSuccess(t *testing.T) {
+	v, s := testPIN(t)
+	if err := v.save(s, "pin", false, false); err != nil {
+		t.Fatal(err)
+	}
+	attempt := func(outcome pinOutcome, want int, blocked bool) {
+		t.Helper()
+		p, done, err := v.begin(s)
+		if err != nil || len(p) == 0 {
+			t.Fatal("attempt unavailable", err)
+		}
+		done(outcome)
+		count, err := v.failureCount(s)
+		_, gotBlocked, _ := v.status(s)
+		if err != nil || count != want || gotBlocked != blocked {
+			t.Fatalf("count=%d blocked=%v err=%v", count, gotBlocked, err)
+		}
+	}
+	attempt(pinRejected, 1, false)
+	attempt(pinRejected, 2, false)
+	v = &pinVault{path: v.path}
+	attempt(pinUnrelated, 2, false)
+	attempt(pinSuccess, 0, false)
+	attempt(pinRejected, 1, false)
+	attempt(pinRejected, 2, false)
+	attempt(pinRejected, 3, true)
+	v = &pinVault{path: v.path}
+	if p, _, err := v.begin(s); err != nil || len(p) > 0 {
+		t.Fatal("fourth automatic attempt allowed", err)
 	}
 }

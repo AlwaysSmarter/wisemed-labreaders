@@ -95,6 +95,13 @@ func TestPassiveAPIsAuthenticateBeforeReadOnlyCalls(t *testing.T) {
 		t.Fatal(err)
 	}
 	m.nativeSupported = true
+	var dbErr error
+	m.db, dbErr = openJobs(m.cfg.Database)
+	if dbErr != nil {
+		t.Fatal(dbErr)
+	}
+	defer m.db.Close()
+	close(m.ready)
 	principal := apibridge.Principal{TenantID: "test", Subject: "operator", Admin: true}
 	invoke := func(path, body string) apibridge.Response {
 		res, err := apibridge.Invoke(context.Background(), rt.mux, principal, apibridge.Request{Method: "POST", Path: "/api/siui/" + path, Body: json.RawMessage(body)})
@@ -118,6 +125,10 @@ func TestPassiveAPIsAuthenticateBeforeReadOnlyCalls(t *testing.T) {
 	res = invoke("personalization", `{"start":"2026-10-01","stop":"2026-10-03"}`)
 	if res.Status != 200 || ocsp != 1 || provider != 1 || download != 1 {
 		t.Fatalf("personalization: %+v", res)
+	}
+	var archived int
+	if e := m.db.QueryRow(`SELECT COUNT(*) FROM siui_history_outbox WHERE completed_at<>''`).Scan(&archived); e != nil || archived != 2 {
+		t.Fatalf("passive calls missing from outbox: %d %v", archived, e)
 	}
 	principal.Admin = false
 	if res = invoke("personalization", `{"start":"2026-10-01","stop":"2026-10-03"}`); res.Status != 403 {

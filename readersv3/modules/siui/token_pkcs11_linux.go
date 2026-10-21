@@ -267,7 +267,8 @@ func (s *p11Signer) Sign(_ io.Reader, digest []byte, opts crypto.SignerOpts) (si
 		return nil, errors.New("Token reports few PIN attempts remaining; automatic PIN refused. Use manual PIN in CNAS settings")
 	}
 	var pin []byte
-	finish := func(bool) {}
+	pinRejected := false
+	finish := func(pinOutcome) {}
 	if flags&0x100 == 0 {
 		pin, finish, err = s.cfg.pin.begin(s.cfg)
 		if err != nil {
@@ -281,7 +282,7 @@ func (s *p11Signer) Sign(_ io.Reader, digest []byte, opts crypto.SignerOpts) (si
 		if err == nil {
 			err = verifyTokenSignature(s.Public(), digest, signature, opts)
 		}
-		finish(err == nil)
+		finish(signingPINOutcome(pinRejected, err))
 	}()
 	var session uint64
 	if rv := a.open(s.cert.slot, 4, 0, 0, &session); rv != 0 {
@@ -294,7 +295,8 @@ func (s *p11Signer) Sign(_ io.Reader, digest []byte, opts crypto.SignerOpts) (si
 	}
 	if rv := a.login(session, 1, ptr, uint64(len(pin))); rv != 0 && rv != 0x100 {
 		runtime.KeepAlive(pin)
-		return nil, fmt.Errorf("Token authentication failed (PKCS#11 0x%x); automatic PIN suspended; use manual PIN", rv)
+		pinRejected = pkcs11PINRejected(rv)
+		return nil, fmt.Errorf("Token authentication failed (PKCS#11 0x%x); check token/PIN status", rv)
 	}
 	runtime.KeepAlive(pin)
 	class := uint64(3)
@@ -329,6 +331,7 @@ func (s *p11Signer) Sign(_ io.Reader, digest []byte, opts crypto.SignerOpts) (si
 		return nil, errors.New("invalid digest length")
 	}
 	if rv := a.signInit(session, &mech, keys[0]); rv != 0 {
+		pinRejected = pkcs11PINRejected(rv)
 		return nil, fmt.Errorf("PKCS#11 signing initialization failed (0x%x)", rv)
 	}
 	// Allocate once to avoid a second C_Sign call in middleware with unusual retry behavior.
@@ -338,7 +341,8 @@ func (s *p11Signer) Sign(_ io.Reader, digest []byte, opts crypto.SignerOpts) (si
 	runtime.KeepAlive(payload)
 	runtime.KeepAlive(out)
 	if rv != 0 || size > uint64(len(out)) {
-		return nil, fmt.Errorf("PKCS#11 signing failed (0x%x); automatic PIN suspended", rv)
+		pinRejected = pkcs11PINRejected(rv)
+		return nil, fmt.Errorf("PKCS#11 signing failed (0x%x)", rv)
 	}
 	out = out[:size]
 	if _, ok := s.Public().(*ecdsa.PublicKey); ok {

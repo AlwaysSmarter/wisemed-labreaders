@@ -52,7 +52,10 @@ func Ensure(path string) (EnsureResult, error) {
 	if err != nil {
 		return EnsureResult{}, err
 	}
-	changed := preserveLegacyConnectionSettings(current)
+	changed := migrateSIUIDataMap(current)
+	if preserveLegacyConnectionSettings(current) {
+		changed = true
+	}
 	if mergeMissing(current, template) {
 		changed = true
 	}
@@ -136,7 +139,14 @@ func writeMap(path string, raw map[string]interface{}) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, blob, 0o644)
+	mode := os.FileMode(0o644)
+	if analyzer, ok := raw["analyzer"].(map[string]interface{}); ok && analyzer["protocol"] == siuiDataModule {
+		mode = 0o600
+		if err := os.Chmod(path, mode); err != nil && !os.IsNotExist(err) {
+			return err
+		}
+	}
+	return os.WriteFile(path, blob, mode)
 }
 
 func mergeMissing(current, defaults map[string]interface{}) bool {

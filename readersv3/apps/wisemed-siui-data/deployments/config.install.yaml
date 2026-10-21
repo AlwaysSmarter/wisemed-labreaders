@@ -1,0 +1,79 @@
+reader:
+  id: wisemed-siui-data
+  label: WiseMED SIUI Data
+  analyzer_name: WiseMED SIUI Catalogue Provider
+  analyzer_code: wisemed-siui-data
+  db_name: wisemed-siui-data.db
+logging:
+  verbose_level: 0
+local_http:
+  enabled: true
+  address: 127.0.0.1:19114
+  language: ro
+  tls: true
+wisemed_ws:
+  enabled: false
+  url: wss://wslocal.wisemed.eu/ws
+  heartbeat_ms: 15000
+  reconnect_delay_ms: 30000
+analyzer:
+  comm_type: utility
+  protocol: siui-data
+modules:
+  local-http:
+    enabled: true
+    address: 127.0.0.1:19114
+    language: ro
+    tls: true
+    cors_allowed_origins: ""
+  events:
+    enabled: true
+  help:
+    help_dir: ./help
+  app-updates:
+    enabled: true
+    app_id: wisemed-siui-data
+    channel: stable
+    base_url: http://127.0.0.1:19090
+    auto_download: true
+    download_dir: ./updates
+  wisemed-api:
+    cfg_wisemed_protocol: https
+    cfg_wisemed_ip: ""
+    cfg_wisemed_port: "443"
+    cfg_wisemed_path: /wisemed-api/apiv2
+    cfg_wisemed_key: ""
+  wisemed-ws:
+    enabled: false
+    url: wss://wslocal.wisemed.eu/ws
+    auth_mode: device_key
+    scopes: route:reply,route:event,route:command,devices:debug,connections:read,server:status,api:invoke
+    tenant_id: ""
+    key_id: ""
+    issuer: ""
+    audience: wsm-server
+    subject: ""
+    secret_file: ""
+    token_file: ""
+    token_path: ""
+    ca_file: ""
+    heartbeat_ms: 15000
+    reconnect_delay_ms: 30000
+  siui-data:
+    jwt_secret_env: WISEMED_SIUI_DATA_JWT_SECRET
+    # Tenant keys are managed in the internal Clients page; never distribute the global key.
+    client_jwt_secrets: {}
+    postgres_host: 127.0.0.1
+    postgres_port: 5432
+    postgres_database: ""
+    postgres_user: ""
+    postgres_password: ""
+    postgres_sslmode: prefer
+    postgres_root_cert: ""
+    postgres_max_conns: 20
+    upload_dir: ./catalogue-uploads
+    max_upload_mib: 4096
+    max_xml_mib: 16384
+    import_timeout_minutes: 120
+    local_import_dir: ""
+    local_poll_seconds: 30

@@ -18,29 +18,41 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"wisemed-labreaders/readersv3/shared/history"
 )
 
 const maxDownload = 64 * 1024 * 1024
 const downloadChunk = 256 * 1024
 
 type serviceWork struct {
-	ID         string
-	Operation  Operation
-	Parameters map[string]string
-	Config     settings
+	ID             string
+	Operation      Operation
+	Parameters     map[string]string
+	NullParameters []string
+	Config         settings
+	Callback       *wmCallback
+	CallbackPath   string
 }
 type serviceCall struct {
-	ID          string          `json:"id"`
-	OperationID string          `json:"operation_id"`
-	Operation   string          `json:"operation"`
-	Status      string          `json:"status"`
-	Error       string          `json:"error,omitempty"`
-	Result      json.RawMessage `json:"result,omitempty"`
+	ID          string           `json:"id"`
+	OperationID string           `json:"operation_id"`
+	Operation   string           `json:"operation"`
+	Status      string           `json:"status"`
+	Error       string           `json:"error,omitempty"`
+	Result      json.RawMessage  `json:"result,omitempty"`
+	History     *historyDelivery `json:"history,omitempty"`
+	Callback    *wmDelivery      `json:"callwmapi,omitempty"`
 }
 
 func initializeServiceJobs(db *sql.DB) error {
 	_, err := db.Exec(`CREATE TABLE IF NOT EXISTS siui_calls(id TEXT PRIMARY KEY,owner TEXT NOT NULL,operation_id TEXT NOT NULL,operation TEXT NOT NULL,digest TEXT NOT NULL,status TEXT NOT NULL,error TEXT NOT NULL DEFAULT '',result TEXT NOT NULL DEFAULT '',created_at TEXT NOT NULL,UNIQUE(owner,operation_id)); UPDATE siui_calls SET status='unknown',error='Process stopped; reconcile with CNAS before submitting again' WHERE status IN ('queued','running')`)
-	return err
+	if err != nil {
+		return err
+	}
+	if err = initializeHistory(db); err != nil {
+		return err
+	}
+	return initializeCallbacks(db)
 }
 func readServiceCall(db *sql.DB, owner, id string) (serviceCall, error) {
 	var c serviceCall
@@ -48,6 +60,21 @@ func readServiceCall(db *sql.DB, owner, id string) (serviceCall, error) {
 	err := db.QueryRow(`SELECT id,operation_id,operation,status,error,result FROM siui_calls WHERE owner=? AND id=?`, owner, id).Scan(&c.ID, &c.OperationID, &c.Operation, &c.Status, &c.Error, &result)
 	if result != "" {
 		c.Result = json.RawMessage(result)
+	}
+	if err == nil {
+		var delivery wmDelivery
+		e := db.QueryRow(`SELECT status,attempts,http_status,error FROM siui_wm_callbacks WHERE call_id=?`, id).Scan(&delivery.Status, &delivery.Attempts, &delivery.HTTPStatus, &delivery.Error)
+		if e == nil {
+			c.Callback = &delivery
+		} else if e != sql.ErrNoRows {
+			return c, e
+		}
+	}
+	if err == nil {
+		var h historyDelivery
+		if e := db.QueryRow(`SELECT status,attempts,error FROM siui_history_outbox WHERE call_id=?`, id).Scan(&h.Status, &h.Attempts, &h.Error); e == nil {
+			c.History = &h
+		}
 	}
 	return c, err
 }
@@ -93,6 +120,25 @@ func (m *Module) serviceHTTP(w http.ResponseWriter, r *http.Request, route, owne
 		fail(w, 503, "SIUI worker is starting")
 		return
 	}
+	if strings.HasPrefix(route, "calls/") && strings.HasSuffix(route, "/callwmapi/retry") && r.Method == "POST" {
+		id := strings.TrimSuffix(strings.TrimPrefix(route, "calls/"), "/callwmapi/retry")
+		if _, err := readServiceCall(m.db, owner, id); err != nil {
+			fail(w, 404, "call not found")
+			return
+		}
+		result, err := m.db.Exec(`UPDATE siui_wm_callbacks SET status='pending',attempts=0,next_attempt=0,error='' WHERE call_id=? AND status='failed' AND body!=''`, id)
+		if err != nil {
+			fail(w, 500, "cannot retry callback")
+			return
+		}
+		count, _ := result.RowsAffected()
+		if count == 0 {
+			fail(w, 409, "only failed deliveries with a prepared body can be retried")
+			return
+		}
+		respond(w, 202, map[string]any{"ok": true, "message": "WiseMED delivery queued; CNAS will not be called again"})
+		return
+	}
 	if strings.HasPrefix(route, "calls/") && r.Method == "GET" {
 		id := strings.TrimPrefix(route, "calls/")
 		wantFile := strings.HasSuffix(id, "/file")
@@ -130,20 +176,54 @@ func (m *Module) serviceHTTP(w http.ResponseWriter, r *http.Request, route, owne
 		return
 	}
 	var in struct {
-		OperationID string            `json:"operation_id"`
-		Parameters  map[string]string `json:"parameters"`
+		OperationID string             `json:"operation_id"`
+		Parameters  map[string]*string `json:"parameters"`
+		Callback    *wmCallback        `json:"callwmapi,omitempty"`
 	}
 	if err := decode(w, r, &in); err != nil {
 		fail(w, 400, err.Error())
 		return
 	}
-	if err := validateParameters(op, in.Parameters); err != nil {
+	parameters := make(map[string]string, len(in.Parameters))
+	var nullParameters []string
+	for name, value := range in.Parameters {
+		if value == nil {
+			parameters[name] = ""
+			nullParameters = append(nullParameters, name)
+		} else {
+			parameters[name] = *value
+		}
+	}
+	if err := validateParameters(op, parameters, nullParameters...); err != nil {
 		fail(w, 400, err.Error())
 		return
 	}
 	if !operationIDPattern.MatchString(in.OperationID) {
 		fail(w, 400, "operation_id required (1–128 identifier characters)")
 		return
+	}
+	var callbackPath, callbackDestination string
+	if in.Callback != nil {
+		if err := in.Callback.validate(); err != nil {
+			fail(w, 400, err.Error())
+			return
+		}
+		var err error
+		callbackPath, err = in.Callback.path(parameters)
+		if err != nil {
+			fail(w, 400, err.Error())
+			return
+		}
+		sender, ok := m.callbackSender()
+		if !ok {
+			fail(w, 503, "WiseMED API unavailable")
+			return
+		}
+		callbackDestination, err = sender.CallbackDestination()
+		if err != nil {
+			fail(w, 409, "configure WiseMED API before requesting callbacks")
+			return
+		}
 	}
 	if !m.nativeSupported {
 		fail(w, 503, "Real CNAS operations require Windows or macOS and a configured token")
@@ -155,9 +235,16 @@ func (m *Module) serviceHTTP(w http.ResponseWriter, r *http.Request, route, owne
 	// Bind deduplication to credentials/reference and destinations without storing them.
 	b, _ := json.Marshal(struct {
 		Operation  string
-		Parameters map[string]string
+		Parameters map[string]*string
 		Config     settings
 	}{op.Name, in.Parameters, cfg})
+	if in.Callback != nil {
+		b, _ = json.Marshal(struct {
+			Request     json.RawMessage
+			Callback    *wmCallback
+			Destination string
+		}{b, in.Callback, callbackDestination})
+	}
 	sum := sha256.Sum256(b)
 	digest := hex.EncodeToString(sum[:])
 	var existingID, existingDigest string
@@ -193,13 +280,46 @@ func (m *Module) serviceHTTP(w http.ResponseWriter, r *http.Request, route, owne
 		return
 	}
 	id := hex.EncodeToString(random)
-	_, err = m.db.Exec(`INSERT INTO siui_calls(id,owner,operation_id,operation,digest,status,created_at) VALUES(?,?,?,?,?,'queued',?)`, id, owner, in.OperationID, op.Name, digest, time.Now().UTC().Format(time.RFC3339))
+	tx, err := m.db.Begin()
 	if err != nil {
 		fail(w, 500, "cannot reserve operation")
 		return
 	}
+	defer tx.Rollback()
+	_, err = tx.Exec(`INSERT INTO siui_calls(id,owner,operation_id,operation,digest,status,created_at) VALUES(?,?,?,?,?,'queued',?)`, id, owner, in.OperationID, op.Name, digest, time.Now().UTC().Format(time.RFC3339))
+	if err != nil {
+		fail(w, 500, "cannot reserve operation")
+		return
+	}
+	if err = m.saveOperationSource(tx, r, id); err != nil {
+		fail(w, 500, "cannot persist operation source")
+		return
+	}
+	parametersHistory, _ := json.Marshal(in.Parameters)
+	_, err = tx.Exec(`INSERT INTO siui_history_outbox(call_id,parameters,source_ip) VALUES(?,?,?)`, id, string(parametersHistory), r.RemoteAddr)
+	if err != nil {
+		fail(w, 500, "cannot reserve History outbox")
+		return
+	}
+	if in.Callback != nil {
+		spec, sealErr := encodeWMCallback(cfg.Database, id, in.Callback)
+		if sealErr != nil {
+			fail(w, 500, "cannot protect WiseMED callback")
+			return
+		}
+		parameters, _ := json.Marshal(in.Parameters)
+		_, err = tx.Exec(`INSERT INTO siui_wm_callbacks(call_id,spec,parameters,destination) VALUES(?,?,?,?)`, id, string(spec), string(parameters), callbackDestination)
+		if err != nil {
+			fail(w, 500, "cannot reserve WiseMED callback")
+			return
+		}
+	}
+	if err = tx.Commit(); err != nil {
+		fail(w, 500, "cannot persist operation")
+		return
+	}
 	m.pending++
-	m.calls <- serviceWork{id, op, in.Parameters, cfg}
+	m.calls <- serviceWork{ID: id, Operation: op, Parameters: parameters, NullParameters: nullParameters, Config: cfg, Callback: in.Callback, CallbackPath: callbackPath}
 	respond(w, 202, map[string]any{"ok": true, "call": serviceCall{ID: id, OperationID: in.OperationID, Operation: op.Name, Status: "queued"}})
 }
 func (m *Module) runServiceWork(parent context.Context, job serviceWork) {
@@ -207,15 +327,20 @@ func (m *Module) runServiceWork(parent context.Context, job serviceWork) {
 	if _, err := m.db.Exec(`UPDATE siui_calls SET status='running' WHERE id=?`, job.ID); err != nil {
 		return
 	}
+	_, _ = m.db.Exec(`UPDATE siui_history_outbox SET started_at=? WHERE call_id=?`, time.Now().UTC().Format(time.RFC3339Nano), job.ID)
 	ctx, cancel := context.WithTimeout(parent, 120*time.Second)
 	defer cancel()
 	c := client{cfg: job.Config, backend: m.factory(job.Config), logf: m.rt.Logf, session: &m.ocspSession, operation: job.Operation.Name, callID: job.ID}
-	values, submitted, err := c.invokeOperation(ctx, job.Operation, job.Parameters)
+	values, submitted, err := c.invokeOperation(ctx, job.Operation, job.Parameters, job.NullParameters...)
 	result := map[string]any{"values": values, "ocsp": map[string]any{"reused": c.sessionReused, "age_seconds": c.sessionAge, "token_id": c.sessionID}}
+	if err == nil {
+		enrichInsuredResult(job.Operation.Name, values, result)
+	}
 	if err == nil && job.Operation.Download && (len(values) == 2 || (job.Operation.Name == "getEInvoice" && len(values) == 3)) && values[0] != "" {
 		var file map[string]any
 		file, err = m.downloadServiceFile(ctx, &c, job.ID, values, job.Operation.Service)
 		if err == nil {
+			file["validation_schema"] = resultFileSchema(job.Operation.Name, job.Parameters)
 			result["file"] = file
 		}
 	}
@@ -239,7 +364,36 @@ func (m *Module) runServiceWork(parent context.Context, job serviceWork) {
 	if err == nil {
 		b, _ = json.Marshal(result)
 	}
-	if _, e := m.db.Exec(`UPDATE siui_calls SET status=?,error=?,result=? WHERE id=?`, status, message, string(b), job.ID); e != nil {
+	var callbackBody []byte
+	var callbackErr error
+	if err == nil && job.Callback != nil {
+		callbackBody, callbackErr = job.Callback.prepareBody(ctx, job.Config.Database, job.ID, result)
+	}
+	tx, persistErr := m.db.Begin()
+	if persistErr == nil {
+		defer tx.Rollback()
+		_, persistErr = tx.Exec(`UPDATE siui_calls SET status=?,error=?,result=? WHERE id=?`, status, message, string(b), job.ID)
+		if persistErr == nil {
+			_, persistErr = tx.Exec(`UPDATE siui_history_outbox SET completed_at=? WHERE call_id=?`, time.Now().UTC().Format(time.RFC3339Nano), job.ID)
+		}
+		if persistErr == nil && job.Callback != nil {
+			deliveryStatus, deliveryError, body := "skipped", "CNAS operation did not complete", []byte(nil)
+			if err == nil {
+				body = callbackBody
+				transformErr := callbackErr
+				if transformErr != nil {
+					deliveryStatus, deliveryError = "failed", transformErr.Error()
+				} else {
+					deliveryStatus, deliveryError = "pending", ""
+				}
+			}
+			_, persistErr = tx.Exec(`UPDATE siui_wm_callbacks SET status=?,error=?,path=?,body=? WHERE call_id=?`, deliveryStatus, deliveryError, job.CallbackPath, string(body), job.ID)
+		}
+		if persistErr == nil {
+			persistErr = tx.Commit()
+		}
+	}
+	if persistErr != nil {
 		m.rt.Logf("SIUI call persistence failed id=%s", job.ID)
 	}
 	if err != nil {
@@ -270,7 +424,7 @@ func (m *Module) downloadServiceFile(ctx context.Context, c *client, id string, 
 	h.Del("SOAPAction")
 	h.Del("Content-Type")
 	target = address
-	code, headers, data, err := c.backend.Do(ctx, "GET", address, h, nil)
+	code, _, data, err := c.backend.Do(ctx, "GET", address, h, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -280,29 +434,26 @@ func (m *Module) downloadServiceFile(ctx context.Context, c *client, id string, 
 	if len(data) == 0 || len(data) > maxDownload {
 		return nil, errors.New("empty or oversized CNAS download")
 	}
-	dir := filepath.Join(filepath.Dir(c.cfg.Database), "siui-downloads")
+	downloadStorageMu.RLock()
+	defer downloadStorageMu.RUnlock()
+	path := datedDownloadPath(c.cfg.Database, id, time.Now().UTC())
+	dir := filepath.Dir(path)
 	if err = os.MkdirAll(dir, 0700); err != nil {
 		return nil, err
 	}
-	if err = os.WriteFile(filepath.Join(dir, id), data, 0600); err != nil {
+	if err = os.WriteFile(path, data, 0600); err != nil {
 		return nil, errors.New("cannot save CNAS download")
 	}
-	filename := id + ".download"
-	if bytes.HasPrefix(data, []byte("PK")) {
-		filename = id + ".zip"
-	} else if bytes.HasPrefix(bytes.TrimSpace(data), []byte("<")) {
-		filename = id + ".xml"
-	}
-	mime := headers.Get("Content-Type")
-	if mime == "" {
-		mime = "application/octet-stream"
-	}
+	filename, mime := history.DownloadIdentity(address, id, data)
 	return map[string]any{"size": len(data), "content_type": mime, "filename": filename, "path": "/api/siui/calls/" + id + "/file", "chunk_size": downloadChunk}, nil
 }
 func (m *Module) serviceFileHTTP(w http.ResponseWriter, r *http.Request, call serviceCall) {
+	downloadStorageMu.RLock()
+	defer downloadStorageMu.RUnlock()
 	var result struct {
 		File *struct {
-			Size int64 `json:"size"`
+			Size             int64  `json:"size"`
+			ValidationSchema string `json:"validation_schema"`
 		} `json:"file"`
 	}
 	if json.Unmarshal(call.Result, &result) != nil || result.File == nil || call.Status != "completed" {
@@ -314,23 +465,64 @@ func (m *Module) serviceFileHTTP(w http.ResponseWriter, r *http.Request, call se
 	if raw := r.URL.Query().Get("offset"); raw != "" {
 		offset, err = strconv.ParseInt(raw, 10, 64)
 	}
-	if err != nil || offset < 0 || offset > result.File.Size {
+	if err != nil || offset < 0 || offset > processedFileLimit {
 		fail(w, 400, "invalid download offset")
 		return
 	}
 	m.mu.Lock()
-	dir := filepath.Dir(m.cfg.Database)
+	database := m.cfg.Database
 	m.mu.Unlock()
-	file, err := os.Open(filepath.Join(dir, "siui-downloads", call.ID))
+	file, err := os.Open(existingDownloadPath(database, call.ID))
 	if err != nil {
+		if os.IsNotExist(err) {
+			entry, e := scanOperation(m.db.QueryRow(operationSelect+" WHERE c.id=?", call.ID))
+			if e == nil && entry.History.Status == "archived" {
+				q := r.URL.Query()
+				if q.Get("unzip") != "" || q.Get("entry") != "" || q.Has("schema") || q.Has("validateXSD") || q.Get("format") != "" {
+					fail(w, 409, "local copy removed; download original from History before further processing")
+					return
+				}
+				if !q.Has("offset") {
+					cloned := r.Clone(r.Context())
+					u := *r.URL
+					q.Set("offset", "0")
+					u.RawQuery = q.Encode()
+					cloned.URL = &u
+					r = cloned
+				}
+				m.operationHistoryHTTP(w, r, entry, []string{"history", "download"})
+				return
+			}
+		}
 		fail(w, 404, "download unavailable")
 		return
 	}
 	defer file.Close()
-	data, err := io.ReadAll(io.NewSectionReader(file, offset, downloadChunk))
+	var source io.ReaderAt = file
+	size := result.File.Size
+	q := r.URL.Query()
+	if q.Get("unzip") != "" || q.Get("entry") != "" || q.Has("schema") || q.Has("validateXSD") || q.Get("format") != "" {
+		raw, readErr := io.ReadAll(io.LimitReader(file, processedFileLimit+1))
+		if readErr != nil {
+			fail(w, 500, "cannot read download")
+			return
+		}
+		processed, processErr := processCallFile(r.Context(), raw, q, result.File.ValidationSchema)
+		if processErr != nil {
+			fail(w, 422, processErr.Error())
+			return
+		}
+		source = bytes.NewReader(processed)
+		size = int64(len(processed))
+	}
+	if offset > size {
+		fail(w, 400, "invalid download offset")
+		return
+	}
+	data, err := io.ReadAll(io.NewSectionReader(source, offset, downloadChunk))
 	if err != nil {
 		fail(w, 500, "cannot read download")
 		return
 	}
-	respond(w, 200, map[string]any{"ok": true, "offset": offset, "next_offset": offset + int64(len(data)), "eof": offset+int64(len(data)) >= result.File.Size, "data_base64": base64.StdEncoding.EncodeToString(data)})
+	respond(w, 200, map[string]any{"ok": true, "offset": offset, "next_offset": offset + int64(len(data)), "eof": offset+int64(len(data)) >= size, "data_base64": base64.StdEncoding.EncodeToString(data)})
 }

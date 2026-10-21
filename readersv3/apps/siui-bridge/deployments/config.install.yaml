@@ -74,3 +74,9 @@ modules:
     certificate_store: CurrentUser
     certificate_thumbprint: ""
     database: ./siui-jobs.db
+  siui-history-sync:
+    enabled: false
+    url: ""
+    token: ""
+    ca_file: ""
+    retry_seconds: 30

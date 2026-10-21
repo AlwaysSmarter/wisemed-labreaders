@@ -14,8 +14,9 @@ import (
 )
 
 type Parameter struct {
-	Name string `json:"name"`
-	Type string `json:"type"`
+	Name     string `json:"name"`
+	Type     string `json:"type"`
+	Nullable bool   `json:"nullable,omitempty"`
 }
 type Operation struct {
 	Label      string      `json:"label"`
@@ -43,7 +44,18 @@ func findOperation(group, name string) (Operation, bool) {
 	}
 	return Operation{}, false
 }
-func validateParameters(op Operation, args map[string]string) error {
+func validateParameters(op Operation, args map[string]string, nullParameters ...string) error {
+	for _, name := range nullParameters {
+		allowed := false
+		for _, p := range op.Parameters {
+			if p.Name == name && p.Nullable {
+				allowed = true
+			}
+		}
+		if !allowed {
+			return fmt.Errorf("parameter %s does not accept null", name)
+		}
+	}
 	if len(args) != len(op.Parameters) {
 		return errors.New("supply exactly the parameters listed in the operation catalogue")
 	}
@@ -65,6 +77,10 @@ func validateParameters(op Operation, args map[string]string) error {
 			}
 			if !valid {
 				return fmt.Errorf("%s must be an XML dateTime, e.g. 2026-10-05T00:00:00+03:00", p.Name)
+			}
+		case "boolean":
+			if v != "true" && v != "false" && v != "1" && v != "0" {
+				return fmt.Errorf("%s must be an XML boolean string: true, false, 1 or 0", p.Name)
 			}
 		case "int":
 			if _, err := strconv.ParseInt(v, 10, 32); err != nil {
@@ -91,7 +107,7 @@ func validateParameters(op Operation, args map[string]string) error {
 	}
 	return nil
 }
-func operationEnvelope(op Operation, args map[string]string) []byte {
+func operationEnvelope(op Operation, args map[string]string, nullParameters ...string) []byte {
 	var b bytes.Buffer
 	b.WriteString(`<soap:Envelope xmlns:soap="` + soapNS + `" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema"><soap:Body>`)
 	if op.Style == "rpc" {
@@ -100,6 +116,16 @@ func operationEnvelope(op Operation, args map[string]string) []byte {
 		b.WriteString(`<` + op.Name + ` xmlns="` + op.Namespace + `">`)
 	}
 	for _, p := range op.Parameters {
+		isNull := false
+		for _, name := range nullParameters {
+			if name == p.Name {
+				isNull = true
+			}
+		}
+		if isNull {
+			b.WriteString("<" + p.Name + ` xsi:nil="true"/>`)
+			continue
+		}
 		b.WriteString("<" + p.Name)
 		if op.Style == "rpc" {
 			b.WriteString(` xsi:type="xsd:` + p.Type + `"`)
@@ -211,10 +237,10 @@ func operationSchema(op Operation, args map[string]string) string {
 	}
 	return ""
 }
-func (c *client) invokeOperation(ctx context.Context, op Operation, args map[string]string) (values []string, submitted bool, err error) {
+func (c *client) invokeOperation(ctx context.Context, op Operation, args map[string]string, nullParameters ...string) (values []string, submitted bool, err error) {
 	address := ""
 	defer func() { err = withConnectionError(address, err) }()
-	if err = validateParameters(op, args); err != nil {
+	if err = validateParameters(op, args, nullParameters...); err != nil {
 		return
 	}
 	if schema := operationSchema(op, args); schema != "" {
@@ -242,7 +268,7 @@ func (c *client) invokeOperation(ctx context.Context, op Operation, args map[str
 		return nil, false, e
 	}
 	address = strings.TrimRight(base, "/") + "/svapntws/services/" + op.Service
-	status, _, data, e := c.backend.Do(ctx, "POST", address, h, operationEnvelope(op, args))
+	status, _, data, e := c.backend.Do(ctx, "POST", address, h, operationEnvelope(op, args, nullParameters...))
 	submitted = op.Mutating
 	if e != nil {
 		if connectionFailedBeforeSend(e) {

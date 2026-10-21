@@ -14,11 +14,12 @@ import (
 	"wisemed-labreaders/readersv3/core/config"
 	"wisemed-labreaders/readersv3/core/module"
 	"wisemed-labreaders/readersv3/core/runtime"
-	"wisemed-labreaders/readersv3/modules/builtin"
 	"wisemed-labreaders/readersv3/shared/appmeta"
 )
 
 type RunOptions struct {
+	// BackgroundStartupUpdates avoids waiting for the update server before serving.
+	BackgroundStartupUpdates bool
 	// SkipBootstrap is for standalone utilities with their own settings UI.
 	SkipBootstrap  bool
 	Headless       bool
@@ -48,11 +49,23 @@ func Run(configPath string, defaultModules []string, opts RunOptions) error {
 		fmt.Println("flag -showlog activ: logurile runtime vor fi afisate si in consola.")
 	}
 	cfg.EnabledModules = append([]string(nil), defaultModules...)
+	if opts.BackgroundStartupUpdates {
+		cfg.EnabledModules = append(cfg.EnabledModules, "runner-startup-updates")
+	}
 	changed := false
 	if !opts.SkipBootstrap || opts.Reconfigure {
 		changed, err = ensureBootstrap(cfg, opts.Reconfigure)
 	}
 	if err != nil {
+		if cfg.Analyzer.Protocol == "siui-data" {
+			// Preserve an identity already registered before a later WSM setup error.
+			if changed {
+				if saveErr := cfg.Save(); saveErr != nil {
+					return fmt.Errorf("SIUI Data setup incomplete: %v; save progress: %w", err, saveErr)
+				}
+			}
+			return fmt.Errorf("SIUI Data setup incomplete: %w", err)
+		}
 		log.Printf("bootstrap: non-blocking startup warning: %v", err)
 		startupConsolef("warning bootstrap: %v", err)
 		changed = false
@@ -81,12 +94,14 @@ func Run(configPath string, defaultModules []string, opts RunOptions) error {
 	if opts.InstallService {
 		return installService(cfg)
 	}
-	if err := checkForUpdates(cfg, opts); err != nil {
-		if errors.Is(err, errUpdateStarted) {
-			return nil
+	if !opts.BackgroundStartupUpdates {
+		if err := checkForUpdates(cfg, opts); err != nil {
+			if errors.Is(err, errUpdateStarted) {
+				return nil
+			}
+			log.Printf("app-updates: non-blocking startup warning: %v", err)
+			startupConsolef("warning update server: %v", err)
 		}
-		log.Printf("app-updates: non-blocking startup warning: %v", err)
-		startupConsolef("warning update server: %v", err)
 	}
 	if opts.Headless && !opts.HeadlessChild {
 		info, err := launchHeadlessProcess(configPath)
@@ -103,7 +118,7 @@ func Run(configPath string, defaultModules []string, opts RunOptions) error {
 		return nil
 	}
 	reg := module.NewRegistry()
-	builtin.RegisterAll(reg)
+	registerRunnerModules(reg, opts)
 	logger := log.New(log.Writer(), "", log.LstdFlags|log.Lmicroseconds)
 	app := runtime.New(cfg, logger, reg)
 	if err := app.InitModules(cfg.EnabledModules); err != nil {
@@ -126,7 +141,7 @@ func Run(configPath string, defaultModules []string, opts RunOptions) error {
 			}()
 		}
 	}
-	return runAppLoop(ctx, configPath, defaultModules, logger)
+	return runAppLoop(ctx, configPath, defaultModules, logger, opts)
 }
 
 func startupConsolef(format string, args ...interface{}) {
@@ -210,7 +225,7 @@ func (p *processControl) RequestRestart(reason string) {
 	}
 }
 
-func runAppLoop(ctx context.Context, configPath string, defaultModules []string, logger *log.Logger) error {
+func runAppLoop(ctx context.Context, configPath string, defaultModules []string, logger *log.Logger, opts RunOptions) error {
 	restartCh := make(chan string, 1)
 	for {
 		cfg, err := config.Load(configPath)
@@ -219,9 +234,12 @@ func runAppLoop(ctx context.Context, configPath string, defaultModules []string,
 		}
 		normalizeLegacyConfig(cfg)
 		cfg.EnabledModules = append([]string(nil), defaultModules...)
+		if opts.BackgroundStartupUpdates {
+			cfg.EnabledModules = append(cfg.EnabledModules, "runner-startup-updates")
+		}
 
 		reg := module.NewRegistry()
-		builtin.RegisterAll(reg)
+		registerRunnerModules(reg, opts)
 		app := runtime.New(cfg, logger, reg)
 		app.RegisterService("process-control", &processControl{restartCh: restartCh})
 		if err := app.InitModules(cfg.EnabledModules); err != nil {

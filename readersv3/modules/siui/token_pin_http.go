@@ -20,11 +20,16 @@ func (m *Module) tokenPINHTTP(w http.ResponseWriter, r *http.Request) {
 			fail(w, 500, "PIN storage unavailable")
 			return
 		}
+		failures, e := cfg.pin.failureCount(cfg)
+		if e != nil {
+			fail(w, 500, "PIN storage unavailable")
+			return
+		}
 		hint := ""
 		if set {
 			hint = "<hidden>"
 		}
-		respond(w, 200, map[string]any{"ok": true, "configured": set, "hint": hint, "blocked": blocked, "manual_required": runtime.GOOS == "linux", "pkcs11_module": cfg.PKCS11Module})
+		respond(w, 200, map[string]any{"ok": true, "configured": set, "hint": hint, "blocked": blocked, "failed_attempts": failures, "max_attempts": pinFailureLimit, "manual_required": runtime.GOOS == "linux", "pkcs11_module": cfg.PKCS11Module})
 		return
 	}
 	if r.Method != "PUT" {

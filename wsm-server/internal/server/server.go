@@ -157,6 +157,7 @@ func (s *Server) routes() http.Handler {
 		writeJSON(w, 200, map[string]interface{}{"status": "ok", "service": "wsm-server"})
 	})
 	r.Get("/api/connections", s.connections)
+	r.Post("/api/connections/{id}/commands", s.commandHTTP)
 	r.Get("/api/debug/state", s.connections)
 	r.Get("/api/equipment/{id}", s.equipmentHTTP)
 	r.Get("/ws", s.handleWS)
@@ -174,6 +175,15 @@ func (s *Server) connections(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	v := s.hub.Snapshot(claims.TenantID)
+	if kind := r.URL.Query().Get("client_type"); kind != "" {
+		filtered := make([]ConnectionInfo, 0)
+		for _, c := range v {
+			if c.ClientType == kind {
+				filtered = append(filtered, c)
+			}
+		}
+		v = filtered
+	}
 	writeJSON(w, 200, map[string]interface{}{"tenant_id": claims.TenantID, "connections": v, "count": len(v), "stats": s.hub.Stats(claims.TenantID)})
 }
 func (s *Server) handleWS(w http.ResponseWriter, r *http.Request) {
@@ -481,7 +491,7 @@ func authorizeMessage(c *AuthClaims, m Envelope) error {
 				return nil
 			}
 		case "client_type":
-			if c.Has("route:broadcast") && (t.ClientType == "reader" || t.ClientType == "siui-bridge" || t.ClientType == "browser" || t.ClientType == "service") {
+			if c.Has("route:broadcast") && (t.ClientType == "reader" || isSIUIServiceClientType(t.ClientType) || t.ClientType == "browser" || t.ClientType == "service") {
 				return nil
 			}
 		case "topic":
@@ -517,6 +527,7 @@ func (s *Server) dispatch(c *Connection, claims *AuthClaims, m Envelope, cfg *co
 		deliver.Timestamp = time.Now().UTC()
 		deliver.Payload = clonePayload(m.Payload)
 		deliver.Payload["sender_connection_id"] = c.ID
+		deliver.Payload["sender_ip"] = c.RemoteIP
 		deliver.Payload["sender_client_type"] = c.ClientType
 		deliver.Payload["sender_client_id"] = c.ClientID
 		deliver.Payload["sender_reader_id"] = c.ReaderID

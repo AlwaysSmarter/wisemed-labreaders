@@ -80,10 +80,15 @@
             <button class="nav-sublink" data-view="analytes" data-settings-subview="reader" data-i18n="settings_reader">Setari reader</button>
             <button class="nav-sublink" data-view="analytes" data-settings-subview="qc" data-i18n="settings_qc">Setari QC</button>
             <button class="nav-sublink" data-view="analytes" data-settings-subview="siui" hidden>CNAS</button>
+<button class="nav-sublink" data-view="analytes" data-settings-subview="history" hidden>History</button>
             <button class="nav-sublink" data-view="analytes" data-settings-subview="pad" hidden>Setări PAD</button>
             <button class="nav-sublink" data-view="analytes" data-settings-subview="demo" hidden>Demo</button>
             <button class="nav-sublink" data-view="analytes" data-settings-subview="wss">WSS</button>
           </div>
+          <a id="siui-data-versions-nav" class="nav-direct-link" href="/siui-data-versions" hidden>Versiuni nomenclatoare</a>
+          <a id="siui-data-setup-nav" class="nav-direct-link" href="/siui-data-settings" hidden>Setup SIUI Data</a>
+          <button id="history-nav-link" class="nav-link" data-view="history" hidden>Istoric</button>
+          <button id="operations-nav-link" class="nav-link" data-view="operations" hidden>Operations</button>
           <button id="debug-nav-link" class="nav-link" data-view="debug" data-i18n="nav_debug" hidden>Debug</button>
           <div class="nav-submenu" id="debug-submenu" hidden>
             <button id="debug-wsm-link" class="nav-sublink" data-view="wsm">WSM</button>
@@ -845,6 +850,8 @@
           </article>
         </section>
         <section id="view-wsm" class="panel-grid" hidden><article id="wsm-debug-panel" class="panel full-span"></article></section>
+        <section id="view-history" class="panel-grid" hidden></section>
+        <section id="view-operations" class="panel-grid" hidden></section>
         <section id="view-debug" class="panel-grid" hidden>
           <article class="panel">
             <div class="panel-head">

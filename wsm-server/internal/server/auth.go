@@ -148,8 +148,12 @@ func authenticate(cfg *config.Config, r *http.Request, queryAllowed bool) (*Auth
 	}
 	return claims, nil
 }
+func isSIUIServiceClientType(kind string) bool {
+	return kind == "siui-bridge" || kind == "siui-bridge-history"
+}
+
 func validateHelloAgainstClaims(h HelloPayload, c *AuthClaims) error {
-	if c == nil || !(h.ClientType == c.Role || c.Role == "service" && h.ClientType == "siui-bridge") || h.ClientID != c.ClientID || h.ReaderID != c.ReaderID || h.EquipmentID != "" && h.EquipmentID != c.EquipmentID || h.UserID != "" && h.UserID != c.Subject || h.Label != "" && h.Label != c.Label {
+	if c == nil || !(h.ClientType == c.Role || c.Role == "service" && isSIUIServiceClientType(h.ClientType)) || h.ClientID != c.ClientID || h.ReaderID != c.ReaderID || h.EquipmentID != "" && h.EquipmentID != c.EquipmentID || h.UserID != "" && h.UserID != c.Subject || h.Label != "" && h.Label != c.Label {
 		return errors.New("hello must match token identity")
 	}
 	return nil

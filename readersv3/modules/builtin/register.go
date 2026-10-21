@@ -39,6 +39,8 @@ import (
 	"wisemed-labreaders/readersv3/modules/resultsync"
 	"wisemed-labreaders/readersv3/modules/signingpad"
 	"wisemed-labreaders/readersv3/modules/siui"
+	"wisemed-labreaders/readersv3/modules/siuidata"
+	"wisemed-labreaders/readersv3/modules/siuihistory"
 	"wisemed-labreaders/readersv3/modules/stats"
 	sqlitestorage "wisemed-labreaders/readersv3/modules/storage/sqlite"
 	filetransport "wisemed-labreaders/readersv3/modules/transports/file"
@@ -64,6 +66,8 @@ func RegisterAll(reg *module.Registry) {
 	reg.Register("result-sync", resultsync.New)
 	reg.Register("signing-pad", signingpad.New)
 	reg.Register("siui", siui.New)
+	reg.Register("siui-data", siuidata.New)
+	reg.Register("siui-history", siuihistory.New)
 	reg.Register("stats", stats.New)
 	reg.Register("daily-details", dailydetails.New)
 	reg.Register("daily-orders", dailyorders.New)

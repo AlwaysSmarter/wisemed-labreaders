@@ -1,3 +1,8 @@
+> Contractul actual pentru toate operațiile și callback-urile persistente WiseMED
+> (callwmapi, lt opțional, procesare XML/ZIP pe server) este în
+> [API.md](API.md). Acest document păstrează și note despre interfața legacy.
+> Exemplele browser și reconectarea limitată sunt documentate în secțiunea wrapper din API.md.
+
 # Validare 72h - API HTTP/HTTPS și WSM
 
 Un singur handler HTTP autentificat este invocat local sau in-process prin

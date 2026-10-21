@@ -585,3 +585,121 @@ DOM IDs and /debug/wsm. Integrating pages must use the new names and asset path.
 Staged output/wsm-browser-sdk rebuilt; active installations need normal updates.
 Go WSM suite and reader localhttp tests passed, 31 SDK/shared UI Node tests passed;
 optional DOM suite skipped because jsdom is unavailable. PHP syntax check passed.
+
+
+## SIUI high-level wrapper update (2026-10-18)
+SIUIBridge now reconnects disconnected WSM before requests (3 attempts, 5s each,
+configurable); optional wsmFactory initializes a missing client. Never await a
+stale ready indefinitely. Shared reconnects, bounded discovery/request/download,
+no automatic POST replay. Named catalog operations finish polling, download by
+default and optional processResult before returning. file options unzip/entry/
+format/schema use SIUI Bridge file endpoint through WSM. XML JSON is a generic
+ordered tree, not domain extraction. Server processing is bounded, uses only
+bundled XSD and preserves owner checks; XSD retains existing 1MiB limit.
+options.callwmapi forwards the persistent WiseMED callback including optional lt
+in the WiseMED JWT; normal authenticated users may request callbacks, WiseMED
+enforces write rights. Callback delivery is independent of browser processing;
+getCall exposes delivery state, retryCallWMAPI retries delivery only.
+See docs/siui-browser-wrapper.md and readersv3/apps/siui-bridge/docs/API.md.
+
+callwmapi.file now prepares downloaded XML as file_json on the bridge before
+persisting the callback body. Optional unzip/entry/bundled schema; same bounded
+processing as file download. Examples/browser/siui-workflows.js demonstrates
+insured + patient update, personalization JSON + /cnas/personalisation, and PARA
+72h validation + /file/{id}/. Endpoints are illustrative PHP contracts, not
+implemented here; completed is not semantic validation or callback confirmation.
+
+
+XSD selection update: file processing validates by default, validateXSD:false
+is the explicit escape hatch for newer CNAS definitions. Client schema names
+are rejected. Bridge persists selected response schema in file metadata using
+operation/partnerCategory. Personalization schemas copied from supplied docs;
+PHM/REC ambiguous variants fail explicitly. Original raw ZIP/PDF unchanged.
+
+
+objWSMSIUI global singleton is now the recommended browser entrypoint. Lazy
+getWSM/wsmFactory, shared existing Bridge reconnection, totalTimeout 300s default.
+Every async method resolves {success:true,data} or {success:false,error:string,
+code,...}; legacy SIUIBridge retains throwing contract. No auto POST replay.
+Syntax errors before invocation cannot be caught by wrapper.
+
+objWSMSIUI requires no configure/create call: auto-detects window.objWSM and
+global lexical let/const objWSM at invocation time. Missing WSM resolves a
+failure envelope; URL/auth cannot be fabricated. Optional configure remains for
+advanced overrides. Default bridge selection requires one online SIUI bridge.
+
+Optional page-local objWSMSIUI tuning: setTimeouts, setReconnectOptions,
+setPollingInterval, setWSM, useAutomaticWSM, selectBridge, getOptions, resetOptions.
+Validated nonthrowing result envelopes; no persistence/server configuration or
+socket disconnect. In-flight invocations snapshot settings; changes affect next
+calls. Legacy configure remains available.
+
+objWSMSIUI status telemetry: setStatusHandler(fn|null) global and per-call
+onStatus, local requestId correlation, lifecycle stages, phase percent null
+when unknown, bytes-based original-download progress. UI handler exceptions and
+rejections isolated; no events after terminal completion/error/abort. Legacy
+onProgress behavior unchanged. Completed denotes wrapper call, not callback
+delivery or medical validation.
+
+
+Default objWSMSIUI discovery now picks the first siui-bridge in the WSM list,
+then pins identity. Explicit selectors and legacy SIUIBridge remain strict about
+ambiguity. selectBridge({}) clears the pin for automatic reselection.
+
+
+Documentation entrypoint: wsm-server/docs/siui-browser-quickstart.md, with
+readable self-contained JS request builders and async UI functions for singleton,
+insured/personalisation/72h callwmapi, status, retry, abort and tuning. Explicitly
+clarifies callwsapi is not implemented; canonical option is callwmapi.
+No runtime behavior changes in this documentation update.
+
+## SIUI Bridge History hello compatibility (2026-10-18)
+
+WSM accepts `client_type=siui-bridge-history` with signed role `service`, as for
+`siui-bridge`. Exact signed client/reader/equipment identities remain enforced.
+History participates in duplicate equipment/reader checks and client-type routing.
+Verified locally with a generated device key and a real TLS WebSocket hello/ack.
+The deployed WSM binary must be updated; changing/rebuilding History alone does
+not change the remote hello allowlist. Shared reader diagnostics now retain the
+WebSocket close reason when hello is rejected.
+
+## Generic HTTP command wrapper (2026-10-19)
+
+`GET /api/connections?client_type=<any type>` filters tenant-local discovery;
+missing filter lists all. `POST /api/connections/{id}/commands` accepts
+`{command,args,timeout_ms}` and waits synchronously for the actual WSS peer reply,
+returning `{request_id,connection_id,response}`. Uses existing authorization and
+identity stamping via a temporary service/browser hub connection, counted in
+connection limits and removed after completion. Reply sender and correlation ID
+are checked. Reload, subject revocation, expiry, shutdown, caller cancellation
+and peer disconnect bound the wait; no automatic replay. Default 135000ms,
+maximum 300000ms, also bounded by JWT expiry. HTTP command responses override
+ordinary 10s HTTP write deadline. Nginx template read timeout 310s/body cap16m.
+Details: `wsm-server/docs/http-commands.md`; generic PHP ext-curl wrapper:
+`wsm-server/examples/php/WSMHttpClient.php`. Config names match relevant JS
+transport options: connectTimeout5000/requestTimeout135000/totalTimeout300000,
+connectAttempts3 only retries transient GET discovery errors, never POST.
+Per-call options supported. SIUI job polling/download remains separate.
+Requires WSM rebuild/restart and proxy timeout alignment; not deployed here.
+Local verification passed: WSM `go test -race ./...`, `go vet ./...`, PHP syntax
+and option validation; real PHP ext-curl -> TLS1.2 HTTP -> WSS simulated reader
+round trip with verified private CA, actual delayed reply and remote 422 preserved.
+The PHP constructor optionally accepts a trusted CA PEM path as fourth argument.
+
+### SIUI Operations caller metadata (2026-10-21)
+
+Routed commands/replies/events now include server-stamped `sender_ip` from the
+connection peer, overwriting caller input. HTTP command temporary connections
+also retain their HTTP peer IP. Reader API bridging passes this as Principal.SourceIP
+for SIUI Operations auditing. Behind a proxy this is the proxy peer; no untrusted
+forwarded header is used. Requires deploying the updated WSM binary; older servers
+remain compatible but do not provide the IP. No production deployment performed.
+
+### Prescription bridge coverage (2026-10-22)
+The catalogue now exposes 40 SOAP operations, including generatePrescriptionSeries/getPrescriptionSeriesInfo (GENERAL, document/literal) and all 13 EPrescriptionWS operations: added processIssuedPrescription, getReleasedPrescription, cancelReleasedPrescription, updateInvoices. This supersedes the earlier processIssuedPrescription exclusion; validateEnlisted/validatePharmacyDrugs remain excluded. XML boolean parameters accept only true/false/1/0 strings; Debug and OpenAPI reflect that contract. Carnet responses preserve every raw return string, with no inferred structure or physician mapping. processIssuedPrescription/updateInvoices have syntax-only XML validation (no supplied XSD). Offline issuance/number allocation/storage/printing remain WiseMED responsibilities; CNAS operations require connectivity. See the prescription section in WSM wrapper docs and examples/browser/siui-prescriptions.js for aceOverWatch callbacks and stable generation IDs. No live CNAS writes or installed-service restart performed.
+Local verification for this change: go test -race ./modules/siui ./modules/localhttp passed in readersv3; go test ./internal/server passed in WSM; both apps built successfully. SDK/example Node suites: 25 pass, 1 existing auxiliary-route coverage failure (missing dashboard in wrapper); SOAP catalogue parity and all new prescription/example cases pass. SIUI UI suite: 15 pass. Refreshed output/wsm-browser-sdk/bin/wsm-server and prescription docs/example; SIUI binary built to /tmp/wisemed-prescriptions-siui-bridge for verification, installed binaries were not replaced.
+
+### Prescription null parameter and download correction (2026-10-22)
+Corrected both SDK and backend for JSON null subUnitCode on generatePrescriptionSeries/getPrescriptionSeriesInfo only, using nullable catalogue metadata and SOAP xsi:nil=true. Required/unknown fields still reject null; null and empty-string payloads have distinct deduplication digests. The HTTP boundary uses string pointers to preserve null rather than silently converting it to empty. Debug blank subUnitCode sends null; OpenAPI declares nullable. Both catalogue operations now download the CNAS URL/size result through the existing HTTPS-origin-restricted download pipeline; values are URL+size, not individual carnets. This supersedes the prior raw-carnet-response assumption. SDK returns downloaded bytes in data.download.data by default. Reference: official PIAS specification §5.20 (portal.cnas.ro, v3.7.34 dated 2026-10-14). Backend race tests, including null-through-WSM-to-SOAP/file download and null/empty dedup isolation, passed; selected SDK/example suite 26 passed, excluding the previously known unrelated dashboard-route coverage failure; UI suite 15 passed. No CNAS operations invoked in verification.
+Debug → CLINICE also lists getPrescriptionSeriesInfo and generatePrescriptionSeries; their operation group and general/* routes remain unchanged for SDK compatibility.
+Refreshed local WSM output/bin/WSM_Server, SDK package binary/control/docs, and both local SIUI Bridge output binary paths after the fix. No running service was restarted and no real CNAS call was made.

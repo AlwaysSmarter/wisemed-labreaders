@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Bundle Name="WiseMED siui-bridge-history Setup"
+          Manufacturer="WiseMED"
+          Version="1.0.0"
+          UpgradeCode="F8E0B6B5-8E4C-5951-AE94-98FF16E3A2F2">
+    <BootstrapperApplication>
+      <bal:WixStandardBootstrapperApplication xmlns:bal="http://wixtoolset.org/schemas/v4/wxs/bal" Theme="standard" />
+    </BootstrapperApplication>
+    <Chain>
+      <MsiPackage SourceFile="$(var.MsiPath)" DisplayInternalUI="no" />
+    </Chain>
+  </Bundle>
+</Wix>

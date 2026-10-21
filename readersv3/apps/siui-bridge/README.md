@@ -1,3 +1,8 @@
+> Contractul actual pentru toate operațiile și callback-urile persistente WiseMED
+> (callwmapi, lt opțional, procesare XML/ZIP pe server) este în
+> [API.md](docs/API.md). Acest document păstrează și note despre interfața legacy.
+> Exemplele browser și reconectarea limitată sunt documentate în secțiunea wrapper din API.md.
+
 # SIUI Bridge — GENERAL și CLINICE
 
 Configurarea este în **Setări → CNAS**; serviciile sunt în **Debug → GENERAL / CLINICE**.
@@ -239,4 +244,15 @@ WSM sau update serverul și nu exportă certificatul tokenului.
 
 Debug → FACTURĂ ELECTRONICĂ oferă câmpurile XSD, toate cele 14 categorii, articole multiple, totaluri exacte, XML și DataMatrix ZIP, previzualizare/tipărire, semnare CMS cu token și trimitere explicită. Consultarea facturii, ID-ului pentru ANAF și notei de refuz folosește același API HTTPS/JWT și WSM. Vezi secțiunea dedicată din [API.md](docs/API.md). Exemplul fictiv este pentru test local; nu se transmite automat la CNAS. Numerotarea „formular 13” nu a fost confirmată în documentația furnizată.
 
-PIN-ul se configurează separat în Setări → CNAS și este afișat numai ca `<hidden>`. Windows folosește DPAPI; macOS/Linux AES-256-GCM cu cheia de instalare protejată 0600. După primul eșec, autentificarea automată rămâne suspendată până la actualizarea PIN-ului. Introducerea manuală temporară este disponibilă pentru maximum 150 secunde. Detalii și limite în docs/API.md, secțiunea „PIN criptat și autentificare prin driver”.
+PIN-ul se configurează separat în Setări → CNAS și este afișat numai ca `<hidden>`. Windows folosește DPAPI; macOS/Linux AES-256-GCM cu cheia de instalare protejată 0600. Autentificarea automată se suspendă după 3 respingeri explicite ale PIN-ului; succesul resetează contorul. Lipsa tokenului, anularea și erorile de conexiune nu o suspendă. Introducerea manuală temporară este disponibilă pentru maximum 150 secunde. Detalii și limite în docs/API.md, secțiunea „PIN criptat și autentificare prin driver”.
+
+## SIUI Bridge History
+
+**Setări → History** configurează sincronizarea asincronă către utilitarul separat
+[siui-bridge-history](../siui-bridge-history/README.md): URL HTTPS, cheie Bridge și CA opțională.
+Coada SQLite este persistentă; păstrează cererea, rezultatul și timpii originali și reia
+transferul după întreruperi. Rezultatul CNAS și `callwmapi` nu așteaptă rețeaua History.
+Starea livrării este separată în `call.history`; monitorizare/retry în Setări → History.
+[API, exemple și limite](../siui-bridge-history/docs/API.md).
+
+Dashboardul principal prezintă încărcarea, graficele apelurilor, OCSP, endpointurile CNAS și cozile de livrare. Operations oferă perioade prestabilite, intervale de zile/ore, taguri colorate și detalii de audit. Vezi [API.md](docs/API.md#dashboard-operațional-și-filtre-operations).

@@ -101,3 +101,5 @@ generate_icon "update-server"       "#0E4F45" "#10B981" "#065F46" "UPDATES" "Rel
 
 echo "Generated PNG previews in: $PNG_DIR"
 echo "Generated ICO files in: $ICO_DIR"
+
+generate_icon "wisemed-siui-data" "#075985" "#0F766E" "#075985" "SIUI" "Data provider" "SD"

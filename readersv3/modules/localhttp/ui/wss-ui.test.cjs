@@ -10,7 +10,7 @@ function functionSource(name) {
   return source.slice(source.slice(start-6,start) === "async " ? start-6 : start, end + 2);
 }
 function context(names, globals = {}) {
-  const scope = vm.createContext({Date, siuiPollGeneration:0, siuiDebugGeneration:0, isSIUIMode:()=>false, ...globals});
+  const scope = vm.createContext({Date, siuiPollGeneration:0, siuiDebugGeneration:0, isSIUIMode:()=>false, isHistoryMode:()=>false, ...globals});
   vm.runInContext(names.map(functionSource).join('\n'), scope);
   return scope;
 }

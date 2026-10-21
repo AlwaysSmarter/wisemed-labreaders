@@ -12,14 +12,35 @@ import (
 	"time"
 )
 
+type pinOutcome uint8
+
+const (
+	pinUnrelated pinOutcome = iota
+	pinSuccess
+	pinRejected
+)
+const pinFailureLimit = 3
+
+func signingPINOutcome(rejected bool, err error) pinOutcome {
+	if rejected {
+		return pinRejected
+	}
+	if err == nil {
+		return pinSuccess
+	}
+	return pinUnrelated
+}
+
 type pinRecord struct {
-	Sealed  []byte `json:"sealed"`
-	Blocked bool   `json:"blocked"`
+	Sealed   []byte `json:"sealed"`
+	Blocked  bool   `json:"blocked"`
+	Failures int    `json:"failures"`
 }
 type pinVault struct {
 	mu         sync.Mutex
 	path       string
 	manual     map[string][]byte
+	active     map[string]uint64
 	until      time.Time
 	generation uint64
 	logf       func(string, ...interface{})
@@ -101,6 +122,7 @@ func (v *pinVault) save(s settings, pin string, forget, manual bool) error {
 		v.manual = map[string][]byte{}
 	}
 	v.generation++
+	delete(v.active, key)
 	for k, p := range v.manual {
 		clear(p)
 		delete(v.manual, k)
@@ -148,11 +170,9 @@ func (v *pinVault) save(s settings, pin string, forget, manual bool) error {
 	return v.write(rows)
 }
 
-// Persist suspension BEFORE handing a PIN to a driver. A crash, cancellation or
-// failed operation leaves it suspended across restarts. Only verified signing
-// success may re-enable the same encrypted record; manual PINs never re-enable it.
-func (v *pinVault) begin(s settings) ([]byte, func(bool), error) {
-	noop := func(bool) {}
+// begin serializes automatic attempts and persists explicit PIN rejection counts.
+func (v *pinVault) begin(s settings) ([]byte, func(pinOutcome), error) {
+	noop := func(pinOutcome) {}
 	if v == nil {
 		return nil, noop, nil
 	}
@@ -163,11 +183,20 @@ func (v *pinVault) begin(s settings) ([]byte, func(bool), error) {
 		delete(v.manual, key)
 		if time.Now().Before(v.until) {
 			generation := v.generation
-			return p, func(success bool) {
+			return p, func(outcome pinOutcome) {
 				defer clear(p)
 				v.mu.Lock()
 				defer v.mu.Unlock()
-				if success && generation == v.generation && time.Now().Before(v.until) {
+				if outcome == pinSuccess && generation == v.generation {
+					if rows, err := v.read(); err == nil {
+						if r, ok := rows[key]; ok {
+							r.Failures = 0
+							rows[key] = r
+							_ = v.write(rows)
+						}
+					}
+				}
+				if outcome != pinRejected && generation == v.generation && time.Now().Before(v.until) {
 					v.manual[key] = append([]byte(nil), p...)
 				}
 			}, nil
@@ -179,48 +208,63 @@ func (v *pinVault) begin(s settings) ([]byte, func(bool), error) {
 		return nil, noop, errors.New("Depozitul PIN nu poate fi citit; autentificarea automată este oprită")
 	}
 	r, ok := rows[key]
-	if !ok || r.Blocked {
+	_, busy := v.active[key]
+	if !ok || r.Blocked || busy {
 		return nil, noop, nil
 	}
 	p, e := openPIN(v.path, r.Sealed, key)
 	if e != nil {
 		return nil, noop, errors.New("PIN-ul nu poate fi decriptat; actualizați-l în Setări CNAS")
 	}
-	r.Blocked = true
-	rows[key] = r
-	if e = v.write(rows); e != nil {
-		clear(p)
-		return nil, noop, errors.New("Nu se poate proteja contorul încercărilor PIN")
+	if v.active == nil {
+		v.active = map[string]uint64{}
 	}
+	generation := v.generation
+	v.active[key] = generation
 	if v.logf != nil {
 		v.logf("SIUI token: o singura incercare automata PIN pentru certificatul %s", s.Thumbprint)
 	}
 	original := string(r.Sealed)
 	var once sync.Once
-	return p, func(success bool) {
+	return p, func(outcome pinOutcome) {
 		once.Do(func() {
 			clear(p)
-			if !success {
-				if v.logf != nil {
-					v.logf("[ERROR] SIUI token: autentificare automata suspendata; folositi introducerea manuala sau actualizati PIN-ul")
-				}
-				return
-			}
 			v.mu.Lock()
 			defer v.mu.Unlock()
+			if current, ok := v.active[key]; ok && current == generation {
+				delete(v.active, key)
+			}
+			if outcome == pinUnrelated || generation != v.generation {
+				return
+			}
 			rows, e := v.read()
 			if e != nil {
 				return
 			}
 			current := rows[key]
-			if string(current.Sealed) == original {
-				current.Blocked = false
-				rows[key] = current
-				_ = v.write(rows)
+			if string(current.Sealed) != original {
+				return
+			}
+			if outcome == pinSuccess {
+				current.Failures = 0
+			} else {
+				current.Failures++
+				current.Blocked = current.Failures >= pinFailureLimit
+			}
+			rows[key] = current
+			if e = v.write(rows); e != nil {
+				if v.logf != nil {
+					v.logf("[ERROR] SIUI token: nu se poate salva suspendarea PIN-ului")
+				}
+				return
+			}
+			if v.logf != nil && outcome == pinRejected {
+				v.logf("[ERROR] SIUI token: PIN respins (%d/%d); suspendat=%t", current.Failures, pinFailureLimit, current.Blocked)
 			}
 		})
 	}, nil
 }
+
 func randomBytes(n int) ([]byte, error) { b := make([]byte, n); _, e := rand.Read(b); return b, e }
 
 func (v *pinVault) available(s settings) bool {
@@ -244,4 +288,11 @@ func (v *pinVault) manualAvailable(s settings) bool {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	return len(v.manual[pinIdentity(s)]) > 0 && time.Now().Before(v.until)
+}
+
+func (v *pinVault) failureCount(s settings) (int, error) {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	rows, err := v.read()
+	return rows[pinIdentity(s)].Failures, err
 }
