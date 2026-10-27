@@ -5,3 +5,4 @@ cd "$(dirname "$0")"
 export WSM_DOCKER_OUTPUT_DIR="${WSM_DOCKER_OUTPUT_DIR:-$HOME/dockers}"
 export WSM_DOCKER_PLATFORM="${WSM_DOCKER_PLATFORM:-linux/amd64}"
 exec ./wsm-server/build-docker.sh
+cp update-wsm.sh "${WSM_DOCKER_OUTPUT_DIR:-$HOME/dockers}"

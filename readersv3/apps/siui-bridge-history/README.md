@@ -139,3 +139,8 @@ Pagina principală este un dashboard al arhivei: spațiu stocat, bridge-uri auto
 și distribuție pe Bridge. Perioade: azi, ieri, săptămâna curentă, ultimele 7 zile,
 luna curentă și interval personalizat. Activitatea este măsurată la primirea în
 History; spațiul și coada sunt totaluri curente, independente de perioada aleasă.
+
+## Docker pe EC2
+
+Build, export în `~/dockers`, setup și update cu rollback: [ghid Docker comun](../../docker/README.md).
+Scriptul `update-siui-bridge-history.sh` este livrat și în `output/siui-bridge-history/`.

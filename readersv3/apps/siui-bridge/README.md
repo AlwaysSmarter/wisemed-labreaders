@@ -256,3 +256,8 @@ Starea livrării este separată în `call.history`; monitorizare/retry în Setă
 [API, exemple și limite](../siui-bridge-history/docs/API.md).
 
 Dashboardul principal prezintă încărcarea, graficele apelurilor, OCSP, endpointurile CNAS și cozile de livrare. Operations oferă perioade prestabilite, intervale de zile/ore, taguri colorate și detalii de audit. Vezi [API.md](docs/API.md#dashboard-operațional-și-filtre-operations).
+
+## Docker pe EC2
+
+Build, export în `~/dockers`, setup și update cu rollback: [ghid Docker comun](../../docker/README.md).
+Scriptul `update-siui-bridge.sh` este livrat și în `output/siui-bridge/`.

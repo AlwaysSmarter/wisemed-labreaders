@@ -571,3 +571,42 @@ Local verification for this change: go test -race ./modules/siui ./modules/local
 Corrected both SDK and backend for JSON null subUnitCode on generatePrescriptionSeries/getPrescriptionSeriesInfo only, using nullable catalogue metadata and SOAP xsi:nil=true. Required/unknown fields still reject null; null and empty-string payloads have distinct deduplication digests. The HTTP boundary uses string pointers to preserve null rather than silently converting it to empty. Debug blank subUnitCode sends null; OpenAPI declares nullable. Both catalogue operations now download the CNAS URL/size result through the existing HTTPS-origin-restricted download pipeline; values are URL+size, not individual carnets. This supersedes the prior raw-carnet-response assumption. SDK returns downloaded bytes in data.download.data by default. Reference: official PIAS specification §5.20 (portal.cnas.ro, v3.7.34 dated 2026-10-14). Backend race tests, including null-through-WSM-to-SOAP/file download and null/empty dedup isolation, passed; selected SDK/example suite 26 passed, excluding the previously known unrelated dashboard-route coverage failure; UI suite 15 passed. No CNAS operations invoked in verification.
 Debug → CLINICE also lists getPrescriptionSeriesInfo and generatePrescriptionSeries; their operation group and general/* routes remain unchanged for SDK compatibility.
 Refreshed local WSM output/bin/WSM_Server, SDK package binary/control/docs, and both local SIUI Bridge output binary paths after the fix. No running service was restarted and no real CNAS call was made.
+
+
+## SIUI Docker deployment on EC2 (2026-10-27)
+
+Root make-siui-bridge-docker.sh, make-siui-bridge-history-docker.sh and
+make-wisemed-siui-data-docker.sh delegate to readersv3/docker/build.sh. Default
+linux/amd64 built natively/cross-compiled on Apple Silicon, UTC timestamp in
+archive/tag/appmeta.Version. Exports ~/dockers/<app>-YYYYMMDD-HHMMSS.tar.gz and
+standalone update-<app>.sh. Updater also lives in readersv3/output/<app>/, refreshed
+by prepare-docker-output.sh and prepare-reader-output.sh. Preserve local configs.
+
+Shared Dockerfile uses Debian slim, CA/tzdata/xmllint/OpenSC/PCSC, UID/GID65532,
+read-only root, writable deployments/data and tmpfs /tmp. Host networking on EC2
+keeps loopback MySQL/PostgreSQL/WSM reachable; app UIs retain ports19112/19113/19114.
+Defaults are /opt/<app>/deployments/config.yaml and /opt/<app>/data/ (SQLite,
+history/staging, uploads); container mounts these at /data/deployments and
+/data/data. Logs and generated local TLS stay in deployments. Existing operator
+paths/config values are preserved by the common config merge. Databases remain
+external services; no DB data files packaged. See readersv3/docker/README.md.
+
+Update scripts reuse/start an SSH agent, unlock ~/.ssh/github_dockers, clone
+AlwaysSmarter/dockers, select tracked per-app timestamped archives, verify gzip,
+arch/app/version/config, prepare permissions and replace with health/rollback.
+--setup runs the existing wizard interactively before persistent installation.
+Host application root belongs to invoking user; deployments/data to65532.
+Optional private docker.env and allowlisted mount/device/group docker.args are
+read by host updater and are not mounted into the app. Health uses /api/session
+protocol+embedded version and persistent local CA, without disabling TLS checks.
+Rollback restores container settings, not mutable data/schema/config migrations.
+Native updater settings/check/download stay intact; WISEMED_CONTAINER=1 prevents
+auto-applying native archives to an immutable container binary.
+
+Local verification: all three real AMD64 Docker images built/exported and started
+with synthetic configurations, isolated networking and temporary persistent
+mounts; version/UID/help/config/data paths and verified HTTPS health passed.
+8 offline orchestration tests passed (all apps, agent lifecycle, rollback, first
+install cleanup, preflight errors, same-version no-op, setup). Go race tests for
+tools/docker-runtime and apps/runner passed. No EC2 installation, Git push,
+production DB/CNAS/USB-token operations performed.

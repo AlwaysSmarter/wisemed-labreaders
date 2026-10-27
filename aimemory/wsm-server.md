@@ -391,6 +391,13 @@ cleanup. No secrets/production state modifications or Git push performed locally
 Offline orchestration tests passed (success, rollback, preflight rejection, same
 image no-op); actual EC2/private repo access has not been tested. Docs docker-update.md.
 
+2026-10-27 updater SSH identity fix: clone explicitly uses ~/.ssh/github_dockers
+with -F /dev/null, IdentitiesOnly=yes and BatchMode=yes, overriding inherited
+GIT_SSH_COMMAND and ignoring other SSH config/agent identities. Normal host key
+verification remains enabled. Missing/unreadable key fails before Docker work.
+Offline tests cover identity selection/quoting and missing-key failure; EC2 access
+has not been verified locally.
+
 2026-09-29 Docker build fix: user hit Go compiler SIGSEGV while running AMD64
 builder under emulation on M2. Dockerfile now uses FROM --platform=$BUILDPLATFORM
 and cross-compiles both binaries with CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH.

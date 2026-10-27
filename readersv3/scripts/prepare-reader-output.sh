@@ -31,3 +31,8 @@ if [[ ! -f "$DEST/deployments/config.yaml" ]]; then
   cp "$DEST/deployments/config.install.yaml" "$DEST/deployments/config.yaml"
 fi
 printf 'Reader output ready: %s\n' "$DEST"
+case "$APP" in
+  siui-bridge|siui-bridge-history|wisemed-siui-data)
+    bash "$ROOT_DIR/scripts/prepare-docker-output.sh" "$APP"
+    ;;
+esac

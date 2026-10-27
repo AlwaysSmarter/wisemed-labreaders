@@ -18,6 +18,7 @@ if name=='uname':print('x86_64');sys.exit(0)
 if name=='flock':sys.exit(0)
 if name=='git':
  if a[0]=='clone':
+  (base/'ssh-command').write_text(os.environ['GIT_SSH_COMMAND'])
   d=pathlib.Path(a[-1]);d.mkdir();
   with gzip.open(d/'wisemed-wsm-20260924-160000.tar.gz','wb') as f:f.write(b'fixture')
  elif 'ls-files' in a:sys.stdout.write('wisemed-wsm-20260924-160000.tar.gz\0')
@@ -57,13 +58,26 @@ class UpdateTests(unittest.TestCase):
             for name in ['docker','git','curl','flock','uname']:
                 f=bindir/name;f.write_text(FAKE);f.chmod(0o755)
             for name in ['deployments','state']:(p/'data'/name).mkdir(parents=True)
-            env={**os.environ,'PATH':str(bindir)+':'+os.environ['PATH'],'TEST_DIR':td,
+            home=p/'home with spaces';(home/'.ssh').mkdir(parents=True)
+            if scenario!='missing-key':(home/'.ssh/github_dockers').write_text('fixture')
+            env={**os.environ,'HOME':str(home),'PATH':str(bindir)+':'+os.environ['PATH'],'TEST_DIR':td,
+                 'GIT_SSH_COMMAND':'ssh -i /wrong/key',
                  'SCENARIO':scenario,'WSM_DATA_DIR':str(p/'data'),
                  'WSM_UPDATE_CACHE':str(p/'cache'),'WSM_HEALTH_TIMEOUT':'1'}
             result=subprocess.run(['bash',str(SCRIPT)],env=env,capture_output=True,text=True,timeout=20)
             state=json.loads((p/'state.json').read_text()) if (p/'state.json').exists() else {}
-            calls=[json.loads(s) for s in (p/'calls').read_text().splitlines()]
+            calls=[json.loads(s) for s in (p/'calls').read_text().splitlines()] if (p/'calls').exists() else []
+            if (p/'ssh-command').exists():
+                # Execute the command through a shell to verify quoting of HOME, without SSH.
+                command=(p/'ssh-command').read_text().replace('ssh ', 'printf "%s\\n" ', 1)
+                args=subprocess.check_output(['sh','-c',command],env=env,text=True).splitlines()
+                self.assertEqual(args,['-F','/dev/null','-o','IdentitiesOnly=yes','-o','BatchMode=yes',
+                                       '-i',str(home/'.ssh/github_dockers')])
             return result,state,calls
+    def test_missing_key_fails_before_docker_or_clone(self):
+        r,s,c=self.run_case('missing-key');self.assertNotEqual(r.returncode,0)
+        self.assertIn('Missing or unreadable SSH key:',r.stderr)
+        self.assertEqual(c,[])
     def test_success(self):
         r,s,c=self.run_case('success');self.assertEqual(r.returncode,0,r.stderr)
         self.assertEqual(s['wsm-server'],{'running':True,'image':'new'})

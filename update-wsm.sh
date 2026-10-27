@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
-# Run as ec2-user (Git uses its SSH key); Docker uses sudo if needed.
-set -Eeuo pipefail
-umask 077
+# Run as ec2-user (Git uses ~/.ssh/github_dockers); Docker uses sudo if needed.
+#Begin Variables
 repo=git@github.com:AlwaysSmarter/dockers.git
 version=${1:-latest}
 root=${WSM_DATA_DIR:-/srv/wsm}
@@ -9,9 +8,29 @@ name=${WSM_CONTAINER_NAME:-wsm-server}
 port=${WSM_HOST_PORT:-8090}
 cache=${WSM_UPDATE_CACHE:-$HOME/.cache/wsm-update}
 health_timeout=${WSM_HEALTH_TIMEOUT:-60}
+sshkey=~/.ssh/github_dockers
+#End Variables
+eval "$(ssh-agent -s)"
+
+ssh-add "$sshkey"
+
+wsm_root="${WSM_DATA_DIR:-/srv/wsm}"
+
+sudo chown -R root:65532 "$wsm_root/deployments"
+sudo find "$wsm_root/deployments" -type d -exec chmod 750 {} +
+sudo find "$wsm_root/deployments" -type f -exec chmod 640 {} +
+
+sudo chown -R 65532:65532 "$wsm_root/state"
+sudo chmod -R u+rwX "$wsm_root/state"
+
+
+set -Eeuo pipefail
+umask 077
+
 [[ $# -le 1 && ( $version == latest || $version =~ ^[0-9]{8}-[0-9]{6}$ ) ]] || { echo "Usage: $0 [latest|YYYYMMDD-HHMMSS]" >&2; exit 2; }
 [[ $port =~ ^[0-9]+$ && $health_timeout =~ ^[1-9][0-9]*$ && $root == /* ]] || { echo 'Invalid port, timeout or absolute data directory' >&2; exit 2; }
-for tool in git docker curl flock python3 gzip; do command -v "$tool" >/dev/null || { echo "Install missing dependency: $tool" >&2; exit 1; }; done
+for tool in git ssh docker curl flock python3 gzip; do command -v "$tool" >/dev/null || { echo "Install missing dependency: $tool" >&2; exit 1; }; done
+[[ -r $HOME/.ssh/github_dockers ]] || { echo "Missing or unreadable SSH key: $HOME/.ssh/github_dockers" >&2; exit 1; }
 mkdir -p "$cache"
 exec 9>"$cache/update.lock"
 flock -n 9 || { echo 'Another WSM update is running' >&2; exit 1; }
@@ -59,8 +78,10 @@ healthy() {
 trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
-echo 'Fetching private Docker archive repository using current user SSH credentials…'
-GIT_TERMINAL_PROMPT=0 git clone --depth 1 "$repo" "$work/repo"
+echo 'Fetching private Docker archive repository using ~/.ssh/github_dockers…'
+# Ignore SSH config identities and agent keys; keep normal known_hosts verification.
+GIT_SSH_COMMAND='ssh -F /dev/null -o IdentitiesOnly=yes -o BatchMode=yes -i "$HOME/.ssh/github_dockers"' \
+ GIT_TERMINAL_PROMPT=0 git clone --depth 1 "$repo" "$work/repo"
 # Select only tracked archives; fail rather than choose ambiguously duplicated versions.
 archive=$(python3 - "$work/repo" "$version" <<'PY'
 import pathlib,re,subprocess,sys

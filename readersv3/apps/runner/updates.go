@@ -152,7 +152,9 @@ func checkForUpdates(cfg *config.Config, opts RunOptions) error {
 		log.Printf("app-updates: %v", err)
 		return nil
 	}
-	autoApply := isArchiveUpdate(filePath) && (resp.Mandatory || currentRunsAsService())
+	// Immutable Docker images are replaced by the host updater. Keep the shared
+	// check/download settings, but never launch a native in-place replacement.
+	autoApply := os.Getenv("WISEMED_CONTAINER") != "1" && isArchiveUpdate(filePath) && (resp.Mandatory || currentRunsAsService())
 	if autoApply {
 		if resp.Mandatory {
 			mandatoryConsolef("app-updates: rulez update obligatoriu")

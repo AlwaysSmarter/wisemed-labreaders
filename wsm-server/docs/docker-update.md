@@ -4,6 +4,10 @@ Copiați o singură dată scriptul `update-wsm.sh` din rădăcina proiectului pe
 Nu sunt necesare sursele WSM. Rulați ca utilizatorul care are cheia SSH pentru
 `git@github.com:AlwaysSmarter/dockers.git` (de exemplu ec2-user), nu cu sudo în fața
 întregului script. Scriptul folosește sudo pentru Docker dacă este necesar.
+Clonarea folosește explicit `~/.ssh/github_dockers`, cu `IdentitiesOnly=yes` și
+`BatchMode=yes`, ignorând configurația SSH și celelalte chei din agent.
+Cheia trebuie să existe și să aibă acces la repository; o cheie lipsă oprește
+scriptul înainte de operațiile Docker. Verificarea known_hosts rămâne activă.
 
 Prerechizite: Docker pornit, git, python3, curl, gzip și flock (util-linux), acces SSH
 la repository și cheia host GitHub verificată în known_hosts. Nu dezactivează
