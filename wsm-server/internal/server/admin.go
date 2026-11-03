@@ -47,6 +47,16 @@ type adminState struct {
 }
 
 func (s *Server) adminRoutes(r chi.Router) {
+	r.Get("/admin/api/logs/dates", s.adminLogDates)
+	r.Get("/admin/api/logs", s.adminLogs)
+	r.Get("/admin/api/tenant", s.adminTenantInfo)
+	r.Patch("/admin/api/tenant", s.adminUpdateTenant)
+	r.Patch("/admin/api/tenant/origins", s.adminOrigins)
+	r.Get("/admin/api/browsers", s.adminBrowsers)
+	r.Post("/admin/api/browsers", s.adminCreateBrowser)
+	r.Post("/admin/api/browsers/key", s.adminRevealBrowser)
+	r.Patch("/admin/api/browsers/{keyID}", s.adminChangeBrowser)
+	r.Delete("/admin/api/browsers/{keyID}", s.adminChangeBrowser)
 	r.Get("/admin/api/tenants", s.adminTenants)
 	r.Post("/admin/api/login", s.adminLogin)
 	r.Get("/admin/api/session", s.adminSessionStatus)
@@ -66,20 +76,33 @@ func (s *Server) adminConfig(w http.ResponseWriter, r *http.Request, mutation bo
 		http.NotFound(w, r)
 		return nil
 	}
-	origin, _ := url.Parse(c.Admin.PublicOrigin)
-	if origin == nil || r.Host != origin.Host || (r.Header.Get("Origin") != "" && r.Header.Get("Origin") != c.Admin.PublicOrigin) {
+	origin := adminRequestOrigin(c.Admin, r)
+	if origin == "" {
 		adminError(w, 403, "origin not allowed")
 		return nil
 	}
 	if mutation {
 		media, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
-		if r.Header.Get("Origin") != c.Admin.PublicOrigin || err != nil || media != "application/json" {
+		if r.Header.Get("Origin") != origin || err != nil || media != "application/json" {
 			adminError(w, 403, "same-origin JSON required")
 			return nil
 		}
 	}
 	return c
 }
+
+// Match both the public Host and Origin to the same configured origin. Even
+// allowlisted aliases must not make cross-origin requests to each other.
+func adminRequestOrigin(admin config.Admin, r *http.Request) string {
+	for _, origin := range admin.Origins() {
+		u, err := url.Parse(origin)
+		if err == nil && u.Host != "" && r.Host == u.Host && (r.Header.Get("Origin") == "" || r.Header.Get("Origin") == origin) {
+			return origin
+		}
+	}
+	return ""
+}
+
 func decodeAdmin(w http.ResponseWriter, r *http.Request, out interface{}) bool {
 	d := json.NewDecoder(http.MaxBytesReader(w, r.Body, 8192))
 	d.DisallowUnknownFields()
@@ -218,7 +241,7 @@ func (s *Server) adminLogin(w http.ResponseWriter, r *http.Request) {
 	}
 	sess := adminSession{TenantID: in.TenantID, Username: in.Username, ExpiresAt: now.Add(time.Duration(c.Admin.SessionTTLSeconds) * time.Second), CSRF: csrf, Epoch: s.admin.epoch}
 	s.admin.sessions[sha256.Sum256([]byte(token))] = sess
-	s.setAdminCookie(w, c, token, c.Admin.SessionTTLSeconds)
+	s.setAdminCookie(w, r, c, token, c.Admin.SessionTTLSeconds)
 	writeJSON(w, 200, map[string]interface{}{"authenticated": true, "session": sess, "csrf_token": csrf})
 }
 func (s *Server) authenticateAdmin(ctx context.Context, upstream config.WiseMed, username, password string) error {
@@ -279,8 +302,8 @@ func (s *Server) authenticateAdmin(ctx context.Context, upstream config.WiseMed,
 	}
 	return errors.New("missing login token")
 }
-func (s *Server) setAdminCookie(w http.ResponseWriter, c *config.Config, value string, maxAge int) {
-	cookie := &http.Cookie{Name: adminCookie, Value: value, Path: "/admin", HttpOnly: true, Secure: strings.HasPrefix(c.Admin.PublicOrigin, "https://"), SameSite: http.SameSiteStrictMode, MaxAge: maxAge}
+func (s *Server) setAdminCookie(w http.ResponseWriter, r *http.Request, c *config.Config, value string, maxAge int) {
+	cookie := &http.Cookie{Name: adminCookie, Value: value, Path: "/admin", HttpOnly: true, Secure: strings.HasPrefix(adminRequestOrigin(c.Admin, r), "https://"), SameSite: http.SameSiteStrictMode, MaxAge: maxAge}
 	if maxAge < 0 {
 		cookie.Expires = time.Unix(1, 0)
 	}
@@ -341,7 +364,7 @@ func (s *Server) adminLogout(w http.ResponseWriter, r *http.Request) {
 	s.admin.mu.Lock()
 	delete(s.admin.sessions, sha256.Sum256([]byte(cookie.Value)))
 	s.admin.mu.Unlock()
-	s.setAdminCookie(w, c, "", -1)
+	s.setAdminCookie(w, r, c, "", -1)
 	writeJSON(w, 200, map[string]interface{}{"ok": true})
 }
 func (s *Server) deviceView(c *config.Config, id string, d config.Device) map[string]interface{} {

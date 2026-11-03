@@ -24,10 +24,16 @@ func dashboardEndpoints(cfg settings) []endpointCheck {
 	out := []endpointCheck{{Service: "OCSP", URL: strings.TrimRight(cfg.BaseURL, "/") + "/OCSP/validator"}}
 	seen := map[string]bool{}
 	for _, op := range operations() {
+		if op.Group == "docmed" {
+			continue
+		}
 		if !seen[op.Service] {
 			seen[op.Service] = true
 			out = append(out, endpointCheck{Service: op.Service, URL: strings.TrimRight(cfg.serviceBaseURL(op.Service), "/") + "/svapntws/services/" + op.Service})
 		}
+	}
+	for _, service := range []string{"DocMedService", "DocumentSeries", "MedicalDocumentDownloader", "DocStatusChangerService"} {
+		out = append(out, endpointCheck{Service: service, URL: cfg.docMedEndpoints()[service]})
 	}
 	return out
 }

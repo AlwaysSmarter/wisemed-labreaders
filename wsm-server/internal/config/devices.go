@@ -1,10 +1,8 @@
 package config
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
-	"io"
 	"net"
 	"net/url"
 	"os"
@@ -16,9 +14,19 @@ import (
 )
 
 type Admin struct {
-	Enabled           bool   `yaml:"enabled"`
-	PublicOrigin      string `yaml:"public_origin"`
-	SessionTTLSeconds int    `yaml:"session_ttl_seconds"`
+	Enabled           bool     `yaml:"enabled"`
+	PublicOrigin      string   `yaml:"public_origin"`
+	PublicOrigins     []string `yaml:"public_origins,omitempty"`
+	SessionTTLSeconds int      `yaml:"session_ttl_seconds"`
+}
+
+// Origins includes the legacy single origin and any explicitly configured aliases.
+func (a Admin) Origins() []string {
+	origins := slices.Clone(a.PublicOrigins)
+	if a.PublicOrigin != "" {
+		origins = append(origins, a.PublicOrigin)
+	}
+	return origins
 }
 
 // Device records belong to the separate writable registry, never the master config.
@@ -99,15 +107,20 @@ func (c *Config) prepareAdmin(base string) error {
 		c.Security.DeviceKeysFile = resolve(base, c.Security.DeviceKeysFile)
 	}
 	if c.Admin.Enabled {
-		u, e := url.Parse(c.Admin.PublicOrigin)
-		if e != nil || u.Host == "" || u.User != nil || u.Path != "" || u.RawQuery != "" || u.Fragment != "" {
-			return errors.New("admin public_origin must be an exact origin")
+		if len(c.Admin.Origins()) == 0 {
+			return errors.New("admin requires public_origin or public_origins")
 		}
-		if u.Scheme != "https" {
-			host := net.ParseIP(u.Hostname())
-			listener := net.ParseIP(c.Server.Address)
-			if u.Scheme != "http" || listener == nil || !listener.IsLoopback() || !c.Server.AllowInsecureLoopback || (u.Hostname() != "localhost" && (host == nil || !host.IsLoopback())) {
-				return errors.New("admin requires HTTPS origin (HTTP only for explicit loopback development)")
+		for _, origin := range c.Admin.Origins() {
+			u, e := url.Parse(origin)
+			if e != nil || u.Host == "" || u.User != nil || u.Path != "" || u.RawQuery != "" || u.ForceQuery || u.Fragment != "" {
+				return errors.New("admin public_origin/public_origins must contain exact origins")
+			}
+			if u.Scheme != "https" {
+				host := net.ParseIP(u.Hostname())
+				listener := net.ParseIP(c.Server.Address)
+				if u.Scheme != "http" || listener == nil || !listener.IsLoopback() || !c.Server.AllowInsecureLoopback || (u.Hostname() != "localhost" && (host == nil || !host.IsLoopback())) {
+					return errors.New("admin requires HTTPS origin (HTTP only for explicit loopback development)")
+				}
 			}
 		}
 		if c.Security.DeviceKeysFile == "" {
@@ -121,54 +134,28 @@ func (c *Config) prepareAdmin(base string) error {
 // Reload reads the registry again under its admission gate, avoiding a stale config
 // read overwriting a just-provisioned device.
 func (c *Config) RefreshDevices() error {
-	devices, err := ReadDevices(c.Security.DeviceKeysFile)
+	registry, err := ReadRegistry(c.Security.DeviceKeysFile)
 	if err != nil {
 		return err
 	}
-	next, err := c.WithDevices(devices)
+	next, err := c.WithDevices(registry.Devices)
 	if err != nil {
 		return err
 	}
-	c.Security.Keys = next.Security.Keys
+	next, err = next.WithAccess(registry)
+	if err != nil {
+		return err
+	}
+	c.Security = next.Security
 	c.Devices = next.Devices
+	c.Browsers = next.Browsers
+	c.ManagedTenants = next.ManagedTenants
+	c.Tenants = next.Tenants
 	return nil
 }
 func ReadDevices(path string) (map[string]Device, error) {
-	out := map[string]Device{}
-	if path == "" {
-		return out, nil
-	}
-	f, e := os.Open(path)
-	if errors.Is(e, os.ErrNotExist) {
-		return out, nil
-	}
-	if e != nil {
-		return nil, e
-	}
-	defer f.Close()
-	data, e := io.ReadAll(io.LimitReader(f, 4*1024*1024+1))
-	if e != nil {
-		return nil, e
-	}
-	if len(data) > 4*1024*1024 {
-		return nil, errors.New("device registry too large")
-	}
-	var v struct {
-		Devices map[string]Device `yaml:"devices"`
-	}
-	d := yaml.NewDecoder(bytes.NewReader(data))
-	d.KnownFields(true)
-	if e = d.Decode(&v); e != nil {
-		return nil, errors.New("invalid device registry")
-	}
-	var extra interface{}
-	if d.Decode(&extra) != io.EOF {
-		return nil, errors.New("device registry must contain one document")
-	}
-	if v.Devices != nil {
-		out = v.Devices
-	}
-	return out, nil
+	registry, err := ReadRegistry(path)
+	return registry.Devices, err
 }
 func (c *Config) WithDevices(devices map[string]Device) (*Config, error) {
 	next := *c
@@ -219,18 +206,25 @@ func (c *Config) WithDevices(devices map[string]Device) (*Config, error) {
 	return &next, nil
 }
 func WriteDevices(path string, devices map[string]Device) error {
+	registry, err := ReadRegistry(path)
+	if err != nil {
+		return err
+	}
+	registry.Devices = devices
+	return WriteRegistry(path, registry)
+}
+func WriteRegistry(path string, registry Registry) error {
 	if path == "" {
 		return errors.New("device registry is not configured")
 	}
-	data, e := yaml.Marshal(struct {
-		Devices map[string]Device `yaml:"devices"`
-	}{devices})
+	data, e := yaml.Marshal(registry)
 	if e != nil {
 		return e
 	}
 	if len(data) > 4*1024*1024 {
 		return errors.New("device registry is full")
 	}
+
 	dir := filepath.Dir(path)
 	if e = os.MkdirAll(dir, 0700); e != nil {
 		return e

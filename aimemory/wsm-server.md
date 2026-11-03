@@ -229,12 +229,21 @@ YAML persistence. Blank save preserves the existing key; settings API returns on
 then api_key_echipament. Source updates apply to all26 shared applications; rebuild
 installed readers to get the field. Keys aren't returned by reader status API.
 
-Local runtime admin config was prepared for https://wslocal.wisemed.eu/admin/ and
+Local runtime admin config was prepared for both https://wslocal.wisemed.eu/admin/
+and https://wslocalhost.wisemed.eu/admin/ (2026-10-27) and
 tenant local, reusing Yumizen's existing HTTPS WiseMED API configuration. API key
 was copied privately to ignored output/deployments/keys/local-wisemed-api.key;
 registry path is output/state/device-keys.yaml. No live login/request was made.
 Real WiseMED authentication must still be verified by the operator. Read
 wsm-server/docs/admin-console.md for API/config/provisioning details.
+
+Admin aliases (2026-10-27): `admin.public_origins` accepts an explicit list;
+legacy `public_origin` remains additive and compatible. Every configured origin
+is validated with the existing HTTPS/loopback policy. Host and Origin must match
+the same entry, including port; allowlisted aliases cannot send cross-origin
+requests to each other. Cookies stay host-only and use the matched origin's
+scheme for Secure. Local source/runtime configs list both aliases. A rebuilt
+server and restart are required for the new configuration field.
 
 ## Build, tests and remaining deployment work
 
@@ -710,3 +719,93 @@ Local verification for this change: go test -race ./modules/siui ./modules/local
 Corrected both SDK and backend for JSON null subUnitCode on generatePrescriptionSeries/getPrescriptionSeriesInfo only, using nullable catalogue metadata and SOAP xsi:nil=true. Required/unknown fields still reject null; null and empty-string payloads have distinct deduplication digests. The HTTP boundary uses string pointers to preserve null rather than silently converting it to empty. Debug blank subUnitCode sends null; OpenAPI declares nullable. Both catalogue operations now download the CNAS URL/size result through the existing HTTPS-origin-restricted download pipeline; values are URL+size, not individual carnets. This supersedes the prior raw-carnet-response assumption. SDK returns downloaded bytes in data.download.data by default. Reference: official PIAS specification §5.20 (portal.cnas.ro, v3.7.34 dated 2026-10-14). Backend race tests, including null-through-WSM-to-SOAP/file download and null/empty dedup isolation, passed; selected SDK/example suite 26 passed, excluding the previously known unrelated dashboard-route coverage failure; UI suite 15 passed. No CNAS operations invoked in verification.
 Debug → CLINICE also lists getPrescriptionSeriesInfo and generatePrescriptionSeries; their operation group and general/* routes remain unchanged for SDK compatibility.
 Refreshed local WSM output/bin/WSM_Server, SDK package binary/control/docs, and both local SIUI Bridge output binary paths after the fix. No running service was restarted and no real CNAS call was made.
+
+
+## Browser/backend provisioning and tenant settings (2026-10-28)
+
+The admin console now exposes tenant-scoped `tenant` / `tenant edit`, `browsers`,
+`browser add/key/edit/rotate/rights/delete/list` and `origin add/delete`. Browser
+keys support browser+service; default scopes exclude api:admin (editable using
+rights). Static browser keys are listed masked and read-only. Managed credentials
+are revealed only by explicit add/key/rotate in the temporary secret panel.
+Tenant view masks the WiseMED upstream API credential as first3***last3; tenant
+edit uses a form (blank secret preserves it), never command-history arguments.
+
+The existing writable security.device_keys_file now has optional browsers,
+tenant_origins and tenant_settings sections. Atomic 0600 writes preserve all
+sections, including when editing readers. Full origin overrides can remove YAML
+origins; tenant issuer/base URL/API credential overrides survive full Load and
+reload. No production configuration or credential files were modified for this
+work. Older binaries cannot read the extended registry. Tenant mutations remain
+bound to the authenticated tenant, exact same-origin JSON and CSRF. Origin/key
+revocation and browser rights updates close tenant sockets and invalidate its
+control tickets; tenant settings edits also invalidate its admin sessions.
+Source changes require a new server binary; PHP still emits browser JWTs and must
+be updated to match any new issuer or rotated signing credential.
+
+Validation for this change: Go tests with race detection and vet; admin JavaScript
+command tests; full registry Load/reload persistence (including removed origins
+and API-key overrides); real TLS WebSocket authentication, rejected origin and
+credential rotation; UI smoke in IAB against disposable local tenant/upstream
+fixtures. Linux/amd64 distribution built separately at
+wsm-server/dist/browser-admin-linux-amd64-20261028.tar.gz. No deployed WSM process
+was restarted; temporary smoke server and browser tab were closed.
+
+
+## Daily operational logs and on-demand browser initialization (2026-10-28)
+
+Main installs internal/logstore.Store as the standard Go logger writer: stderr
+is always preserved, with daily UTC wsm-YYYY-MM-DD.log files. Optional
+server.log_dir resolves relative to the config; default is logs/ beside the
+writable device registry, falling back to ../logs beside config when no registry
+is set. Directory/file creation modes are 0700/0600, startup fails on unavailable
+storage, runtime disk errors keep stderr working. No automatic deletion.
+Server receives the store through SetLogStore before serving. Admin logs/dates
+and cursor-paginated logs endpoints require the existing WiseMED -1 session;
+live is bounded polling (1s), reauthenticated each request. Tenant-marked lines
+are filtered to the session tenant, generic diagnostics are shared. Strict date
+filenames, regular-file checks and bounded reads prevent arbitrary file access.
+Admin logs panel defaults to today UTC and supports date selection/live/stop.
+JWT, origin and hello identity failures have safe operational diagnostics.
+
+SDK autoConnect:false creates a dormant WSM client. ready/connect/network calls
+connect on demand and share one flight; tokenProvider runs per connection, with
+a timeout including token retrieval and rejection of late provider completions.
+SIUI prefers connect over reconnect so concurrent initialization is not canceled.
+WiseMED PHP checkout header keeps async SDK scripts; footer registers the SIUI
+getWSM callback after script load and lazily creates WSM with tokenProvider and
+both autoConnect/autoReconnect disabled. Token requests share a promise; no
+XDEBUG_TRIGGER is sent. PHP issuer now supplies its secret_file config field.
+Deploy both server embedded scripts and PHP templates; no live service restart
+or real CNAS/WiseMED request was performed by these changes.
+
+Validation: daily UTC rotation/mirroring, tenant filtering, invalid dates/symlinks,
+bounded/incomplete reads and concurrent append/read pass under Go race tests.
+Admin tests reject anonymous/non--1 users and stop reads after logout. IAB smoke
+verified logs live (1s), current day selection, tenant isolation, stop and logout
+against disposable fixtures; the tab/server were closed. 50 WSM JavaScript tests
+and the WiseMED lazy bootstrap integration test pass. Linux/amd64 package:
+wsm-server/dist/logs-lazy-linux-amd64-20261028.tar.gz. Live services were not changed.
+
+
+### Configured browser key reveal (2026-10-28)
+
+`browser key <key-id>` now explicitly reveals any loaded browser-capable key in
+the authenticated tenant, including YAML/static keys. It uses the same -1 admin
+session, same-origin POST and CSRF as managed key reveal; other tenants and
+reader-only credentials are 404. Lists stay masked; secrets appear only in the
+temporary panel, while audit logs contain tenant/key IDs only. Static policy
+editing/rotation/revocation still belongs to YAML. UI distinguishes that restriction
+from revealing a key and shows tenant origins for static credentials.
+
+## SIPE catalogue / CNAS origins (2026-11-02)
+
+SIUIBridge SDK now exposes 41 SOAP methods, adding clinice.getPrescriptionsSeriesNo(requestXml) from the 14.10.2026 EPrescriptionWS WSDL. It reads history by prescription series/number, not allocation. Source SDK catalogue parity and all named-method submission tests updated; 43 combined UI/SDK tests and go test ./internal/server passed locally. Reader defaults are SIUI https://siui.e-pias.ro and SIPE https://sipe.e-pias.ro, HTTPS/443; DocMED configuration is available through existing settings APIs and remote control UI, with no new DocMED SOAP implementation. See ../docs/cnas-endpoints-2026-10.md. Existing unrelated workspace changes preserved; no running WSM process restarted and no real CNAS calls made.
+
+## DocMED SDK integration (2026-11-02)
+
+Supersedes the configuration-only limitation in the prior CNAS note. Reader implements 22 DocMED methods separately at /api/siui/docmed/<ExactName>. SDK metadata/direct and safe singleton groups now include docmed; total 63 methods. downloadDocMedAttachment(callId) uses existing chunked file route with docmed_attachment=true on every offset, defaulting XSD off for ZIP bytes (the enclosing DocMED XML was already validated). Existing legacy methods and routes preserved. Remote control UI exposes DOCMED and synthetic request examples. No list-all-documents method exists; known-document retrieval needs CID/series/number/issue date. Read/write semantics, XSD caveat for undefined fpidType and local verification are in readersv3/apps/siui-bridge/docs/DocMED.md. Go server tests and 45 combined UI/DOM/SDK tests passed; local bundles rebuilt without restarting running services or contacting CNAS.
+
+## DocMED variable forms / frontend dependencies (2026-11-03)
+
+Reader Debug DocMED uses generated variable forms rather than XML textareas, posting fields through the same API/WSM adapter. Server builds/validates XML; raw parameters.requestXml stays compatible. New /docmed-forms.js frontend module and existing /siui-invoice.js are explicitly allowed in controlAsset at root and /control/, registered in server routes and included by build.sh/prepare-local.sh. Control still serves only named frontend assets; config/other files are not exposed. Added control module route tests. Local WSM/control bundles rebuilt, no running service restarted. WSM Go tests, reader Go race tests and 47 combined UI/DOM/SDK tests pass; the DocMED dropdown choices come from CNAS XSD enums and the available CAS nomenclature, not invented external codes.

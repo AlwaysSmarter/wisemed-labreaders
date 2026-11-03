@@ -178,11 +178,32 @@ func (m *Module) serviceHTTP(w http.ResponseWriter, r *http.Request, route, owne
 	var in struct {
 		OperationID string             `json:"operation_id"`
 		Parameters  map[string]*string `json:"parameters"`
+		Fields      json.RawMessage    `json:"fields,omitempty"`
 		Callback    *wmCallback        `json:"callwmapi,omitempty"`
 	}
-	if err := decode(w, r, &in); err != nil {
+	limit := int64(2 * maxData)
+	if op.Group == "docmed" {
+		limit = 2 * docMedXMLLimit
+	}
+	if err := decodeLimit(w, r, &in, limit); err != nil {
 		fail(w, 400, err.Error())
 		return
+	}
+	if in.Fields != nil {
+		if op.Group != "docmed" || len(in.Parameters) > 0 {
+			fail(w, 400, "supply either DocMED fields or parameters, not both")
+			return
+		}
+		request, err := buildDocMedRequest(op, in.Fields)
+		if err != nil {
+			fail(w, 400, err.Error())
+			return
+		}
+		if err = validateSchema(r.Context(), "docmed:"+op.RequestSchema, []byte(request)); err != nil {
+			fail(w, 400, "DocMED request validation ("+op.RequestSchema+"): "+err.Error())
+			return
+		}
+		in.Parameters = map[string]*string{"requestXml": &request}
 	}
 	parameters := make(map[string]string, len(in.Parameters))
 	var nullParameters []string
@@ -333,6 +354,24 @@ func (m *Module) runServiceWork(parent context.Context, job serviceWork) {
 	c := client{cfg: job.Config, backend: m.factory(job.Config), logf: m.rt.Logf, session: &m.ocspSession, operation: job.Operation.Name, callID: job.ID}
 	values, submitted, err := c.invokeOperation(ctx, job.Operation, job.Parameters, job.NullParameters...)
 	result := map[string]any{"values": values, "ocsp": map[string]any{"reused": c.sessionReused, "age_seconds": c.sessionAge, "token_id": c.sessionID}}
+	if job.Operation.Group == "docmed" && len(values) == 1 {
+		summary, file, storeErr := m.storeDocMedResult(ctx, job, []byte(values[0]), docMedResponseValidated(err))
+		if storeErr != nil {
+			if err != nil {
+				err = fmt.Errorf("%w; cannot persist DocMED response: %v", err, storeErr)
+			} else {
+				err = storeErr
+			}
+		} else {
+			var fault *docMedSOAPFault
+			if errors.As(err, &fault) {
+				summary["fault"] = fault
+			}
+			result["docmed"] = summary
+			result["file"] = file
+			result["values"] = []string{}
+		}
+	}
 	if err == nil {
 		enrichInsuredResult(job.Operation.Name, values, result)
 	}
@@ -361,7 +400,7 @@ func (m *Module) runServiceWork(parent context.Context, job serviceWork) {
 		}
 	}
 	b := []byte("")
-	if err == nil {
+	if err == nil || result["docmed"] != nil {
 		b, _ = json.Marshal(result)
 	}
 	var callbackBody []byte
@@ -456,7 +495,7 @@ func (m *Module) serviceFileHTTP(w http.ResponseWriter, r *http.Request, call se
 			ValidationSchema string `json:"validation_schema"`
 		} `json:"file"`
 	}
-	if json.Unmarshal(call.Result, &result) != nil || result.File == nil || call.Status != "completed" {
+	if json.Unmarshal(call.Result, &result) != nil || result.File == nil || (call.Status != "completed" && !((call.Status == "failed" || call.Status == "unknown") && isDocMedCall(call.Operation))) {
 		fail(w, 404, "download unavailable")
 		return
 	}
@@ -478,7 +517,7 @@ func (m *Module) serviceFileHTTP(w http.ResponseWriter, r *http.Request, call se
 			entry, e := scanOperation(m.db.QueryRow(operationSelect+" WHERE c.id=?", call.ID))
 			if e == nil && entry.History.Status == "archived" {
 				q := r.URL.Query()
-				if q.Get("unzip") != "" || q.Get("entry") != "" || q.Has("schema") || q.Has("validateXSD") || q.Get("format") != "" {
+				if q.Has("docmed_attachment") || q.Get("unzip") != "" || q.Get("entry") != "" || q.Has("schema") || q.Has("validateXSD") || q.Get("format") != "" {
 					fail(w, 409, "local copy removed; download original from History before further processing")
 					return
 				}
@@ -501,16 +540,33 @@ func (m *Module) serviceFileHTTP(w http.ResponseWriter, r *http.Request, call se
 	var source io.ReaderAt = file
 	size := result.File.Size
 	q := r.URL.Query()
-	if q.Get("unzip") != "" || q.Get("entry") != "" || q.Has("schema") || q.Has("validateXSD") || q.Get("format") != "" {
+	if q.Has("docmed_attachment") || q.Get("unzip") != "" || q.Get("entry") != "" || q.Has("schema") || q.Has("validateXSD") || q.Get("format") != "" {
 		raw, readErr := io.ReadAll(io.LimitReader(file, processedFileLimit+1))
 		if readErr != nil {
 			fail(w, 500, "cannot read download")
 			return
 		}
-		processed, processErr := processCallFile(r.Context(), raw, q, result.File.ValidationSchema)
-		if processErr != nil {
-			fail(w, 422, processErr.Error())
-			return
+		schema := result.File.ValidationSchema
+		if q.Has("docmed_attachment") {
+			if q.Get("docmed_attachment") != "true" || call.Operation != "GetMedicalDocument" {
+				fail(w, 400, "invalid DocMED attachment selection")
+				return
+			}
+			raw, err = docMedAttachment(raw)
+			if err != nil {
+				fail(w, 422, err.Error())
+				return
+			}
+			schema = ""
+		}
+		processed := raw
+		if q.Get("unzip") != "" || q.Get("entry") != "" || q.Has("schema") || q.Has("validateXSD") || q.Get("format") != "" {
+			var processErr error
+			processed, processErr = processCallFile(r.Context(), raw, q, schema)
+			if processErr != nil {
+				fail(w, 422, processErr.Error())
+				return
+			}
 		}
 		source = bytes.NewReader(processed)
 		size = int64(len(processed))

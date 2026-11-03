@@ -17,9 +17,11 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/websocket"
 	"wisemed-labreaders/serverlast/wsm-server/internal/config"
+	"wisemed-labreaders/serverlast/wsm-server/internal/logstore"
 )
 
 type Server struct {
+	logs           *logstore.Store
 	admin          adminState
 	authEpoch      uint64
 	ticketMu       sync.Mutex
@@ -37,6 +39,10 @@ type Server struct {
 func New(cfg *config.Config) *Server {
 	return &Server{tickets: map[string]controlTicket{}, cfg: cfg, hub: NewHub(), active: map[*Connection]bool{}, reserved: map[string]int{}, upstreamClient: &http.Client{Timeout: 20 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}}
 }
+
+// SetLogStore is called before serving requests; tests may supply a disposable store.
+func (s *Server) SetLogStore(store *logstore.Store) { s.logs = store }
+
 func (s *Server) current() *config.Config { s.gate.RLock(); defer s.gate.RUnlock(); return s.cfg }
 
 // Reload atomically replaces validated credentials/origins/upstreams/certificate.
@@ -148,6 +154,8 @@ func (s *Server) routes() http.Handler {
 		})
 		registerAdminUI(adminUI)
 	})
+	r.Get("/docmed-forms.js", s.controlAsset)
+	r.Get("/siui-invoice.js", s.controlAsset)
 	r.Get("/app.js", s.controlAsset)
 	r.Get("/styles.css", s.controlAsset)
 	r.Get("/wss-remote.js", s.controlAsset)
@@ -167,7 +175,7 @@ func (s *Server) connections(w http.ResponseWriter, r *http.Request) {
 	cfg := s.current()
 	claims, err := authenticate(cfg, r, false)
 	if err != nil {
-		writeAuthFailure(w, err)
+		writeAuthFailure(w, err, r)
 		return
 	}
 	if !claims.Has("connections:read") || !allowedOrigin(r, cfg.Tenants[claims.TenantID]) {
@@ -195,12 +203,13 @@ func (s *Server) handleWS(w http.ResponseWriter, r *http.Request) {
 	claims, err := s.authenticateSocket(cfg, r)
 	if err != nil {
 		s.gate.RUnlock()
-		writeAuthFailure(w, err)
+		writeAuthFailure(w, err, r)
 		return
 	}
 	tenant := cfg.Tenants[claims.TenantID]
 	if !socketOriginAllowed(r, tenant, claims) {
 		s.gate.RUnlock()
+		log.Printf("ws rejected tenant=%s peer=%q reason=origin_denied origin=%q", claims.TenantID, r.RemoteAddr, diagnosticOrigin(r))
 		http.Error(w, "origin denied", 403)
 		return
 	}
@@ -212,6 +221,7 @@ func (s *Server) handleWS(w http.ResponseWriter, r *http.Request) {
 	if s.stopping || total >= cfg.Server.MaxConnections || s.reserved[claims.TenantID] >= cfg.Server.MaxConnectionsPerTenant {
 		s.activeMu.Unlock()
 		s.gate.RUnlock()
+		log.Printf("ws rejected tenant=%s peer=%q reason=connection_limit", claims.TenantID, r.RemoteAddr)
 		http.Error(w, "connection limit", 503)
 		return
 	}
@@ -228,6 +238,7 @@ func (s *Server) handleWS(w http.ResponseWriter, r *http.Request) {
 	upgrader := websocket.Upgrader{HandshakeTimeout: 5 * time.Second, Subprotocols: []string{"wsm.v1"}, CheckOrigin: func(r *http.Request) bool { return socketOriginAllowed(r, tenant, claims) }}
 	ws, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
+		log.Printf("ws rejected tenant=%s peer=%q reason=upgrade_failed", claims.TenantID, r.RemoteAddr)
 		release()
 		s.gate.RUnlock()
 		return
@@ -272,6 +283,16 @@ func (s *Server) handleWS(w http.ResponseWriter, r *http.Request) {
 	for {
 		var msg Envelope
 		if err := ws.ReadJSON(&msg); err != nil {
+			// Do not log parser error strings: they may include message content.
+			reason := "closed_or_read_error"
+			if timeout, ok := err.(net.Error); ok && timeout.Timeout() {
+				if registered {
+					reason = "read_timeout"
+				} else {
+					reason = "hello_timeout"
+				}
+			}
+			log.Printf("ws disconnected tenant=%s connection=%s hello_completed=%t reason=%s", conn.TenantID, conn.ID, registered, reason)
 			if registered {
 				s.hub.Remove(conn.ID)
 				s.hub.Broadcast(conn.TenantID, presence(conn, "disconnected"))
@@ -295,18 +316,21 @@ func (s *Server) handleWS(w http.ResponseWriter, r *http.Request) {
 		if !registered {
 			if msg.Type != "hello" {
 				s.gate.RUnlock()
+				log.Printf("ws rejected tenant=%s connection=%s reason=hello_required", conn.TenantID, conn.ID)
 				policyClose(ws, "hello required")
 				return
 			}
 			hello, e := decodeHello(msg)
 			if e != nil || validateHelloAgainstClaims(hello, claims) != nil {
 				s.gate.RUnlock()
+				log.Printf("ws rejected tenant=%s connection=%s reason=hello_identity_denied", conn.TenantID, conn.ID)
 				policyClose(ws, "hello identity denied")
 				return
 			}
 			hello.Label = claims.Label
 			if !s.hub.Register(conn, hello) {
 				s.gate.RUnlock()
+				log.Printf("ws rejected tenant=%s connection=%s reason=identity_already_connected", conn.TenantID, conn.ID)
 				policyClose(ws, "reader identity already connected")
 				return
 			}

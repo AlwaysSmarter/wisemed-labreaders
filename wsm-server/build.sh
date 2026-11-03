@@ -12,4 +12,4 @@ cp docs/*.md "$out/docs/"
 cp examples/reader/main.go "$out/examples/reader/"
 cp examples/browser/* "$out/examples/browser/"
 
-cp ../readersv3/modules/localhttp/ui/index.html ../readersv3/modules/localhttp/ui/app.js ../readersv3/modules/localhttp/ui/styles.css ../readersv3/modules/localhttp/ui/wss-remote.js "$out/control/"
+cp ../readersv3/modules/localhttp/ui/docmed-forms.js ../readersv3/modules/localhttp/ui/siui-invoice.js ../readersv3/modules/localhttp/ui/index.html ../readersv3/modules/localhttp/ui/app.js ../readersv3/modules/localhttp/ui/styles.css ../readersv3/modules/localhttp/ui/wss-remote.js "$out/control/"

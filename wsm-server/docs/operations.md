@@ -196,10 +196,18 @@ câmpuri necunoscute, URL-uri WiseMED non-HTTPS și origini browser neexplicite.
 Fișierele TLS nu sunt emise/renewate de WSM. Operatorul verifică lanțul public și
 expirarea, DNS/firewall, încrederea clienților și hostname-ul.
 
-Logurile merg la stderr/journal (UTC); nu se mai scriu automat lângă config și nu
-se loghează payloaduri medicale, JWT-uri sau query-uri. `-showlog` este păstrat doar
-ca flag compatibil, fără efect asupra destinației. Retenția este gestionată de
-journald/platformă. `GET /healthz` verifică procesul, nu upstreamurile.
+Logurile merg simultan la stderr/journal și în fișiere zilnice UTC
+`wsm-YYYY-MM-DD.log`. `server.log_dir` este opțional; implicit se folosește
+`logs/` lângă registrul de chei, sau `../logs` față de configurație dacă registrul
+nu este configurat. Directorul trebuie să fie inscriptibil și persistent.
+Într-un container read-only, păstrează registrul în volumul persistent
+`/var/lib/wsm-server`; dacă nu folosești registrul, setează explicit
+`server.log_dir: /var/lib/wsm-server/logs` și montează acel director inscriptibil.
+În `/admin/`, `logs` selectează implicit azi, iar `logs live` urmărește mesajele
+cu sesiune WiseMED `user_type=-1`. Fișierele nu au retenție automată; platforma
+continuă să gestioneze separat stderr/journal. Nu se loghează payloaduri medicale,
+JWT-uri sau query-uri. `-showlog` rămâne compatibil, fără a dezactiva destinațiile.
+`GET /healthz` verifică procesul, nu upstreamurile.
 
 ## Rotație, revocare, reîncărcare certificat
 

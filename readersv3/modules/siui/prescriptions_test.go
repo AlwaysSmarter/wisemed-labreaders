@@ -257,3 +257,22 @@ func TestPrescriptionNullAndFileDownloadThroughWSM(t *testing.T) {
 		})
 	}
 }
+
+func TestPrescriptionHistoryBySeriesUsesPublishedSchema(t *testing.T) {
+	op, ok := findOperation("clinice", "getPrescriptionsSeriesNo")
+	if !ok || op.Mutating || op.Service != "EPrescriptionWS" {
+		t.Fatal("incorrect prescription history operation")
+	}
+	request := `<request xmlns="http://www.cnas.ro/pel/1.0" providerCode="123" providerName="Test" insuranceHouse="CAS-DJ" contractNo="TEST" contractType="MF" reportDate="2026-11-01" series="ABCDE" no="123" atDate="2026-11-01"/>`
+	schema := operationSchema(op, map[string]string{})
+	if err := validateSchema(context.Background(), schema, []byte(request)); err != nil {
+		t.Fatal(err)
+	}
+	if err := validateSchema(context.Background(), schema, []byte(strings.Replace(request, ` no="123"`, "", 1))); err == nil {
+		t.Fatal("history request accepted without prescription number")
+	}
+	response := `<response xmlns="http://www.cnas.ro/pel/1.0" providerCode="123" providerName="Test" insuranceHouse="CAS-DJ" contractNo="TEST" contractType="MF" reportDate="2026-11-01"/>`
+	if err := validateSchema(context.Background(), resultFileSchema(op.Name, map[string]string{}), []byte(response)); err != nil {
+		t.Fatal(err)
+	}
+}

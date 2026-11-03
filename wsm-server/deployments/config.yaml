@@ -22,7 +22,9 @@ tenants:
 # Optional WiseMED administrator console; see docs/admin-console.md.
 admin:
   enabled: true
-  public_origin: https://wslocal.wisemed.eu
+  public_origins:
+    - https://wslocal.wisemed.eu
+    - https://wslocalhost.wisemed.eu
   session_ttl_seconds: 900
 # When enabling, also set security.device_keys_file to a writable persistent path
 # such as /var/lib/wsm-server/device-keys.yaml and configure tenant.wisemed HTTPS API.

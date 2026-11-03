@@ -1,8 +1,36 @@
 (function(root){
 'use strict';
+function checkOrigin(value){
+ let url;try{url=new URL(value);}catch{throw new Error('Origine HTTPS invalidă.');}
+ if(!/^https:\/\/[^/?#\s]+$/.test(value)||!url.hostname||url.username||url.password)throw new Error('Originea trebuie să fie HTTPS, fără cale, credențiale, query sau fragment.');
+}
 function parseCommand(input){
  const args=String(input).trim().split(/\s+/);const command=args.shift().toLowerCase();
- if(!['help','history','devices','list','add','key','edit','delete','rights','toggle','info','save','cancel','clear','logout'].includes(command))throw new Error('Comandă necunoscută. Folosește help.');
+ if(command==='logs'){
+  let action='show',date='';
+  if(['live','stop','dates'].includes(args[0]))action=args.shift();
+  if(args.length){date=args.shift();if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||!Number.isFinite(Date.parse(date+'T00:00:00Z'))||new Date(date+'T00:00:00Z').toISOString().slice(0,10)!==date)throw new Error('Data logului trebuie să fie YYYY-MM-DD.');}
+  if(args.length||(['stop','dates'].includes(action)&&date))throw new Error('Format: logs [YYYY-MM-DD], logs live [YYYY-MM-DD], logs stop sau logs dates.');
+  return {command,action,date};
+ }
+ if(command==='tenant'){
+  if(args.length>1||(args.length===1&&args[0]!=='edit'))throw new Error('Format: tenant sau tenant edit.');
+  return {command,action:args[0]||'show'};
+ }
+ if(command==='origin'){
+  if(args.length!==2||!['add','delete'].includes(args[0]))throw new Error('Format: origin add/delete <https://origine>.');
+  checkOrigin(args[1]);return {command,action:args[0],origin:args[1]};
+ }
+ if(command==='browser'){
+  const action=args.shift();
+  if(!['add','edit','key','delete','rotate','rights','list'].includes(action))throw new Error('Format: browser add/edit <key-id> <https://origine>, browser key/delete/rotate/rights <key-id>, browser list.');
+  if(action==='list'){if(args.length)throw new Error('Format: browser list.');return {command,action};}
+  const needsOrigin=action==='add'||action==='edit';
+  if(args.length!==(needsOrigin?2:1)||!/^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$/.test(args[0]))throw new Error(needsOrigin?'Format: browser '+action+' <key-id> <https://origine>.':'Format: browser '+action+' <key-id>. Folosește ID-ul exact din browsers.');
+  if(needsOrigin)checkOrigin(args[1]);
+  return {command,action,key_id:args[0],...(needsOrigin?{origin:args[1]}:{})};
+ }
+ if(!['browsers','help','history','devices','list','add','key','edit','delete','rights','toggle','info','save','cancel','clear','logout'].includes(command))throw new Error('Comandă necunoscută. Folosește help.');
  if(command==='key'||command==='delete'||command==='rights'){
   if(args.length!==1||!/^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$/.test(args[0]))throw new Error(`Format: ${command} <equipment-id>.`);
   return {command,equipment_id:args[0]};
@@ -51,12 +79,13 @@ function appendOutput(doc,host,text){
 }
 if(typeof module!=='undefined'&&module.exports){module.exports={parseCommand,appendOutput,permissionInfo,CommandHistory,historyKey};return;}
 const doc=root.document,$=id=>doc.getElementById(id);let csrf='',session=null,busy=false,rightsDraft=null,commandHistory=null;
+const logsState={generation:0,timer:null,controller:null,live:false,cursor:-1,cursorDate:'',date:'',timezone:'UTC'};
 function notice(message){$('notice').textContent=message;}
 function forgetSecret(){ $('device-secret').value='';$('device-secret').type='password';$('device-fields').textContent='';$('secret-panel').hidden=true;$('toggle-secret').textContent='Arată cheia'; }
 function setBusy(value){busy=value;doc.querySelectorAll('button').forEach(button=>{button.disabled=value;});$('busy-label').textContent=value?'Se execută…':'';}
 function output(text){appendOutput(doc,$('history'),text);}
-async function api(path,method='GET',body){
- const response=await fetch('/admin/api/'+path,{method,credentials:'same-origin',cache:'no-store',headers:{'Content-Type':'application/json',...(method!=='GET'?{'X-CSRF-Token':csrf}:{})},...(body!==undefined?{body:JSON.stringify(body)}:{})});
+async function api(path,method='GET',body,signal){
+ const response=await fetch('/admin/api/'+path,{method,signal,credentials:'same-origin',cache:'no-store',headers:{'Content-Type':'application/json',...(method!=='GET'?{'X-CSRF-Token':csrf}:{})},...(body!==undefined?{body:JSON.stringify(body)}:{})});
  const data=await response.json().catch(()=>({}));
  if(!response.ok){if(response.status===401){csrf='';session=null;rightsDraft=null;forgetSecret();renderSession();}throw new Error(data.error||'Solicitarea nu a putut fi executată.');}
  return data;
@@ -71,11 +100,51 @@ function renderSession(){
 
  $('login-panel').hidden=!!session;$('console-panel').hidden=!session;
  $('session-label').textContent=session?`${session.tenant_id} / ${session.username}`:'Consolă echipamente';
- if(!session)$('history').replaceChildren();
+ if(!session){stopLogs(true);$('history').replaceChildren();$('tenant-panel').hidden=true;$('tenant-form').elements.api_key.value='';}
 }
-async function logout(){rightsDraft=null;forgetSecret();await api('logout','POST',{});csrf='';session=null;renderSession();notice('Sesiune închisă.');}
+function stopLogs(hide=false){
+ clearTimeout(logsState.timer);logsState.controller?.abort();logsState.controller=null;
+ logsState.generation++;logsState.live=false;
+ $('log-live').textContent='În timp real';$('log-state').textContent='Oprit';
+ if(hide){$('logs-panel').hidden=true;$('log-content').textContent='';}
+}
+function fillLogDates(dates,selected){
+ const values=[...new Set([selected,...dates])].filter(Boolean).sort().reverse();
+ const select=$('log-date');select.replaceChildren();
+ for(const date of values){const option=doc.createElement('option');option.value=date;option.textContent=date;select.append(option);}
+ select.value=selected;
+}
+async function readLogPage(){
+ const generation=logsState.generation;
+ const controller=new AbortController();logsState.controller=controller;
+ const query=new URLSearchParams({cursor:String(logsState.cursor),cursor_date:logsState.cursorDate});
+ if(logsState.date)query.set('date',logsState.date);
+ try{
+  const page=await api('logs?'+query,'GET',undefined,controller.signal);
+  if(generation!==logsState.generation)return;
+  if(logsState.cursorDate!==page.date)$('log-content').textContent='';
+  logsState.cursor=page.cursor;logsState.cursorDate=page.date;
+  if($('log-date').value!==page.date)fillLogDates(Array.from($('log-date').options).map(o=>o.value),page.date);
+  const text=page.lines.join('\n');
+  if(text){const content=$('log-content');content.textContent=(content.textContent+(content.textContent?'\n':'')+text).slice(-1024*1024);content.scrollTop=content.scrollHeight;}
+  $('log-state').textContent=`${logsState.live?'Live · actualizare la 1s':'Instantaneu'} · ${page.date} · ${page.timezone}`;
+  if(page.more||logsState.live)logsState.timer=setTimeout(()=>readLogPage(),page.more?0:1000);
+ }catch(error){
+  if(generation!==logsState.generation||error.name==='AbortError')return;
+  stopLogs();$('log-state').textContent=error.message;notice(error.message);
+ }
+}
+async function openLogs(date='',live=false){
+ stopLogs();const generation=logsState.generation;
+ const data=await api('logs/dates');if(generation!==logsState.generation)return;
+ logsState.date=date;logsState.live=live;logsState.cursor=-1;logsState.cursorDate='';
+ fillLogDates(data.dates,date||data.today);
+ $('logs-panel').hidden=false;$('log-content').textContent='';$('log-live').textContent=live?'Oprește live':'În timp real';
+ await readLogPage();
+}
+async function logout(){stopLogs(true);rightsDraft=null;forgetSecret();await api('logout','POST',{});csrf='';session=null;renderSession();notice('Sesiune închisă.');}
 function showRights(){
- output(`Drepturi pentru echipamentul ${rightsDraft.equipment_id} (modificări încă nesalvate):\n`+rightsDraft.catalog.map((p,i)=>`${i+1}. [${rightsDraft.selected.has(p.id)?'x':' '}] ${p.id} — ${p.description}`).join('\n')+'\nFolosește info 1 2 pentru explicații, toggle 1 2 pentru bifare/debifare, save pentru aplicare sau cancel.');
+ output(`Drepturi pentru ${rightsDraft.kind==='browser'?'browser':'echipamentul'} ${rightsDraft.equipment_id} (modificări încă nesalvate):\n`+rightsDraft.catalog.map((p,i)=>`${i+1}. [${rightsDraft.selected.has(p.id)?'x':' '}] ${p.id} — ${p.description}`).join('\n')+'\nFolosește info 1 2 pentru explicații, toggle 1 2 pentru bifare/debifare, save pentru aplicare sau cancel.');
 }
 async function run(command){
  forgetSecret();notice('');const parsed=parseCommand(command);
@@ -83,9 +152,54 @@ async function run(command){
  if(parsed.command==='history'){output(commandHistory?.entries.map((entry,i)=>`${i+1}. ${entry}`).join('\n')||'Istoricul este gol.');return;}
  if(parsed.command==='clear'){$('history').replaceChildren();return;}
  if(parsed.command==='logout'){await logout();return;}
- output('wsm › '+[parsed.command,parsed.numbers?.join(' '),parsed.equipment_id,parsed.command==='edit'&&!parsed.reader_id?'--remove-reader':parsed.reader_id].filter(Boolean).join(' '));
+ output('wsm › '+command.trim());
+ if(parsed.command==='logs'){
+  if(parsed.action==='stop'){stopLogs();output('Urmărirea logurilor a fost oprită.');return;}
+  if(parsed.action==='dates'){const data=await api('logs/dates');output('Zile disponibile ('+data.timezone+'):\n'+data.dates.join('\n'));return;}
+  await openLogs(parsed.date,parsed.action==='live');return;
+ }
  if(parsed.command==='help'){
-  output('devices / list                  Lista echipamentelor și starea online\nkey <equipment-id>              Afișează cheia echipamentului\nadd <equipment-id> [reader-id]   Creează cheia unui echipament (reader + service)\nedit <equipment-id> <reader-id>  Adaugă sau schimbă restricția reader-id\nedit <equipment-id> --remove-reader  Elimină restricția reader-id\ndelete <equipment-id>            Șterge accesul WSS și revocă cheia\nrights <equipment-id>            Afișează și editează drepturile\ntoggle <număr> [număr ...]       Bifează/debifează drepturile din lista rights\ninfo <număr> [număr ...]         Explicații și exemple pentru drepturile din lista rights\nsave / cancel                   Aplică / abandonează selecția drepturilor\nhistory                         Afișează istoricul comenzilor (↑/↓ pentru navigare)\nclear                           Curăță afișajul; păstrează istoricul comenzilor\nlogout                          Închide sesiunea\n\nEquipment ID = ID-ul echipamentului din WiseMED. Reader ID este opțional; completează-l numai dacă știi ID-ul intern exact al aplicației. Nu sunt acceptate comenzi de sistem.');return;
+  output('logs [YYYY-MM-DD]              Loguri pentru ziua selectată (implicit azi UTC)\nlogs live [YYYY-MM-DD]         Urmărire în timp real\nlogs stop / logs dates        Oprește urmărirea / listează zilele\n\ntenant                         Setări tenant și cheie API mascată\ntenant edit                    Formular modificare issuer/API/cheie\norigin add/delete <https://origine>  Adaugă/șterge origine permisă\nbrowsers / browser list         Chei browser/backend (inclusiv YAML)\nbrowser add <key-id> <origine>  Generează cheia și permite originea\nbrowser edit <key-id> <origine> Modifică originea; păstrează cheia\nbrowser key <key-id>            Afișează separat cheia pentru PHP\nbrowser rotate <key-id>         Generează altă cheie și revocă accesul vechi\nbrowser rights <key-id>         Editează drepturile cu toggle/save\nbrowser delete <key-id>         Revocă cheia generată\n\ndevices / list                  Lista echipamentelor și starea online\nkey <equipment-id>              Afișează cheia echipamentului\nadd <equipment-id> [reader-id]   Creează cheia unui echipament (reader + service)\nedit <equipment-id> <reader-id>  Adaugă sau schimbă restricția reader-id\nedit <equipment-id> --remove-reader  Elimină restricția reader-id\ndelete <equipment-id>            Șterge accesul WSS și revocă cheia\nrights <equipment-id>            Afișează și editează drepturile\ntoggle <număr> [număr ...]       Bifează/debifează drepturile din lista rights\ninfo <număr> [număr ...]         Explicații și exemple pentru drepturile din lista rights\nsave / cancel                   Aplică / abandonează selecția drepturilor\nhistory                         Afișează istoricul comenzilor (↑/↓ pentru navigare)\nclear                           Curăță afișajul; păstrează istoricul comenzilor\nlogout                          Închide sesiunea\n\nEquipment ID = ID-ul echipamentului din WiseMED. Reader ID este opțional; completează-l numai dacă știi ID-ul intern exact al aplicației. Nu sunt acceptate comenzi de sistem.');return;
+ }
+ if(parsed.command==='tenant'){
+  const data=await api('tenant');
+  if(parsed.action==='edit'){
+   const form=$('tenant-form');form.elements.issuer.value=data.issuer||'';form.elements.base_url.value=data.wisemed.base_url||'';form.elements.api_key.value='';$('tenant-panel').hidden=false;
+   output('Completează formularul tenantului. Cheia API goală păstrează valoarea curentă. După salvare trebuie să te autentifici din nou.');return;
+  }
+  output(`Tenant: ${data.tenant_id}\nIssuer: ${data.issuer}\nWiseMED API: ${data.wisemed.base_url}\nCheie API: ${data.wisemed.api_key_masked||'neconfigurată'}\nOrigini permise:\n${(data.allowed_origins||[]).join('\n')||'(niciuna)'}`);return;
+ }
+ if(parsed.command==='origin'){
+  const data=await api('tenant/origins','PATCH',{action:parsed.action,origin:parsed.origin});
+  output('Origini salvate și aplicate:\n'+(data.allowed_origins||[]).join('\n')+(parsed.action==='delete'?'\nConexiunile tenantului se reautentifică.':''));return;
+ }
+ if(parsed.command==='browsers'||parsed.command==='browser'){
+  if(parsed.command==='browsers'||parsed.action==='list'){
+   const data=await api('browsers');output(data.browsers.length?data.browsers.map(b=>`${b.key_id} | ${b.origin||'origini tenant'} | ${b.managed?'consolă':'YAML (editare în configurație)'} | ${b.disabled?'inactiv':'activ'} | ${b.roles.join(',')} | ${b.secret_masked}`).join('\n'):'Nu există chei browser în această instanță.');return;
+  }
+  if(parsed.action==='rights'){
+   const data=await api('browsers');const b=data.browsers.find(b=>b.key_id===parsed.key_id);
+   if(!b||!b.managed)throw new Error('Cheie browser gestionată negăsită; cheile YAML se modifică în configurație.');
+   rightsDraft={kind:'browser',equipment_id:b.key_id,key_id:b.key_id,catalog:data.permissions,selected:new Set(b.scopes)};showRights();return;
+  }
+  if(parsed.action==='delete'){
+   await api('browsers/'+encodeURIComponent(parsed.key_id),'DELETE',{});
+   if(rightsDraft?.key_id===parsed.key_id)rightsDraft=null;
+   output('Cheie browser revocată. Originea rămâne disponibilă altor clienți; folosește origin delete pentru eliminare. Conexiunile tenantului se reautentifică.');return;
+  }
+  let data;
+  if(parsed.action==='add')data=await api('browsers','POST',{key_id:parsed.key_id,origin:parsed.origin});
+  else if(parsed.action==='key')data=await api('browsers/key','POST',{key_id:parsed.key_id});
+  else data=await api('browsers/'+encodeURIComponent(parsed.key_id),'PATCH',parsed.action==='rotate'?{rotate:true}:{origin:parsed.origin});
+  const b=data.browser;
+  output(`Browser ${b.key_id}: ${parsed.action==='edit'?'origine actualizată; cheia păstrată':parsed.action==='rotate'?'cheie regenerată; copiaz-o în PHP':parsed.action==='add'?'creat; copiază cheia în PHP':'cheie disponibilă separat'}.`);
+  if(data.secret){
+   $('secret-title').textContent='Cheie browser / backend PHP';
+   $('secret-instructions').textContent='Configurează secretul exclusiv în backendul PHP care emite JWT. Browserul primește numai JWT-ul, niciodată cheia secretă.';
+   $('device-fields').textContent=[['Server WSS',`${root.location.protocol==='https:'?'wss:':'ws:'}//${root.location.host}/ws`],['Tenant',b.tenant_id],['ID cheie',b.key_id],['Issuer',b.issuer],['Audience',b.audience],['Origini',b.origin||(b.allowed_origins||[]).join(', ')],['Roluri',b.roles.join(',')],['Permisiuni',b.scopes.join(',')]].map(([k,v])=>`${k}: ${v}`).join('\n');
+   $('device-secret').value=data.secret;data.secret='';$('secret-panel').hidden=false;
+  }
+  return;
  }
  if(parsed.command==='rights'){
   const data=await api('devices');const d=(data.devices||[]).find(v=>v.equipment_id===parsed.equipment_id);
@@ -102,7 +216,8 @@ async function run(command){
    for(const n of parsed.numbers){const id=rightsDraft.catalog[n-1].id;if(rightsDraft.selected.has(id))rightsDraft.selected.delete(id);else rightsDraft.selected.add(id);}showRights();return;
   }
   const scopes=rightsDraft.catalog.filter(p=>rightsDraft.selected.has(p.id)).map(p=>p.id);
-  const data=await api('devices/'+encodeURIComponent(rightsDraft.key_id),'PATCH',{scopes});
+  const data=await api((rightsDraft.kind==='browser'?'browsers/':'devices/')+encodeURIComponent(rightsDraft.key_id),'PATCH',{scopes});
+  if(rightsDraft.kind==='browser'){output('Drepturi browser salvate: '+data.browser.scopes.join(',')+'. Actualizează drepturile cerute în JWT-ul emis de PHP. Conexiunile tenantului se reautentifică.');rightsDraft=null;return;}
   output(`Drepturi salvate pentru ${rightsDraft.equipment_id}. Cheia rămâne aceeași.\nCopiază în reader → Debug WSS → Permisiuni solicitate, apoi Salvează și aplică:\n${data.device.scopes.join(',')}`);rightsDraft=null;return;
  }
  if(['devices','list'].includes(parsed.command)){
@@ -121,6 +236,7 @@ async function run(command){
  if(!data.device||typeof data.secret!=='string'||!data.secret)throw new Error('Răspuns de provisionare incomplet. Verifică lista devices înainte de reîncercare.');
  const device=data.device;
  output(`${reveal?'Cheie solicitată pentru':'Echipament creat'}: ${device.equipment_id}. Cheia este afișată separat.`);
+ $('secret-instructions').textContent='În reader: Settings → Debug WSS, autentificare Cheie echipament (JWT). Lipește cheia în câmpul Cheie WSS și apasă Salvează și aplică.';
  $('secret-title').textContent=reveal?'Cheia echipamentului':'Echipament creat';
  $('device-fields').textContent=[['Server WSS',`${root.location.protocol==='https:'?'wss:':'ws:'}//${root.location.host}/ws`],['Autentificare','device_key'],['Tenant',device.tenant_id],['ID cheie',device.key_id],['Subiect JWT',device.subject],['Emitent JWT',device.issuer],['Audiență JWT',device.audience],['Equipment ID',device.equipment_id],['Reader ID (opțional)',device.reader_id||'neimpus'],['Roluri JWT',Array.isArray(device.roles)?device.roles.join(','):device.roles||''],['Permisiuni',Array.isArray(device.scopes)?device.scopes.join(','):device.scopes||'']].map(([key,value])=>`${key}: ${value??''}`).join('\n');
  $('device-secret').value=data.secret;$('secret-panel').hidden=false;data.secret='';
@@ -143,8 +259,21 @@ $('command-input').addEventListener('keydown',event=>{
 $('logout-button').addEventListener('click',()=>action(logout));
 $('dismiss-secret').addEventListener('click',forgetSecret);
 $('toggle-secret').addEventListener('click',()=>{const shown=$('device-secret').type==='password';$('device-secret').type=shown?'text':'password';$('toggle-secret').textContent=shown?'Ascunde cheia':'Arată cheia';});
-$('copy-secret').addEventListener('click',()=>action(async()=>{if(!$('device-secret').value)return;try{await navigator.clipboard.writeText($('device-secret').value);notice('Cheia a fost copiată. Lipește-o în câmpul Cheie WSS din Debug WSS al readerului/utilitarului.');}catch{notice('Copierea automată nu este disponibilă. Folosește Arată cheia și copiază manual.');}}));
-root.addEventListener('pagehide',forgetSecret);
+$('copy-secret').addEventListener('click',()=>action(async()=>{if(!$('device-secret').value)return;try{await navigator.clipboard.writeText($('device-secret').value);notice('Cheia a fost copiată. Folosește instrucțiunile din panoul cheii.');}catch{notice('Copierea automată nu este disponibilă. Folosește Arată cheia și copiază manual.');}}));
+$('log-load').addEventListener('click',()=>action(()=>openLogs($('log-date').value,false)));
+$('log-date').addEventListener('change',()=>action(()=>openLogs($('log-date').value,logsState.live)));
+$('log-live').addEventListener('click',()=>action(async()=>{if(logsState.live){stopLogs();return;}await openLogs(logsState.date,true);}));
+$('log-close').addEventListener('click',()=>stopLogs(true));
+$('tenant-form').addEventListener('submit',event=>{event.preventDefault();action(async()=>{
+ const form=event.currentTarget;
+ const body={issuer:form.elements.issuer.value,base_url:form.elements.base_url.value};
+ if(form.elements.api_key.value)body.api_key=form.elements.api_key.value;
+ form.elements.api_key.value='';
+ try{await api('tenant','PATCH',body);}finally{delete body.api_key;}
+ $('tenant-panel').hidden=true;csrf='';session=null;rightsDraft=null;forgetSecret();renderSession();notice('Setări tenant salvate. Autentifică-te din nou. Emitenții JWT trebuie să folosească noul issuer; cheia API trebuie să corespundă celei din WiseMED.');
+});});
+$('tenant-cancel').addEventListener('click',()=>{$('tenant-form').elements.api_key.value='';$('tenant-panel').hidden=true;});
+root.addEventListener('pagehide',()=>{stopLogs(true);forgetSecret();$('tenant-form').elements.api_key.value='';});
 action(async()=>{
  const tenants=await api('tenants');const select=$('login-form').elements.tenant_id;select.replaceChildren();
  for(const tenant of tenants.tenants||[]){const option=doc.createElement('option');option.value=tenant.id;option.textContent=tenant.label||tenant.id;select.append(option);}

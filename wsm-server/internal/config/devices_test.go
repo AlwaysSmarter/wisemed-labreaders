@@ -105,3 +105,26 @@ func TestDeviceRegistryRejectsInvalidAndNeverLeaksSecretInErrors(t *testing.T) {
 		t.Fatal("bad registry accepted or disclosed")
 	}
 }
+
+func TestAdminMultipleOriginsConfiguration(t *testing.T) {
+	for _, tc := range []struct {
+		name, legacy string
+		origins      []string
+		valid        bool
+	}{
+		{"list only", "", []string{"https://admin.example", "https://alias.example"}, true},
+		{"legacy and alias", "https://admin.example", []string{"https://alias.example"}, true},
+		{"invalid alias", "https://admin.example", []string{"https://alias.example/"}, false},
+		{"empty alias", "https://admin.example", []string{""}, false},
+		{"public HTTP alias", "https://admin.example", []string{"http://alias.example"}, false},
+		{"wildcard alias", "https://admin.example", []string{"*"}, false},
+		{"invalid legacy with valid alias", "*", []string{"https://alias.example"}, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			c := &Config{Admin: Admin{Enabled: true, PublicOrigin: tc.legacy, PublicOrigins: tc.origins}, Security: Security{DeviceKeysFile: filepath.Join(t.TempDir(), "devices.yaml")}, Server: Server{Address: "127.0.0.1", AllowInsecureLoopback: true}}
+			if err := c.prepareAdmin(""); (err == nil) != tc.valid {
+				t.Fatalf("valid=%v, err=%v", tc.valid, err)
+			}
+		})
+	}
+}

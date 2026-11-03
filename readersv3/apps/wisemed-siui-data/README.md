@@ -165,3 +165,5 @@ Filtrele de text au și variante cu sufix `All` pentru chip-uri obligatorii (AND
 
 Build, export în `~/dockers`, setup și update cu rollback: [ghid Docker comun](../../docker/README.md).
 Scriptul `update-wisemed-siui-data.sh` este livrat și în `output/wisemed-siui-data/`.
+
+CIM10 este importat ca arbore, cu numele curățat și indicatorii păstrați separat. `/api/siui-data/cim10` caută și filtrează diagnostice; `/api/siui-data/cim10/tree` include și părinții potrivirilor. `parentCode` selectează copiii direcți, `roots=true` rădăcinile; `nameAll` cere toate fragmentele, iar `isDagger`, `isAsterisk`, `isNormal`, `isInjury`, `isExternalCause`, `isSequela` filtrează indicatorii. Datele active existente sunt proiectate automat prin migrarea v5, fără reimport.

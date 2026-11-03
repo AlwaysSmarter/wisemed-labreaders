@@ -62,7 +62,7 @@ func (m *Module) Init(rt module.Runtime) error {
 	s := rt.ModuleSettings(m.ID())
 	base := value(s["base_url"])
 	if base == "" {
-		base = "https://www.siui.ro"
+		base = DefaultBaseURL
 	}
 	if e := validateBase(base); e != nil {
 		return e
@@ -93,9 +93,16 @@ func (m *Module) Init(rt module.Runtime) error {
 	if err := validateBase(m.cfg.EInvoiceBaseURL); err != nil {
 		return err
 	}
+	m.cfg.DocMedBaseURL = value(s["docmed_base_url"])
+	if m.cfg.DocMedBaseURL == "" {
+		m.cfg.DocMedBaseURL = DefaultDocMedBaseURL
+	}
+	if err := validateBase(m.cfg.DocMedBaseURL); err != nil {
+		return fmt.Errorf("docmed_base_url: %w", err)
+	}
 	m.cfg.PEBaseURL = value(s["pe_base_url"])
 	if m.cfg.PEBaseURL == "" {
-		m.cfg.PEBaseURL = "https://sipe.siui.ro"
+		m.cfg.PEBaseURL = DefaultPEBaseURL
 	}
 	if err := validateBase(m.cfg.PEBaseURL); err != nil {
 		return err
@@ -223,10 +230,13 @@ func fail(w http.ResponseWriter, status int, message string) {
 	respond(w, status, map[string]any{"ok": false, "error": message})
 }
 func decode(w http.ResponseWriter, r *http.Request, v any) error {
+	return decodeLimit(w, r, v, 2*maxData)
+}
+func decodeLimit(w http.ResponseWriter, r *http.Request, v any, limit int64) error {
 	if !strings.HasPrefix(r.Header.Get("Content-Type"), "application/json") {
 		return errors.New("application/json required")
 	}
-	d := json.NewDecoder(http.MaxBytesReader(w, r.Body, 2*maxData))
+	d := json.NewDecoder(http.MaxBytesReader(w, r.Body, limit))
 	d.DisallowUnknownFields()
 	if e := d.Decode(v); e != nil {
 		return errors.New("invalid or oversized JSON")
@@ -286,12 +296,15 @@ func (m *Module) handle(w http.ResponseWriter, r *http.Request) {
 	case route == "auth/token" && r.Method == "POST":
 		m.tokenHTTP(w, r, subject, owner, admin)
 	case route == "catalog" && r.Method == "GET":
-		respond(w, 200, map[string]any{"ok": true, "operations": operations(), "insurance_houses": insuranceHouses()})
+		m.mu.Lock()
+		fiscal, cas := splitUsername(m.cfg.Username)
+		m.mu.Unlock()
+		respond(w, 200, map[string]any{"ok": true, "operations": operations(), "insurance_houses": insuranceHouses(), "docmed_defaults": map[string]string{"providerCode": fiscal, "providerInsuranceHouse": cas, "insuranceHouseCode": cas}})
 	case route == "openapi.json" && r.Method == "GET":
 		respond(w, 200, openAPIDocument(m.rt.ReaderID()))
 	case strings.HasPrefix(route, "invoice/"):
 		m.invoiceHTTP(w, r, route, admin)
-	case strings.HasPrefix(route, "facturare/") || strings.HasPrefix(route, "general/") || strings.HasPrefix(route, "clinice/") || strings.HasPrefix(route, "calls/"):
+	case strings.HasPrefix(route, "docmed/") || strings.HasPrefix(route, "facturare/") || strings.HasPrefix(route, "general/") || strings.HasPrefix(route, "clinice/") || strings.HasPrefix(route, "calls/"):
 		m.serviceHTTP(w, r, route, owner, admin)
 	case route == "status" && r.Method == "GET":
 		m.mu.Lock()
@@ -448,7 +461,7 @@ func (m *Module) settingsHTTP(w http.ResponseWriter, r *http.Request) {
 	defer m.mu.Unlock()
 	if r.Method == "GET" {
 		fiscal, cas := splitUsername(m.cfg.Username)
-		respond(w, 200, map[string]any{"ok": true, "settings": map[string]any{"licence_configured": m.cfg.Licence != "", "licence_hint": licenceHint(m.cfg.Licence), "username": m.cfg.Username, "fiscal_code": fiscal, "cas_code": cas, "certificate_profiles": m.cfg.Profiles, "pe_base_url": m.cfg.PEBaseURL, "einvoice_base_url": m.cfg.EInvoiceBaseURL, "base_url": m.cfg.BaseURL, "allow_invalid_server_certificate_date": m.cfg.AllowInvalidServerCertificateDate, "allow_revoked_server_certificate": m.cfg.AllowRevokedServerCertificate, "certificate_store": m.cfg.Store, "certificate_thumbprint": m.cfg.Thumbprint}})
+		respond(w, 200, map[string]any{"ok": true, "settings": map[string]any{"licence_configured": m.cfg.Licence != "", "licence_hint": licenceHint(m.cfg.Licence), "username": m.cfg.Username, "fiscal_code": fiscal, "cas_code": cas, "certificate_profiles": m.cfg.Profiles, "pe_base_url": m.cfg.PEBaseURL, "docmed_base_url": m.cfg.DocMedBaseURL, "docmed_endpoints": m.cfg.docMedEndpoints(), "einvoice_base_url": m.cfg.EInvoiceBaseURL, "base_url": m.cfg.BaseURL, "allow_invalid_server_certificate_date": m.cfg.AllowInvalidServerCertificateDate, "allow_revoked_server_certificate": m.cfg.AllowRevokedServerCertificate, "certificate_store": m.cfg.Store, "certificate_thumbprint": m.cfg.Thumbprint}})
 		return
 	}
 	if r.Method != "PUT" {
@@ -460,6 +473,7 @@ func (m *Module) settingsHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var in struct {
+		DocMedBaseURL                     *string `json:"docmed_base_url"`
 		EInvoiceBaseURL                   *string `json:"einvoice_base_url"`
 		AllowRevokedServerCertificate     *bool   `json:"allow_revoked_server_certificate"`
 		FiscalCode                        *string `json:"fiscal_code"`
@@ -476,10 +490,6 @@ func (m *Module) settingsHTTP(w http.ResponseWriter, r *http.Request) {
 		fail(w, 400, e.Error())
 		return
 	}
-	if e := validateBase(in.BaseURL); e != nil {
-		fail(w, 400, e.Error())
-		return
-	}
 	peBase := m.cfg.PEBaseURL
 	if in.PEBaseURL != nil {
 		peBase = *in.PEBaseURL
@@ -491,13 +501,21 @@ func (m *Module) settingsHTTP(w http.ResponseWriter, r *http.Request) {
 	if in.EInvoiceBaseURL != nil {
 		invoiceBase = *in.EInvoiceBaseURL
 	}
-	if validateBase(invoiceBase) != nil || !m.cfg.acceptsOrigin(invoiceBase) {
-		fail(w, 400, "configure a valid HTTPS eFactura origin locally in config.yaml")
-		return
+	docmedBase := m.cfg.DocMedBaseURL
+	if in.DocMedBaseURL != nil {
+		docmedBase = *in.DocMedBaseURL
 	}
-	if validateBase(peBase) != nil || !m.cfg.acceptsOrigin(in.BaseURL) || !m.cfg.acceptsOrigin(peBase) {
-		fail(w, 400, "configure custom CNAS origins locally in config.yaml")
-		return
+	for _, origin := range []struct{ field, address string }{
+		{"base_url", in.BaseURL}, {"pe_base_url", peBase}, {"einvoice_base_url", invoiceBase}, {"docmed_base_url", docmedBase},
+	} {
+		if validateBase(origin.address) != nil {
+			fail(w, 400, origin.field+" must be an HTTPS origin (host and optional port, without a service path)")
+			return
+		}
+		if !m.cfg.acceptsOrigin(origin.address) {
+			fail(w, 400, origin.field+": address or port is not allowed; use official SIUI/SIPE/DocMed HTTPS origins on port 443 (legacy siui.ro origins also accept 444), or configure custom CNAS origins locally in config.yaml")
+			return
+		}
 	}
 	if in.FiscalCode != nil || in.CASCode != nil {
 		if in.FiscalCode == nil || in.CASCode == nil {
@@ -575,12 +593,14 @@ func (m *Module) settingsHTTP(w http.ResponseWriter, r *http.Request) {
 	next.BaseURL = in.BaseURL
 	next.PEBaseURL = peBase
 	next.EInvoiceBaseURL = invoiceBase
+	next.DocMedBaseURL = docmedBase
 	next.AllowInvalidServerCertificateDate = allowInvalidDate
 	next.AllowRevokedServerCertificate = allowRevoked
 	next.saveActiveProfile()
 	s["certificate_profiles"] = next.Profiles
 	s["pe_base_url"] = peBase
 	s["einvoice_base_url"] = invoiceBase
+	s["docmed_base_url"] = docmedBase
 	fiscal, cas := splitUsername(in.Username)
 	if _, err := cnasUsername(fiscal, cas); err == nil {
 		s["fiscal_code"] = fiscal
@@ -604,6 +624,7 @@ func (m *Module) settingsHTTP(w http.ResponseWriter, r *http.Request) {
 	m.cfg.Profiles = next.Profiles
 	m.cfg.PEBaseURL = peBase
 	m.cfg.EInvoiceBaseURL = invoiceBase
+	m.cfg.DocMedBaseURL = docmedBase
 	m.cfg.Username = in.Username
 	m.cfg.Licence = licence
 	m.cfg.AllowInvalidServerCertificateDate = allowInvalidDate

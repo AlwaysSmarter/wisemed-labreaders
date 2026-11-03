@@ -160,3 +160,10 @@ Personalizările folosesc tabele PostgreSQL separate de nomenclatoarele publice.
 Configurare opțională în `modules.siui-data`: `client_jwt_secrets: {"7991962": "<secret distinct, minimum 32 bytes>"}`. Recomandat: generează secretul din pagina internă, copiază-l înainte de salvare, apoi distribuie clientului numai propria cheie/token. JWT HS256: header `kid` egal cu CUI-ul numeric; claim `cui` egal cu același CUI, `admin:false`, issuer `wisemed-siui-data`, audience `siui-data-api`, `sub`, `iat`, `exp` cu durată maximă 900 secunde. Cheia globală rămâne în variabila `WISEMED_SIUI_DATA_JWT_SECRET` de pe server; browserul primește doar un token temporar. [Contractul detaliat](docs/API.md#personalizări-interne-și-servicii-țintite).
 
 Filtrele de text au și variante cu sufix `All` pentru chip-uri obligatorii (AND), de exemplu `nameAll[]=consulta&nameAll[]=repetata` sau `presentationModeAll[]=cutie&presentationModeAll[]=20`. Convenția este comună serviciilor, medicamentelor, medicilor și înregistrărilor brute; Exploratorul API afișează parametrii disponibili și explicațiile lor. Array-urile fără `All` păstrează OR.
+
+## Docker pe EC2
+
+Build, export în `~/dockers`, setup și update cu rollback: [ghid Docker comun](../../docker/README.md).
+Scriptul `update-wisemed-siui-data.sh` este livrat și în `output/wisemed-siui-data/`.
+
+CIM10 este importat ca arbore, cu numele curățat și indicatorii păstrați separat. `/api/siui-data/cim10` caută și filtrează diagnostice; `/api/siui-data/cim10/tree` include și părinții potrivirilor. `parentCode` selectează copiii direcți, `roots=true` rădăcinile; `nameAll` cere toate fragmentele, iar `isDagger`, `isAsterisk`, `isNormal`, `isInjury`, `isExternalCause`, `isSequela` filtrează indicatorii. Datele active existente sunt proiectate automat prin migrarea v5, fără reimport.

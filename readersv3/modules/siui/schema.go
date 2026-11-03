@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"unicode/utf16"
 )
 
@@ -29,7 +30,7 @@ try {
  $settings.XmlResolver=$null
  $settings.ValidationType=[System.Xml.ValidationType]::Schema
  $settings.Schemas=$set
- $settings.MaxCharactersInDocument=1048576
+ $settings.MaxCharactersInDocument=[long]$p.limit
  $text=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($p.data))
  $reader=[System.Xml.XmlReader]::Create([System.IO.StringReader]::new($text),$settings)
  try { while($reader.Read()){} } finally {$reader.Dispose()}
@@ -38,24 +39,42 @@ try {
 `
 
 func validateSchema(ctx context.Context, schema string, data []byte) error {
-	if _, err := assets.ReadFile("assets/schemas/validation/" + schema); err != nil || filepath.Base(schema) != schema {
+	base := "assets/schemas/validation/"
+	limit := maxData
+	names := []string{schema, "CommonReportingTypes.xsd", "CommonReportingTypesPE.xsd"}
+	if strings.HasPrefix(schema, "docmed:") {
+		schema = strings.TrimPrefix(schema, "docmed:")
+		base = "assets/schemas/docmed/"
+		limit = docMedXMLLimit
+		names = nil
+		entries, err := assets.ReadDir(strings.TrimSuffix(base, "/"))
+		if err != nil {
+			return err
+		}
+		for _, entry := range entries {
+			if !entry.IsDir() {
+				names = append(names, entry.Name())
+			}
+		}
+	}
+	if _, err := assets.ReadFile(base + schema); err != nil || filepath.Base(schema) != schema {
 		return errors.New("unsupported schema")
 	}
-	if _, e := parseXML(data); e != nil {
-		return e
+	if _, err := parseXMLLimit(data, limit); err != nil {
+		return err
 	}
 	dir, e := os.MkdirTemp("", "wisemed-siui-xsd-")
 	if e != nil {
 		return e
 	}
 	defer os.RemoveAll(dir)
-	for _, name := range []string{schema, "CommonReportingTypes.xsd", "CommonReportingTypesPE.xsd"} {
-		b, e := assets.ReadFile("assets/schemas/validation/" + name)
-		if e != nil {
-			return e
+	for _, name := range names {
+		b, err := assets.ReadFile(base + name)
+		if err != nil {
+			return err
 		}
-		if e = os.WriteFile(filepath.Join(dir, name), b, 0600); e != nil {
-			return e
+		if err = os.WriteFile(filepath.Join(dir, name), b, 0600); err != nil {
+			return err
 		}
 	}
 	var cmd *exec.Cmd
@@ -67,15 +86,22 @@ func validateSchema(ctx context.Context, schema string, data []byte) error {
 		}
 		exe := filepath.Join(os.Getenv("SystemRoot"), "System32", "WindowsPowerShell", "v1.0", "powershell.exe")
 		cmd = exec.CommandContext(ctx, exe, "-NoProfile", "-NonInteractive", "-EncodedCommand", base64.StdEncoding.EncodeToString(b))
-		schemaData, _ := assets.ReadFile("assets/schemas/validation/" + schema)
+		schemaData, _ := assets.ReadFile(base + schema)
 		ns := piasNS
+		if base == "assets/schemas/docmed/" {
+			ns = docMedNS
+		}
 		if bytes.Contains(schemaData, []byte(`targetNamespace="http://www.cnas.ro/pel/1.0"`)) {
 			ns = "http://www.cnas.ro/pel/1.0"
 		}
-		payload, _ := json.Marshal(map[string]string{"namespace": ns, "schema": filepath.Join(dir, schema), "data": base64.StdEncoding.EncodeToString(data)})
+		payload, _ := json.Marshal(map[string]any{"limit": limit, "namespace": ns, "schema": filepath.Join(dir, schema), "data": base64.StdEncoding.EncodeToString(data)})
 		cmd.Stdin = bytes.NewReader(payload)
 	} else {
-		cmd = exec.CommandContext(ctx, "xmllint", "--nonet", "--noout", "--schema", filepath.Join(dir, schema), "-")
+		validator, err := exec.LookPath("xmllint")
+		if err != nil {
+			return errors.New("validatorul XSD xmllint nu este disponibil pe calculatorul bridge-ului")
+		}
+		cmd = exec.CommandContext(ctx, validator, "--nonet", "--noout", "--schema", filepath.Join(dir, schema), "-")
 		cmd.Stdin = bytes.NewReader(data)
 	}
 	// Do not capture libxml diagnostics: they can contain patient data.
@@ -83,7 +109,11 @@ func validateSchema(ctx context.Context, schema string, data []byte) error {
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
-		return errors.New("XML does not conform to the bundled PIAS schema, or the XSD validator is unavailable")
+		var invalid *exec.ExitError
+		if !errors.As(e, &invalid) {
+			return errors.New("validatorul XSD nu a putut fi pornit pe calculatorul bridge-ului")
+		}
+		return errors.New("XML does not conform to the bundled PIAS schema")
 	}
 	return nil
 }

@@ -1,4 +1,5 @@
 import {renderInvoiceDashboard} from "/siui-invoice.js";
+import {renderDocMedForm} from "/docmed-forms.js";
 const translations = {
   ro: {
     language: "Limba",
@@ -7345,7 +7346,7 @@ async function loadSIUIPanel() {
   const [{settings},catalog]=await Promise.all([api("/api/siui/settings"),api("/api/siui/catalog")]);
   let profiles=settings.certificate_profiles||[];
   panel.innerHTML=`<h2>CNAS</h2><form id="siui-settings-form">
-   <div class="two-col"><label>Cod fiscal<input name="fiscal_code" value="${escapeHtml(settings.fiscal_code||"")}" pattern="[0-9]+" required></label>
+   <div class="two-col"><label>Cod fiscal<input name="fiscal_code" autocomplete="username" value="${escapeHtml(settings.fiscal_code||"")}" pattern="[0-9]+" required></label>
    <label>Cod CAS<select name="cas_code" required><option value="">Selectează CAS</option>${catalog.insurance_houses.map(h=>`<option value="${escapeHtml(h.code)}">${escapeHtml(h.code)} — ${escapeHtml(h.name)}</option>`).join("")}</select></label></div>
    <p id="siui-username-preview"></p>
    <label>Seria de licență<input name="licence" type="password" autocomplete="new-password" placeholder="Lasă gol pentru a păstra licența"></label>
@@ -7364,7 +7365,10 @@ async function loadSIUIPanel() {
    <fieldset><legend>Conexiune pentru certificatul selectat</legend>
    <label>Adresa CNAS<input name="base_url" type="url" value="${escapeHtml(settings.base_url)}" required></label>
    <label>Port SIUI<input id="siui-port" type="number" min="1" max="65535" required></label>
-   <label>Adresa prescripție electronică (PE)<input name="pe_base_url" type="url" value="${escapeHtml(settings.pe_base_url||"https://sipe.siui.ro")}" required></label>
+   <label>Adresa prescripție electronică (PE)<input name="pe_base_url" type="url" value="${escapeHtml(settings.pe_base_url||"https://sipe.e-pias.ro")}" required></label>
+   <label>Adresa DocMED<input name="docmed_base_url" type="url" value="${escapeHtml(settings.docmed_base_url||"https://docmed.e-pias.ro")}" required></label>
+   <p>DocMED: încărcare /loader/ws, serii /seq/ws, descărcare /download/ws, stare /status/ws. Autentificarea OCSP folosește adresa SIUI.</p>
+   <p>Adresele noi e-pias.ro folosesc implicit HTTPS pe portul 443. Portul 444 nu mai este indicat în specificațiile CNAS din 20.10.2026.</p>
    <fieldset><legend>Factură electronică CNAS (eFactura)</legend>
    <label>URL eFactura<input name="einvoice_base_url" type="url" value="${escapeHtml(settings.einvoice_base_url||settings.base_url)}" required></label>
    <label>Port eFactura<input id="siui-einvoice-port" type="number" min="1" max="65535" required></label></fieldset>
@@ -7372,7 +7376,7 @@ async function loadSIUIPanel() {
    <label class="siui-checkbox"><input id="siui-allow-revoked" type="checkbox" ${settings.allow_revoked_server_certificate?"checked":""}> Permite certificatul serverului CNAS revocat (macOS)</label>
    <p>Excepția pentru revocare păstrează verificarea numelui și lanțului CA.</p>
    <p>Adresele, portul și excepția TLS se păstrează separat pentru fiecare certificat. Excepția ignoră numai perioada de valabilitate a certificatului serverului.</p></fieldset>
-   <button type="submit">Salvează configurarea CNAS</button>
+   <button type="submit">Salvează configurarea CNAS</button><p id="siui-settings-result" role="status"></p>
    <p>Nu se exportă fișiere CER. Licența se păstrează în deployments/config.yaml. Serviciile și testele sunt în Debug → GENERAL / CLINICE.</p>
   </form>`;
   const form=panel.querySelector("form"),port=panel.querySelector("#siui-port"),select=form.elements.certificate_thumbprint;
@@ -7386,8 +7390,9 @@ async function loadSIUIPanel() {
   form.elements.einvoice_base_url.addEventListener("change",syncInvoicePort);invoicePort.addEventListener("change",()=>{if(invoicePort.checkValidity()){const u=new URL(form.elements.einvoice_base_url.value);u.port=invoicePort.value;form.elements.einvoice_base_url.value=u.origin;}});
   const applyProfile=()=>{
    const profile=profiles.find(p=>p.certificate_store===form.elements.certificate_store.value&&p.certificate_thumbprint.toUpperCase()===select.value.toUpperCase());
-   form.elements.base_url.value=profile?.base_url||"https://www.siui.ro";form.elements.pe_base_url.value=profile?.pe_base_url||"https://sipe.siui.ro";
-   form.elements.einvoice_base_url.value=profile?.einvoice_base_url||profile?.base_url||"https://www.siui.ro";syncInvoicePort();
+   form.elements.base_url.value=profile?.base_url||"https://siui.e-pias.ro";form.elements.pe_base_url.value=profile?.pe_base_url||"https://sipe.e-pias.ro";
+   form.elements.docmed_base_url.value=profile?.docmed_base_url||"https://docmed.e-pias.ro";
+   form.elements.einvoice_base_url.value=profile?.einvoice_base_url||profile?.base_url||"https://siui.e-pias.ro";syncInvoicePort();
    panel.querySelector("#siui-allow-invalid-date").checked=!!profile?.allow_invalid_server_certificate_date;panel.querySelector("#siui-allow-revoked").checked=!!profile?.allow_revoked_server_certificate;syncPort();
   };
   const savedOptions=()=>{select.replaceChildren(new Option("Selectează un certificat",""));for(const p of profiles.filter(p=>p.certificate_store===form.elements.certificate_store.value)){select.add(new Option(p.certificate_thumbprint+" (profil salvat)",p.certificate_thumbprint));}};
@@ -7398,8 +7403,17 @@ async function loadSIUIPanel() {
   bindAsyncClick(panel.querySelector("#siui-certificates"),reload);
   reload().catch(e=>setSIUIResult(panel.querySelector("#siui-cert-info"),e.message,true));
   form.elements.certificate_store.addEventListener("change",()=>{savedOptions();applyProfile();reload().catch(e=>showToast(e.message,"error"));});
-  bindAsyncSubmit(form,async event=>{event.preventDefault();await api("/api/siui/settings",{method:"PUT",body:JSON.stringify({...Object.fromEntries(new FormData(form)),allow_revoked_server_certificate:panel.querySelector("#siui-allow-revoked").checked,allow_invalid_server_certificate_date:panel.querySelector("#siui-allow-invalid-date").checked})});showToast("Configurarea CNAS a fost salvată.","success");await loadSIUIPanel();});
+  bindAsyncSubmit(form,async event=>{event.preventDefault();await saveSIUISettings(panel,form);});
  }catch(e){setSIUIResult(panel,e.message,true);throw e;}
+}
+async function saveSIUISettings(panel,form) {
+ const result=panel.querySelector("#siui-settings-result");
+ setSIUIResult(result,"Se salvează configurarea CNAS…");
+ try {
+  await api("/api/siui/settings",{method:"PUT",body:JSON.stringify({...Object.fromEntries(new FormData(form)),allow_revoked_server_certificate:panel.querySelector("#siui-allow-revoked").checked,allow_invalid_server_certificate_date:panel.querySelector("#siui-allow-invalid-date").checked})});
+  showToast("Configurarea CNAS a fost salvată.","success");
+ }catch(e){setSIUIResult(result,e.message,true);return;}
+ await loadSIUIPanel();
 }
 async function setupSIUITokenPIN(panel,form,settings) {
  const fieldset=panel.querySelector("#siui-token-pin-section"),input=panel.querySelector("#siui-token-pin-value"),output=panel.querySelector("#siui-token-pin-state");
@@ -7423,28 +7437,31 @@ async function loadSIUIDebug() {
  if(!panel){panel=document.createElement("article");panel.id="siui-debug-panel";panel.className="panel full-span";view.append(panel);}
  for(const child of view.children)child.hidden=child!==panel;
  const catalog=await api("/api/siui/catalog");if(generation!==siuiDebugGeneration)return;
- panel.innerHTML=`<h2>Servicii CNAS</h2><p>GENERAL și CLINICE — aceleași operații sunt disponibile prin HTTPS cu JWT și WSM.</p>
-  <div><button id="siui-debug-general" type="button">GENERAL</button> <button id="siui-debug-clinice" type="button">CLINICE</button> <button id="siui-debug-facturare" type="button">FACTURĂ ELECTRONICĂ</button></div>
+ panel.innerHTML=`<h2>Servicii CNAS</h2><p>GENERAL, CLINICE și DOCMED — aceleași operații sunt disponibile prin HTTPS cu JWT și WSM.</p>
+  <div><button id="siui-debug-general" type="button">GENERAL</button> <button id="siui-debug-clinice" type="button">CLINICE</button> <button id="siui-debug-docmed" type="button">DOCMED</button> <button id="siui-debug-facturare" type="button">FACTURĂ ELECTRONICĂ</button></div>
   <details><summary>Autentificare API HTTPS (JWT)</summary><button id="siui-issue-jwt" type="button">Generează JWT pentru 15 minute</button><pre id="siui-jwt-result" style="white-space:pre-wrap;overflow-wrap:anywhere"></pre><p>Tokenul API este diferit de sesiunea OCSP. Nu se salvează în browser.</p></details>
   <details><summary>Documentație OpenAPI</summary><button id="siui-openapi" type="button">Descarcă OpenAPI JSON</button></details>
   <div id="siui-operation-area"></div><pre id="siui-debug-result" style="white-space:pre-wrap;overflow-wrap:anywhere" role="status"></pre><div id="siui-download-area"></div>`;
  const output=panel.querySelector("#siui-debug-result");
  bindAsyncClick(panel.querySelector("#siui-issue-jwt"),async()=>{const data=await api("/api/siui/auth/token",{method:"POST",body:"{}"});panel.querySelector("#siui-jwt-result").textContent=data.access_token;});
  bindAsyncClick(panel.querySelector("#siui-openapi"),async()=>{const data=await api("/api/siui/openapi.json");downloadSIUIBlob(new Blob([JSON.stringify(data,null,2)],{type:"application/json"}),"siui-openapi.json");});
+ const docMedDefaults={...(catalog.docmed_defaults||{})};let docMedForm=null;
  const renderGroup=group=>{
   callGeneration++;setSIUIResult(output,"");panel.querySelector("#siui-download-area").replaceChildren();
   const ops=catalog.operations.filter(op=>op.group===group||(group==="clinice"&&["getPrescriptionSeriesInfo","generatePrescriptionSeries"].includes(op.name)));const area=panel.querySelector("#siui-operation-area");
-  area.innerHTML=`<h3>${group.toUpperCase()}</h3>${group==="general"?`<button type="button" id="siui-ocsp-connect">Obține / reutilizează token OCSP</button> <button type="button" id="siui-local-test">Test local fără CNAS</button><p>Tokenul este reutilizat maximum 150 de secunde. După acest interval se obține unul nou; rezultatul arată vechimea tokenului.</p>`:""}<label>Operație<select id="siui-operation">${ops.map(op=>`<option value="${op.name}">${escapeHtml(op.label||op.name)} — ${op.name}</option>`).join("")}</select></label><div id="siui-operation-form"></div>`;
+  area.innerHTML=`<h3>${group.toUpperCase()}</h3>${group==="docmed"?"<p>DocMED caută un document după CID, serie, număr și data emiterii; nu oferă listarea tuturor documentelor. Completează câmpurile documentului cunoscut; bridge-ul construiește cererea automat. GetMedicalDocumentXml nu modifică documentul; ConsumeDocument și UnconsumeDocument îi schimbă starea.</p>":""}${group==="general"?`<button type="button" id="siui-ocsp-connect">Obține / reutilizează token OCSP</button> <button type="button" id="siui-local-test">Test local fără CNAS</button><p>Tokenul este reutilizat maximum 150 de secunde. După acest interval se obține unul nou; rezultatul arată vechimea tokenului.</p>`:""}<label>Operație<select id="siui-operation">${ops.map(op=>`<option value="${op.name}">${escapeHtml(op.label||op.name)} — ${op.name}</option>`).join("")}</select></label><div id="siui-operation-form"></div>`;
   if(group==="general"){
    bindAsyncClick(area.querySelector("#siui-ocsp-connect"),async()=>{setSIUIResult(output,"Autentificare OCSP…");try{const connection=await api("/api/siui/general/ocsp");setSIUIResult(output,"Parametri OCSP:\n"+JSON.stringify(connection.debug,null,2)+"\nConectare…");const session=await api("/api/siui/general/ocsp",{method:"POST",body:"{}"});setSIUIResult(output,JSON.stringify(session,null,2));}catch(e){setSIUIResult(output,output.textContent+"\n"+e.message,true);throw e;}});
    bindAsyncClick(area.querySelector("#siui-local-test"),async()=>{output.textContent=JSON.stringify(await api("/api/siui/insured",{method:"POST",body:JSON.stringify({mode:"local"})}),null,2);});
   }
+  if(group==="docmed")area.querySelector("#siui-operation").value="GetMedicalDocumentXml";
   const renderOperation=()=>{
+   if(docMedForm)Object.assign(docMedDefaults,docMedForm.commonValues());docMedForm=null;
    callGeneration++;setSIUIResult(output,"");panel.querySelector("#siui-download-area").replaceChildren();
    const op=ops.find(o=>o.name===area.querySelector("#siui-operation").value);
-   const fields=op.parameters.map(p=>{
+   const fields=op.group==="docmed"?'<div id="siui-docmed-fields"></div>':op.parameters.map(p=>{
     const name=escapeHtml(p.name);let control;
-    if(/xml$/i.test(p.name))control=`<textarea name="${name}" rows="9" required spellcheck="false" placeholder="XML conform specificației CNAS"></textarea>`;
+    if(/xml$/i.test(p.name))control=`<textarea name="${name}" rows="9" required spellcheck="false" placeholder="XML conform specificației CNAS">${escapeHtml(op.request_example||"")}</textarea>`;
     else if(p.nullable)control=`<input name="${name}" type="text" placeholder="Fără subunitate: lasă gol (null)">`;
     else if(p.type==="boolean")control=`<select name="${name}"><option value="true">true</option><option value="false">false</option></select>`;
     else if(p.name==="partnerCategory")control=`<select name="${name}">${["MF","PHM","CLIN","PARA","STOM","AMB","MD","HC","REC","SPT","NHP","DIA","SICK","CBRET"].map(c=>`<option>${c}</option>`).join("")}</select>`;
@@ -7455,22 +7472,30 @@ async function loadSIUIDebug() {
    }).join("");
    area.querySelector("#siui-operation-form").innerHTML=`<p><code>POST /api/siui/${op.group}/${op.name}</code></p><p>${escapeHtml(op.service)} — ${op.mutating?"Trimite / validează / modifică date în CNAS. Verifică parametrii înainte de executare.":"Operație de preluare date."}</p><form><label>ID operație<input name="operation_id" value="${crypto.randomUUID()}" required></label>${fields}<button type="submit">${op.mutating?"Trimite la CNAS":"Execută"} — ${escapeHtml(op.name)}</button><button id="siui-next-operation" type="button">Cerere nouă (alt ID)</button></form><p>O repetare cu același ID urmărește execuția existentă. Starea completed indică primirea răspunsului; verifică rezultatul CNAS.</p>`;
    const form=area.querySelector("form");
+   if(op.group==="docmed"&&!op.form){setSIUIResult(output,"Actualizează și repornește SIUI Bridge pentru formularele DocMED.",true);form.querySelector('button[type="submit"]').disabled=true;return;}
+   if(op.group==="docmed")docMedForm=renderDocMedForm(form.querySelector("#siui-docmed-fields"),op.form,docMedDefaults,catalog.insurance_houses||[]);
+   const activeDocMedForm=docMedForm;
    form.querySelector("#siui-next-operation").onclick=()=>{form.elements.operation_id.value=crypto.randomUUID();};
    if(op.name==="validateReport")form.elements.reportType.addEventListener("change",()=>{form.elements.requestType.value="RQ_"+form.elements.reportType.value+"_SRV";});
    bindAsyncSubmit(form,async event=>{
-    event.preventDefault();const activeCall=++callGeneration;const data=Object.fromEntries(new FormData(form));const id=data.operation_id;delete data.operation_id;for(const p of op.parameters){if(p.nullable&&data[p.name]==="")data[p.name]=null;}
-    setSIUIResult(output,"Trimitere cerere…");panel.querySelector("#siui-download-area").replaceChildren();
-    try{const response=await api("/api/siui/"+op.group+"/"+op.name,{method:"POST",body:JSON.stringify({operation_id:id,parameters:data})});
+    event.preventDefault();const activeCall=++callGeneration;
+    try{
+     const id=form.elements.operation_id.value;let request;
+     if(activeDocMedForm){const fields=await activeDocMedForm.read();Object.assign(docMedDefaults,activeDocMedForm.commonValues());request={operation_id:id,fields};}
+     else {const data=Object.fromEntries(new FormData(form));delete data.operation_id;for(const p of op.parameters){if(p.nullable&&data[p.name]==="")data[p.name]=null;}request={operation_id:id,parameters:data};}
+     setSIUIResult(output,"Trimitere cerere…");panel.querySelector("#siui-download-area").replaceChildren();
+     const response=await api("/api/siui/"+op.group+"/"+op.name,{method:"POST",body:JSON.stringify(request)});
      const poll=async()=>{if(generation!==siuiDebugGeneration||activeCall!==callGeneration||state.currentView!=="debug")return;const result=await api("/api/siui/calls/"+encodeURIComponent(response.call.id));if(generation!==siuiDebugGeneration||activeCall!==callGeneration)return;setSIUIResult(output,(result.call.error?result.call.error+"\n\n":"")+JSON.stringify(result.call,null,2),["failed","unknown"].includes(result.call.status));
       if(["queued","running"].includes(result.call.status)){setTimeout(()=>poll().catch(e=>{setSIUIResult(output,e.message,true);}),1500);}
-      else if(result.call.result?.file){const button=document.createElement("button");button.textContent="Descarcă fișierul CNAS";panel.querySelector("#siui-download-area").replaceChildren(button);bindAsyncClick(button,async()=>{await downloadSIUIFile(result.call.result.file);});}
+      else if(result.call.result?.file){const area=panel.querySelector("#siui-download-area");area.replaceChildren();for(const [label,file]of [["Descarcă răspunsul CNAS",result.call.result.file],["Descarcă PDF-ul arhivat ZIP",result.call.result.docmed?.attachment]]){if(!file)continue;const button=document.createElement("button");button.textContent=label;area.append(button);bindAsyncClick(button,async()=>{await downloadSIUIFile(file);});}}
      };await poll();
-    }catch(e){setSIUIResult(output,e.message,true);throw e;}
+    }catch(e){setSIUIResult(output,e.message,true);}
    });
   };
   area.querySelector("#siui-operation").addEventListener("change",renderOperation);renderOperation();
  };
  panel.querySelector("#siui-debug-facturare").onclick=()=>{const activeCall=++callGeneration;setSIUIResult(output,"");panel.querySelector("#siui-download-area").replaceChildren();renderInvoiceDashboard(panel.querySelector("#siui-operation-area"),{api,escapeHtml,downloadSIUIBlob,downloadSIUIFile,setButtonLoading,alive:()=>generation===siuiDebugGeneration&&activeCall===callGeneration&&state.currentView==="debug"}).catch(e=>{setSIUIResult(output,e.message,true)})};
+ panel.querySelector("#siui-debug-docmed").onclick=()=>renderGroup("docmed");
  panel.querySelector("#siui-debug-general").onclick=()=>renderGroup("general");panel.querySelector("#siui-debug-clinice").onclick=()=>renderGroup("clinice");renderGroup("general");
 }
 function downloadSIUIBlob(blob,name) {const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}

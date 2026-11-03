@@ -61,6 +61,7 @@
     {"group":"clinice","name":"cancelPrescribedPrescription","parameters":[{"name":"providerCode","type":"string"},{"name":"physicianStencilNo","type":"string"},{"name":"contractNo","type":"string"},{"name":"contractType","type":"string"},{"name":"insuranceHouseCode","type":"string"},{"name":"series","type":"string"},{"name":"no","type":"string"},{"name":"prescriptionDate","type":"dateTime"},{"name":"cancellationReason","type":"string"}],"mutating":true},
     {"group":"clinice","name":"downloadNotReportedPrescriptionsReport","parameters":[{"name":"insuranceHouseCode","type":"string"},{"name":"fromDate","type":"dateTime"},{"name":"toDate","type":"dateTime"},{"name":"providerCode","type":"string"},{"name":"stencilNo","type":"string"}],"mutating":false},
     {"group":"clinice","name":"getStatusForPrescriptions","parameters":[{"name":"insuranceHouseCode","type":"string"},{"name":"providerCode","type":"string"},{"name":"contractNo","type":"string"},{"name":"contractType","type":"string"},{"name":"startFrom","type":"dateTime"},{"name":"endTo","type":"dateTime"},{"name":"workPlaceCode","type":"string"}],"mutating":false},
+    {"group":"clinice","name":"getPrescriptionsSeriesNo","parameters":[{"name":"requestXml","type":"string"}],"mutating":false},
     {"group":"clinice","name":"getPrescribedPrescriptionsForCid","parameters":[{"name":"requestXml","type":"string"}],"mutating":false},
     {"group":"clinice","name":"processHospitalPrescription","parameters":[{"name":"reportXml","type":"string"}],"mutating":true},
     {"group":"clinice","name":"cancelReleasedHospitalPrescription","parameters":[{"name":"providerCode","type":"string"},{"name":"workplaceCode","type":"string"},{"name":"insuranceHouseCode","type":"string"},{"name":"series","type":"string"},{"name":"no","type":"string"},{"name":"fractionNo","type":"int"},{"name":"cancellationReason","type":"string"}],"mutating":true},
@@ -69,10 +70,36 @@
     {"group":"facturare","name":"getEInvoice","parameters":[{"name":"serialCode","type":"string"},{"name":"serialNumber","type":"string"},{"name":"providerFiscalCode","type":"string"}],"mutating":false},
     {"group":"facturare","name":"getEInvoiceId","parameters":[{"name":"serialCode","type":"string"},{"name":"serialNumber","type":"string"},{"name":"providerFiscalCode","type":"string"}],"mutating":false},
     {"group":"facturare","name":"getEInvoiceClearingNote","parameters":[{"name":"serialCode","type":"string"},{"name":"serialNumber","type":"string"},{"name":"providerFiscalCode","type":"string"}],"mutating":false},
-    {"group":"facturare","name":"cancelEInvoice","parameters":[{"name":"serialCode","type":"string"},{"name":"serialNumber","type":"string"},{"name":"providerFiscalCode","type":"string"},{"name":"cancellationDate","type":"dateTime"},{"name":"cancellationReason","type":"string"}],"mutating":true}
+    {"group":"facturare","name":"cancelEInvoice","parameters":[{"name":"serialCode","type":"string"},{"name":"serialNumber","type":"string"},{"name":"providerFiscalCode","type":"string"},{"name":"cancellationDate","type":"dateTime"},{"name":"cancellationReason","type":"string"}],"mutating":true},
+    {"group":"docmed","name":"MedicalLeave","parameters":[{"name":"requestXml","type":"string"}],"mutating":true},
+    {"group":"docmed","name":"MedicalLetter","parameters":[{"name":"requestXml","type":"string"}],"mutating":true},
+    {"group":"docmed","name":"PhysicianElectronicPrescription","parameters":[{"name":"requestXml","type":"string"}],"mutating":true},
+    {"group":"docmed","name":"RecoveryMedicalPlan","parameters":[{"name":"requestXml","type":"string"}],"mutating":true},
+    {"group":"docmed","name":"LaboratoryMFReferral","parameters":[{"name":"requestXml","type":"string"}],"mutating":true},
+    {"group":"docmed","name":"LaboratoryAGReferral","parameters":[{"name":"requestXml","type":"string"}],"mutating":true},
+    {"group":"docmed","name":"LaboratoryCTReferral","parameters":[{"name":"requestXml","type":"string"}],"mutating":true},
+    {"group":"docmed","name":"LaboratorySGReferral","parameters":[{"name":"requestXml","type":"string"}],"mutating":true},
+    {"group":"docmed","name":"PalliativeRecommendation","parameters":[{"name":"requestXml","type":"string"}],"mutating":true},
+    {"group":"docmed","name":"MedicalDeviceRecommendation","parameters":[{"name":"requestXml","type":"string"}],"mutating":true},
+    {"group":"docmed","name":"HomeCareMedicalPlan","parameters":[{"name":"requestXml","type":"string"}],"mutating":true},
+    {"group":"docmed","name":"ClinicalReferral","parameters":[{"name":"requestXml","type":"string"}],"mutating":true},
+    {"group":"docmed","name":"LaboratoryRMNReferral","parameters":[{"name":"requestXml","type":"string"}],"mutating":true},
+    {"group":"docmed","name":"LaboratoryReferral","parameters":[{"name":"requestXml","type":"string"}],"mutating":true},
+    {"group":"docmed","name":"HomeCareRecommendation","parameters":[{"name":"requestXml","type":"string"}],"mutating":true},
+    {"group":"docmed","name":"ConsumeDocument","parameters":[{"name":"requestXml","type":"string"}],"mutating":true},
+    {"group":"docmed","name":"UnconsumeDocument","parameters":[{"name":"requestXml","type":"string"}],"mutating":true},
+    {"group":"docmed","name":"GetDocumentStatus","parameters":[{"name":"requestXml","type":"string"}],"mutating":false},
+    {"group":"docmed","name":"GenDocumentSeries","parameters":[{"name":"requestXml","type":"string"}],"mutating":true},
+    {"group":"docmed","name":"GetDocumentSeries","parameters":[{"name":"requestXml","type":"string"}],"mutating":false},
+    {"group":"docmed","name":"GetMedicalDocumentXml","parameters":[{"name":"requestXml","type":"string"}],"mutating":false},
+    {"group":"docmed","name":"GetMedicalDocument","parameters":[{"name":"requestXml","type":"string"}],"mutating":false}
   ];
   // Auxiliary routes are explicit so callers never need direct HTTP to the bridge.
   const endpoints = [
+    {"name":"getDownloadStorage","method":"GET","path":"downloads/storage"},
+    {"name":"listOperations","method":"GET","path":"operations"},
+    {"name":"getDashboard","method":"GET","path":"dashboard"},
+    {"name":"checkDashboard","method":"POST","path":"dashboard/checks"},
     {"name":"getStatus","method":"GET","path":"status"},
     {"name":"getCatalog","method":"GET","path":"catalog"},
     {"name":"getOpenAPI","method":"GET","path":"openapi.json"},
@@ -99,7 +126,7 @@
       if(!validWSM(wsm) && typeof options.wsmFactory!=='function') throw fail('invalid_wsm','Este necesar un obiect WSMServer.');
       this.wsm=wsm;this.options={pollInterval:1000,waitTimeout:180000,requestTimeout:135000,connectAttempts:3,connectTimeout:5000,download:true,...options};
       this.client=null;this._selection={equipmentID:options.equipmentID,clientID:options.clientID,connectionID:options.connectionID};
-      this.general={};this.clinice={};this.facturare={};
+      this.general={};this.clinice={};this.facturare={};this.docmed={};
       for(const op of operations) {
         const invoke=(parameters={},options={})=>this.executeOperation(op.group,op.name,parameters,options);
         this[op.group][op.name]=invoke;
@@ -133,7 +160,7 @@
                   this.wsm=candidate;
                 }
                 if(this.wsm.isConnected) return;
-                const connect=this.wsm.reconnect||this.wsm.connect;
+                const connect=this.wsm.connect||this.wsm.reconnect;
                 if(typeof connect!=='function') throw fail('wsm_disconnected','WSM nu oferă conectare; configurează wsmFactory.');
                 await connect.call(this.wsm);
                 if(!this.wsm.isConnected) throw fail('wsm_disconnected','WSM nu este conectat.');
@@ -144,7 +171,7 @@
               if(!this.wsm?.isConnected) this.wsm?.disconnect?.();
             } finally { active=false; }
           }
-          throw fail('wsm_disconnected','Conectarea WSM a eșuat după '+attempts+' încercări.',{attempts,cause:last});
+          throw fail('wsm_disconnected','Conectarea WSM a eșuat după '+attempts+' încercări.'+(last?.message?' '+last.message:''),{attempts,cause:last});
         })();
         this._connection=flight;
         const original=this.wsm;
@@ -267,9 +294,10 @@
     getCall(id,options={}) {return this._request('GET','calls/'+segment(id),undefined,options);}
     getCallFileChunk(id,offset=0,options={}) {
       if(!Number.isSafeInteger(offset)||offset<0) return Promise.reject(fail('invalid_offset','Offset invalid.'));
-      return this._request('GET','calls/'+segment(id)+'/file',undefined,{...options,query:{offset,...(options.unzip?{unzip:'true'}:{}),...(options.entry?{entry:options.entry}:{}),...(options.validateXSD===false?{validateXSD:'false'}:{}),...(options.format&&options.format!=='bytes'?{format:options.format}:{})}});
+      return this._request('GET','calls/'+segment(id)+'/file',undefined,{...options,query:{offset,...(options.docmedAttachment?{docmed_attachment:'true'}:{}),...(options.unzip?{unzip:'true'}:{}),...(options.entry?{entry:options.entry}:{}),...(options.validateXSD===false?{validateXSD:'false'}:{}),...(options.format&&options.format!=='bytes'?{format:options.format}:{})}});
     }
     getValidation(id,options={}) {return this._request('GET','validations/'+segment(id),undefined,options);}
+    downloadDocMedAttachment(id,options={}) {return this.downloadCallFile(id,{validateXSD:false,...options,docmedAttachment:true});}
     async downloadCallFile(id,options={}) {
       const controller=new AbortController();
       const propagate=()=>controller.abort();
@@ -320,7 +348,7 @@
       ...(e?.callId?{callId:e.callId}:{}),
       ...(e?.attempts?{attempts:e.attempts}:{})
     });
-    const api={general:{},clinice:{},facturare:{}};
+    const api={general:{},clinice:{},facturare:{},docmed:{}};
     api.configure=(options={})=>{
       try {
         if(!options||typeof options!=='object'||Array.isArray(options))throw fail('invalid_options','Configurare invalidă.');
@@ -414,7 +442,7 @@
     }
     for(const [name,index] of Object.entries({
       refresh:0,ensureConnected:0,getCall:1,getValidation:1,waitCall:1,waitValidation:1,
-      getCallFileChunk:2,downloadCallFile:1,completeCall:1,retryCallWMAPI:1,
+      getCallFileChunk:2,downloadCallFile:1,downloadDocMedAttachment:1,completeCall:1,retryCallWMAPI:1,
       submitOperation:3,executeOperation:3
     })) api[name]=(...args)=>invoke(name,args,index);
     return api;

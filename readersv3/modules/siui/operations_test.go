@@ -77,10 +77,13 @@ func sampleParameters(op Operation) map[string]string {
 	return args
 }
 func TestEveryRequestedSOAPOperation(t *testing.T) {
-	if len(operations()) != 40 {
-		t.Fatal("expected 40 SOAP operations")
+	if len(operations()) != 63 {
+		t.Fatal("expected 63 SOAP operations")
 	}
 	for _, op := range operations() {
+		if op.Group == "docmed" {
+			continue
+		} // Dedicated document/literal coverage is in docmed_test.go.
 		t.Run(op.Name, func(t *testing.T) {
 			args := sampleParameters(op)
 			b := &operationBackend{t: t}
@@ -156,7 +159,7 @@ func TestSOAPReferencesFaultsAndClinicalSelection(t *testing.T) {
 func serviceTestModule(t *testing.T, b backend) (*Module, *testRuntime) {
 	t.Helper()
 	dir := t.TempDir()
-	rt := &testRuntime{mux: http.NewServeMux(), guard: testGuard{}, path: filepath.Join(dir, "config.yaml"), settings: map[string]interface{}{"username": "123_CAS-DJ", "licence": "test", "certificate_thumbprint": strings.Repeat("A", 40), "database": filepath.Join(dir, "jobs.db")}}
+	rt := &testRuntime{mux: http.NewServeMux(), guard: testGuard{}, path: filepath.Join(dir, "config.yaml"), settings: map[string]interface{}{"base_url": "https://www.siui.ro", "pe_base_url": "https://sipe.siui.ro", "username": "123_CAS-DJ", "licence": "test", "certificate_thumbprint": strings.Repeat("A", 40), "database": filepath.Join(dir, "jobs.db")}}
 	if e := os.WriteFile(rt.path, []byte("modules:\n  siui: {}\n"), 0600); e != nil {
 		t.Fatal(e)
 	}
@@ -380,6 +383,9 @@ func TestProfilesPersistThroughSettings(t *testing.T) {
 }
 func TestCatalogMatchesBundledWSDL(t *testing.T) {
 	for _, op := range operations() {
+		if op.Group == "docmed" {
+			continue
+		}
 		b, err := assets.ReadFile("assets/wsdl/" + op.Service + ".wsdl")
 		if err != nil {
 			t.Fatal(err)

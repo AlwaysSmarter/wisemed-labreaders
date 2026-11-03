@@ -1,0 +1,464 @@
+[
+  {
+    "name": "MedicalLeave",
+    "group": "docmed",
+    "service": "DocMedService",
+    "namespace": "http://www.cnas.ro/pias/2.0",
+    "style": "docmed",
+    "parameters": [
+      {
+        "name": "requestXml",
+        "type": "string"
+      }
+    ],
+    "mutating": true,
+    "download": false,
+    "label": "MedicalLeave",
+    "request_element": "MedicalLeaveRequest",
+    "response_element": "MedicalLeaveResponse",
+    "request_schema": "MedicalLeaveRequest.xsd",
+    "response_schema": "MedicalLeaveResponse.xsd",
+    "endpoint_path": "/loader/ws"
+  },
+  {
+    "name": "MedicalLetter",
+    "group": "docmed",
+    "service": "DocMedService",
+    "namespace": "http://www.cnas.ro/pias/2.0",
+    "style": "docmed",
+    "parameters": [
+      {
+        "name": "requestXml",
+        "type": "string"
+      }
+    ],
+    "mutating": true,
+    "download": false,
+    "label": "MedicalLetter",
+    "request_element": "MedicalLetterRequest",
+    "response_element": "MedicalLetterResponse",
+    "request_schema": "MedicalLetterRequest.xsd",
+    "response_schema": "MedicalLetterResponse.xsd",
+    "endpoint_path": "/loader/ws"
+  },
+  {
+    "name": "PhysicianElectronicPrescription",
+    "group": "docmed",
+    "service": "DocMedService",
+    "namespace": "http://www.cnas.ro/pias/2.0",
+    "style": "docmed",
+    "parameters": [
+      {
+        "name": "requestXml",
+        "type": "string"
+      }
+    ],
+    "mutating": true,
+    "download": false,
+    "label": "PhysicianElectronicPrescription",
+    "request_element": "PhysicianElectronicPrescriptionRequest",
+    "response_element": "PhysicianElectronicPrescriptionResponse",
+    "request_schema": "PhysicianElectronicPrescriptionRequest.xsd",
+    "response_schema": "PhysicianElectronicPrescriptionResponse.xsd",
+    "endpoint_path": "/loader/ws"
+  },
+  {
+    "name": "RecoveryMedicalPlan",
+    "group": "docmed",
+    "service": "DocMedService",
+    "namespace": "http://www.cnas.ro/pias/2.0",
+    "style": "docmed",
+    "parameters": [
+      {
+        "name": "requestXml",
+        "type": "string"
+      }
+    ],
+    "mutating": true,
+    "download": false,
+    "label": "RecoveryMedicalPlan",
+    "request_element": "RecoveryMedicalPlanRequest",
+    "response_element": "RecoveryMedicalPlanResponse",
+    "request_schema": "RecoveryMedicalPlanRequest.xsd",
+    "response_schema": "RecoveryMedicalPlanResponse.xsd",
+    "endpoint_path": "/loader/ws"
+  },
+  {
+    "name": "LaboratoryMFReferral",
+    "group": "docmed",
+    "service": "DocMedService",
+    "namespace": "http://www.cnas.ro/pias/2.0",
+    "style": "docmed",
+    "parameters": [
+      {
+        "name": "requestXml",
+        "type": "string"
+      }
+    ],
+    "mutating": true,
+    "download": false,
+    "label": "LaboratoryMFReferral",
+    "request_element": "LaboratoryMFReferralRequest",
+    "response_element": "LaboratoryMFReferralResponse",
+    "request_schema": "LaboratoryMFReferralRequest.xsd",
+    "response_schema": "LaboratoryMFReferralResponse.xsd",
+    "endpoint_path": "/loader/ws"
+  },
+  {
+    "name": "LaboratoryAGReferral",
+    "group": "docmed",
+    "service": "DocMedService",
+    "namespace": "http://www.cnas.ro/pias/2.0",
+    "style": "docmed",
+    "parameters": [
+      {
+        "name": "requestXml",
+        "type": "string"
+      }
+    ],
+    "mutating": true,
+    "download": false,
+    "label": "LaboratoryAGReferral",
+    "request_element": "LaboratoryAGReferralRequest",
+    "response_element": "LaboratoryAGReferralResponse",
+    "request_schema": "LaboratoryAGReferralRequest.xsd",
+    "response_schema": "LaboratoryAGReferralResponse.xsd",
+    "endpoint_path": "/loader/ws"
+  },
+  {
+    "name": "LaboratoryCTReferral",
+    "group": "docmed",
+    "service": "DocMedService",
+    "namespace": "http://www.cnas.ro/pias/2.0",
+    "style": "docmed",
+    "parameters": [
+      {
+        "name": "requestXml",
+        "type": "string"
+      }
+    ],
+    "mutating": true,
+    "download": false,
+    "label": "LaboratoryCTReferral",
+    "request_element": "LaboratoryCTReferralRequest",
+    "response_element": "LaboratoryCTReferralResponse",
+    "request_schema": "LaboratoryCTReferralRequest.xsd",
+    "response_schema": "LaboratoryCTReferralResponse.xsd",
+    "endpoint_path": "/loader/ws"
+  },
+  {
+    "name": "LaboratorySGReferral",
+    "group": "docmed",
+    "service": "DocMedService",
+    "namespace": "http://www.cnas.ro/pias/2.0",
+    "style": "docmed",
+    "parameters": [
+      {
+        "name": "requestXml",
+        "type": "string"
+      }
+    ],
+    "mutating": true,
+    "download": false,
+    "label": "LaboratorySGReferral",
+    "request_element": "LaboratorySGReferralRequest",
+    "response_element": "LaboratorySGReferralResponse",
+    "request_schema": "LaboratorySGReferralRequest.xsd",
+    "response_schema": "LaboratorySGReferralResponse.xsd",
+    "endpoint_path": "/loader/ws"
+  },
+  {
+    "name": "PalliativeRecommendation",
+    "group": "docmed",
+    "service": "DocMedService",
+    "namespace": "http://www.cnas.ro/pias/2.0",
+    "style": "docmed",
+    "parameters": [
+      {
+        "name": "requestXml",
+        "type": "string"
+      }
+    ],
+    "mutating": true,
+    "download": false,
+    "label": "PalliativeRecommendation",
+    "request_element": "PalliativeRecommendationRequest",
+    "response_element": "PalliativeRecommendationResponse",
+    "request_schema": "PalliativeRecommendationRequest.xsd",
+    "response_schema": "PalliativeRecommendationResponse.xsd",
+    "endpoint_path": "/loader/ws"
+  },
+  {
+    "name": "MedicalDeviceRecommendation",
+    "group": "docmed",
+    "service": "DocMedService",
+    "namespace": "http://www.cnas.ro/pias/2.0",
+    "style": "docmed",
+    "parameters": [
+      {
+        "name": "requestXml",
+        "type": "string"
+      }
+    ],
+    "mutating": true,
+    "download": false,
+    "label": "MedicalDeviceRecommendation",
+    "request_element": "MedicalDeviceRecommendationRequest",
+    "response_element": "MedicalDeviceRecommendationResponse",
+    "request_schema": "MedicalDeviceRecommendationRequest.xsd",
+    "response_schema": "MedicalDeviceRecommendationResponse.xsd",
+    "endpoint_path": "/loader/ws"
+  },
+  {
+    "name": "HomeCareMedicalPlan",
+    "group": "docmed",
+    "service": "DocMedService",
+    "namespace": "http://www.cnas.ro/pias/2.0",
+    "style": "docmed",
+    "parameters": [
+      {
+        "name": "requestXml",
+        "type": "string"
+      }
+    ],
+    "mutating": true,
+    "download": false,
+    "label": "HomeCareMedicalPlan",
+    "request_element": "HomeCareMedicalPlanRequest",
+    "response_element": "HomeCareMedicalPlanResponse",
+    "request_schema": "HomeCareMedicalPlanRequest.xsd",
+    "response_schema": "HomeCareMedicalPlanResponse.xsd",
+    "endpoint_path": "/loader/ws"
+  },
+  {
+    "name": "ClinicalReferral",
+    "group": "docmed",
+    "service": "DocMedService",
+    "namespace": "http://www.cnas.ro/pias/2.0",
+    "style": "docmed",
+    "parameters": [
+      {
+        "name": "requestXml",
+        "type": "string"
+      }
+    ],
+    "mutating": true,
+    "download": false,
+    "label": "ClinicalReferral",
+    "request_element": "ClinicalReferralRequest",
+    "response_element": "ClinicalReferralResponse",
+    "request_schema": "ClinicalReferralRequest.xsd",
+    "response_schema": "ClinicalReferralResponse.xsd",
+    "endpoint_path": "/loader/ws"
+  },
+  {
+    "name": "LaboratoryRMNReferral",
+    "group": "docmed",
+    "service": "DocMedService",
+    "namespace": "http://www.cnas.ro/pias/2.0",
+    "style": "docmed",
+    "parameters": [
+      {
+        "name": "requestXml",
+        "type": "string"
+      }
+    ],
+    "mutating": true,
+    "download": false,
+    "label": "LaboratoryRMNReferral",
+    "request_element": "LaboratoryRMNReferralRequest",
+    "response_element": "LaboratoryRMNReferralResponse",
+    "request_schema": "LaboratoryRMNReferralRequest.xsd",
+    "response_schema": "LaboratoryRMNReferralResponse.xsd",
+    "endpoint_path": "/loader/ws"
+  },
+  {
+    "name": "LaboratoryReferral",
+    "group": "docmed",
+    "service": "DocMedService",
+    "namespace": "http://www.cnas.ro/pias/2.0",
+    "style": "docmed",
+    "parameters": [
+      {
+        "name": "requestXml",
+        "type": "string"
+      }
+    ],
+    "mutating": true,
+    "download": false,
+    "label": "LaboratoryReferral",
+    "request_element": "LaboratoryReferralRequest",
+    "response_element": "LaboratoryReferralResponse",
+    "request_schema": "LaboratoryReferralRequest.xsd",
+    "response_schema": "LaboratoryReferralResponse.xsd",
+    "endpoint_path": "/loader/ws"
+  },
+  {
+    "name": "HomeCareRecommendation",
+    "group": "docmed",
+    "service": "DocMedService",
+    "namespace": "http://www.cnas.ro/pias/2.0",
+    "style": "docmed",
+    "parameters": [
+      {
+        "name": "requestXml",
+        "type": "string"
+      }
+    ],
+    "mutating": true,
+    "download": false,
+    "label": "HomeCareRecommendation",
+    "request_element": "HomeCareRecommendationRequest",
+    "response_element": "HomeCareRecommendationResponse",
+    "request_schema": "HomeCareRecommendationRequest.xsd",
+    "response_schema": "HomeCareRecommendationResponse.xsd",
+    "endpoint_path": "/loader/ws"
+  },
+  {
+    "name": "ConsumeDocument",
+    "group": "docmed",
+    "service": "DocStatusChangerService",
+    "namespace": "http://www.cnas.ro/pias/2.0",
+    "style": "docmed",
+    "parameters": [
+      {
+        "name": "requestXml",
+        "type": "string"
+      }
+    ],
+    "mutating": true,
+    "download": false,
+    "label": "ConsumeDocument",
+    "request_element": "ConsumeDocumentRequest",
+    "response_element": "ConsumeDocumentResponse",
+    "request_schema": "ConsumeDocumentRequest.xsd",
+    "response_schema": "ConsumeDocumentResponse.xsd",
+    "endpoint_path": "/status/ws"
+  },
+  {
+    "name": "UnconsumeDocument",
+    "group": "docmed",
+    "service": "DocStatusChangerService",
+    "namespace": "http://www.cnas.ro/pias/2.0",
+    "style": "docmed",
+    "parameters": [
+      {
+        "name": "requestXml",
+        "type": "string"
+      }
+    ],
+    "mutating": true,
+    "download": false,
+    "label": "UnconsumeDocument",
+    "request_element": "UnconsumeDocumentRequest",
+    "response_element": "UnconsumeDocumentResponse",
+    "request_schema": "UnconsumeDocumentRequest.xsd",
+    "response_schema": "UnconsumeDocumentResponse.xsd",
+    "endpoint_path": "/status/ws"
+  },
+  {
+    "name": "GetDocumentStatus",
+    "group": "docmed",
+    "service": "DocStatusChangerService",
+    "namespace": "http://www.cnas.ro/pias/2.0",
+    "style": "docmed",
+    "parameters": [
+      {
+        "name": "requestXml",
+        "type": "string"
+      }
+    ],
+    "mutating": false,
+    "download": false,
+    "label": "GetDocumentStatus",
+    "request_element": "GetDocumentStatusRequest",
+    "response_element": "GetDocumentStatusResponse",
+    "request_schema": "GetDocumentStatusRequest.xsd",
+    "response_schema": "GetDocumentStatusResponse.xsd",
+    "endpoint_path": "/status/ws"
+  },
+  {
+    "name": "GenDocumentSeries",
+    "group": "docmed",
+    "service": "DocumentSeries",
+    "namespace": "http://www.cnas.ro/pias/2.0",
+    "style": "docmed",
+    "parameters": [
+      {
+        "name": "requestXml",
+        "type": "string"
+      }
+    ],
+    "mutating": true,
+    "download": false,
+    "label": "GenDocumentSeries",
+    "request_element": "GenDocumentSeriesRequest",
+    "response_element": "GenDocumentSeriesResponse",
+    "request_schema": "GenDocumentSeriesRequest.xsd",
+    "response_schema": "DocumentSeriesResponse.xsd",
+    "endpoint_path": "/seq/ws"
+  },
+  {
+    "name": "GetDocumentSeries",
+    "group": "docmed",
+    "service": "DocumentSeries",
+    "namespace": "http://www.cnas.ro/pias/2.0",
+    "style": "docmed",
+    "parameters": [
+      {
+        "name": "requestXml",
+        "type": "string"
+      }
+    ],
+    "mutating": false,
+    "download": false,
+    "label": "GetDocumentSeries",
+    "request_element": "GetDocumentSeriesRequest",
+    "response_element": "GetDocumentSeriesResponse",
+    "request_schema": "GetDocumentSeriesRequest.xsd",
+    "response_schema": "DocumentSeriesResponse.xsd",
+    "endpoint_path": "/seq/ws"
+  },
+  {
+    "name": "GetMedicalDocumentXml",
+    "group": "docmed",
+    "service": "MedicalDocumentDownloader",
+    "namespace": "http://www.cnas.ro/pias/2.0",
+    "style": "docmed",
+    "parameters": [
+      {
+        "name": "requestXml",
+        "type": "string"
+      }
+    ],
+    "mutating": false,
+    "download": false,
+    "label": "GetMedicalDocumentXml",
+    "request_element": "GetMedicalDocumentXmlRequest",
+    "response_element": "GetMedicalDocumentXmlResponse",
+    "request_schema": "GetMedicalDocumentXmlRequest.xsd",
+    "response_schema": "GetMedicalDocumentXmlResponse.xsd",
+    "endpoint_path": "/download/ws"
+  },
+  {
+    "name": "GetMedicalDocument",
+    "group": "docmed",
+    "service": "MedicalDocumentDownloader",
+    "namespace": "http://www.cnas.ro/pias/2.0",
+    "style": "docmed",
+    "parameters": [
+      {
+        "name": "requestXml",
+        "type": "string"
+      }
+    ],
+    "mutating": false,
+    "download": false,
+    "label": "GetMedicalDocument",
+    "request_element": "GetMedicalDocumentRequest",
+    "response_element": "GetMedicalDocumentResponse",
+    "request_schema": "GetMedicalDocumentRequest.xsd",
+    "response_schema": "GetMedicalDocumentResponse.xsd",
+    "endpoint_path": "/download/ws"
+  }
+]

@@ -206,10 +206,7 @@ func (n nativeBackend) Do(ctx context.Context, method, raw string, headers http.
 			responseHeaders.Add(strings.TrimSpace(k), strings.TrimSpace(v))
 		}
 	}
-	responseLimit := maxData
-	if method == "GET" && !strings.HasPrefix(u.Path, "/OCSP/") {
-		responseLimit = maxDownload
-	}
+	responseLimit := cnasResponseLimit(method, raw)
 	var data []byte
 	chunk := make([]byte, 16384)
 	for {

@@ -106,14 +106,14 @@ func (s *Server) controlAsset(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	path := strings.TrimPrefix(r.URL.Path, "/control/")
-	if r.URL.Path == "/app.js" || r.URL.Path == "/styles.css" || r.URL.Path == "/wss-remote.js" {
+	if r.URL.Path == "/docmed-forms.js" || r.URL.Path == "/siui-invoice.js" || r.URL.Path == "/app.js" || r.URL.Path == "/styles.css" || r.URL.Path == "/wss-remote.js" {
 		path = strings.TrimPrefix(r.URL.Path, "/")
 	}
 	if r.URL.Path == "/control" || path == "" {
 		path = "index.html"
 	}
 	// Only bundled frontend files; no directory listing/config/secrets.
-	if path != "app.js" && path != "styles.css" && path != "wss-remote.js" {
+	if path != "docmed-forms.js" && path != "siui-invoice.js" && path != "app.js" && path != "styles.css" && path != "wss-remote.js" {
 		path = "index.html"
 	}
 	file := filepath.Join(root, path)

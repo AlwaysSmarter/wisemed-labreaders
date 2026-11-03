@@ -8,6 +8,7 @@ import (
 )
 
 type certificateProfile struct {
+	DocMedBaseURL                     string `json:"docmed_base_url" yaml:"docmed_base_url"`
 	EInvoiceBaseURL                   string `json:"einvoice_base_url" yaml:"einvoice_base_url"`
 	AllowRevokedServerCertificate     bool   `json:"allow_revoked_server_certificate" yaml:"allow_revoked_server_certificate"`
 	Store                             string `json:"certificate_store" yaml:"certificate_store"`
@@ -53,7 +54,7 @@ func (s *settings) saveActiveProfile() {
 	if s.Thumbprint == "" {
 		return
 	}
-	p := certificateProfile{Store: s.Store, Thumbprint: s.Thumbprint, BaseURL: s.BaseURL, PEBaseURL: s.PEBaseURL, EInvoiceBaseURL: s.EInvoiceBaseURL, AllowInvalidServerCertificateDate: s.AllowInvalidServerCertificateDate, AllowRevokedServerCertificate: s.AllowRevokedServerCertificate}
+	p := certificateProfile{Store: s.Store, Thumbprint: s.Thumbprint, BaseURL: s.BaseURL, PEBaseURL: s.PEBaseURL, EInvoiceBaseURL: s.EInvoiceBaseURL, DocMedBaseURL: s.DocMedBaseURL, AllowInvalidServerCertificateDate: s.AllowInvalidServerCertificateDate, AllowRevokedServerCertificate: s.AllowRevokedServerCertificate}
 	for i, v := range s.Profiles {
 		if profileKey(v.Store, v.Thumbprint) == profileKey(p.Store, p.Thumbprint) {
 			s.Profiles[i] = p
@@ -67,19 +68,25 @@ func knownOrigin(s string) bool {
 	if e != nil {
 		return false
 	}
-	return (u.Hostname() == "www.siui.ro" || u.Hostname() == "testsiui.siui.ro" || u.Hostname() == "sipe.siui.ro") && (u.Port() == "" || u.Port() == "443" || u.Port() == "444")
+	switch strings.ToLower(u.Hostname()) {
+	case "siui.e-pias.ro", "sipe.e-pias.ro", "docmed.e-pias.ro":
+		return u.Port() == "" || u.Port() == "443"
+	case "www.siui.ro", "sipe.siui.ro", "testsiui.siui.ro", "testsipe.siui.ro":
+		return u.Port() == "" || u.Port() == "443" || u.Port() == "444"
+	}
+	return false
 }
 func (s settings) acceptsOrigin(address string) bool {
 	u, _ := url.Parse(address)
 	for _, p := range s.Profiles {
-		for _, v := range []string{p.BaseURL, p.PEBaseURL, p.EInvoiceBaseURL} {
+		for _, v := range []string{p.BaseURL, p.PEBaseURL, p.EInvoiceBaseURL, p.DocMedBaseURL} {
 			o, _ := url.Parse(v)
 			if o != nil && u != nil && o.Host == u.Host {
 				return true
 			}
 		}
 	}
-	for _, v := range []string{s.BaseURL, s.PEBaseURL, s.EInvoiceBaseURL} {
+	for _, v := range []string{s.BaseURL, s.PEBaseURL, s.EInvoiceBaseURL, s.DocMedBaseURL} {
 		o, _ := url.Parse(v)
 		if o != nil && u != nil && o.Host == u.Host {
 			return true

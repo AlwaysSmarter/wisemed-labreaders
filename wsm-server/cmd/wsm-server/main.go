@@ -11,6 +11,7 @@ import (
 	"syscall"
 
 	"wisemed-labreaders/serverlast/wsm-server/internal/config"
+	"wisemed-labreaders/serverlast/wsm-server/internal/logstore"
 	"wisemed-labreaders/serverlast/wsm-server/internal/server"
 )
 
@@ -63,10 +64,23 @@ For other configuration failures, correct the specific error reported above.`, e
 		fmt.Println("configuration valid")
 		return nil
 	}
+	store, err := logstore.New(cfg.Server.LogDir, os.Stderr)
+	if err != nil {
+		return fmt.Errorf("initialize daily logs: %w", err)
+	}
+	log.SetOutput(store)
+	defer func() { log.SetOutput(os.Stderr); _ = store.Close() }()
+	log.Printf("daily logs enabled directory=%s timezone=UTC", cfg.Server.LogDir)
+	log.Printf("wsm-server version=%s configuration=%s", buildVersion, *path)
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	svc := server.New(cfg)
+	svc.SetLogStore(store)
 	stopReload := watchReload(ctx, svc, *path)
 	defer stopReload()
-	return svc.Run(ctx)
+	err = svc.Run(ctx)
+	if err != nil {
+		log.Printf("server stopped: %v", err)
+	}
+	return err
 }

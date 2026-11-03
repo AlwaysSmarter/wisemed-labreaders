@@ -15,7 +15,7 @@ fi
 if [ ! -e output/deployments/config.yaml ]; then
   cp deployments/config.yaml output/deployments/config.yaml
 fi
-for asset in index.html app.js styles.css wss-remote.js; do
+for asset in index.html app.js styles.css wss-remote.js siui-invoice.js docmed-forms.js; do
   cp "../readersv3/modules/localhttp/ui/$asset" "output/control/$asset"
 done
 echo "Prepared output/deployments/config.yaml and output/control; existing configuration preserved."

@@ -200,6 +200,8 @@ func resultFileSchema(operation string, args map[string]string) string {
 		return "PhysicianDrugPEResponse.xsd"
 	case "processHospitalPrescription":
 		return "HospitalRegisterPEResponse.xsd"
+	case "getPrescriptionsSeriesNo":
+		return "getPrescriptionsSeriesNoResponse.xsd"
 	case "getPrescribedPrescriptionsForCid":
 		return "getPrescribedPrescriptionsForCidResponse.xsd"
 	}

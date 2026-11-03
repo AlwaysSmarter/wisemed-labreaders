@@ -99,3 +99,25 @@ test('getClientsByType accepts arbitrary exact types and returns null when absen
   }
  }finally{wsm.disconnect();}
 });
+
+test('lazy initialization calls token provider only when needed and shares connections',async()=>{
+ let tokens=0;const before=Socket.instances.length;
+ const wsm=WSMServer('wss://example',null,{autoConnect:false,autoReconnect:false,tokenProvider:async()=>{tokens++;return jwt();}});
+ await tick();assert.equal(tokens,0);assert.equal(Socket.instances.length,before);
+ const first=wsm.ping(),second=wsm.serverStatus();await tick();
+ assert.equal(tokens,1);assert.equal(Socket.instances.length,before+1);
+ let ws=Socket.instances.at(-1);ws.onopen();ws.receive({type:'hello_ack',payload:{connection_id:'lazy'}});await tick();
+ for(const request of ws.sent.slice(1))ws.answer(request,request.type==='ping'?'pong':'reply',{});
+ await Promise.all([first,second]);assert.equal(tokens,1);
+ wsm.disconnect();const again=wsm.ping();await tick();assert.equal(tokens,2);
+ ws=Socket.instances.at(-1);ws.onopen();ws.receive({type:'hello_ack',payload:{connection_id:'renewed'}});await tick();ws.answer(ws.sent.at(-1),'pong',{});await again;wsm.disconnect();
+});
+test('token provider timeout prevents late socket creation and permits a fresh attempt',async()=>{
+ let resolve,requests=0;const before=Socket.instances.length;
+ const wsm=WSMServer('wss://example',null,{autoConnect:false,autoReconnect:false,connectTimeout:5,tokenProvider:()=>{requests++;return new Promise(done=>{resolve=done;});}});
+ await assert.rejects(wsm.connect(),{code:'connect_timeout'});
+ resolve(jwt());await tick();assert.equal(Socket.instances.length,before);
+ wsm.options.tokenProvider=async()=>{requests++;return jwt();};wsm.options.connectTimeout=1000;
+ const pending=wsm.connect();await tick();const ws=Socket.instances.at(-1);ws.onopen();ws.receive({type:'hello_ack',payload:{connection_id:'retry'}});await pending;
+ assert.equal(requests,2);wsm.disconnect();
+});

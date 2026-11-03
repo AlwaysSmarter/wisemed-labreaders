@@ -555,3 +555,54 @@ func TestAdminPermissionEditing(t *testing.T) {
 		t.Fatal("rights lost on reader edit")
 	}
 }
+
+func TestAdminMultipleOrigins(t *testing.T) {
+	s, c := adminFixture(t, `{"user_type":-1,"login_token":"TOKEN-PRIVATE"}`)
+	c.Admin.PublicOrigins = []string{"https://alias.example"}
+	for _, origin := range []string{"https://admin.example", "https://alias.example"} {
+		t.Run(origin, func(t *testing.T) {
+			for _, method := range []string{"GET", "POST"} {
+				path, body := "/admin/api/tenants", ""
+				if method == "POST" {
+					path, body = "/admin/api/login", `{"tenant_id":"a","username":"operator","password":"PASSWORD-PRIVATE"}`
+				}
+				r := httptest.NewRequest(method, origin+path, strings.NewReader(body))
+				r.Header.Set("Origin", origin)
+				r.Header.Set("Content-Type", "application/json")
+				w := httptest.NewRecorder()
+				s.routes().ServeHTTP(w, r)
+				if w.Code != 200 {
+					t.Fatalf("%s: %d %s", method, w.Code, w.Body.String())
+				}
+				if method == "POST" {
+					cookie := w.Result().Cookies()[0]
+					if !cookie.Secure || cookie.Domain != "" || !cookie.HttpOnly || cookie.SameSite != http.SameSiteStrictMode {
+						t.Fatalf("cookie flags: %+v", cookie)
+					}
+				}
+			}
+		})
+	}
+	for _, tc := range []struct{ host, origin string }{
+		{"admin.example", "https://alias.example"},
+		{"alias.example", "https://admin.example"},
+		{"evil.example", "https://alias.example"},
+		{"alias.example", "https://evil.example"},
+		{"alias.example:8443", "https://alias.example"},
+	} {
+		r := httptest.NewRequest("GET", "https://"+tc.host+"/admin/api/tenants", nil)
+		r.Header.Set("Origin", tc.origin)
+		w := httptest.NewRecorder()
+		s.routes().ServeHTTP(w, r)
+		if w.Code != 403 {
+			t.Fatalf("accepted host=%s origin=%s: %d", tc.host, tc.origin, w.Code)
+		}
+	}
+	// Navigation does not send Origin; the alias still needs to serve the UI.
+	r := httptest.NewRequest("GET", "https://alias.example/admin/", nil)
+	w := httptest.NewRecorder()
+	s.routes().ServeHTTP(w, r)
+	if w.Code != 200 {
+		t.Fatalf("alias navigation: %d", w.Code)
+	}
+}

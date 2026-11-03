@@ -179,7 +179,7 @@ Nu loga/persista aceste răspunsuri sau PIN-ul trimis la `setTokenPIN`.
 `setTokenPIN({pin:'...',manual:true})` furnizează PIN temporar;
 `setTokenPIN({forget:true})` îl șterge conform regulilor bridge-ului.
 
-## Cele 40 de operații CNAS
+## Cele 63 de operații CNAS
 
 Fiecare operație are două forme echivalente:
 
@@ -234,6 +234,7 @@ Metodele sunt și sub `general`, `clinice`, `facturare`, și direct pe obiect.
 | `clinice.cancelPrescribedPrescription` | `providerCode`, `physicianStencilNo`, `contractNo`, `contractType`, `insuranceHouseCode`, `series`, `no`, `prescriptionDate`, `cancellationReason` | Da |
 | `clinice.downloadNotReportedPrescriptionsReport` | `insuranceHouseCode`, `fromDate`, `toDate`, `providerCode`, `stencilNo` | Nu |
 | `clinice.getStatusForPrescriptions` | `insuranceHouseCode`, `providerCode`, `contractNo`, `contractType`, `startFrom`, `endTo`, `workPlaceCode` | Nu |
+| `clinice.getPrescriptionsSeriesNo` | `requestXml` | Nu |
 | `clinice.getPrescribedPrescriptionsForCid` | `requestXml` | Nu |
 | `clinice.processHospitalPrescription` | `reportXml` | Da |
 | `clinice.cancelReleasedHospitalPrescription` | `providerCode`, `workplaceCode`, `insuranceHouseCode`, `series`, `no`, `fractionNo`, `cancellationReason` | Da |
@@ -251,7 +252,7 @@ Corpurile și semantica endpointurilor rămân cele din
 
 ## Așteptarea execuțiilor și idempotency
 
-`operationId` este obligatoriu pentru cele 40 de operații. Generează-l o singură
+`operationId` este obligatoriu pentru cele 63 de operații. Generează-l o singură
 dată pentru o intenție de lucru și păstrează-l pentru reconcilierea acelei intenții.
 Nu genera un ID nou la fiecare retry al unei operații cu efecte.
 
@@ -753,3 +754,9 @@ await SIUIPrescriptions.generatePrescriptionSeriesSIUI(target, generationParamet
         console.log(values); // verifică acceptarea CNAS înainte de mesajul de succes
     });
 ```
+
+PIAS 3.7.34 (20.10.2026): SIUI folosește implicit `https://siui.e-pias.ro`, iar SIPE `https://sipe.e-pias.ro`, pe HTTPS/443. Setările bridge-ului includ `docmed_base_url` și destinațiile DocMED; cele 22 de operații DocMED sunt implementate separat în `bridge.docmed` / `objWSMSIUI.docmed`. `clinice.getPrescriptionsSeriesNo(requestXml)` consultă istoricul rețetei după serie/număr.
+
+## DocMED
+
+Toate cele 22 de metode sunt accesibile prin grupul `docmed` și primesc `{requestXml}` cu XML-ul Request complet; `operationId` rămâne obligatoriu. `GetMedicalDocumentXml` caută un document după CID, dată, serie și număr; nu există listare generală. Rezultatele mici sunt în `call.result.docmed`; XML-ul complet se descarcă prin pipeline-ul existent. Pentru execuțiile `GetMedicalDocument`, `downloadDocMedAttachment(callId)` descarcă ZIP-ul în fragmente fără un nou apel CNAS. DocMED business errors produc `failed` cu mesaje structurate; scrierile ambigue rămân `unknown`, fără retry automat. Vezi `readersv3/apps/siui-bridge/docs/DocMED.md` pentru lista completă, limite și particularitățile XSD CNAS.

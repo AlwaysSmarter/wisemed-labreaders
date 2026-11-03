@@ -207,6 +207,10 @@ func (m *Module) queryHTTP(w http.ResponseWriter, r *http.Request, route string)
 			w.Header().Set("X-Catalogue-Version", id)
 		}
 	}
+	if route == "cim10" || route == "cim10/tree" {
+		m.cim10HTTP(ctx, w, r, tx, route, f, ids, meta)
+		return
+	}
 	if route == "physicians" || route == "simple-physicians" || strings.HasPrefix(route, "physicians/") {
 		m.physiciansHTTP(ctx, w, r, tx, route, f, ids, meta)
 		return

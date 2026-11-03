@@ -50,7 +50,7 @@ trimiterea validărilor cere utilizator, licență și certificatul selectat.
 Store poate fi `CurrentUser` sau `LocalMachine`. API-ul de setări nu primește PIN,
 cheie privată, fișier `.cer`, cale de fișier sau URL arbitrar pentru un apel.
 Originile personalizate se configurează local; UI permite numai originea deja
-configurată sau originile oficiale www/testsiui.siui.ro pe porturile 443/444.
+configurată sau originile oficiale siui.e-pias.ro / sipe.e-pias.ro / docmed.e-pias.ro pe HTTPS/443. Originile vechi www/sipe/testsiui/testsipe.siui.ro rămân acceptate pe 443/444 pentru compatibilitate. DocMED are o origine separată `docmed_base_url` și patru căi SOAP proprii; nu folosește `/svapntws/services`.
 
 ### HTTP/HTTPS local
 

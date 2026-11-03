@@ -10,8 +10,8 @@ function mock(handler=()=>({ok:true})) {
 }
 const root=path.resolve(__dirname,'../../../..');
 test('catalog matches all registered SOAP operations',()=>{
- const actual=JSON.parse(fs.readFileSync(path.join(root,'readersv3/modules/siui/assets/operations.json'))).map(({group,name,parameters,mutating})=>({group,name,parameters,mutating}));
- assert.deepEqual(SIUIBridge.operations,actual);assert.equal(actual.length,40);
+ const actual=[...JSON.parse(fs.readFileSync(path.join(root,'readersv3/modules/siui/assets/operations.json'))),...JSON.parse(fs.readFileSync(path.join(root,'readersv3/modules/siui/assets/docmed_operations.json')))].map(({group,name,parameters,mutating})=>({group,name,parameters,mutating}));
+ assert.deepEqual(SIUIBridge.operations,actual);assert.equal(actual.length,63);
 });
 test('catalog covers every explicit SIUI auxiliary route',()=>{
  const paths=new Set(SIUIBridge.endpoints.map(e=>e.path));
@@ -51,7 +51,7 @@ test('all named operations submit correct parameters once and wait for completio
   assert.equal(typeof bridge[op.name],'function');assert.equal(result.status,'completed');
   const request=wsm.calls.at(-2);assert.equal(request.path,'/api/siui/'+op.group+'/'+op.name);assert.deepEqual(request.options.body,{operation_id:'stable-'+op.name,parameters});
  }
- assert.equal(wsm.calls.filter(c=>c.options.method==='POST').length,40);
+ assert.equal(wsm.calls.filter(c=>c.options.method==='POST').length,63);
 });
 test('invalid operation input never submits and wait:false preserves queued state',async()=>{
  const wsm=mock(()=>({call:{id:'id',status:'queued'}}));const bridge=await SIUIBridge.create(wsm);
@@ -291,4 +291,18 @@ test('series null subUnitCode reaches WSM and downloaded file reaches caller',as
   const result=await safe.general.getPrescriptionSeriesInfo(args,{operationId:'bad-null'});
   assert.equal(result.code,'invalid_parameters');assert.equal(wsm.calls.length,before);
  }
+});
+
+test('DocMED methods and attachment projection keep routes and query on every chunk',async()=>{
+ const wsm=mock((path,opts)=>{
+  if(path.includes('/file'))return opts.query.offset===0?{offset:0,next_offset:3,eof:false,data_base64:btoa('abc')}:{offset:3,next_offset:5,eof:true,data_base64:btoa('de')};
+  if(opts.method==='POST')return {call:{id:'docmed-read',status:'queued'}};
+  return {call:{id:'docmed-read',status:'completed',result:{docmed:{attributes:{documentType:'LR'}}}}};
+ });
+ const bridge=await SIUIBridge.create(wsm,{pollInterval:1});
+ await bridge.docmed.GetMedicalDocumentXml({requestXml:'<GetMedicalDocumentXmlRequest/>'},{operationId:'old-document-check',download:false});
+ assert.equal(wsm.calls[0].path,'/api/siui/docmed/GetMedicalDocumentXml');
+ const bytes=await bridge.downloadDocMedAttachment('docmed-read');assert.equal(new TextDecoder().decode(bytes),'abcde');
+ const chunks=wsm.calls.filter(c=>c.path.endsWith('/file'));assert.equal(chunks.length,2);
+ for(const call of chunks){assert.equal(call.options.query.docmed_attachment,'true');assert.equal(call.options.query.validateXSD,'false');}
 });

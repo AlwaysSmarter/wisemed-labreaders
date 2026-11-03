@@ -26,6 +26,7 @@ type settings struct {
 	AllowInvalidServerCertificateDate                       bool
 	AllowRevokedServerCertificate                           bool
 	PEBaseURL                                               string
+	DocMedBaseURL                                           string
 	EInvoiceBaseURL                                         string
 	Profiles                                                []certificateProfile
 }

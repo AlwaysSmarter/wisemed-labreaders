@@ -217,9 +217,11 @@ licență greșită primit de la CNAS. Versiunea curentă afișează și flags/c
 callback-ul WinHTTP: certificat expirat, CA necunoscută, nume diferit, revocare sau
 Schannel. Nici sesiunea OCSP, nici licența/PIN-ul nu apar în diagnostic.
 
-Portul este explicit în formular: implicit 443; 444 este disponibil dacă endpointul
-folosit îl cere. Se persistă în `base_url` (ex. `https://www.siui.ro:444`). Schimbarea
-portului nu reprezintă o soluție generală pentru erori de certificat.
+Portul este explicit în formular, implicit 443. Specificațiile CNAS 3.7.34 din
+20.10.2026 indică `https://siui.e-pias.ro` și `https://sipe.e-pias.ro`, fără
+instrucțiunea veche de folosire a portului 444 după emitentul certificatului.
+Configurațiile explicite vechi/personalizate rămân compatibile. Schimbarea portului
+nu reprezintă o soluție generală pentru erori de certificat.
 
 La verificarea TLS directă din 3 octombrie 2026 (ora României), www.siui.ro:443
 prezenta certificatul *.siui.ro emis de certSIGN Web CA, valabil până la
@@ -261,3 +263,13 @@ Dashboardul principal prezintă încărcarea, graficele apelurilor, OCSP, endpoi
 
 Build, export în `~/dockers`, setup și update cu rollback: [ghid Docker comun](../../docker/README.md).
 Scriptul `update-siui-bridge.sh` este livrat și în `output/siui-bridge/`.
+
+
+## Actualizare CNAS din 20 octombrie 2026
+
+Originile implicite sunt SIUI `https://siui.e-pias.ro`, SIPE `https://sipe.e-pias.ro`, DocMED `https://docmed.e-pias.ro`, pe HTTPS/443. Configurația `docmed_base_url` se editează din Setări CNAS, se persistă per certificat și expune patru endpoint-uri de conectivitate. Cele 22 de operații SOAP DocMED sunt disponibile separat în Debug → DOCMED și `POST /api/siui/docmed/<operație>`; nu se redirecționează operațiile SIUI existente. Vezi [API DocMED](docs/DocMED.md), inclusiv testarea unui document vechi cu GetMedicalDocumentXml. API-ul SIPE include acum `clinice.getPrescriptionsSeriesNo` pentru istoricul rețetei după serie/număr.
+
+Vezi [auditul documentației și endpoint-urilor](../../../docs/cnas-endpoints-2026-10.md) și [API](docs/API.md). Valorile explicite existente nu sunt suprascrise la încărcare; schimbă profilul din Setări CNAS pentru migrarea unei instalări vechi.
+
+
+Formularele DocMED colectează variabile, nu XML. Tipurile de document, valorile enumerate CNAS și CAS-urile sunt liste derulante; câmpurile opționale, investigațiile repetabile și PDF/ZIP se completează din formular. Bridge-ul construiește XML-ul pe server și raportează separat erorile de validare a cererii și ale răspunsului. Vezi [DocMED](docs/DocMED.md).

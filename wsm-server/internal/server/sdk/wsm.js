@@ -19,14 +19,20 @@
   class Client {
     constructor(url, token, options = {}) {
       this.url = socketURL(url);
-      this.options = {timeout:35000, connectTimeout:10000, reconnectDelay:30000, autoReconnect:true, ...options};
+      this.options = {timeout:35000, connectTimeout:10000, reconnectDelay:30000, autoReconnect:true, autoConnect:true, ...options};
       this._token = token; this._pending = new Map(); this._generation = 0; this._stopped = false;
       this.isConnected = false; this.connectionID = ''; this.clients = [];
       this.onConnect = null; this.onDisconnect = null; this.onError = null; this.onTokenRequired = null;
       this.onEvent = null; this.onCommand = null; this.onReply = null; this.onPresence = null; this.onMessage = null;
-      this.ready = this.connect();
-      this.ready.catch(() => {}); // Also available to callers via await ready / onError.
+      this._ready = null;
+      if(this.options.autoConnect) {
+        this.ready = this.connect();
+        this.ready.catch(() => {});
+      } // Also available to callers via await ready / onError.
     }
+    // Accessing ready is itself a request to connect; construction can stay lazy.
+    get ready() { return this._ready || this.connect(); }
+    set ready(value) { this._ready = value; }
     _emit(name, value) {
       if (typeof this[name] !== 'function') return;
       try { Promise.resolve(this[name](value)).catch(e => { if(name !== 'onError') this._emit('onError', e); }); }
@@ -43,18 +49,20 @@
         this._resolveConnect = resolve; this._rejectConnect = reject;
       });
       this.ready.catch(() => {});
+      this._helloTimer = setTimeout(() => {
+        if(generation !== this._generation || !this._connecting) return;
+        this._fail(error('connect_timeout','WSM token/hello timed out.'));
+        this._ws?.close();
+      }, this.options.connectTimeout);
       Promise.resolve().then(async () => {
         let jwt = this._token;
         if (typeof this.options.tokenProvider === 'function') jwt = await this.options.tokenProvider();
-        if (generation !== this._generation || this._stopped) return;
+        if (generation !== this._generation || this._stopped || !this._connecting) return;
         const identity = claims(jwt); // Used only for hello; WSM verifies signature and permissions.
         if (identity.role !== 'browser' || !identity.client_id || !identity.exp) throw error('invalid_token', 'SDK requires a browser JWT with client_id and exp.');
         if (identity.exp * 1000 <= Date.now()) throw error('token_expired', 'Obtain a fresh JWT from WiseMED.');
         this._token = jwt; this._expires = identity.exp * 1000;
         const ws = new WebSocket(this.url, ['wsm.v1', 'wsm.jwt.' + jwt]); this._ws = ws;
-        this._helloTimer = setTimeout(() => {
-          if (generation === this._generation) { this._fail(error('connect_timeout','WSM hello timed out.')); ws.close(); }
-        }, this.options.connectTimeout);
         ws.onopen = () => {
           if (generation !== this._generation) return;
           ws.send(JSON.stringify({type:'hello',payload:{client_type:'browser',client_id:identity.client_id}}));
@@ -129,7 +137,7 @@
       if(callback) this._emit(callback,message);
     }
     async _request(type, payload = {}, target, expected = 'reply', peer, timeout, correlationID) {
-      await this.ready;
+      await (this.options.autoConnect === false ? this.connect() : this.ready);
       if(!this.isConnected) throw error('disconnected','WSM is not connected.');
       if(this._pending.size >= 256) throw error('busy','Too many outstanding requests.');
       const id = crypto.randomUUID();

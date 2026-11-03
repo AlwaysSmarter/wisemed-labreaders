@@ -415,6 +415,9 @@ func runImport(ctx context.Context, conn *pgxpool.Conn, id, typ, asOf, filename 
 	if e != nil {
 		return fmt.Errorf("drug graph: %w", e)
 	}
+	if e = buildCim10(ctx, tx, id); e != nil {
+		return fmt.Errorf("CIM10 tree: %w", e)
+	}
 	var declaredDate *string
 	if e = tx.QueryRow(ctx, `SELECT source_date::text FROM siui_data_imports WHERE id=$1`, id).Scan(&declaredDate); e != nil {
 		return e

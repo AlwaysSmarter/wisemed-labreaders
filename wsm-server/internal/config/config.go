@@ -18,6 +18,7 @@ import (
 )
 
 type Server struct {
+	LogDir                  string `yaml:"log_dir"`
 	ControlUIDir            string `yaml:"control_ui_dir"`
 	Address                 string `yaml:"address"`
 	Port                    int    `yaml:"port"`
@@ -73,12 +74,14 @@ type Tenant struct {
 	WiseMed        WiseMed  `yaml:"wisemed"`
 }
 type Config struct {
-	Admin       Admin             `yaml:"admin"`
-	Devices     map[string]Device `yaml:"-"`
-	Server      Server            `yaml:"server"`
-	Security    Security          `yaml:"security"`
-	Tenants     map[string]Tenant `yaml:"tenants"`
-	Certificate *tls.Certificate  `yaml:"-"`
+	ManagedTenants map[string]TenantSettings `yaml:"-"`
+	Browsers       map[string]Browser        `yaml:"-"`
+	Admin          Admin                     `yaml:"admin"`
+	Devices        map[string]Device         `yaml:"-"`
+	Server         Server                    `yaml:"server"`
+	Security       Security                  `yaml:"security"`
+	Tenants        map[string]Tenant         `yaml:"tenants"`
+	Certificate    *tls.Certificate          `yaml:"-"`
 }
 
 var identifier = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$`)
@@ -196,6 +199,16 @@ func (c *Config) Prepare(base string) error {
 	if err := c.prepareAdmin(base); err != nil {
 		return err
 	}
+	if s.LogDir == "" {
+		if c.Security.DeviceKeysFile != "" {
+			s.LogDir = filepath.Join(filepath.Dir(c.Security.DeviceKeysFile), "logs")
+		} else {
+			s.LogDir = resolve(base, "../logs")
+		}
+	} else {
+		s.LogDir = resolve(base, s.LogDir)
+	}
+
 	if len(c.Tenants) == 0 || len(c.Security.Keys) == 0 {
 		return errors.New("at least one tenant and key are required")
 	}
@@ -214,7 +227,10 @@ func (c *Config) Prepare(base string) error {
 			if e != nil || u.Scheme != "https" || u.Host == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" {
 				return fmt.Errorf("tenant %s: WiseMED URL must be HTTPS without credentials/query/fragment", id)
 			}
-			secret, e := readSecret(base, t.WiseMed.APIKeyFile, t.WiseMed.APIKeyRef)
+			secret := t.WiseMed.APIKey
+			if override := c.ManagedTenants[id]; override.APIKey == nil {
+				secret, e = readSecret(base, t.WiseMed.APIKeyFile, t.WiseMed.APIKeyRef)
+			}
 			if e != nil {
 				return fmt.Errorf("tenant %s WiseMED credential: %w", id, e)
 			}
@@ -250,7 +266,9 @@ func (c *Config) Prepare(base string) error {
 		}
 		secret := k.Secret
 		var e error
-		if _, generated := c.Devices[kid]; !generated {
+		_, device := c.Devices[kid]
+		_, browser := c.Browsers[kid]
+		if !device && !browser {
 			secret, e = readSecret(base, k.SecretFile, k.SecretEnv)
 		}
 		if e != nil {

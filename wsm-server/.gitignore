@@ -11,3 +11,9 @@
 /output/control/
 /output/state/
 /deployments/device-keys.yaml
+
+/logs/
+/output/logs/
+
+/deployments/logs/
+/output/deployments/logs/

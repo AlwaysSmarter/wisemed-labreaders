@@ -817,6 +817,22 @@
     "label": "Stare rețete"
   },
   {
+    "name": "getPrescriptionsSeriesNo",
+    "group": "clinice",
+    "service": "EPrescriptionWS",
+    "namespace": "http://processPrescription.webservices.utils.svapnt.siveco.ro",
+    "style": "rpc",
+    "parameters": [
+      {
+        "name": "requestXml",
+        "type": "string"
+      }
+    ],
+    "mutating": false,
+    "download": false,
+    "label": "Istoric rețetă după serie și număr"
+  },
+  {
     "name": "getPrescribedPrescriptionsForCid",
     "group": "clinice",
     "service": "EPrescriptionWS",

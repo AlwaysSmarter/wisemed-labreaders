@@ -4,7 +4,7 @@
 
 Setări → CNAS este exclusiv pentru utilitarul `siui-bridge`. Introdu codul fiscal (numai cifre), alege codul CAS din nomenclator și completează seria de licență. Utilizatorul CNAS se formează automat: `7991962_CAS-DJ`. Sunt incluse cele 45 de coduri InsuranceHouse din nomenclatorul furnizat `NomenclatoareClinice_20261001.xml`, inclusiv AOPSNAJ și MLPTL. Lista este un snapshot al acestui fișier, nu o interogare live CNAS.
 
-Selectează CurrentUser/LocalMachine și certificatul/tokenul USB. Pentru fiecare pereche magazin + amprentă se păstrează adresa SIUI, portul (inclus în URL), adresa PE și excepția pentru valabilitatea certificatului serverului. La schimbarea certificatului, formularul încarcă profilul salvat; un certificat nou pornește cu adresele oficiale. Apasă Salvează înainte de executarea operațiilor.
+Selectează CurrentUser/LocalMachine și certificatul/tokenul USB. Pentru fiecare pereche magazin + amprentă se păstrează adresa SIUI, portul (inclus în URL), adresa PE, adresa DocMED și excepția pentru valabilitatea certificatului serverului. La schimbarea certificatului, formularul încarcă profilul salvat; un certificat nou pornește cu adresele oficiale. Apasă Salvează înainte de executarea operațiilor.
 
 Configurația este în `deployments/config.yaml`, secțiunea `modules.siui`. `username` vechi rămâne compatibil; câmpurile `fiscal_code` și `cas_code` au prioritate când sunt ambele completate. Configurația veche creează automat profilul certificatului activ. O licență goală la salvare păstrează valoarea existentă. GET întoarce numai starea și indiciul primele/ultimele 3 caractere. Nu se exportă cheia sau certificatul tokenului în CER.
 
@@ -17,14 +17,15 @@ modules:
     licence: "LICENTA_CNАS"
     certificate_store: CurrentUser
     certificate_thumbprint: "AMPRENTA_SHA1_40_HEX"
-    base_url: https://www.siui.ro
-    pe_base_url: https://sipe.siui.ro
+    base_url: https://siui.e-pias.ro
+    pe_base_url: https://sipe.e-pias.ro
+    docmed_base_url: https://docmed.e-pias.ro
     allow_invalid_server_certificate_date: false
     database: ./siui-jobs.db
     certificate_profiles: [] # gestionat la salvarea din Setări
 ```
 
-`base_url` trebuie să fie o origine HTTPS fără cale/query. Portul poate fi 443 sau 444, conform configurației CNAS. Originile personalizate se configurează local, nu pot fi injectate arbitrar prin API. Excepția TLS opțională ignoră doar perioada de valabilitate a certificatului serverului; numele, CA și utilizarea certificatului rămân verificate. Certificatul tokenului trebuie să fie valid. PE utilizează separat `https://sipe.siui.ro/svapntws/services/EPrescriptionWS`; OCSP utilizează originea SIUI și `/OCSP/validator`.
+`base_url` trebuie să fie o origine HTTPS fără cale/query. Adresele noi e-pias.ro folosesc implicit HTTPS/443. Documentația CNAS din 20.10.2026 nu mai indică portul dedicat 444 pentru AlfaSign/CertDigital. Porturile explicite din configurațiile locale sunt păstrate; nu se schimbă portul automat după emitentul certificatului. Originile personalizate se configurează local, nu pot fi injectate arbitrar prin API. Excepția TLS opțională ignoră doar perioada de valabilitate a certificatului serverului; numele, CA și utilizarea certificatului rămân verificate. Certificatul tokenului trebuie să fie valid. PE utilizează separat `https://sipe.e-pias.ro/svapntws/services/EPrescriptionWS`; OCSP utilizează originea SIUI și `/OCSP/validator`.
 
 Setări → Server și actualizări păstrează serviciul, HTTP/HTTPS, logurile și actualizările. Secțiunile Comunicare analizor și Rezultate și WiseMED sunt ascunse numai pentru SIUI Bridge. Funcțiile comune de autentificare WiseMED și WSM rămân active.
 
@@ -47,7 +48,7 @@ Sesiunea OCSP CNAS este separată de JWT-ul API. Operațiile obțin automat o se
 ## WSM
 
 Pentru pagini WiseMED există wrapperul `SIUIBridge(objWSM, options)`, servit de WSM
-la `/sdk/siui-bridge.js`. Acoperă toate cele 40 de operații CNAS și endpointurile
+la `/sdk/siui-bridge.js`. Acoperă toate cele 63 de operații CNAS și endpointurile
 auxiliare, inclusiv polling, descărcări fragmentate și anularea așteptării locale.
 [Integrare și inventarul metodelor](../../../../wsm-server/docs/siui-browser-wrapper.md).
 
@@ -745,7 +746,8 @@ Operație SIUI pentru rețete, distinctă de processPrescribedPrescription din P
 - `GET /api/siui/openapi.json`: document OpenAPI 3.0.3 generat din același catalog.
 - `GET /api/siui/status`: platformă, configurare și număr de lucrări active.
 - `GET /api/siui/settings`: administrator; configurare cu licență mascată și profiluri.
-- `PUT /api/siui/settings`: administrator; `fiscal_code`, `cas_code`, `licence` (opțional), `certificate_store`, `certificate_thumbprint`, `base_url`, `pe_base_url`, `allow_invalid_server_certificate_date`. Transmite configurația completă a profilului selectat. Salvarea fără token este permisă pentru pregătire pe Mac; selectarea unui certificat nou este validată în magazinul de certificate al platformei.
+- `PUT /api/siui/settings`: administrator; `fiscal_code`, `cas_code`, `licence` (opțional), `certificate_store`, `certificate_thumbprint`, `base_url`, `pe_base_url`, `einvoice_base_url`, `docmed_base_url`, `allow_invalid_server_certificate_date`. Transmite configurația completă a profilului selectat. Salvarea fără token este permisă pentru pregătire pe Mac; selectarea unui certificat nou este validată în magazinul de certificate al platformei.
+  Adresele noi `siui.e-pias.ro`, `sipe.e-pias.ro` și `docmed.e-pias.ro` sunt acceptate implicit pe HTTPS/443. Pentru compatibilitate, `www.siui.ro`, `sipe.siui.ro`, `testsiui.siui.ro` și `testsipe.siui.ro` rămân acceptate pe 443/444. Alte adrese se configurează local în `config.yaml`.
 - `GET /api/siui/certificates?store=CurrentUser`: administrator; inventarul tokenurilor/certificatelor. `LocalMachine` este alternativa.
 - Vechile rute `/insured`, `/ocsp-test`, `/personalization`, `/validations` rămân pentru compatibilitate. `/validations` rămâne PARA; noul `/general/validateReport` suportă CLIN și PARA. `/ocsp-test` nu divulgă tokenul, `/general/ocsp` îl întoarce administratorului.
 
@@ -981,7 +983,7 @@ nu sunt rescrise.
 
 ## Callback persistent către WiseMED: callwmapi
 
-Toate cele 40 de operații asincrone din catalog (general, clinice, facturare)
+Toate cele 63 de operații asincrone din catalog (general, clinice, facturare)
 acceptă opțional callwmapi, prin HTTP/JWT sau WSM api.request, inclusiv pentru
 utilizatori obișnuiți autentificați. WiseMED verifică drepturile de scriere.
 Restricțiile operației CNAS inițiale rămân aplicabile.
@@ -1372,7 +1374,7 @@ Toți parametrii se trimit ca șiruri JSON, cu excepția parametrilor declarați
 - Preluare/anulare prescriere: `clinice.getPrescribedPrescription` / `clinice.cancelPrescribedPrescription`.
 - Eliberare la farmacie: `clinice.processIssuedPrescription`, `clinice.getReleasedPrescription`, `clinice.cancelReleasedPrescription`. „Issued/released” desemnează eliberarea, nu prescrierea de către medic.
 - Spitalizare: `clinice.processHospitalPrescription`, `clinice.getReleasedHospitalPrescription`, `clinice.cancelReleasedHospitalPrescription`.
-- Consultare/rapoarte: `clinice.getStatusForPrescriptions`, `clinice.getPrescribedPrescriptionsForCid`, `clinice.downloadNotReportedPrescriptionsReport`; `clinice.updateInvoices` actualizează facturile în serviciul PE.
+- Consultare/rapoarte: `clinice.getStatusForPrescriptions`, `clinice.getPrescribedPrescriptionsForCid`, `clinice.getPrescriptionsSeriesNo` (istoric după serie/număr, parametrul `requestXml`), `clinice.downloadNotReportedPrescriptionsReport`; `clinice.updateInvoices` actualizează facturile în serviciul PE.
 - Prescripții SIUI clasice: `clinice.getPrescription` și `clinice.validatePrescription` (distincte de PE).
 
 ### Online și offline
@@ -1407,3 +1409,28 @@ await SIUIPrescriptions.generatePrescriptionSeriesSIUI(target, generationParamet
         console.log(values); // verifică acceptarea CNAS înainte de mesajul de succes
     });
 ```
+
+
+## Adrese PIAS 3.7.34 și configurație DocMED 1.0 (20.10.2026)
+
+Producție: SIUI și OCSP pe `https://siui.e-pias.ro`, SIPE pe `https://sipe.e-pias.ro`. eFactura utilizează `einvoice_base_url`, implicit originea SIUI. Mediile de test rămân `https://testsiui.siui.ro` și `https://testsipe.siui.ro`. CEAS continuă prin eCard.SDK la `tcp://umceas.siui.ro:443` / `tcp://testumceas.siui.ro:443`; nu este serviciu SOAP al bridge-ului.
+
+`docmed_base_url` este o origine HTTPS separată, implicit `https://docmed.e-pias.ro`, editabilă prin Setări CNAS și GET/PUT settings, salvată și în profilul certificatului. Absența câmpului într-un PUT păstrează valoarea curentă. GET întoarce și `docmed_endpoints`:
+
+| Serviciu DocMED | Cale SOAP |
+| --- | --- |
+| DocMedService | `/loader/ws` |
+| DocumentSeries | `/seq/ws` |
+| MedicalDocumentDownloader | `/download/ws` |
+| DocStatusChangerService | `/status/ws` |
+
+Aceste destinații apar în diagnosticul de conectivitate HTTPS. Configurarea și un răspuns HEAD nu confirmă trimiterea/validarea unui formular. Cele 22 de metode DocMED sunt implementate separat în grupul `docmed`, la `POST /api/siui/docmed/<operație>`, cu contracte SOAP document/literal și XSD-uri proprii. Vezi [DocMED — API și testarea documentelor vechi](DocMED.md). Nu se redirecționează metodele SIUI vechi către DocMED.
+
+DocMED folosește aceleași certificate și credențiale, cu OCSP la originea SIUI (`/OCSP/validator`). WSDL-urile SIUI/SIPE noi păstrează operațiile existente și adaugă `EPrescriptionWS.getPrescriptionsSeriesNo`; nu documentează mutarea generală a SIUI în DocMED. Noile adrese nu garantează retragerea tehnică a listenerelor vechi 444; nu se testează autentificarea reală la modificarea configurației.
+
+Auditul complet și sursele sunt în `docs/cnas-endpoints-2026-10.md`.
+
+
+## Operații DocMED
+
+Debug → DOCMED și SDK-ul `objWSMSIUI.docmed` oferă toate cele 22 de metode. Interfața oferă formulare cu liste de valori, fără XML manual. Cererea folosește `fields`, iar bridge-ul construiește și validează XML-ul. API-ul avansat `parameters.requestXml` rămâne compatibil. Răspunsurile sunt validate XSD și stocate ca fișiere descărcabile. Erorile de business păstrează codurile CNAS. DocMED nu are o metodă de listare a tuturor documentelor. Pentru un document vechi cunoscut, începe cu `GetMedicalDocumentXml` (CID, dată, serie, număr). Detalii, toate rutele și exemplele sunt în [DocMED](DocMED.md).

@@ -59,3 +59,20 @@ test('history rejects invalid commands and survives unavailable or corrupt stora
  const corrupted=new CommandHistory({getItem:()=>'{bad json'},'key');assert.deepEqual(corrupted.entries,[]);
  const filtered=new CommandHistory({getItem:()=>JSON.stringify(['help',null,'unrecognized secret'])},'key');assert.deepEqual(filtered.entries,['help']);
 });
+
+test('browser provisioning and tenant commands keep secrets out of command history',()=>{
+ assert.deepEqual(parseCommand('browsers'),{command:'browsers'});
+ assert.deepEqual(parseCommand('browser add wisemed-web https://php.example:8443'),{command:'browser',action:'add',key_id:'wisemed-web',origin:'https://php.example:8443'});
+ assert.deepEqual(parseCommand('browser edit wisemed-web https://other.example'),{command:'browser',action:'edit',key_id:'wisemed-web',origin:'https://other.example'});
+ for(const action of ['key','rotate','delete','rights'])assert.deepEqual(parseCommand(`browser ${action} web`),{command:'browser',action,key_id:'web'});
+ assert.deepEqual(parseCommand('tenant edit'),{command:'tenant',action:'edit'});
+ assert.deepEqual(parseCommand('origin delete https://php.example'),{command:'origin',action:'delete',origin:'https://php.example'});
+ for(const command of ['tenant key SECRET','browser add web http://php.example','browser add web https://php.example/path','browser add web https://user:password@php.example','browser add web https://php.example?','browser rotate web SECRET','origin add https://php.example/#x'])assert.throws(()=>parseCommand(command));
+});
+test('daily log commands accept dates and reject paths or invalid dates',()=>{
+ assert.deepEqual(parseCommand('logs'),{command:'logs',action:'show',date:''});
+ assert.deepEqual(parseCommand('logs live'),{command:'logs',action:'live',date:''});
+ assert.deepEqual(parseCommand('logs 2026-10-28'),{command:'logs',action:'show',date:'2026-10-28'});
+ assert.deepEqual(parseCommand('logs live 2026-10-27'),{command:'logs',action:'live',date:'2026-10-27'});
+ for(const command of ['logs ../../secret','logs 2026-02-31','logs stop today','logs dates 2026-10-28'])assert.throws(()=>parseCommand(command));
+});

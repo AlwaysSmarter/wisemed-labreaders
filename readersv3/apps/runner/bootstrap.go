@@ -136,7 +136,9 @@ func ensureBootstrap(cfg *config.Config, reconfigure bool) (bool, error) {
 
 	if cfg.Analyzer.Protocol == "siui" && reconfigure {
 		section := cfg.ModuleSettings("siui")
-		promptString(reader, "CNAS base URL", section, "base_url", "https://www.siui.ro")
+		promptString(reader, "CNAS base URL", section, "base_url", "https://siui.e-pias.ro")
+		promptString(reader, "SIPE base URL", section, "pe_base_url", "https://sipe.e-pias.ro")
+		promptString(reader, "DocMed base URL", section, "docmed_base_url", "https://docmed.e-pias.ro")
 		promptString(reader, "CNAS username", section, "username", "")
 		fmt.Println("Licența CNAS se introduce în interfața web: Setări → CNAS - validare 72h.")
 		promptString(reader, "Certificate store (CurrentUser/LocalMachine)", section, "certificate_store", "CurrentUser")

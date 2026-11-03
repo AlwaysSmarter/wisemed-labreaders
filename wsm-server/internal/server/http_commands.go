@@ -24,7 +24,7 @@ func (s *Server) commandHTTP(w http.ResponseWriter, r *http.Request) {
 	claims, err := authenticate(cfg, r, false)
 	s.gate.RUnlock()
 	if err != nil {
-		writeAuthFailure(w, err)
+		writeAuthFailure(w, err, r)
 		return
 	}
 	if (claims.Role != "service" && claims.Role != "browser") || !allowedOrigin(r, cfg.Tenants[claims.TenantID]) {

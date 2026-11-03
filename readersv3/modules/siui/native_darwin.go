@@ -201,10 +201,7 @@ func (n nativeBackend) Do(ctx context.Context, method, raw string, headers http.
 		return 0, nil, nil, fmt.Errorf("macOS CNAS request failed: %w", err)
 	}
 	defer response.Body.Close()
-	limit := maxData
-	if method == http.MethodGet && !strings.HasPrefix(request.URL.Path, "/OCSP/") {
-		limit = maxDownload
-	}
+	limit := cnasResponseLimit(method, raw)
 	data, err := io.ReadAll(io.LimitReader(response.Body, int64(limit)+1))
 	if err != nil {
 		return 0, nil, nil, err

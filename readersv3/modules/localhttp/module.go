@@ -228,6 +228,7 @@ func (m *Module) Init(rt module.Runtime) error {
 	m.rt.Handle("/operations", m.withNoCache(http.HandlerFunc(m.handleIndex)))
 	m.rt.Handle("/debug", m.withNoCache(http.HandlerFunc(m.handleIndex)))
 	m.rt.Handle("/wss-remote.js", m.withNoCache(http.HandlerFunc(m.handleStaticAsset("ui/wss-remote.js", "application/javascript; charset=utf-8"))))
+	m.rt.Handle("/docmed-forms.js", m.withNoCache(http.HandlerFunc(m.handleStaticAsset("ui/docmed-forms.js", "application/javascript; charset=utf-8"))))
 	m.rt.Handle("/siui-invoice.js", m.withNoCache(http.HandlerFunc(m.handleStaticAsset("ui/siui-invoice.js", "application/javascript; charset=utf-8"))))
 	m.rt.Handle("/app.js", m.withNoCache(http.HandlerFunc(m.handleStaticAsset("ui/app.js", "application/javascript; charset=utf-8"))))
 	m.rt.Handle("/styles.css", m.withNoCache(http.HandlerFunc(m.handleStaticAsset("ui/styles.css", "text/css; charset=utf-8"))))

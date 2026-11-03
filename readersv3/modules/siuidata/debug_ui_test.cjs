@@ -92,3 +92,17 @@ test('All text search variants follow services, physicians, targeted and raw rec
   const params=e.run('endpointParameters()');for(const field of fields){assert.ok(params.includes(field+'All'),route+' '+field);assert.ok(e.run(`parameterDescription('${field}All')`).includes('(AND)'));}
  }
 });
+
+test('CIM10 explorer exposes tree navigation, required fragments and separate flags',()=>{
+ const e=explorer();
+ for(const route of ['cim10','cim10/tree']){
+  e.run(`$('endpoint').value=String(endpoints.findIndex(e=>e[1]==='${route}'));choose()`);
+  const fields=e.run('endpointParameters()');
+  for(const field of ['name','nameAll','qAll','parentCode','roots','entityLevel','isDagger','isAsterisk','isNormal','isInjury','isExternalCause','isSequela','flagStatus','limit','start'])assert.ok(fields.includes(field));
+  assert.ok(e.run("parameterDescription('parentCode')").includes('copiii direcți'));
+  assert.ok(e.run("parameterDescription('isDagger')").includes('dagger'));
+  e.run(`$('query').replaceChildren();addRow('nameAll','["tulburare","somatoforma"]');addRow('isDagger','true');preview()`);
+  const url=new URL(e.elements.get('request-url').textContent);
+  assert.equal(url.pathname,'/api/siui-data/'+route);assert.deepEqual(url.searchParams.getAll('nameAll[]'),['tulburare','somatoforma']);assert.equal(url.searchParams.get('isDagger'),'true');
+ }
+});

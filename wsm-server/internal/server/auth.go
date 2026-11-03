@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"slices"
 	"strings"
 	"time"
@@ -38,15 +39,27 @@ func (e *authFailure) Error() string { return e.Code + ": " + e.Message }
 func authDenied(code, message string) error {
 	return &authFailure{Code: "wsm_" + code, Message: message}
 }
-func writeAuthFailure(w http.ResponseWriter, err error) {
+func writeAuthFailure(w http.ResponseWriter, err error, r *http.Request) {
 	failure := &authFailure{Code: "wsm_invalid_credentials", Message: "Autentificare WSM refuzată. Verifică cheia/tokenul sau tichetul de control; pentru chei de echipament folosește key <equipment-id> în consola WSM."}
 	var detail *authFailure
 	if errors.As(err, &detail) {
 		failure = detail
 	}
-	log.Printf("WSS authentication rejected: %s", failure)
+	log.Printf("WSS authentication rejected peer=%q origin=%q: %s", r.RemoteAddr, diagnosticOrigin(r), failure)
 	w.Header().Set("Cache-Control", "no-store")
 	writeJSON(w, http.StatusUnauthorized, map[string]string{"error": failure.Code, "message": failure.Message})
+}
+
+func diagnosticOrigin(r *http.Request) string {
+	origin := r.Header.Get("Origin")
+	if origin == "" {
+		return ""
+	}
+	u, err := url.Parse(origin)
+	if err != nil || len(origin) > 512 || u.Host == "" || u.User != nil || u.Path != "" || u.RawQuery != "" || u.ForceQuery || u.Fragment != "" {
+		return "<invalid>"
+	}
+	return origin
 }
 
 func authenticate(cfg *config.Config, r *http.Request, queryAllowed bool) (*AuthClaims, error) {

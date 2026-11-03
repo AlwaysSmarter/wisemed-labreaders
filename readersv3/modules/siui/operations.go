@@ -19,22 +19,29 @@ type Parameter struct {
 	Nullable bool   `json:"nullable,omitempty"`
 }
 type Operation struct {
-	Label      string      `json:"label"`
-	Name       string      `json:"name"`
-	Group      string      `json:"group"`
-	Service    string      `json:"service"`
-	Namespace  string      `json:"namespace"`
-	Style      string      `json:"style"`
-	Parameters []Parameter `json:"parameters"`
-	Mutating   bool        `json:"mutating"`
-	Download   bool        `json:"download"`
+	Form            *docMedFormNode `json:"form,omitempty"`
+	RequestExample  string          `json:"request_example,omitempty"`
+	RequestElement  string          `json:"request_element,omitempty"`
+	ResponseElement string          `json:"response_element,omitempty"`
+	RequestSchema   string          `json:"request_schema,omitempty"`
+	ResponseSchema  string          `json:"response_schema,omitempty"`
+	EndpointPath    string          `json:"endpoint_path,omitempty"`
+	Label           string          `json:"label"`
+	Name            string          `json:"name"`
+	Group           string          `json:"group"`
+	Service         string          `json:"service"`
+	Namespace       string          `json:"namespace"`
+	Style           string          `json:"style"`
+	Parameters      []Parameter     `json:"parameters"`
+	Mutating        bool            `json:"mutating"`
+	Download        bool            `json:"download"`
 }
 
 func operations() []Operation {
 	b, _ := assets.ReadFile("assets/operations.json")
 	var out []Operation
 	_ = json.Unmarshal(b, &out)
-	return out
+	return append(out, docMedOperations()...)
 }
 func findOperation(group, name string) (Operation, bool) {
 	for _, op := range operations() {
@@ -64,8 +71,12 @@ func validateParameters(op Operation, args map[string]string, nullParameters ...
 		if !ok {
 			return fmt.Errorf("missing parameter %s", p.Name)
 		}
-		if len(v) > maxData {
-			return fmt.Errorf("parameter %s exceeds 1 MiB", p.Name)
+		limit := maxData
+		if op.Group == "docmed" {
+			limit = docMedXMLLimit
+		}
+		if len(v) > limit {
+			return fmt.Errorf("parameter %s exceeds %d bytes", p.Name, limit)
 		}
 		switch p.Type {
 		case "dateTime":
@@ -88,9 +99,18 @@ func validateParameters(op Operation, args map[string]string, nullParameters ...
 			}
 		}
 		if strings.HasSuffix(strings.ToLower(p.Name), "xml") {
-			if _, err := parseXML([]byte(v)); err != nil {
+			if _, err := parseXMLLimit([]byte(v), limit); err != nil {
 				return fmt.Errorf("%s: %w", p.Name, err)
 			}
+		}
+	}
+	if op.Group == "docmed" {
+		root, err := parseXMLLimit([]byte(args["requestXml"]), docMedXMLLimit)
+		if err != nil {
+			return err
+		}
+		if root.XMLName.Local != op.RequestElement || root.XMLName.Space != docMedNS {
+			return fmt.Errorf("expected %s in namespace %s", op.RequestElement, docMedNS)
 		}
 	}
 	if op.Name == "validateReport" {
@@ -230,6 +250,8 @@ func operationSchema(op Operation, args map[string]string) string {
 		return "PhysicianDrugPERequest.xsd"
 	case "processHospitalPrescription":
 		return "HospitalRegisterPERequest.xsd"
+	case "getPrescriptionsSeriesNo":
+		return "getPrescriptionsSeriesNoRequest.xsd"
 	case "getPrescribedPrescriptionsForCid":
 		return "getPrescribedPrescriptionsForCidRequest.xsd"
 	case "validateSickLeave":
@@ -238,6 +260,9 @@ func operationSchema(op Operation, args map[string]string) string {
 	return ""
 }
 func (c *client) invokeOperation(ctx context.Context, op Operation, args map[string]string, nullParameters ...string) (values []string, submitted bool, err error) {
+	if op.Group == "docmed" {
+		return c.invokeDocMed(ctx, op, args, nullParameters...)
+	}
 	address := ""
 	defer func() { err = withConnectionError(address, err) }()
 	if err = validateParameters(op, args, nullParameters...); err != nil {
@@ -322,6 +347,12 @@ func xmlParameter(args map[string]string) string {
 }
 
 func (s settings) serviceBaseURL(service string) string {
+	if _, ok := s.docMedEndpoints()[service]; ok {
+		if s.DocMedBaseURL != "" {
+			return s.DocMedBaseURL
+		}
+		return DefaultDocMedBaseURL
+	}
 	if service == "EPrescriptionWS" {
 		return s.PEBaseURL
 	}

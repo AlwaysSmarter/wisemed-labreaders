@@ -123,7 +123,7 @@ func connectPostgres(ctx context.Context, c settings) (*pgxpool.Pool, error) {
 	return p, nil
 }
 
-const latestSchemaVersion = 4
+const latestSchemaVersion = 5
 
 func readSchemaVersion(ctx context.Context, q interface {
 	QueryRow(context.Context, string, ...any) pgx.Row
@@ -162,12 +162,17 @@ func ensurePostgresSchema(ctx context.Context, p *pgxpool.Pool) error {
 	}
 	// Completed migrations must not be replayed: older versions temporarily
 	// restrict catalogue_type and cannot validate newer imports such as PHYS.
-	for i, migration := range []string{schema, drugSchema, physicianSchema, clientSchema} {
+	for i, migration := range []string{schema, drugSchema, physicianSchema, clientSchema, cim10Schema} {
 		if i+1 <= version {
 			continue
 		}
 		if _, e = tx.Exec(ctx, migration); e != nil {
 			return fmt.Errorf("migrate SIUI schema to version %d: %w", i+1, e)
+		}
+	}
+	if version < 5 {
+		if e = backfillCim10(ctx, tx); e != nil {
+			return fmt.Errorf("migrate CIM10 hierarchy: %w", e)
 		}
 	}
 	return tx.Commit(ctx)

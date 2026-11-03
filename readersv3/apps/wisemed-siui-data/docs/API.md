@@ -420,3 +420,80 @@ Validare pe exemplele furnizate: CLIN (1 contract și 1 convenție, 27 angajați
 Medicamentele din nomenclatoarele clinice sunt importate împreună cu serviciile: `drugs?type=CLIN` și `simple-drugs?type=CLIN`. Nu este necesară o versiune PHM pentru a le interoga. Dashboardul afișează și numărul medicamentelor active în cardurile CLIN/PARA; `simple-drugs` din Explorator API pornește cu sursa CLIN, fără filtrul implicit `isSpecial=true`. Sursa PHM rămâne selectabilă explicit. Prefixul local `NomenclatoarePHM_YYYYMMDD.xml` este acceptat ca alias al `NomenclatoareFarmacii_YYYYMMDD.xml`.
 
 Validarea strictă a înregistrărilor `Physician`/`PhysicianSpeciality` se aplică numai exportului PHYS (`getPhysicianCatalogues`). În CLIN/PHM, înregistrările auxiliare incomplete ale medicilor se păstrează în sursă fără să blocheze importul medicamentelor.
+
+
+## CIM10: diagnostice și ierarhie
+
+`GET /api/siui-data/cim10` returnează o listă de obiecte simple `{code, name}`. `GET /api/siui-data/cim10/tree` returnează potrivirile și toți strămoșii lor într-un arbore de obiecte `{code, name, children}`. Frații și celelalte ramuri care nu corespund căutării nu sunt adăugate. Un strămoș necesar apare chiar dacă nu satisface filtrul de nume sau indicatori.
+
+`code` păstrează **identificatorul complet SIUI**, de exemplu `5_111_F45.1`, nu doar `F45.1`. Pentru navigare, trimite codul primit ca `parentCode` și vei primi numai copiii direcți; pentru rădăcini folosește `roots=true`.
+
+La import, proiecția PostgreSQL `siui_data_cim10` păstrează separat denumirea curățată, indicatorii nullable, valorile lor originale, `entityLevel`, părintele și calea până la nod. Denumirea originală rămâne disponibilă intern în `raw_name`, iar arhiva și înregistrările brute nu sunt rescrise. Sufixul cu șase indicatori este extras din dreapta, păstrând virgulele care fac parte din denumire. Ghilimelele reziduale de la granița denumire–indicatori sunt eliminate din denumirea curățată. Indicatorii lipsă sau trunchiați rămân necunoscuți, nu devin `false`.
+
+Semnificația indicatorilor este interpretarea dedusă din exportul CNAS; XSD-ul nu definește oficial pozițiile. `-1` este păstrat ca `true`, `0` ca `false`, iar valoarea lipsă sau `-` ca `null`. Denumirile afișate primesc sufixul ` +` pentru dagger, respectiv ` *` pentru asterisc, pe baza indicatorului sau a simbolului explicit din cod. Referințele din text, precum `(G55.1*)`, sunt păstrate.
+
+| Parametru | Semnificație |
+|---|---|
+| `type` / `partnerCategory` | O singură sursă deja importată; implicit CLIN. Datele rămân în versiunea sursei. |
+| `name`, `q` | Fragment din **denumirea curățată**, fără diferențe de majuscule sau diacritice. Array = OR. |
+| `nameAll`, `qAll` | Toate fragmentele în aceeași denumire, indiferent de ordine. Array = AND. |
+| `code` | Identificator complet exact, string sau array. |
+| `parentCode` | Numai copiii direcți ai părintelui/părinților indicați. |
+| `roots` | Un boolean: `true` pentru rădăcini, `false` pentru noduri cu părinte prezent. |
+| `entityLevel` | Nivel XML, uzual 0 capitol, 1 grupă, 2 diagnostic. String sau array. |
+| `isNormal` | Indicatorul 1: cod obișnuit. |
+| `isDagger` | Indicatorul 2: etiologie / dagger. |
+| `isAsterisk` | Indicatorul 3: manifestare / asterisc. |
+| `isInjury` | Indicatorul 4: leziuni, otrăviri și alte consecințe ale cauzelor externe. |
+| `isExternalCause` | Indicatorul 5: cauze externe și coduri complementare. |
+| `isSequela` | Indicatorul 6: sechele. |
+| `flagStatus` | `complete`, `incomplete` sau `absent`; string sau array. |
+| `limit`, `start` | Paginare în potriviri: implicit 50, maximum 1000; start implicit 0. |
+
+Indicatorii acceptă `true` / `false` sau array de booleeni ca string-uri. Un filtru `isSequela=false` exclude valorile necunoscute. Filtrele diferite se combină prin AND, array-urile obișnuite prin OR. Parametrii necunoscuți sunt respinși cu HTTP 400.
+
+În ambele endpointuri, `totalCount` numără potrivirile înaintea paginării. **În `tree`, `limit` și `start` se aplică potrivirilor, apoi sunt adăugați părinții**, care pot crește numărul de noduri peste `limit`. `rows` conține rădăcinile arborelui rezultat; `nodeCount` numără toate nodurile returnate, iar `pagination: "matches"` explică această convenție. Părinții comuni sunt returnați o singură dată.
+
+```http
+GET /api/siui-data/cim10?nameAll[]=tulburare&nameAll[]=somatoforma&limit=50&start=0
+GET /api/siui-data/cim10?isDagger=true
+GET /api/siui-data/cim10?flagStatus=incomplete
+GET /api/siui-data/cim10?roots=true
+GET /api/siui-data/cim10?parentCode=5
+GET /api/siui-data/cim10?parentCode=5_111
+GET /api/siui-data/cim10/tree?name=nediferentiata&isNormal=true
+```
+
+Exemplu de răspuns pentru ultima căutare:
+
+```json
+{
+  "success": true,
+  "totalCount": 1,
+  "rows": [
+    {
+      "code": "5",
+      "name": "Tulburari mentale si de comportament",
+      "children": [
+        {
+          "code": "5_111",
+          "name": "Tulburari nevrotice, de stress si somatoforme (F40-F48)",
+          "children": [
+            {
+              "code": "5_111_F45.1",
+              "name": "Tulburare somatoforma nediferentiata",
+              "children": []
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "nodeCount": 3,
+  "pagination": "matches"
+}
+```
+
+Schema v5 construiește automat proiecția pentru versiunile **active deja importate**. Importurile ulterioare o reconstruiesc în aceeași tranzacție cu restul nomenclatoarelor; vechea versiune rămâne accesibilă până la activarea celei noi. Duplicatele de cod și ciclurile resping importul. Dacă sursa omite un părinte, nodul este păstrat ca rădăcină a unui subarbore, fără inventarea părintelui. Lipsa întregii secțiuni Cim10 produce o listă goală. Nu se folosește nomenclatorul ICD10 cu 999 de coduri ca substitut.
+
+Exploratorul API include ambele endpointuri și toate filtrele de mai sus.

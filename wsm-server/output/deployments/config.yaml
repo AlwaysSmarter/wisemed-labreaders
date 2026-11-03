@@ -1,6 +1,8 @@
 admin:
     enabled: true
-    public_origin: https://wslocal.wisemed.eu
+    public_origins:
+      - https://wslocal.wisemed.eu
+      - https://wslocalhost.wisemed.eu
     session_ttl_seconds: 900
 security:
     audience: wsm-server
@@ -48,6 +50,7 @@ tenants:
         allowed_origins:
             - https://localhost:8443
             - https://wslocal.wisemed.eu
+            - https://wslocalhost.wisemed.eu
             - https://php.wisemed.eu
         issuer: https://localhost:8443
         wisemed:

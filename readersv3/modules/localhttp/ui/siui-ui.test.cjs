@@ -156,3 +156,16 @@ test('SIUI presets use local day boundaries and Monday week start',()=>{
  assert.equal(week.from.getDay(),1);assert.equal(week.from.getDate(),19);
  assert.equal(seven.from.getDate(),15);assert.equal(month.from.getDate(),1);
 });
+
+test('CNAS settings errors stay visible and preserve the edited form',async()=>{
+ const output={textContent:'',classList:{toggle(){}},setAttribute(name,value){this[name]=value;}};
+ const panel={querySelector:selector=>selector==='#siui-settings-result'?output:{checked:false}};
+ let reloads=0,saves=0;
+ class Fields { *[Symbol.iterator](){yield ['base_url','https://www.siui.ro:8443'];yield ['docmed_base_url','https://docmed.e-pias.ro'];} }
+ const ctx=scope(['saveSIUISettings','setSIUIResult'],{FormData:Fields,api:async(path,options)=>{saves++;assert.equal(JSON.parse(options.body).base_url,'https://www.siui.ro:8443');assert.equal(JSON.parse(options.body).docmed_base_url,'https://docmed.e-pias.ro');throw Error('base_url: address or port is not allowed');},showToast(){throw Error('unexpected success');},loadSIUIPanel:async()=>reloads++});
+ await ctx.saveSIUISettings(panel,{});
+ assert.equal(saves,1);assert.equal(reloads,0);
+ assert.match(output.textContent,/base_url: address or port is not allowed/);assert.equal(output.role,'alert');
+ ctx.api=async()=>({ok:true});ctx.showToast=()=>{};
+ await ctx.saveSIUISettings(panel,{});assert.equal(reloads,1);
+});

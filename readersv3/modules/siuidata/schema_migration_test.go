@@ -18,7 +18,7 @@ func TestClientSchemaUpgradePreservesPhysicianImports(t *testing.T) {
 	}
 	// Recreate a v3 installation with active PHYS data, including dictionary
 	// codes shared by CNAS and OPSNAJ. Replaying v1/v2 would break this data.
-	if _, e = db.Exec(context.Background(), `DROP TABLE siui_client_specialties; DROP TABLE siui_client_employees; DROP TABLE siui_client_contracts; DROP TABLE siui_client_snapshots; DELETE FROM siui_data_schema_version WHERE version=4`); e != nil {
+	if _, e = db.Exec(context.Background(), `DROP TABLE siui_client_specialties; DROP TABLE siui_client_employees; DROP TABLE siui_client_contracts; DROP TABLE siui_client_snapshots; DELETE FROM siui_data_schema_version WHERE version>=4`); e != nil {
 		t.Fatal(e)
 	}
 	_, replica := newTestModule(t, cfg)

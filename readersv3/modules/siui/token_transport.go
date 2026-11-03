@@ -62,8 +62,9 @@ func tokenHTTP(ctx context.Context, cfg settings, cert tls.Certificate, method, 
 		return 0, nil, nil, e
 	}
 	defer res.Body.Close()
-	data, e := io.ReadAll(io.LimitReader(res.Body, maxDownload+1))
-	if len(data) > maxDownload {
+	limit := cnasResponseLimit(method, address)
+	data, e := io.ReadAll(io.LimitReader(res.Body, int64(limit)+1))
+	if len(data) > limit {
 		return 0, nil, nil, errors.New("CNAS response too large")
 	}
 	return res.StatusCode, res.Header, data, e

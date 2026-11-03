@@ -10,7 +10,7 @@ import (
 	"strings"
 )
 
-//go:embed assets/wsdl/*.wsdl assets/schemas/validation/*.xsd assets/*.json
+//go:embed assets/wsdl/*.wsdl assets/schemas/validation/*.xsd assets/schemas/docmed/*.xsd assets/*.json
 var assets embed.FS
 
 const soapNS = "http://schemas.xmlsoap.org/soap/envelope/"
@@ -41,8 +41,9 @@ func (n node) child(k string) node {
 	}
 	return node{}
 }
-func parseXML(b []byte) (node, error) {
-	if len(b) > maxData {
+func parseXML(b []byte) (node, error) { return parseXMLLimit(b, maxData) }
+func parseXMLLimit(b []byte, limit int) (node, error) {
+	if len(b) > limit {
 		return node{}, errors.New("XML too large")
 	}
 	d := xml.NewDecoder(bytes.NewReader(b))

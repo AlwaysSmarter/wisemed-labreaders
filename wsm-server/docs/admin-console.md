@@ -1,6 +1,6 @@
 # Consola administratorului WSM
 
-Deschideți `https://<domeniu-wsm>/admin/`. Consola oferă comenzi pentru aparate;
+Deschideți `https://<domeniu-wsm>/admin/`. Consola oferă comenzi pentru aparate, browsere/backenduri și setările tenantului;
 nu este un shell al sistemului de operare și nu execută programe sau comenzi OS.
 
 Autentificarea se face cu utilizatorul și parola WiseMED pentru tenantul selectat.
@@ -10,6 +10,54 @@ token de login; rolul nu este acceptat din browser. Utilizatorii
 cu tip 0, alte valori sau tip lipsă sunt refuzați. WSM nu salvează parola sau
 tokenul de login WiseMED. Sesiunea locală este temporară și are cookie HttpOnly;
 în producție se folosește HTTPS, inclusiv când Nginx termină TLS.
+
+## Browsere, backenduri PHP și setări tenant
+
+După autentificare, comenzile se aplică exclusiv tenantului selectat:
+
+| Comandă | Efect |
+| --- | --- |
+| `tenant` | Afișează issuer, URL-ul API WiseMED, originile permise și cheia API mascată `abc***xyz`. |
+| `tenant edit` | Deschide formularul de modificare issuer/API URL/cheie API. Cheia goală păstrează valoarea curentă. |
+| `browsers` / `browser list` | Listează cheile browser, inclusiv cele din YAML (read-only), cu secrete mascate. |
+| `browser add wisemed-web https://php.example.ro` | Generează o cheie browser/backend și adaugă originea în tenant. |
+| `browser key wisemed-web` | Afișează separat cheia browser din tenantul curent (consolă sau YAML) și configurația pentru PHP. |
+| `browser edit wisemed-web https://new.example.ro` | Schimbă originea înregistrată și permite noua origine, păstrând cheia. |
+| `browser rotate wisemed-web` | Generează un secret nou; cel vechi este revocat imediat. |
+| `browser rights wisemed-web` | Deschide editorul de drepturi; folosește `toggle`, `info`, `save`, `cancel`. |
+| `browser delete wisemed-web` | Revocă cheia gestionată; originea rămâne pentru celelalte chei. |
+| `origin add https://php.example.ro` | Adaugă o origine HTTPS exactă, fără cale, query sau fragment. |
+| `origin delete https://php.example.ro` | Elimină originea, inclusiv dacă provenea din YAML. |
+
+Cheile generate permit rolurile `browser` și `service`; PHP păstrează secretul și
+emite JWT-uri pentru utilizatorii autorizați. JavaScript primește numai JWT-ul.
+`api:admin` nu este acordat implicit: activează-l explicit prin `browser rights`
+pentru operații administrative precum validarea SIUI și emite-l în PHP numai
+utilizatorilor autorizați. Drepturile și originile sunt politici ale tenantului;
+originea înregistrată pe browser este metadata, nu o restricție suplimentară pe
+cheie. Schimbarea ei nu elimină automat originea veche: folosește `origin delete`.
+Cheile statice existente sunt vizibile; modificarea/revocarea lor rămâne în YAML.
+
+În liste și în `tenant`, cheile apar numai cu primele și ultimele trei caractere,
+separate de `***`; secretele prea scurte apar doar ca `***`. Cheia completă a unui
+browser este disponibilă numai în panoul temporar: add/rotate pentru cheile gestionate și browser key pentru orice cheie browser a tenantului.
+Cheia API WiseMED se introduce prin formularul `tenant edit`, niciodată ca argument
+al unei comenzi păstrate în istoric. Ea trebuie să corespundă celei acceptate de
+backendul PHP; WSM nu modifică automat configurația PHP. La schimbarea issuer-ului,
+actualizează și emitentul JWT din PHP/readere, deoarece valoarea `iss` trebuie să
+coincidă exact cu noua valoare.
+
+Setările se aplică imediat și sunt salvate atomic, cu permisiuni `0600`, în
+`security.device_keys_file`, alături de aparate: `browsers`, `tenant_origins`,
+`tenant_settings`. Nu trebuie editat YAML-ul principal sau repornit WSM la fiecare
+modificare. Registrul trebuie să fie într-un volum persistent, inscriptibil de WSM;
+modificările rămân valabile la reload/restart și suprascriu setările tenantului din
+YAML. Versiunile WSM anterioare nu înțeleg secțiunile noi ale registrului.
+
+Eliminarea unei origini, revocarea/rotirea unei chei și salvarea drepturilor
+închid conexiunile tenantului și invalidează tichetele sale pentru reautentificare.
+Modificarea setărilor prin `tenant edit` invalidează și sesiunile administrative
+ale acelui tenant: autentifică-te din nou, folosind API-ul WiseMED actualizat.
 
 ## Comenzi
 
@@ -118,6 +166,23 @@ tenants:
 
 `public_origin` este originea browserului, fără path, și include portul dacă este
 nestandard. În spatele Nginx este adresa HTTPS publică, nu adresa HTTP internă.
+Pentru mai multe adrese ale aceleiași console, folosiți lista `public_origins`:
+
+```yaml
+admin:
+  enabled: true
+  public_origins:
+    - https://wslocal.wisemed.eu
+    - https://wslocalhost.wisemed.eu
+  session_ttl_seconds: 900
+```
+
+`public_origin` rămâne compatibil și se adaugă listei dacă este configurat.
+Fiecare cerere trebuie să aibă Host și Origin pentru aceeași adresă permisă;
+lista nu permite cereri cross-origin între aliasuri. Cookie-urile sunt limitate
+la hostul accesat, deci autentificarea se face separat pe fiecare adresă.
+După actualizarea binarului pentru suportul listei, reporniți WSM.
+
 `base_url` și cheia API trebuie să corespundă instanței WiseMED reale; adresele din
 exemplu nu reprezintă un backend funcțional.
 
@@ -220,3 +285,41 @@ separat după tenant și utilizator. Istoricul rezistă la refresh, logout, înc
 browserului și repornirea WSM; nu se sincronizează între browsere/calculatoare.
 Ștergerea datelor site-ului îl elimină. Dacă stocarea nu este disponibilă, consola
 anunță acest lucru și păstrează istoricul doar în sesiunea curentă.
+
+## Loguri zilnice și urmărire live
+
+WSM scrie simultan în stderr/journal și în fișiere private `wsm-YYYY-MM-DD.log`,
+cu zile și timestamps UTC. În consola autentificată:
+
+```text
+logs                    # ziua curentă UTC, ultimele mesaje
+logs 2026-10-28          # ziua aleasă
+logs dates              # zilele disponibile
+logs live               # actualizare la fiecare secundă; urmărește și schimbarea zilei
+logs live 2026-10-28     # urmărește ziua explicită
+logs stop
+```
+
+Panoul oferă selector de zi, Încărcare, În timp real și Închide. Implicit este azi.
+Accesul folosește sesiunea administrativă WiseMED creată numai pentru `user_type`
+canonic `-1`; un JWT browser sau rolul `api:admin` nu oferă acces la fișiere.
+Fiecare citire live revalidează sesiunea și se oprește la logout/expirare/reload.
+Sunt afișate mesajele marcate cu tenantul curent și diagnosticele generale fără
+marcaj tenant, nu mesajele altor tenanturi. Fișierele de pe disc conțin jurnalul
+complet al procesului; interfața afișează o pagină recentă și păstrează cel mult
+1 MiB de text în memorie.
+
+Directorul se poate configura prin `server.log_dir` (relativ la configurație).
+Implicit este `logs/` lângă `security.device_keys_file`; dacă registrul nu este
+configurat, este `../logs` față de directorul configurației. Pentru Docker/systemd,
+registrul din `/var/lib/wsm-server` duce automat la `/var/lib/wsm-server/logs`, în
+volumul persistent existent. Directorul trebuie să fie inscriptibil de WSM.
+Fișierele sunt create cu `0600`, directorul cu `0700`; nu sunt servite ca resurse
+statice. Nu există ștergere automată a zilelor vechi. Schimbarea `log_dir` cere
+restart. O eroare de scriere la runtime este raportată în stderr, care rămâne activ.
+Fișierele se deschid după validarea configurației; erorile care împiedică pornirea
+sau inițializarea directorului se văd în stderr.
+
+Refuzurile JWT includ codul, peer-ul și o origine validată, fără JWT/secret/query.
+Refuzurile de origine și de identitate hello sunt acum logate explicit. Nu sunt
+logate corpurile API medicale sau textul erorilor de parsare a mesajelor WSS.

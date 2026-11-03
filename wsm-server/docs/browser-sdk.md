@@ -511,3 +511,32 @@ includerea siui-bridge.js, fără configurare; detectează objWSM din pagină. R
 fără Promise respins. Vezi începutul documentației siui-browser-wrapper.md.
 
 [Ghid practic objWSMSIUI: JavaScript lizibil, progres și callwmapi](siui-browser-quickstart.md).
+
+
+## Inițializare la cerere cu callback pentru token
+
+Pentru o pagină care trebuie să funcționeze și dacă WSM este offline:
+
+```js
+window.objWSM = WSMServer('wss://ws.example.ro', null, {
+  autoConnect: false,
+  autoReconnect: false,
+  tokenProvider: getTokenFromAuthenticatedWiseMEDBackend
+});
+objWSMSIUI.configure({getWSM: () => window.objWSM});
+```
+
+Construirea obiectului nu cere token și nu deschide socketul. Primul apel SIUI,
+`objWSM.connect()`, accesul `objWSM.ready` sau un apel de rețea al obiectului lazy
+pornește conectarea. `tokenProvider` este apelat numai la conectare/reconectare,
+nu când conexiunea este deja activă. Conectările simultane sunt reunite; timeoutul
+include și așteptarea callbackului de token. Un callback întârziat după timeout
+nu mai poate crea un socket. `autoReconnect:false` evită reconectări în fundal;
+următoarea operație explicită cere token nou. Comenzile trimise nu sunt rejucate.
+
+SDK-urile pot fi încărcate cu `async`. Pagina trebuie să înregistreze callbackul
+SIUI după încărcarea scriptului (eveniment `load` sau verificare dacă există deja).
+Integrarea WiseMED din footer folosește `getWiseMEDWSM()` pentru crearea obiectului
+la cerere și `getWiseMEDWSMToken()` pentru endpointul autentificat `/wsm/token`.
+`getWSMTokenAndConnect()` rămâne disponibil pentru conectare explicită din alte
+acțiuni ale paginii. Inițializarea și cererile simultane de token sunt reunite.
