@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-
 	"wisemed-labreaders/readersv3/core/config"
 )
 
@@ -18,29 +17,26 @@ type serviceInstallInfo struct {
 }
 
 func buildServiceInstallInfo(cfg *config.Config) (serviceInstallInfo, error) {
-	exePath, err := os.Executable()
-	if err != nil {
-		return serviceInstallInfo{}, err
+	exePath, e := os.Executable()
+	if e != nil {
+		return serviceInstallInfo{}, e
 	}
-	exePath, err = filepath.Abs(exePath)
-	if err != nil {
-		return serviceInstallInfo{}, err
+	exePath, e = filepath.Abs(exePath)
+	if e != nil {
+		return serviceInstallInfo{}, e
 	}
-	configPath, err := filepath.Abs(cfg.Path())
-	if err != nil {
-		return serviceInstallInfo{}, err
+	configPath, e := filepath.Abs(cfg.Path())
+	if e != nil {
+		return serviceInstallInfo{}, e
 	}
 	token := sanitizeLogToken(firstNonEmpty(cfg.Reader.ID, cfg.Reader.AnalyzerCode, cfg.Reader.Label, "reader"))
 	if token == "" {
 		token = "reader"
 	}
 	label := firstNonEmpty(cfg.Reader.Label, cfg.Reader.AnalyzerName, cfg.Reader.ID, "Reader")
-	return serviceInstallInfo{
-		ServiceName: "wisemed-" + token,
-		DisplayName: "WiseMED " + label,
-		Description: fmt.Sprintf("WiseMED readersv3 %s service", label),
-		Executable:  exePath,
-		ConfigPath:  configPath,
-		WorkDir:     filepath.Dir(exePath),
-	}, nil
+	serviceName := "wisemed-" + token
+	if token == "wisemed-ai" {
+		serviceName = token
+	}
+	return serviceInstallInfo{ServiceName: serviceName, DisplayName: "WiseMED " + label, Description: fmt.Sprintf("WiseMED readersv3 %s service", label), Executable: exePath, ConfigPath: configPath, WorkDir: filepath.Dir(exePath)}, nil
 }

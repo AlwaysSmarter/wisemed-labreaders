@@ -108,6 +108,12 @@ func openAPIDocument(readerIDs ...string) map[string]any {
 		"post": map[string]any{"summary": "Delete confirmed archived local downloads (administrator)", "description": "Requires confirm=true. Checks final state, archive manifest, SHA-256 and callbacks; preserves calls and sent request data.", "requestBody": map[string]any{"content": map[string]any{"application/json": map[string]any{"schema": map[string]any{"type": "object", "properties": map[string]any{"confirm": map[string]any{"type": "boolean"}}}}}}, "responses": map[string]any{"200": map[string]string{"description": "Removed bytes/files and errors"}}},
 	}
 	addInvoiceOpenAPI(paths)
+	paths["/api/siui/report/package"] = map[string]any{"post": map[string]any{
+		"summary":     "Sign report XML with the configured token (CMS attached), ZIP and Base64; administrator only",
+		"description": "Same sequence as the legacy bridge: CMS-sign exact XML bytes, store signed bytes under the original .xml filename in ZIP, encode ZIP as Base64. Does not submit to CNAS. XML maximum 10 MiB.",
+		"requestBody": map[string]any{"required": true, "content": map[string]any{"application/json": map[string]any{"schema": map[string]any{"type": "object", "additionalProperties": false, "required": []string{"filename", "report_xml"}, "properties": map[string]any{"filename": map[string]any{"type": "string", "pattern": reportFilenamePattern.String()}, "report_xml": map[string]any{"type": "string"}}}}}},
+		"responses":   map[string]any{"200": map[string]string{"description": "reportXML: Base64 ZIP for general/sendReport; signed=true; cnas_contacted=false"}, "400": map[string]string{"description": "Invalid XML or filename"}, "403": map[string]string{"description": "Administrator required"}, "502": map[string]string{"description": "Token signing failed"}},
+	}}
 	settingsProperties := map[string]any{}
 	for _, name := range []string{"fiscal_code", "cas_code", "licence", "certificate_store", "certificate_thumbprint", "base_url", "pe_base_url", "einvoice_base_url", "docmed_base_url"} {
 		settingsProperties[name] = map[string]any{"type": "string"}

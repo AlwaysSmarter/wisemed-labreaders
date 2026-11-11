@@ -13,6 +13,23 @@ function scope(names,globals) {
  vm.runInContext(names.map(fn).join('\n'),ctx);
  return ctx;
 }
+test('sendReport switches XML source and reads file contents without populating the textarea',async()=>{
+ const source={value:'text',addEventListener(_,fn){this.change=fn;}},file={files:[],addEventListener(_,fn){this.change=fn;}},xml={value:'<manual/>',required:true};
+ const form={querySelector:selector=>selector==='#siui-report-source'?source:file,elements:{reportXML:xml,report_filename:{value:""}}};
+ const ctx=scope(['bindSIUIReportUpload'],{}),read=ctx.bindSIUIReportUpload(form);
+ assert.equal(await read(),'<manual/>');assert.equal(file.disabled,true);assert.equal(xml.required,true);
+ source.value='file';source.change();
+ assert.equal(xml.disabled,true);assert.equal(xml.hidden,true);assert.equal(xml.required,false);assert.equal(file.required,true);assert.equal(file.disabled,false);
+ await assert.rejects(read,/Selectează/);
+ const content='<report>'+('ș'.repeat(600000))+'</report>';
+ file.files=[{name:'PARA_123_20261105_1200.xml',size:Buffer.byteLength(content),text:async()=>content}];file.change();assert.equal(form.elements.report_filename.value,'PARA_123_20261105_1200.xml');
+ assert.equal(await read(),content);assert.equal(xml.value,'<manual/>');
+ file.files=[{size:0,text:async()=>''}];await assert.rejects(read,/gol/);
+ file.files=[{size:10*1024*1024+1,text:async()=>{throw Error('must not read oversized file');}}];await assert.rejects(read,/10 MiB/);
+ file.files=[{size:1,text:async()=>{throw Error('read failed');}}];await assert.rejects(read,/read failed/);
+ source.value='text';source.change();
+ assert.equal(await read(),'<manual/>');assert.equal(xml.disabled,false);assert.equal(xml.required,true);assert.equal(file.required,false);
+});
 test('SIUI configuration deep links work locally and through WSM',()=>{
  for(const remote of [false,true]) for(const subview of ['siui','reader','wss']) {
   const path='/settings/'+subview;

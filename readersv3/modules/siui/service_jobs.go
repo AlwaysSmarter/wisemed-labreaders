@@ -185,6 +185,10 @@ func (m *Module) serviceHTTP(w http.ResponseWriter, r *http.Request, route, owne
 	if op.Group == "docmed" {
 		limit = 2 * docMedXMLLimit
 	}
+	if op.Group == "general" && op.Name == "sendReport" {
+		// JSON escaping can expand each XML byte to six bytes (e.g. \u003c).
+		limit = 6*maxReportXML + maxData
+	}
 	if err := decodeLimit(w, r, &in, limit); err != nil {
 		fail(w, 400, err.Error())
 		return

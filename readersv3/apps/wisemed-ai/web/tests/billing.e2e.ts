@@ -1,0 +1,28 @@
+import {test,expect} from '@playwright/test'
+import {readFileSync} from 'node:fs'
+import {resolve} from 'node:path'
+test('super admin manages package definitions and sees account limits',async({page})=>{
+ const password=readFileSync(process.env.WAI_PASSWORD_FILE||resolve('../../../output/wisemed-ai/deployments/ai-bootstrap-password'),'utf8').trim()
+ await page.goto('/ai/')
+ await page.getByLabel('Email',{exact:true}).fill('admin@wisemed.local')
+ await page.getByLabel('Parolă',{exact:true}).fill(password)
+ await page.getByRole('button',{name:'Autentificare',exact:true}).click()
+ await page.getByRole('button',{name:'Pachete și monetizare',exact:true}).click()
+ await expect(page.getByRole('heading',{name:'Catalog de servicii',exact:true})).toBeVisible()
+ await expect(page.getByRole('heading',{name:'Free',exact:true})).toBeVisible()
+ await expect(page.getByRole('heading',{name:'Pro',exact:true})).toBeVisible()
+ await expect(page.getByRole('heading',{name:'Premium',exact:true})).toBeVisible()
+ await page.getByRole('button',{name:'Editează pachetul',exact:true}).nth(1).click()
+ await expect(page.getByLabel('Specialități maxime',{exact:true})).toHaveValue('2')
+ await expect(page.getByLabel('Un milion de tokenuri suplimentare',{exact:true})).toBeVisible()
+ await expect(page.getByLabel('Limită de credit implicită',{exact:true})).toBeVisible()
+ await page.getByRole('button',{name:'Închide',exact:true}).click()
+ await expect(page.getByRole('heading',{name:'Utilizatorii din sistem și pachetele alocate',exact:true})).toBeVisible()
+ await page.screenshot({path:'test-results/monetization-admin.png',fullPage:true})
+ await page.getByRole('button',{name:'Pachetul meu',exact:true}).click()
+ await expect(page.getByRole('heading',{name:'Specialitățile mele',exact:true})).toBeVisible()
+ await expect(page.getByRole('heading',{name:'Istoric de procesări AI',exact:true})).toBeVisible()
+ await expect(page.getByText(/Creditul AI funcționează/)).toBeVisible()
+ await page.setViewportSize({width:390,height:844})
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true)
+})

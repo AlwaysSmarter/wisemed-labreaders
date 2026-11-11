@@ -15,8 +15,8 @@ import (
 	"wisemed-labreaders/readersv3/core/config"
 )
 
-func setupLogging(cfg *config.Config, showLog bool) (string, func(), error) {
-	log.SetFlags(log.LstdFlags | log.Lmicroseconds)
+func setupLogging(cfg *config.Config, showLog bool) (string, func(error), error) {
+	previousWriter, previousFlags := log.Writer(), log.Flags()
 	logDir := filepath.Dir(cfg.Path())
 	if logDir == "." || logDir == "" {
 		logDir = "."
@@ -42,8 +42,16 @@ func setupLogging(cfg *config.Config, showLog bool) (string, func(), error) {
 		}
 		writer = io.MultiWriter(console, fh)
 	}
+	log.SetFlags(log.LstdFlags | log.Lmicroseconds)
 	log.SetOutput(writer)
-	return logPath, func() { _ = fh.Close() }, nil
+	return logPath, func(runErr error) {
+		if runErr != nil {
+			log.New(fh, "", log.LstdFlags|log.Lmicroseconds).Printf("[ERROR] %v", runErr)
+		}
+		log.SetOutput(previousWriter)
+		log.SetFlags(previousFlags)
+		_ = fh.Close()
+	}, nil
 }
 
 func logBaseName(cfg *config.Config) string {

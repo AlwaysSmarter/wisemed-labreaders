@@ -210,7 +210,7 @@ func (m *Module) LoginOnly() bool {
 		return false
 	}
 	settings, ok := service.(map[string]interface{})
-	return ok && strings.EqualFold(asString(settings["protocol"]), "html-print-formatter")
+	return ok && (strings.EqualFold(asString(settings["protocol"]), "html-print-formatter") || strings.EqualFold(asString(settings["protocol"]), "wisemed-ai"))
 }
 
 func (m *Module) IsConfigured() bool {

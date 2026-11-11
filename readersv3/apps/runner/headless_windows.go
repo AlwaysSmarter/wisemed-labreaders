@@ -45,13 +45,10 @@ func launchHeadlessProcess(configPath string) (headlessLaunchInfo, error) {
 		CreationFlags: detachedProcess | createNewProcessGroup,
 		HideWindow:    true,
 	}
-	if err := cmd.Start(); err != nil {
+	if err := startHeadlessAndWait(cmd); err != nil {
 		return headlessLaunchInfo{}, err
 	}
 	pid := cmd.Process.Pid
-	if err := cmd.Process.Release(); err != nil {
-		return headlessLaunchInfo{}, err
-	}
 
 	return headlessLaunchInfo{
 		PID: pid,

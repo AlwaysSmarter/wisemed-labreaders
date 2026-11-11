@@ -701,7 +701,7 @@ func defaultCommType(cfg *config.Config) string {
 		return "tcpip"
 	case "hl7", "simple":
 		return "tcpip"
-	case "barcodeprinter", "siui", "siui-history", "siui-data", "html-print-formatter":
+	case "barcodeprinter", "siui", "siui-history", "siui-data", "html-print-formatter", "wisemed-ai":
 		return "utility"
 	default:
 		return "file"
@@ -791,7 +791,7 @@ func supportedCommTypes(cfg *config.Config) []string {
 			add("tcpip")
 		case "seegene-excel", "beosl-csv", "beoslcsv", "cfx96-quantitation", "cary60-uvvis", "analytikjena-plasmaquantms-elite", "shimatzu-tocl", "shimatzu-generic", "biosan-hipo-mpp96", "gammavision", "tricarb-5110-tr", "anatolia-geneworks", "generic-file":
 			add("file")
-		case "barcodeprinter", "anaf-docsmart", "siui", "siui-history", "siui-data", "html-print-formatter":
+		case "barcodeprinter", "anaf-docsmart", "siui", "siui-history", "siui-data", "html-print-formatter", "wisemed-ai":
 			add("utility")
 		}
 	}

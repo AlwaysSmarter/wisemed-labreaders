@@ -75,6 +75,15 @@ func validateParameters(op Operation, args map[string]string, nullParameters ...
 		if op.Group == "docmed" {
 			limit = docMedXMLLimit
 		}
+		if op.Group == "general" && op.Name == "sendReport" && p.Name == "reportXML" {
+			if len(v) > maxReportParameter {
+				return errors.New("reportXML exceeds signed report size limit")
+			}
+			if err := validateReportArchive(v); err != nil {
+				return err
+			}
+			continue
+		}
 		if len(v) > limit {
 			return fmt.Errorf("parameter %s exceeds %d bytes", p.Name, limit)
 		}

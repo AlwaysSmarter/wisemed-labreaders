@@ -17,6 +17,7 @@ const soapNS = "http://schemas.xmlsoap.org/soap/envelope/"
 const validateNS = "http://siuiValidate.webservices.utils.svapnt.siveco.ro"
 const piasNS = "http://www.cnas.ro/siui/2.0"
 const maxData = 1024 * 1024
+const maxReportXML = 10 * 1024 * 1024
 
 type node struct {
 	XMLName  xml.Name

@@ -70,6 +70,10 @@ func sampleParameters(op Operation) map[string]string {
 		}
 		args[p.Name] = v
 	}
+	if op.Name == "sendReport" {
+		packed, _ := invoiceZIP("PARA_123_20261105_1200.xml", []byte("synthetic signed report"))
+		args["reportXML"] = base64.StdEncoding.EncodeToString(packed)
+	}
 	if op.Name == "validateReport" {
 		args["reportType"] = "PARA"
 		args["requestType"] = "RQ_PARA_SRV"
@@ -276,6 +280,7 @@ func TestJWTAndWSMServiceLifecycle(t *testing.T) {
 		t.Fatal("OCSP token not exposed to authorized admin", result, e)
 	}
 }
+
 func TestCertificateProfilesAndCAS(t *testing.T) {
 	if len(insuranceHouses()) != 45 {
 		t.Fatal("CAS catalogue incomplete")

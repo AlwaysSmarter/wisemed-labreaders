@@ -77,3 +77,7 @@ Fiecare permisiune are o pictogramă „i” accesibilă prin click, atingere sa
 Settings → WSS conține numai configurarea și Deconectare / Reconectare acum. Debug → WSM conține starea conexiunii, lista clienților, ping, mesaje, test API, jurnalul WSS și aceleași acțiuni de conectare. Restricțiile consolei remote rămân aplicate.
 
 Reconectare acum afișează un loader și este blocat simultan în Settings → WSS și Debug → WSM cât timp conectarea sau reîncercările automate sunt în curs. Butoanele se reactivează după confirmarea unei conexiuni noi sau după Deconectare. Deconectarea manuală rămâne disponibilă local; restricția de deconectare din consola remote se păstrează.
+
+## WiseMED AI
+
+Utilitarul `wisemed-ai` folosește clientul și autorizarea comune, plus mapping clinic explicit per tenant/subiect. API JSON: `/api/wisemed-ai/v1/`. Nu acordă drepturi clinice din `api:admin` sau headere HTTP. Evenimentele start/progress/result sunt țintite exclusiv către conexiunea atestată a apelantului și nu conțin PHI; sesiunea HTTP folosește SSE. Configurarea completă este disponibilă și în cabinetul AI pentru administratorul instanței. Detalii și limite: [README WiseMED AI](../apps/wisemed-ai/README.md).

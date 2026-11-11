@@ -103,6 +103,17 @@ func main() {
 		fatalf("resolve readers root: %v", err)
 	}
 	switch os.Args[1] {
+	case "sync-app":
+		if len(os.Args) != 3 {
+			fatalf("usage: sync-app <app>")
+		}
+		app, e := findApp(root, os.Args[2])
+		if e != nil {
+			fatalf("sync-app: %v", e)
+		}
+		if e = writeAppScaffolding(root, app); e != nil {
+			fatalf("sync-app: %v", e)
+		}
 	case "sync":
 		if err := runSync(root); err != nil {
 			fatalf("sync: %v", err)
@@ -669,6 +680,9 @@ func packageWindows(root string, manifest runtimeManifest) (artifactInfo, error)
 		"--version", manifest.PackageVersion,
 		"--arch", manifest.GOARCH,
 	}
+	if manifest.App.ID == "wisemed-ai" {
+		args = append(args, "--icon", filepath.Join(root, "resources", "app-icons", "ico", "wisemed-ai.ico"))
+	}
 	logf("building NSIS installer for %s %s", manifest.App.ID, manifest.Target)
 	if err := runCommand(root, nil, args[0], args[1:]...); err != nil {
 		return artifactInfo{}, err
@@ -717,6 +731,14 @@ func packageLinux(root string, manifest runtimeManifest) error {
 	}
 	if err := writeFile(filepath.Join(scriptsDir, "pre-remove.sh"), renderLinuxPreRemove(manifest)); err != nil {
 		return err
+	}
+	if manifest.App.ID == "wisemed-ai" {
+		if e := writeFile(filepath.Join(rootfs, "install.sh"), aiLinuxTarInstall); e != nil {
+			return e
+		}
+		if e := writeFile(filepath.Join(rootfs, "uninstall.sh"), aiLinuxTarUninstall); e != nil {
+			return e
+		}
 	}
 	tarGzPath := filepath.Join(releaseDir, fmt.Sprintf("%s-%s-%s.tar.gz", manifest.App.ID, manifest.PackageVersion, manifest.GOARCH))
 	if err := createTarGz(rootfs, tarGzPath, manifest.SourceDateEpoch); err != nil {
@@ -822,6 +844,9 @@ func packageMacOS(root string, manifest runtimeManifest) error {
 		return err
 	}
 	dmgPath := filepath.Join(releaseDir, fmt.Sprintf("%s-%s-%s.dmg", manifest.App.ID, manifest.PackageVersion, manifest.GOARCH))
+	if manifest.App.ID == "wisemed-ai" {
+		return runCommand(workDir, nil, "hdiutil", "create", "-ov", "-fs", "HFS+", "-format", "UDZO", "-srcfolder", dmgSource, dmgPath)
+	}
 	return runCommand(workDir, nil, "hdiutil", "create", "-fs", "HFS+", "-format", "UDZO", "-srcfolder", dmgSource, dmgPath)
 }
 
@@ -893,6 +918,9 @@ func detectApps(root string) ([]appInfo, error) {
 		id := entry.Name()
 		binaryName := detectBinaryName(filepath.Join(root, "output", id), id)
 		title := prettyTitle(binaryName, id)
+		if id == "wisemed-ai" {
+			title = "AI"
+		}
 		if id == "esignature-server" {
 			title = "eSignature server"
 		}
@@ -900,7 +928,7 @@ func detectApps(root string) ([]appInfo, error) {
 			ID:               id,
 			Title:            title,
 			BinaryName:       binaryName,
-			ServiceName:      "wisemed-" + safeSlug(id),
+			ServiceName:      serviceNameForApp(id),
 			DisplayName:      "WiseMED " + title,
 			Description:      "WiseMED readersv3 " + title + " background service",
 			BundleID:         "eu.wisemed.readersv3." + strings.ReplaceAll(safeSlug(id), "-", "."),
@@ -1072,6 +1100,9 @@ func checksumFile(path string) (string, int64, error) {
 
 func windowsInstallerFileName(manifest runtimeManifest) string {
 	base := safeSlug(firstNonEmpty(manifest.App.Title, manifest.App.DisplayName, manifest.App.ID))
+	if manifest.App.ID == "wisemed-ai" {
+		base = "wisemed-ai"
+	}
 	if base == "" {
 		base = safeSlug(manifest.App.ID)
 	}
@@ -1455,11 +1486,21 @@ func renderWixSource(manifest runtimeManifest) string {
 	if !strings.HasSuffix(binary, ".exe") {
 		binary += ".exe"
 	}
-	return strings.ReplaceAll(strings.ReplaceAll(wixSourceTemplate, "__APP_ID__", manifest.App.ID), "__BINARY__", binary)
+	out := strings.ReplaceAll(strings.ReplaceAll(wixSourceTemplate, "__APP_ID__", manifest.App.ID), "__BINARY__", binary)
+	if manifest.App.ID == "wisemed-ai" {
+		out = strings.ReplaceAll(out, "5C17D0C1-7A9A-4A47-B220-wisemed-ai", "5C17D0C1-7A9A-4A47-B220-779138A16040")
+		out = strings.ReplaceAll(out, "WiseMED wisemed-ai", "WiseMED AI")
+	}
+	return out
 }
 
 func renderWixBundleSource(manifest runtimeManifest) string {
-	return strings.ReplaceAll(bundleWixTemplate, "__APP_ID__", manifest.App.ID)
+	out := strings.ReplaceAll(bundleWixTemplate, "__APP_ID__", manifest.App.ID)
+	if manifest.App.ID == "wisemed-ai" {
+		out = strings.ReplaceAll(out, "9376D033-1B6B-4B5E-94D8-wisemed-ai", "9376D033-1B6B-4B5E-94D8-48EBD291CF49")
+		out = strings.ReplaceAll(out, "WiseMED wisemed-ai", "WiseMED AI")
+	}
+	return out
 }
 
 func renderNSISScript(manifest runtimeManifest) string {
@@ -1508,6 +1549,9 @@ func renderSystemdService(manifest runtimeManifest) string {
 		"__SERVICE_ARGUMENTS__": serviceArguments(manifest.App, "linux"),
 	}
 	out := replaceAll(systemdTemplate, replacements)
+	if manifest.App.ID == "wisemed-ai" {
+		out = strings.Replace(out, "User=root", "User=wisemed-ai\nEnvironment=HOME=/opt/wisemed-ai", 1)
+	}
 	if manifest.App.ID == "html-print-formatter" {
 		out = strings.Replace(out, "User=root", "User=html-print-formatter\nEnvironment=HOME=/opt/html-print-formatter", 1)
 	}
@@ -1519,6 +1563,10 @@ func renderLinuxInstallHelper(app appInfo) string {
 		"__APP_ID__":       app.ID,
 		"__SERVICE_NAME__": app.ServiceName,
 	})
+	if app.ID == "wisemed-ai" {
+		out = strings.ReplaceAll(out, "rsync -a --delete", "rsync -a")
+		out = strings.Replace(out, "sudo systemctl daemon-reload", "id wisemed-ai >/dev/null 2>&1 || sudo useradd --system --user-group --home-dir /opt/wisemed-ai --shell /usr/sbin/nologin wisemed-ai\nsudo chown -R wisemed-ai:wisemed-ai \"$INSTALL_DIR\"\nsudo systemctl daemon-reload", 1)
+	}
 	if app.ID == "html-print-formatter" {
 		out = strings.Replace(out, "sudo systemctl daemon-reload", "id html-print-formatter >/dev/null 2>&1 || sudo useradd --system --user-group --home-dir /opt/html-print-formatter --shell /usr/sbin/nologin html-print-formatter\nsudo chown -R html-print-formatter:html-print-formatter \"$INSTALL_DIR\"\nsudo systemctl daemon-reload", 1)
 	}
@@ -1538,6 +1586,9 @@ func renderLinuxPostInstall(manifest runtimeManifest) string {
 		"__SERVICE_NAME__": manifest.App.ServiceName,
 		"__BINARY__":       manifest.App.BinaryName,
 	})
+	if manifest.App.ID == "wisemed-ai" {
+		out = strings.Replace(out, "systemctl daemon-reload", strings.ReplaceAll(formatterLinuxAccount, "html-print-formatter", "wisemed-ai")+"systemctl daemon-reload", 1)
+	}
 	if manifest.App.ID == "html-print-formatter" {
 		out = strings.Replace(out, "systemctl daemon-reload", formatterLinuxAccount+"systemctl daemon-reload", 1)
 	}
@@ -1567,10 +1618,14 @@ func renderLaunchdPlist(manifest runtimeManifest) string {
 }
 
 func renderMacInstallHelper(app appInfo) string {
-	return replaceAll(macInstallHelperTemplate, map[string]string{
+	out := replaceAll(macInstallHelperTemplate, map[string]string{
 		"__APP_ID__":    app.ID,
 		"__BUNDLE_ID__": app.BundleID,
 	})
+	if app.ID == "wisemed-ai" {
+		out = strings.ReplaceAll(out, "rsync -a --delete", "rsync -a")
+	}
+	return out
 }
 
 func renderMacUninstallHelper(app appInfo) string {
@@ -1608,6 +1663,9 @@ func renderRPMSpec(manifest runtimeManifest) string {
 	})
 	if manifest.App.ID == "html-print-formatter" {
 		out = strings.Replace(out, "%post\n", "%post\n"+formatterLinuxAccount, 1)
+	}
+	if manifest.App.ID == "wisemed-ai" {
+		out = strings.Replace(out, "%post\n", "%post\n"+strings.ReplaceAll(formatterLinuxAccount, "html-print-formatter", "wisemed-ai"), 1)
 	}
 	return out
 }
@@ -1710,7 +1768,7 @@ func serviceArguments(app appInfo, goos string) string {
 	default:
 		args = append(args, "deployments/config.yaml")
 	}
-	if app.SupportsHeadless && app.ID != "html-print-formatter" {
+	if app.SupportsHeadless && app.ID != "html-print-formatter" && app.ID != "wisemed-ai" {
 		args = append(args, "-headless")
 	}
 	return strings.Join(args, " ")
@@ -2400,3 +2458,10 @@ systemctl disable --now __SERVICE_NAME__.service || true
 /opt/__APP_ID__
 /usr/lib/systemd/system/__SERVICE_NAME__.service
 `
+
+func serviceNameForApp(id string) string {
+	if id == "wisemed-ai" {
+		return id
+	}
+	return "wisemed-" + safeSlug(id)
+}

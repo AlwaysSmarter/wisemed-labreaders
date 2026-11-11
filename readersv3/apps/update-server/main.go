@@ -26,6 +26,7 @@ func main() {
 		return
 	}
 
+	log.SetOutput(os.Stdout)
 	ensureResult, err := config.Ensure(*cfgPath)
 	if err != nil {
 		log.Fatal(err)

@@ -8,7 +8,9 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"slices"
 	"strings"
+	"sync"
 	"syscall"
 
 	"wisemed-labreaders/readersv3/core/config"
@@ -29,7 +31,24 @@ type RunOptions struct {
 	ShowLog        bool
 }
 
-func Run(configPath string, defaultModules []string, opts RunOptions) error {
+func Run(configPath string, defaultModules []string, opts RunOptions) (runErr error) {
+	var reportStartup func(error)
+	if opts.HeadlessChild {
+		if path := os.Getenv(headlessStartupEnv); path != "" {
+			var once sync.Once
+			reportStartup = func(err error) {
+				once.Do(func() { writeHeadlessStartup(path, err) })
+			}
+		}
+	}
+	defer func() {
+		if runErr != nil {
+			fmt.Printf("[ERROR] %v\n", runErr)
+		}
+		if reportStartup != nil && runErr != nil {
+			reportStartup(runErr)
+		}
+	}()
 	ensureResult, err := config.Ensure(configPath)
 	if err != nil {
 		return err
@@ -75,7 +94,7 @@ func Run(configPath string, defaultModules []string, opts RunOptions) error {
 	if err != nil {
 		return err
 	}
-	defer closeLog()
+	defer func() { closeLog(runErr) }()
 	if opts.ShowLog {
 		startupConsolef("flag -showlog confirmat: logurile runtime sunt afisate in consola si salvate in fisier.")
 	}
@@ -141,7 +160,7 @@ func Run(configPath string, defaultModules []string, opts RunOptions) error {
 			}()
 		}
 	}
-	return runAppLoop(ctx, configPath, defaultModules, logger, opts)
+	return runAppLoop(ctx, configPath, defaultModules, logger, opts, reportStartup)
 }
 
 func startupConsolef(format string, args ...interface{}) {
@@ -225,7 +244,7 @@ func (p *processControl) RequestRestart(reason string) {
 	}
 }
 
-func runAppLoop(ctx context.Context, configPath string, defaultModules []string, logger *log.Logger, opts RunOptions) error {
+func runAppLoop(ctx context.Context, configPath string, defaultModules []string, logger *log.Logger, opts RunOptions, reportStartup func(error)) error {
 	restartCh := make(chan string, 1)
 	for {
 		cfg, err := config.Load(configPath)
@@ -244,6 +263,15 @@ func runAppLoop(ctx context.Context, configPath string, defaultModules []string,
 		app.RegisterService("process-control", &processControl{restartCh: restartCh})
 		if err := app.InitModules(cfg.EnabledModules); err != nil {
 			return err
+		}
+
+		if reportStartup != nil {
+			enabled, _ := app.ModuleSettings("local-http")["enabled"].(bool)
+			if enabled && slices.Contains(cfg.EnabledModules, "local-http") {
+				app.RegisterService("local-http-ready", func() { reportStartup(nil) })
+			} else {
+				reportStartup(nil)
+			}
 		}
 
 		runCtx, cancel := context.WithCancel(ctx)

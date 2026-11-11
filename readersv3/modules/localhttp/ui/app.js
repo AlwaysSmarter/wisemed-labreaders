@@ -1347,6 +1347,34 @@ function setButtonLoading(button, loading) {
   button.removeAttribute("aria-busy");
 }
 
+function applyWiseMEDAIUI() {
+  state.utilityMode = true; state.barcodeMode = false;
+  document.title = "WiseMED AI · Administrare utilitar";
+  for (const name of ["overview", "orders", "qc", "daily-details", "history", "operations", "debug"]) {
+    const link = barcodeNavButton(name); if (link) link.hidden = true;
+  }
+  for (const id of ["analyzer-pill", "result-sync-pill", "daily-analysis-filter-pill", "debug-communication-link", "reader-summary-card"]) {
+    const node = document.getElementById(id); if (node) node.hidden = true;
+  }
+  document.querySelectorAll("#settings-panel-reader .settings-section-transport, #settings-panel-reader .settings-section-results").forEach(node => node.hidden = true);
+  for (const name of ["analyzer_name", "analyzer_code", "db_name", "sqlite_path"]) {
+    const field = els.readerSettingsForm?.elements.namedItem(name); if (field) field.closest("label").hidden = true;
+  }
+  for (const id of ["today-donut", "qc-summary", "line-chart"]) {
+    const node = document.getElementById(id); if (node) node.closest("article").hidden = true;
+  }
+  if (els.settingsSubmenu) els.settingsSubmenu.hidden = false;
+  els.navSublinks.forEach(link => {
+    if (link.dataset.settingsSubview) link.hidden = !["reader", "wss"].includes(link.dataset.settingsSubview);
+    if (link.dataset.settingsSubview === "reader") link.textContent = "Server și actualizări";
+  });
+  for (const [id, label] of [["reader-eyebrow", "UTILITAR"], ["reader-title", "WiseMED AI"], ["reader-subtitle", "Administrare serviciu"], ["reader-settings-title", "Server și actualizări"]]) {
+    const node = document.getElementById(id); if (node) node.textContent = label;
+  }
+  const dashboard = document.getElementById("wisemed-ai-dashboard-nav");
+  if (dashboard) dashboard.hidden = !!window.WSM_REMOTE;
+}
+
 function applyHTMLFormatterUI() {
   for (const name of ["orders", "qc", "daily-details"]) {
     const link = barcodeNavButton(name); if (link) link.hidden = true;
@@ -1461,6 +1489,7 @@ function barcodeNavButton(viewName) {
 }
 
 function applyBarcodeModeUI() {
+ if(state.aiMode) {applyWiseMEDAIUI();return;}
  for(const id of ["siui-data-versions-nav","siui-data-setup-nav"]){const link=document.getElementById(id);if(link)link.hidden=!isSIUIDataMode()||!!window.WSM_REMOTE;}
  if(isSIUIDataMode()) {
   state.utilityMode=true;state.barcodeMode=false;
@@ -1537,7 +1566,7 @@ async function onLanguageChange(event) {
   syncLanguageControls();
   applyLanguage();
   if (!els.dashboardView.hidden) {
-    if (state.formatterMode) {
+    if (state.formatterMode || state.aiMode) {
       await Promise.all([loadStatus(), loadLogs(), loadReaderSettings()]);
     } else if (isSIUIMode() || isHistoryMode()) {
       await Promise.all([loadStatus(), loadLogs(), loadReaderSettings()]);
@@ -1769,6 +1798,7 @@ async function mountDashboard(sessionResp) {
   state.readerInfo = { ...(sessionResp.reader || {}) };
   state.appUpdateSettings = { ...(sessionResp.app_update || state.appUpdateSettings || {}) };
   state.formatterMode = state.readerInfo?.protocol === "html-print-formatter";
+  state.aiMode = state.readerInfo?.protocol === "wisemed-ai" || state.readerInfo?.id === "wisemed-ai";
   state.settingsSubView = settingsSubViewFromLocation();
   applyBarcodeModeUI();
   els.readerTitle.textContent = formatReaderPrimaryLabel(sessionResp.reader);
@@ -1782,13 +1812,14 @@ async function mountDashboard(sessionResp) {
   state.debugEnabled = !!sessionResp.permissions?.can_debug_tests;
   syncDebugNavVisibility();
   syncOrderControls();
+  if(state.aiMode) applyWiseMEDAIUI();
   if(isESignatureMode()) applyESignatureUI();
   if (!state.barcodeMode) {
     activateSettingsSubView(state.settingsSubView || "reader");
   }
   renderRoundSelect();
   activateView(viewFromLocation(), false);
-  if (state.formatterMode) {
+  if (state.formatterMode || state.aiMode) {
     await Promise.all([loadStatus(), loadLogs(), loadReaderSettings()]);
   } else if (isSIUIMode() || isHistoryMode()) {
     if(isSIUIMode()) await refreshSIUICertificatesAfterLogin();
@@ -1814,7 +1845,7 @@ async function mountDashboard(sessionResp) {
   }
   restartLogPolling();
   restartStatusPolling();
-  if ((Number(state.session?.user_type) || 0) <= 0) {
+  if (!state.aiMode && (Number(state.session?.user_type) || 0) <= 0) {
     loadDebugTests().catch(() => {
       state.debugEnabled = false;
       syncDebugNavVisibility();
@@ -1840,6 +1871,7 @@ async function refreshAppUpdateStatus(force = false) {
 
 function syncDebugNavVisibility() {
   if (!els.debugNavLink) return;
+  if(state.aiMode){els.debugNavLink.hidden=true;document.getElementById("debug-submenu").hidden=true;return;}
   const enabled = (isSIUIMode() || isHistoryMode() || isSIUIDataMode() || !!state.debugEnabled) && (Number(state.session?.user_type) || 0) <= 0;
   const admin = (Number(state.session?.user_type) || 0) <= 0;
   els.debugNavLink.hidden = !admin;
@@ -2001,6 +2033,7 @@ function onAppUpdateIndicatorClick(event) {
 }
 
 function activateView(name, pushHistory = true) {
+ if(state.aiMode && !["analytes","wsm","help"].includes(name)) name="analytes";
  if(name==="history"&&!isHistoryMode()) name="overview";
  if(name==="operations"&&!isSIUIMode()) name="overview";
  if(state.formatterMode && ["orders","qc","daily-details","debug"].includes(name)) name="overview";
@@ -2047,7 +2080,7 @@ function activateView(name, pushHistory = true) {
     return;
   }
   if (name === "analytes") {
-    if (state.formatterMode) {activateSettingsSubView(state.settingsSubView);if(state.settingsSubView==="reader")loadReaderSettings().catch(error=>showToast(error.message,"error"));return;}
+    if (state.formatterMode || state.aiMode) {activateSettingsSubView(state.settingsSubView);if(state.settingsSubView==="reader")loadReaderSettings().catch(error=>showToast(error.message,"error"));return;}
     if (isSIUIMode() || isHistoryMode()) {activateSettingsSubView(state.settingsSubView);if(state.settingsSubView==="reader")loadReaderSettings().catch(error=>showToast(error.message,"error"));return;}
     if (isESignatureMode()) {activateSettingsSubView(state.settingsSubView); return;}
     if (state.settingsSubView === "wss") { activateSettingsSubView("wss"); return; }
@@ -2085,6 +2118,7 @@ function activateView(name, pushHistory = true) {
 }
 
 function renderTopbarTitle() {
+ if(state.aiMode){document.getElementById("dashboard-title").textContent=state.currentView==="wsm" ? "WSM" : state.settingsSubView==="wss" ? "WSM / WSS" : "WiseMED AI · Server și actualizări";return;}
  if(isHistoryMode()&&state.currentView==="overview"){document.getElementById("dashboard-title").textContent="Dashboard SIUI Bridge History";return;}
  if(isSIUIMode()&&state.currentView==="overview"){document.getElementById("dashboard-title").textContent="Dashboard SIUI Bridge";return;}
  if(state.currentView==="history"){document.getElementById("dashboard-title").textContent="Istoric";return;}
@@ -2143,6 +2177,7 @@ function renderTopbarTitle() {
 }
 
 function viewFromLocation() {
+ if(state.aiMode) return currentUIPath()==="/debug/wsm" ? "wsm" : "analytes";
  if(currentUIPath() === "/debug/wsm") return "wsm";
  if(state.formatterMode) return currentUIPath().startsWith("/settings") ? "analytes" : "overview";
  if(isHistoryMode()) return currentUIPath()==="/history" ? "history" : currentUIPath()==="/debug" ? "debug" : currentUIPath().startsWith("/settings") ? "analytes" : "overview";
@@ -2168,6 +2203,7 @@ function viewFromLocation() {
 }
 
 function settingsSubViewFromLocation() {
+ if(state.aiMode) return currentUIPath()==="/settings/wss" ? "wss" : "reader";
  if(currentUIPath()==="/settings/history")return "history";
  if(isHistoryMode()) return currentUIPath()==="/settings/wss"?"wss":currentUIPath()==="/settings/reader"?"reader":"history";
  if(state.formatterMode) return currentUIPath()==="/settings/wss" ? "wss" : "reader";
@@ -2184,6 +2220,7 @@ function settingsSubViewFromLocation() {
 }
 
 function pathForView(name) {
+ if(state.aiMode) return name==="wsm" ? "/debug/wsm" : state.settingsSubView==="wss" ? "/settings/wss" : "/settings/reader";
  if(name==="history") return "/history";
  if(name==="operations") return "/operations";
  if(name==="analytes"&&state.settingsSubView==="history")return "/settings/history";
@@ -2217,6 +2254,7 @@ function pathForView(name) {
 }
 
 function activateSettingsSubView(name) {
+ if(state.aiMode && !["reader","wss"].includes(name)) name="reader";
  if(name==="history" && (isSIUIMode()||isHistoryMode())){state.settingsSubView="history";document.querySelectorAll('[id^="settings-panel-"]').forEach(p=>p.hidden=p.id!=="settings-panel-siui");els.navSublinks.forEach(link=>link.classList.toggle("active",link.dataset.settingsSubview==="history"));window.history.replaceState({view:"analytes"},"","/settings/history");loadHistoryPanel().catch(e=>showToast(e.message,"error"));return;}
  if(state.formatterMode && !["reader","wss"].includes(name)) name="reader";
  const siuiPanel=document.getElementById("settings-panel-siui");
@@ -2424,7 +2462,7 @@ async function loadStatus() {
   const connections = data.connections || {};
   updateConnectionPills(connections);
  if(isESignatureMode()) applyESignatureUI();
-  const cards = state.formatterMode ? [{label:"Utilitar",value:"HTML Print Formatter"},{label:"Comunicare",value:"HTTP / WSS"}] : isESignatureMode() ? [{label:"Utilitar",value:"eSignature server"},{label:"Comunicare",value:"HTTP / WSS"}] : state.barcodeMode ? [
+  const cards = state.aiMode ? [{label:"Utilitar",value:"WiseMED AI"},{label:"Comunicare",value:"HTTP / WSS"}] : state.formatterMode ? [{label:"Utilitar",value:"HTML Print Formatter"},{label:"Comunicare",value:"HTTP / WSS"}] : isESignatureMode() ? [{label:"Utilitar",value:"eSignature server"},{label:"Comunicare",value:"HTTP / WSS"}] : state.barcodeMode ? [
     { label: "Tipariri", value: stats.orders ?? 0 },
     { label: "Etichete", value: stats.results ?? 0 },
     { label: t("events"), value: stats.events ?? 0 },
@@ -2443,9 +2481,11 @@ async function loadStatus() {
   ];
   els.statusCards.innerHTML = cards.map((item) => `<div class="metric"><span class="muted small">${escapeHtml(item.label)}</span><strong>${escapeHtml(String(item.value))}</strong></div>`).join("");
   renderReaderSidebar();
+  if(state.aiMode) applyWiseMEDAIUI();
 }
 
 async function loadDashboard() {
+ if(state.aiMode) return;
  if(state.formatterMode) return;
  if(isSIUIMode()||isHistoryMode()) return;
  if(isESignatureMode()) {
@@ -2615,6 +2655,7 @@ async function loadReaderSettings() {
     syncReaderSettingsTransportFields();
   }
   els.repeatModeSelect.value = state.readerSettings.repeat_mode;
+  if(state.aiMode) applyWiseMEDAIUI();
   syncDeleteOrdersPreferenceControls();
   await loadResultSyncStatus();
   if (els.readerSettingsMessage) {
@@ -2745,6 +2786,7 @@ async function onSaveReaderSettings(event) {
     labnovation_enabled: Boolean(resp.settings?.labnovation_enabled),
   };
   els.repeatModeSelect.value = state.readerSettings.repeat_mode;
+  if(state.aiMode) applyWiseMEDAIUI();
   syncDeleteOrdersPreferenceControls();
   syncReaderSettingsTransportFields();
   if (els.readerSettingsMessage) {
@@ -2831,6 +2873,7 @@ function syncReaderSettingsTransportFields() {
 }
 
 async function loadResultSyncStatus() {
+  if(state.aiMode) return;
   if (!els.resultSyncStatus && !els.resultSyncStatusLabel) return;
   try {
     const resp = await api("/api/result-sync/status");
@@ -6529,6 +6572,7 @@ function applyLanguage() {
   renderDebugTests();
   renderDebugResult();
   if(state.formatterMode) applyHTMLFormatterUI();
+  if(state.aiMode) applyWiseMEDAIUI();
 }
 
 function applyBarcodeOverviewLabels() {
@@ -6550,7 +6594,7 @@ function toggleLogsAccess(canViewLogs) {
 }
 
 function updateConnectionPills(connections) {
-  if (state.formatterMode) { els.analyzerPill.hidden = true; return; }
+  if (state.formatterMode || state.aiMode) { els.analyzerPill.hidden = true; return; }
   const analyzerConnected = !!connections.analyzer_connected;
   const analyzerLastPacketAt = String(connections.analyzer_last_packet_at || "").trim();
   if (state.barcodeMode) {
@@ -6631,6 +6675,10 @@ function formatReaderSecondaryLabel(readerInfo = {}) {
 }
 
 function renderReaderSidebar() {
+ if(state.aiMode){
+  els.readerIdentityIcon.textContent="AI";els.readerIdentityTitle.textContent="Utilitar";els.readerIdentitySubtitle.textContent="WiseMED AI";
+  els.readerSummaryList.textContent="Documentare clinică · HTTP / WSS";return;
+ }
  if(isHistoryMode()){
   els.readerIdentityIcon.textContent="H";els.readerIdentityTitle.textContent="Arhivă centrală";els.readerIdentitySubtitle.textContent="SIUI Bridge History";return;
  }
@@ -7431,6 +7479,25 @@ function setSIUIResult(element,text,error=false) {
  element.setAttribute("role",error?"alert":"status");
 }
 let siuiDebugGeneration=0;
+function bindSIUIReportUpload(form) {
+ const source=form.querySelector("#siui-report-source"),file=form.querySelector("#siui-report-file"),xml=form.elements.reportXML;
+ const sync=()=>{
+  const upload=source.value==="file";
+  xml.disabled=upload;xml.required=!upload;xml.hidden=upload;
+  file.disabled=!upload;file.required=upload;file.hidden=!upload;
+ };
+ source.addEventListener("change",sync);
+ file.addEventListener("change",()=>{if(file.files[0])form.elements.report_filename.value=file.files[0].name;});sync();
+ return async()=>{
+  if(source.value!=="file")return xml.value;
+  const selected=file.files[0];
+  if(!selected)throw new Error("Selectează fișierul XML al raportului.");
+  if(selected.size>10*1024*1024)throw new Error("Fișierul XML depășește limita SIUI Bridge de 10 MiB.");
+  const text=await selected.text();
+  if(!text.trim())throw new Error("Fișierul XML este gol.");
+  return text;
+ };
+}
 async function loadSIUIDebug() {
  const generation=++siuiDebugGeneration;let callGeneration=0;
  const view=document.getElementById("view-debug");let panel=document.getElementById("siui-debug-panel");
@@ -7461,7 +7528,7 @@ async function loadSIUIDebug() {
    const op=ops.find(o=>o.name===area.querySelector("#siui-operation").value);
    const fields=op.group==="docmed"?'<div id="siui-docmed-fields"></div>':op.parameters.map(p=>{
     const name=escapeHtml(p.name);let control;
-    if(/xml$/i.test(p.name))control=`<textarea name="${name}" rows="9" required spellcheck="false" placeholder="XML conform specificației CNAS">${escapeHtml(op.request_example||"")}</textarea>`;
+    if(/xml$/i.test(p.name))control=`${op.name==="sendReport"&&p.name==="reportXML"?'<select id="siui-report-source" aria-label="Sursa XML"><option value="text">Introducere text XML</option><option value="file">Încarcă fișier XML</option></select><input id="siui-report-file" type="file" accept=".xml,application/xml,text/xml" aria-label="Fișier XML raport" hidden disabled><span class="muted">Text sau fișier XML UTF-8, maximum 10 MiB.</span>':""}<textarea name="${name}" rows="9" required spellcheck="false" placeholder="XML conform specificației CNAS">${escapeHtml(op.request_example||"")}</textarea>`;
     else if(p.nullable)control=`<input name="${name}" type="text" placeholder="Fără subunitate: lasă gol (null)">`;
     else if(p.type==="boolean")control=`<select name="${name}"><option value="true">true</option><option value="false">false</option></select>`;
     else if(p.name==="partnerCategory")control=`<select name="${name}">${["MF","PHM","CLIN","PARA","STOM","AMB","MD","HC","REC","SPT","NHP","DIA","SICK","CBRET"].map(c=>`<option>${c}</option>`).join("")}</select>`;
@@ -7470,8 +7537,9 @@ async function loadSIUIDebug() {
     else control=`<input name="${name}" type="text" value="${p.type==="dateTime"?new Date().toISOString().slice(0,19)+"Z":p.type==="int"?"0":""}" ${p.type==="dateTime"||p.type==="int"?"required":""}>`;
     return `<label>${name} <span class="muted">(${escapeHtml(p.type)})</span>${control}</label>`;
    }).join("");
-   area.querySelector("#siui-operation-form").innerHTML=`<p><code>POST /api/siui/${op.group}/${op.name}</code></p><p>${escapeHtml(op.service)} — ${op.mutating?"Trimite / validează / modifică date în CNAS. Verifică parametrii înainte de executare.":"Operație de preluare date."}</p><form><label>ID operație<input name="operation_id" value="${crypto.randomUUID()}" required></label>${fields}<button type="submit">${op.mutating?"Trimite la CNAS":"Execută"} — ${escapeHtml(op.name)}</button><button id="siui-next-operation" type="button">Cerere nouă (alt ID)</button></form><p>O repetare cu același ID urmărește execuția existentă. Starea completed indică primirea răspunsului; verifică rezultatul CNAS.</p>`;
+   area.querySelector("#siui-operation-form").innerHTML=`<p><code>POST /api/siui/${op.group}/${op.name}</code></p><p>${escapeHtml(op.service)} — ${op.mutating?"Trimite / validează / modifică date în CNAS. Verifică parametrii înainte de executare.":"Operație de preluare date."}</p><form><label>ID operație<input name="operation_id" value="${crypto.randomUUID()}" required></label>${op.name==="sendReport"?'<label>Nume fișier raport<input name="report_filename" required placeholder="PARA_CUI_AAAALLZZ_OOMM.xml" pattern="[A-Z][A-Z0-9_]*_[0-9]+_[0-9]{8}_[0-9]{4}\\.xml"></label><p>Raportul XML va fi semnat cu tokenul configurat, arhivat ZIP și codificat Base64 înainte de trimitere.</p>':""}${fields}<button type="submit">${op.mutating?"Trimite la CNAS":"Execută"} — ${escapeHtml(op.name)}</button><button id="siui-next-operation" type="button">Cerere nouă (alt ID)</button></form><p>O repetare cu același ID urmărește execuția existentă. Starea completed indică primirea răspunsului; verifică rezultatul CNAS.</p>`;
    const form=area.querySelector("form");
+   const readReportXML=op.name==="sendReport"?bindSIUIReportUpload(form):null;let reportPackage=null;
    if(op.group==="docmed"&&!op.form){setSIUIResult(output,"Actualizează și repornește SIUI Bridge pentru formularele DocMED.",true);form.querySelector('button[type="submit"]').disabled=true;return;}
    if(op.group==="docmed")docMedForm=renderDocMedForm(form.querySelector("#siui-docmed-fields"),op.form,docMedDefaults,catalog.insurance_houses||[]);
    const activeDocMedForm=docMedForm;
@@ -7482,7 +7550,8 @@ async function loadSIUIDebug() {
     try{
      const id=form.elements.operation_id.value;let request;
      if(activeDocMedForm){const fields=await activeDocMedForm.read();Object.assign(docMedDefaults,activeDocMedForm.commonValues());request={operation_id:id,fields};}
-     else {const data=Object.fromEntries(new FormData(form));delete data.operation_id;for(const p of op.parameters){if(p.nullable&&data[p.name]==="")data[p.name]=null;}request={operation_id:id,parameters:data};}
+     else {const data=Object.fromEntries(new FormData(form));delete data.operation_id;if(readReportXML){const filename=data.report_filename;delete data.report_filename;setSIUIResult(output,"Semnare raport cu tokenul și pregătire arhivă ZIP…");const xml=await readReportXML();if(generation!==siuiDebugGeneration||activeCall!==callGeneration)return;if(!reportPackage||reportPackage.xml!==xml||reportPackage.filename!==filename){const packed=await api("/api/siui/report/package",{method:"POST",body:JSON.stringify({filename,report_xml:xml})});reportPackage={xml,filename,reportXML:packed.reportXML};}data.reportXML=reportPackage.reportXML;}for(const p of op.parameters){if(p.nullable&&data[p.name]==="")data[p.name]=null;}request={operation_id:id,parameters:data};}
+     if(generation!==siuiDebugGeneration||activeCall!==callGeneration)return;
      setSIUIResult(output,"Trimitere cerere…");panel.querySelector("#siui-download-area").replaceChildren();
      const response=await api("/api/siui/"+op.group+"/"+op.name,{method:"POST",body:JSON.stringify(request)});
      const poll=async()=>{if(generation!==siuiDebugGeneration||activeCall!==callGeneration||state.currentView!=="debug")return;const result=await api("/api/siui/calls/"+encodeURIComponent(response.call.id));if(generation!==siuiDebugGeneration||activeCall!==callGeneration)return;setSIUIResult(output,(result.call.error?result.call.error+"\n\n":"")+JSON.stringify(result.call,null,2),["failed","unknown"].includes(result.call.status));

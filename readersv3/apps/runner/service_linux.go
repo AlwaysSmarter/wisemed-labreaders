@@ -45,6 +45,17 @@ WantedBy=multi-user.target
 		}
 		body = strings.Replace(body, "Type=simple", "Type=simple\nUser=html-print-formatter\nEnvironment="+shellEscape("HOME="+info.WorkDir), 1)
 	}
+	if cfg.Analyzer.Protocol == "wisemed-ai" {
+		if err := exec.Command("id", "wisemed-ai").Run(); err != nil {
+			if out, e := exec.Command("useradd", "--system", "--user-group", "--home-dir", info.WorkDir, "--shell", "/usr/sbin/nologin", "wisemed-ai").CombinedOutput(); e != nil {
+				return fmt.Errorf("create AI service account: %w: %s", e, out)
+			}
+		}
+		if out, e := exec.Command("chown", "-R", "wisemed-ai:wisemed-ai", info.WorkDir).CombinedOutput(); e != nil {
+			return fmt.Errorf("AI service ownership: %w: %s", e, out)
+		}
+		body = strings.Replace(body, "Type=simple", "Type=simple\nUser=wisemed-ai\nEnvironment="+shellEscape("HOME="+info.WorkDir), 1)
+	}
 	if err := os.WriteFile(unitPath, []byte(body), 0o644); err != nil {
 		return fmt.Errorf("write %s: %w. Run as root", unitPath, err)
 	}

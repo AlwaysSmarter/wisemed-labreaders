@@ -366,6 +366,11 @@ func (m *Module) Start(ctx context.Context) error {
 		}(server, listener, useTLS, certFile, keyFile)
 		m.rt.Logf("local http listening on %s://%s", protocol, addr)
 		m.printStartupConnectionInfo(protocol, addr)
+		if service, ok := m.rt.Service("local-http-ready"); ok {
+			if ready, ok := service.(func()); ok {
+				ready()
+			}
+		}
 		select {
 		case <-ctx.Done():
 			shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -572,6 +577,16 @@ func (m *Module) requireSession(next http.Handler) http.Handler {
 }
 
 func (m *Module) handleIndex(w http.ResponseWriter, r *http.Request) {
+	if m.wiseMEDAIUtility() {
+		switch r.URL.Path {
+		case "/", "/orders", "/qc", "/daily-details", "/history", "/operations", "/debug":
+			http.Redirect(w, r, "/ai/", http.StatusTemporaryRedirect)
+			return
+		case "/settings", "/settings/analytes", "/settings/qc", "/settings/daily-details", "/settings/daily-analysis-filters", "/settings/astm-specimens", "/settings/history", "/settings/siui", "/settings/pad", "/settings/demo":
+			http.Redirect(w, r, "/settings/reader", http.StatusTemporaryRedirect)
+			return
+		}
+	}
 	if r.URL.Path == "/" && strings.EqualFold(r.Header.Get("Upgrade"), "websocket") && m.analyzerSetting("protocol", "") == "signing-pad" {
 		if service, ok := m.rt.Service("signing-pad"); ok {
 			if handler, ok := service.(interface {
@@ -3150,7 +3165,11 @@ func (m *Module) analyzerSetting(key, fallback string) string {
 }
 
 func (m *Module) loginOnlyUtility() bool {
-	return m.analyzerSetting("protocol", "") == "html-print-formatter"
+	return m.analyzerSetting("protocol", "") == "html-print-formatter" || m.wiseMEDAIUtility()
+}
+
+func (m *Module) wiseMEDAIUtility() bool {
+	return m.analyzerSetting("protocol", "") == "wisemed-ai" || m.rt.ReaderID() == "wisemed-ai"
 }
 
 func (m *Module) wiseMEDAPI() wiseMedAPIService {
@@ -3796,7 +3815,7 @@ func (m *Module) supportedCommTypes() []string {
 			add("serial")
 		case "seegene-excel", "beosl-csv", "cfx96-quantitation", "cary60-uvvis", "analytikjena-plasmaquantms-elite", "shimatzu-tocl", "shimatzu-generic", "biosan-hipo-mpp96", "gammavision", "tricarb-5110-tr", "anatolia-geneworks", "generic-file":
 			add("file")
-		case "barcodeprinter", "anaf-docsmart", "signing-pad", "siui", "siui-history", "siui-data", "html-print-formatter":
+		case "barcodeprinter", "anaf-docsmart", "signing-pad", "siui", "siui-history", "siui-data", "html-print-formatter", "wisemed-ai":
 			add("utility")
 		}
 	}

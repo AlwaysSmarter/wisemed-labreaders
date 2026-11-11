@@ -37,13 +37,10 @@ func launchHeadlessProcess(configPath string) (headlessLaunchInfo, error) {
 	cmd.Stdout = devNull
 	cmd.Stderr = devNull
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
-	if err := cmd.Start(); err != nil {
+	if err := startHeadlessAndWait(cmd); err != nil {
 		return headlessLaunchInfo{}, err
 	}
 	pid := cmd.Process.Pid
-	if err := cmd.Process.Release(); err != nil {
-		return headlessLaunchInfo{}, err
-	}
 
 	quotedCommand := shellQuote(append([]string{exePath}, args...))
 	return headlessLaunchInfo{

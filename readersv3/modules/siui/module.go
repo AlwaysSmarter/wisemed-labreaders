@@ -304,6 +304,8 @@ func (m *Module) handle(w http.ResponseWriter, r *http.Request) {
 		respond(w, 200, openAPIDocument(m.rt.ReaderID()))
 	case strings.HasPrefix(route, "invoice/"):
 		m.invoiceHTTP(w, r, route, admin)
+	case route == "report/package":
+		m.reportPackageHTTP(w, r, admin)
 	case strings.HasPrefix(route, "docmed/") || strings.HasPrefix(route, "facturare/") || strings.HasPrefix(route, "general/") || strings.HasPrefix(route, "clinice/") || strings.HasPrefix(route, "calls/"):
 		m.serviceHTTP(w, r, route, owner, admin)
 	case route == "status" && r.Method == "GET":

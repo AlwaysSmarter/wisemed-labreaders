@@ -46,6 +46,7 @@ import (
 	filetransport "wisemed-labreaders/readersv3/modules/transports/file"
 	serialtransport "wisemed-labreaders/readersv3/modules/transports/serial"
 	tcptransport "wisemed-labreaders/readersv3/modules/transports/tcpip"
+	"wisemed-labreaders/readersv3/modules/wisemedai"
 	"wisemed-labreaders/readersv3/modules/wisemedapi"
 	"wisemed-labreaders/readersv3/modules/ws"
 )
@@ -59,6 +60,7 @@ func RegisterAll(reg *module.Registry) {
 	reg.Register("login", login.New)
 	reg.Register("help", help.New)
 	reg.Register("html-print-formatter", htmlprintformatter.New)
+	reg.Register("wisemed-ai", wisemedai.New)
 	reg.Register("dashboard", dashboard.New)
 	reg.Register("analytes", analytes.New)
 	reg.Register("analyte-management", analytemanagement.New)

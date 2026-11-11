@@ -1,0 +1,6 @@
+web/node_modules/
+web/test-results/
+web/playwright-report/
+.env
+docker/.env
+clients/flutter/.dart_tool/

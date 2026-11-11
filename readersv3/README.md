@@ -58,6 +58,8 @@ Versiunea embedded se poate verifica cu:
 
 Opțiunea `-headless` nu dezactivează modulele aplicației. Ea pornește același reader în fundal, ca proces de tip daemon/service, păstrează WS și local HTTP/HTTPS active, afișează PID-ul și logul folosit, apoi predă promptul înapoi shell-ului. Pe Windows procesul este detașat fără a rămâne atașat de fereastra de consolă.
 
+Erorile care opresc pornirea sunt afișate în stdout chiar și fără `-showlog`. Dacă logul zilnic a putut fi deschis, eroarea este înregistrată și acolo. Lansatorul `-headless` așteaptă până la un minut rezultatul inițializării și, când este activ, deschiderea listenerului HTTP local. Dacă pornirea eșuează, afișează eroarea și returnează un cod nenul.
+
 Toate path-urile relative din configurile de modul se rezolvă față de directorul configului, adică `deployments/`. Asta înseamnă:
 
 - `help_dir: ./help` => `output/<reader>/deployments/help`

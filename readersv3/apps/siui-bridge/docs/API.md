@@ -170,6 +170,10 @@ Exemplele de mai jos sunt șabloane de structură. Înlocuiește valorile cu dat
 
 `POST /api/siui/general/sendReport` — SiuiWS (document). Modifică/validează date; administrator obligatoriu.
 
+În Debug → GENERAL → sendReport, introdu XML-ul ca text sau încarcă un fișier XML UTF-8 (maximum 10 MiB). Completează numele raportului conform CNAS: `PREFIX_COD_AAAALLZZ_OOMM.xml`; la upload numele este preluat din fișier. Bridge-ul semnează XML-ul cu tokenul configurat (CMS cu conținut inclus), pune fișierul semnat în ZIP sub numele original `.xml`, apoi codifică arhiva Base64. Acesta este fluxul bridge-ului vechi (`SIUISendReport.FileSign` → ZIP → Base64). Semnarea trebuie să reușească înainte de apelul CNAS.
+
+Pentru API: apelează mai întâi `POST /api/siui/report/package` cu `{"filename":"PARA_123_20261105_1200.xml","report_xml":"<report/>"}` (administrator). Răspunsul conține `reportXML`, `signed: true`, `cnas_contacted: false`. Trimite valoarea `reportXML` în cererea `sendReport`. Parametrul SOAP `reportXML` este ZIP Base64, nu XML simplu. Arhiva și parametrul Base64 au limite separate care includ costul semnăturii și codificării.
+
 | Parametru | Tip WSDL |
 |---|---|
 | `reportType` | `string` |
@@ -180,7 +184,7 @@ Exemplele de mai jos sunt șabloane de structură. Înlocuiește valorile cu dat
   "operation_id": "sendReport-001",
   "parameters": {
     "reportType": "CLIN",
-    "reportXML": "XML_COMPLET_CONFORM_XSD"
+    "reportXML": "BASE64_ZIP_CU_RAPORT_SEMNAT_CMS"
   }
 }
 ```
@@ -755,7 +759,7 @@ Excluse conform cerinței: validateEnlisted, validatePharmacyDrugs; nu sunt expu
 
 ## Validare XML și interpretarea răspunsurilor
 
-Toate câmpurile XML sunt verificate sintactic: fără DTD/directive, fără entități externe, adâncime maximum 40 și limită 1 MiB. Validările SIUI folosesc XSD-urile locale pentru raport CLIN/PARA, prescripții, trimiteri și concedii. PE processPrescribedPrescription, processHospitalPrescription și getPrescribedPrescriptionsForCid verifică XSD-urile cererilor lor. sendReport verifică XML-ul sintactic; schema raportului și regulile de business depind de categoria CNAS și sunt evaluate de server. Celelalte șiruri respectă tipurile WSDL. Bridge-ul păstrează răspunsul SOAP ca valori exacte, inclusiv codurile numerice și XML-urile, pentru interpretare de către aplicația apelantă.
+Toate câmpurile XML sunt verificate sintactic: fără DTD/directive, fără entități externe, adâncime maximum 40 și limită 1 MiB (10 MiB pentru XML-ul sursă din `report/package`). Validările SIUI folosesc XSD-urile locale pentru raport CLIN/PARA, prescripții, trimiteri și concedii. PE processPrescribedPrescription, processHospitalPrescription și getPrescribedPrescriptionsForCid verifică XSD-urile cererilor lor. report/package verifică XML-ul sintactic; sendReport verifică arhiva ZIP Base64; schema raportului și regulile de business depind de categoria CNAS și sunt evaluate de server. Celelalte șiruri respectă tipurile WSDL. Bridge-ul păstrează răspunsul SOAP ca valori exacte, inclusiv codurile numerice și XML-urile, pentru interpretare de către aplicația apelantă.
 
 ## Diagnostic și testare
 

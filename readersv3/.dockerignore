@@ -1,0 +1,11 @@
+output
+release
+dist
+**/node_modules
+**/test-results
+**/playwright-report
+**/.env
+**/.DS_Store
+**/.dart_tool
+**/*.syso
+**/zz_releasectl_windows_icon.rc

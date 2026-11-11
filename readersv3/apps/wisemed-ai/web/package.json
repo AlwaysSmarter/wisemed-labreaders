@@ -1,0 +1,31 @@
+{
+  "name": "wisemed-ai-admin",
+  "private": true,
+  "version": "1.3.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "vue-tsc --noEmit && vite build",
+    "test": "vitest run",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "@primeuix/themes": "^1.2.5",
+    "@tiptap/core": "^3.6.6",
+    "@tiptap/extension-table": "3.32.2",
+    "@tiptap/starter-kit": "^3.6.6",
+    "@tiptap/vue-3": "^3.6.6",
+    "primeicons": "^7.0.0",
+    "primevue": "^4.4.1",
+    "vue": "^3.5.22"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.56.1",
+    "@types/node": "^22.18.10",
+    "@vitejs/plugin-vue": "^5.2.4",
+    "typescript": "^5.9.3",
+    "vite": "^6.4.1",
+    "vitest": "^3.2.4",
+    "vue-tsc": "^3.1.1"
+  }
+}

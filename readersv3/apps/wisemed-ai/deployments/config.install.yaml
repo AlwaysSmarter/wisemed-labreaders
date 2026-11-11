@@ -1,0 +1,79 @@
+reader:
+  id: wisemed-ai
+  label: AI
+  analyzer_name: WiseMED AI
+  analyzer_code: wisemed-ai
+  db_name: wisemed-ai.db
+logging:
+  verbose_level: 0
+local_http:
+  enabled: true
+  address: 127.0.0.1:19120
+  language: ro
+  tls: false
+wisemed_ws:
+  enabled: false
+  url: wss://wslocal.wisemed.eu/ws
+  heartbeat_ms: 15000
+  reconnect_delay_ms: 30000
+analyzer:
+  comm_type: utility
+  protocol: wisemed-ai
+modules:
+  local-http:
+    enabled: true
+    address: 127.0.0.1:19120
+    language: ro
+    tls: false
+    cors_allowed_origins: ""
+  events:
+    enabled: true
+  help:
+    help_dir: ./help
+  app-updates:
+    enabled: true
+    app_id: wisemed-ai
+    channel: stable
+    base_url: http://127.0.0.1:19090
+    auto_download: true
+    download_dir: ./updates
+  wisemed-api:
+    cfg_wisemed_protocol: https
+    cfg_wisemed_ip: ""
+    cfg_wisemed_port: "443"
+    cfg_wisemed_path: /wisemed-api/apiv2
+    cfg_wisemed_key: ""
+  wisemed-ws:
+    enabled: false
+    url: wss://wslocal.wisemed.eu/ws
+    auth_mode: device_key
+    tenant_id: ""
+    key_id: ""
+    issuer: ""
+    audience: wsm-server
+    subject: ""
+    secret_file: ""
+    token_file: ""
+    token_path: ""
+    ca_file: ""
+    heartbeat_ms: 15000
+    reconnect_delay_ms: 30000
+  wisemed-ai:
+    database_url_env: WISEMED_AI_DATABASE_URL
+    database_url: ""
+    encryption_key_file: ./ai-encryption.key
+    bootstrap_email: admin@wisemed.local
+    bootstrap_password_file: ./ai-bootstrap-password
+    provider: mock
+    model: gpt-4.1-mini
+    openai_key_env: OPENAI_API_KEY
+    openai_key_file: ./ai-openai.key
+    # Operator configured estimates; verify current provider prices before use.
+    monthly_budget_usd: 10
+    input_usd_per_million: 0.4
+    output_usd_per_million: 1.6
+    retention_days: 30
+    secure_cookies: false
+    wisemed_login_enabled: false
+    wsm_identity_enabled: false
+    connector_allowed_hosts: []
