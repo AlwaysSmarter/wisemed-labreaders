@@ -242,4 +242,21 @@ Această aplicare imediată privește câmpurile din formularul eCard, nu setăr
 generale ale serviciului (de exemplu portul HTTP).
 
 Enumerare Windows: https://learn.microsoft.com/en-us/windows/win32/api/winscard/nf-winscard-scardlistreadersw
+
+
+## Rezultate în interfață și confirmarea înrolării
+
+Formularul operației și rezultatul sunt afișate alăturat pe desktop și unul sub
+altul pe ecrane înguste. Rezultatele se încarcă automat când jobul ajunge într-o
+stare finală, inclusiv rezultate parțiale după erori/anulare. Batch-urile se
+afișează câte 20 de rezultate, cu Arată următoarele rezultate și reîncărcare.
+Nu mai este necesară descărcarea unui fișier pentru vizualizare.
+Migrarea, verificarea CMS și consola Debug au de asemenea panouri cerere/rezultat.
+
+Pentru înrolare, activare, schimbare/resetare PIN și scriere, bifați confirmarea
+vizibilă înainte de Execută. Formularul verifică această alegere înainte de a
+trimite cererea; API-ul continuă să ceară `confirm: true`.
+În consola Debug, bifarea confirmării explicite a unei cereri `POST /jobs`
+pentru aceste operații setează și `confirm: true` în JSON-ul trimis. Confirmarea
+se resetează după trimitere și la schimbarea exemplului/operației.
 </pre>
