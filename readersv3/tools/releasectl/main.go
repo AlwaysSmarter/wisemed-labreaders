@@ -441,6 +441,11 @@ func runPackageAll(root string, args []string) error {
 }
 
 func buildRuntime(root string, app appInfo, target string, ti targetInfo, versionOverride string) (runtimeManifest, error) {
+	if app.ID == "wismed-pias-ecard" {
+		if err := validateECardPayload(root); err != nil {
+			return runtimeManifest{}, err
+		}
+	}
 	if app.ID == "esignature-server" && target != "windows-386" {
 		return runtimeManifest{}, fmt.Errorf("esignature-server requires windows-386 for the bundled Signotec x86 DLL")
 	}
@@ -680,8 +685,8 @@ func packageWindows(root string, manifest runtimeManifest) (artifactInfo, error)
 		"--version", manifest.PackageVersion,
 		"--arch", manifest.GOARCH,
 	}
-	if manifest.App.ID == "wisemed-ai" {
-		args = append(args, "--icon", filepath.Join(root, "resources", "app-icons", "ico", "wisemed-ai.ico"))
+	if manifest.App.ID == "wisemed-ai" || manifest.App.ID == "wismed-pias-ecard" {
+		args = append(args, "--icon", filepath.Join(root, "resources", "app-icons", "ico", manifest.App.ID+".ico"))
 	}
 	logf("building NSIS installer for %s %s", manifest.App.ID, manifest.Target)
 	if err := runCommand(root, nil, args[0], args[1:]...); err != nil {

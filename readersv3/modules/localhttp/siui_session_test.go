@@ -7,7 +7,7 @@ import (
 )
 
 func TestSIUISessionSigningUsesPrivateRuntimeKey(t *testing.T) {
-	for _, protocol := range []string{"siui", "siui-history", "siui-data", "html-print-formatter"} {
+	for _, protocol := range []string{"ecard", "siui", "siui-history", "siui-data", "html-print-formatter"} {
 		t.Run(protocol, func(t *testing.T) {
 			rt := &wssSecretRuntime{services: map[string]interface{}{"analyzer-config": map[string]interface{}{"protocol": protocol}}}
 			first := &Module{rt: rt, utilitySessionKey: bytes.Repeat([]byte{1}, 32)}

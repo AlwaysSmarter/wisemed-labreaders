@@ -1,0 +1,104 @@
+[
+  {
+    "sdk": "2.0.0.4",
+    "file": "2.0.0.4/Ceas.eCard.SDK.dll",
+    "source": "docs/CNAS/eCard.SDK.2.0.0.4/Ceas.eCard.SDK.dll",
+    "sha256": "ceeedba57dfcbb96639095e9abcb935674ae4054b0e462064a01bdc092b40ce4"
+  },
+  {
+    "sdk": "2.0.0.3",
+    "file": "2.0.0.3/Ceas.eCard.SDK.dll",
+    "source": "docs/CNAS/eCard.SDK.2.0.0.3/Ceas.eCard.SDK.dll",
+    "sha256": "8e947cf9508f6fbd2f4ec3e3b1a556702ade76a76663d45b40716d0df4f00a6a"
+  },
+  {
+    "sdk": "1.3.0.4",
+    "file": "1.3.0.4/Ceas.eCard.SDK.dll",
+    "source": "docs/CNAS/eCard.SDK.1.3.0.4/Ceas.eCard.SDK.dll",
+    "sha256": "247b153dd0296bfa563ff281b8f9a906d2ad6461eefb62ca1f8d28fa8888dbb6"
+  },
+  {
+    "sdk": "1.3.0.4",
+    "file": "1.3.0.4/BouncyCastle.Crypto.dll",
+    "source": "docs/CNAS/eCard.SDK.1.3.0.4/BouncyCastle.Crypto.dll",
+    "sha256": "8063ac472e4d34d086ac22b003d2027137b367652f92c111e6076ff98d1c8580"
+  },
+  {
+    "sdk": "1.3.0.4",
+    "file": "1.3.0.4/Newtonsoft.Json.dll",
+    "source": "docs/CNAS/eCard.SDK.1.3.0.4/Newtonsoft.Json.dll",
+    "sha256": "500eb5560aae4d3a4d7dc4c61a880906ed0231f1a636113f74778b86eaf979b1"
+  },
+  {
+    "sdk": "1.3.0.2",
+    "file": "1.3.0.2/Ceas.eCard.SDK.dll",
+    "source": "docs/CNAS/eCard.SDK.1.3.0.2/Ceas.eCard.SDK.dll",
+    "sha256": "a213e5b6554234dacecb34785a22c5ec418117f47d037b2b884466592c94df79"
+  },
+  {
+    "sdk": "1.3.0.2",
+    "file": "1.3.0.2/BouncyCastle.Crypto.dll",
+    "source": "docs/CNAS/eCard.SDK.1.3.0.2/BouncyCastle.Crypto.dll",
+    "sha256": "8063ac472e4d34d086ac22b003d2027137b367652f92c111e6076ff98d1c8580"
+  },
+  {
+    "sdk": "1.3.0.2",
+    "file": "1.3.0.2/Newtonsoft.Json.dll",
+    "source": "docs/CNAS/eCard.SDK.1.3.0.2/Newtonsoft.Json.dll",
+    "sha256": "500eb5560aae4d3a4d7dc4c61a880906ed0231f1a636113f74778b86eaf979b1"
+  },
+  {
+    "sdk": "1.3.0.1",
+    "file": "1.3.0.1/Ceas.eCard.SDK.dll",
+    "source": "docs/CNAS/eCard.SDK.1.3.0.1/Ceas.eCard.SDK.dll",
+    "sha256": "c3949391ad2778f61b0641742481fb1efd6f4604b2b9a44c68ea539b83f4df3e"
+  },
+  {
+    "sdk": "1.3.0.1",
+    "file": "1.3.0.1/BouncyCastle.Crypto.dll",
+    "source": "docs/CNAS/eCard.SDK.1.3.0.2/BouncyCastle.Crypto.dll",
+    "sha256": "8063ac472e4d34d086ac22b003d2027137b367652f92c111e6076ff98d1c8580"
+  },
+  {
+    "sdk": "1.3.0.1",
+    "file": "1.3.0.1/Newtonsoft.Json.dll",
+    "source": "docs/CNAS/eCard.SDK.1.3.0.2/Newtonsoft.Json.dll",
+    "sha256": "500eb5560aae4d3a4d7dc4c61a880906ed0231f1a636113f74778b86eaf979b1"
+  },
+  {
+    "sdk": "1.2.0.1",
+    "file": "1.2.0.1/Ceas.eCard.SDK.dll",
+    "source": "docs/CNAS/eCard.SDK.1.2.0.1/Ceas.eCard.SDK.dll",
+    "sha256": "5d4fa05b2f1905ae075480a309b748c85ac5ce65f9b0f9b7faf5b5a24ab8c357"
+  },
+  {
+    "sdk": "1.2.0.1",
+    "file": "1.2.0.1/BouncyCastle.Crypto.dll",
+    "source": "docs/CNAS/eCard.SDK.1.2.0.1/BouncyCastle.Crypto.dll",
+    "sha256": "8063ac472e4d34d086ac22b003d2027137b367652f92c111e6076ff98d1c8580"
+  },
+  {
+    "sdk": "1.2.0.1",
+    "file": "1.2.0.1/Newtonsoft.Json.dll",
+    "source": "docs/CNAS/eCard.SDK.1.2.0.1/Newtonsoft.Json.dll",
+    "sha256": "500eb5560aae4d3a4d7dc4c61a880906ed0231f1a636113f74778b86eaf979b1"
+  },
+  {
+    "sdk": "thinkit-1.3.1.4",
+    "file": "thinkit-1.3.1.4/titCeas.eCard.SDK.dll",
+    "source": "old-src/WiseMEDeCARDManager/bin/Release/titCeas.eCard.SDK.dll",
+    "sha256": "ef28d0301d1b2366ecbed28eeffb749f353c16c5ba7cf272e85320db41e72c23"
+  },
+  {
+    "sdk": "thinkit-1.3.1.4",
+    "file": "thinkit-1.3.1.4/BouncyCastle.Crypto.dll",
+    "source": "old-src/WiseMEDeCARDManager/bin/Release/BouncyCastle.Crypto.dll",
+    "sha256": "8063ac472e4d34d086ac22b003d2027137b367652f92c111e6076ff98d1c8580"
+  },
+  {
+    "sdk": "thinkit-1.3.1.4",
+    "file": "thinkit-1.3.1.4/Newtonsoft.Json.dll",
+    "source": "old-src/WiseMEDeCARDManager/bin/Release/Newtonsoft.Json.dll",
+    "sha256": "500eb5560aae4d3a4d7dc4c61a880906ed0231f1a636113f74778b86eaf979b1"
+  }
+]

@@ -1,0 +1,49 @@
+package ecard
+
+import (
+	"encoding/json"
+	"errors"
+	"net/http"
+	"wisemed-labreaders/readersv3/core/config"
+)
+
+func (m *Module) saveSettings(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		SDKOrder []string `json:"sdk_order"`
+		Reader   string   `json:"reader_name"`
+		UMHost   string   `json:"um_host"`
+		UMPort   int      `json:"um_port"`
+	}
+	if e := decode(w, r, &in); e != nil {
+		fail(w, 400, e)
+		return
+	}
+	b, _ := json.Marshal(in)
+	var values map[string]interface{}
+	_ = json.Unmarshal(b, &values)
+	if _, e := readSettings(values); e != nil {
+		fail(w, 400, e)
+		return
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if len(m.active) != 0 || len(m.queue) != 0 {
+		fail(w, 409, errors.New("wait for queued/running card jobs"))
+		return
+	}
+	cfg, e := config.Load(m.rt.ConfigPath())
+	if e != nil {
+		fail(w, 500, errors.New("cannot load config"))
+		return
+	}
+	settings := cfg.ModuleSettings("ecard")
+	for k, v := range values {
+		settings[k] = v
+	}
+	if e = cfg.Save(); e != nil {
+		fail(w, 500, errors.New("cannot save config"))
+		return
+	}
+	// Running workers read an immutable settings snapshot. Apply on restart.
+	respond(w, 200, map[string]interface{}{"ok": true, "restart_required": true, "saved": in})
+}

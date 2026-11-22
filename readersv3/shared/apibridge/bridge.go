@@ -93,6 +93,9 @@ func Invoke(ctx context.Context, handler http.Handler, p Principal, in Request) 
 		return out, errors.New("invalid content type")
 	}
 	timeout := 30 * time.Second
+	if u.Path == "/api/ecard/sign/batch" && method == "POST" && u.Query().Get("async") != "true" {
+		timeout = 2 * time.Hour
+	}
 	// The formatter's JSON data endpoint enforces its own overall deadline
 	// (at most ten minutes). Preserve cancellation from the WSS session.
 	if (u.Path == "/api/html-print-formatter/render" || u.Path == "/api/html-print-formatter/pdf") && method == "POST" {

@@ -10,6 +10,7 @@ import (
 	"wisemed-labreaders/readersv3/modules/dailydetails"
 	"wisemed-labreaders/readersv3/modules/dailyorders"
 	"wisemed-labreaders/readersv3/modules/dashboard"
+	"wisemed-labreaders/readersv3/modules/ecard"
 	"wisemed-labreaders/readersv3/modules/events"
 	"wisemed-labreaders/readersv3/modules/help"
 	"wisemed-labreaders/readersv3/modules/htmlprintformatter"
@@ -52,6 +53,7 @@ import (
 )
 
 func RegisterAll(reg *module.Registry) {
+	reg.Register("ecard", ecard.New)
 	reg.Register("local-http", localhttp.New)
 	reg.Register("storage-sqlite", sqlitestorage.New)
 	reg.Register("events", events.New)

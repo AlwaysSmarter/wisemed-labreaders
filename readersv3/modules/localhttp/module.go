@@ -3165,7 +3165,7 @@ func (m *Module) analyzerSetting(key, fallback string) string {
 }
 
 func (m *Module) loginOnlyUtility() bool {
-	return m.analyzerSetting("protocol", "") == "html-print-formatter" || m.wiseMEDAIUtility()
+	return m.analyzerSetting("protocol", "") == "ecard" || m.analyzerSetting("protocol", "") == "html-print-formatter" || m.wiseMEDAIUtility()
 }
 
 func (m *Module) wiseMEDAIUtility() bool {
@@ -3815,7 +3815,7 @@ func (m *Module) supportedCommTypes() []string {
 			add("serial")
 		case "seegene-excel", "beosl-csv", "cfx96-quantitation", "cary60-uvvis", "analytikjena-plasmaquantms-elite", "shimatzu-tocl", "shimatzu-generic", "biosan-hipo-mpp96", "gammavision", "tricarb-5110-tr", "anatolia-geneworks", "generic-file":
 			add("file")
-		case "barcodeprinter", "anaf-docsmart", "signing-pad", "siui", "siui-history", "siui-data", "html-print-formatter", "wisemed-ai":
+		case "ecard", "barcodeprinter", "anaf-docsmart", "signing-pad", "siui", "siui-history", "siui-data", "html-print-formatter", "wisemed-ai":
 			add("utility")
 		}
 	}

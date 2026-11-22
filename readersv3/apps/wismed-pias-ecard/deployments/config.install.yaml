@@ -1,0 +1,75 @@
+reader:
+  id: wismed-pias-ecard
+  label: PIAS eCard
+  analyzer_name: WiseMED PIAS eCard
+  analyzer_code: wismed-pias-ecard
+  db_name: wismed-pias-ecard.db
+logging:
+  verbose_level: 0
+local_http:
+  enabled: true
+  address: 127.0.0.1:19124
+  language: ro
+  tls: false
+wisemed_ws:
+  enabled: false
+  url: wss://wslocal.wisemed.eu/ws
+  heartbeat_ms: 15000
+  reconnect_delay_ms: 30000
+analyzer:
+  comm_type: utility
+  protocol: ecard
+modules:
+  local-http:
+    enabled: true
+    address: 127.0.0.1:19124
+    language: ro
+    tls: false
+    cors_allowed_origins: ""
+  events:
+    enabled: true
+  help:
+    help_dir: ./help
+  app-updates:
+    enabled: true
+    app_id: wismed-pias-ecard
+    channel: stable
+    base_url: http://127.0.0.1:19090
+    auto_download: true
+    download_dir: ./updates
+  wisemed-api:
+    cfg_wisemed_protocol: https
+    cfg_wisemed_ip: ""
+    cfg_wisemed_port: "443"
+    cfg_wisemed_path: /wisemed-api/apiv2
+    cfg_wisemed_key: ""
+  wisemed-ws:
+    enabled: false
+    url: wss://wslocal.wisemed.eu/ws
+    auth_mode: device_key
+    tenant_id: ""
+    key_id: ""
+    issuer: ""
+    audience: wsm-server
+    subject: ""
+    secret_file: ""
+    token_file: ""
+    token_path: ""
+    ca_file: ""
+    heartbeat_ms: 15000
+    reconnect_delay_ms: 30000
+  ecard:
+    sdk_order: ["2.0.0.4", "2.0.0.3", "thinkit-1.3.1.4", "1.3.0.4", "1.3.0.2", "1.3.0.1", "1.2.0.1"]
+    sdk_root: ./sdks
+    host_dir: ./host
+    state_dir: ./ecard-state
+    reader_name: ""
+    um_host: umceas.siui.ro
+    um_port: 443
+    operation_timeout_seconds: 180
+    job_timeout_seconds: 7200
+    max_items: 100000
+    max_item_bytes: 65536
+    max_job_bytes: 268435456
+    max_jobs: 32
+    retention_hours: 24

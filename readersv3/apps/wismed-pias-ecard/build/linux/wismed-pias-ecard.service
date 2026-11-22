@@ -1,0 +1,17 @@
+[Unit]
+Description=WiseMED readersv3 Wismed Pias Ecard background service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/wismed-pias-ecard
+ExecStart=/opt/wismed-pias-ecard/wismed-pias-ecard -config deployments/config.yaml -headless
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
