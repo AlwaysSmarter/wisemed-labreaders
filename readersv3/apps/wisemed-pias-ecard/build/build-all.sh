@@ -2,4 +2,4 @@
 set -euo pipefail
 
 cd "$(dirname "$0")/../../.."
-go run ./tools/releasectl build-all --app wismed-pias-ecard "$@"
+go run ./tools/releasectl build-all --app wisemed-pias-ecard "$@"

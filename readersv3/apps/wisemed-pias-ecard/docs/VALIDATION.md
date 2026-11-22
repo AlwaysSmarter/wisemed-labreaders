@@ -49,7 +49,7 @@ certificate prin testele Go cu backend simulat.
 
 - Host Windows .NET x86: **compilat**, inclus în deployments/host, hash verificat.
 - Serviciu Go macOS arm64 v0.1.0: **compilat**, în
-  `readersv3/output/wismed-pias-ecard/wismed-pias-ecard`.
+  `readersv3/output/wisemed-pias-ecard/wisemed-pias-ecard`.
 - Smoke real la 127.0.0.1:19124: `/healthz` OK; `/api/ecard/health` fără sesiune
   returnează 401; `/api/modules` listează numai local-http, events, wisemed-api,
   wisemed-ws, login, help, ecard. Procesul de test a fost oprit.
@@ -59,8 +59,15 @@ certificate prin testele Go cu backend simulat.
 - Installerul și ZIP-ul extrase și comparate byte-cu-byte cu runtime-ul și
   sursele deployments: toate cele șapte SDK-uri și hostul incluse, fără config.yaml,
   TDX, chei locale, baze de date sau loguri. Dimensiunile și SHA-256 corespund
-  metadatelor `dist/releases/wismed-pias-ecard/windows-amd64/0.1.0.json`.
+  metadatelor `dist/releases/wisemed-pias-ecard/windows-amd64/0.1.0.json`.
 - Blocajul de spațiu a fost rezolvat de utilizator. NSIS local necesită locale
   UTF-8 explicit: `LC_ALL=en_US.UTF-8 LANG=en_US.UTF-8` înaintea comenzii release.
 - Testele releasectl au trecut după modificarea pentru iconul installerului.
 - Installerul nu a fost executat pe Windows; testele fizice de mai sus rămân necesare.
+
+## Redenumire 2026-11-22
+
+Rezultatele buildurilor Windows din 2026-11-21 sunt istorice, pentru numele
+anterior. Numele canonic este acum `wisemed-pias-ecard`. Pachetele vechi au fost
+eliminate; noile pachete Windows vor fi compilate de utilizator pe Update Server.
+Nu se declară pachete Windows generate local sub noul nume.

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-APP_ID="wismed-pias-ecard"
-SERVICE_NAME="wisemed-wismed-pias-ecard"
+APP_ID="wisemed-pias-ecard"
+SERVICE_NAME="wisemed-wisemed-pias-ecard"
 
 sudo systemctl disable --now "${SERVICE_NAME}.service" || true
 sudo rm -f "/usr/lib/systemd/system/${SERVICE_NAME}.service"

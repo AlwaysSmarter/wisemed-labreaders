@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-APP_ID="wismed-pias-ecard"
-BUNDLE_ID="eu.wisemed.readersv3.wismed.pias.ecard"
+APP_ID="wisemed-pias-ecard"
+BUNDLE_ID="eu.wisemed.readersv3.wisemed.pias.ecard"
 SOURCE_DIR="$(cd "$(dirname "$0")" && pwd)"
 INSTALL_DIR="/usr/local/${APP_ID}"
 

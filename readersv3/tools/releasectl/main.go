@@ -441,7 +441,7 @@ func runPackageAll(root string, args []string) error {
 }
 
 func buildRuntime(root string, app appInfo, target string, ti targetInfo, versionOverride string) (runtimeManifest, error) {
-	if app.ID == "wismed-pias-ecard" {
+	if app.ID == "wisemed-pias-ecard" {
 		if err := validateECardPayload(root); err != nil {
 			return runtimeManifest{}, err
 		}
@@ -685,7 +685,7 @@ func packageWindows(root string, manifest runtimeManifest) (artifactInfo, error)
 		"--version", manifest.PackageVersion,
 		"--arch", manifest.GOARCH,
 	}
-	if manifest.App.ID == "wisemed-ai" || manifest.App.ID == "wismed-pias-ecard" {
+	if manifest.App.ID == "wisemed-ai" || manifest.App.ID == "wisemed-pias-ecard" {
 		args = append(args, "--icon", filepath.Join(root, "resources", "app-icons", "ico", manifest.App.ID+".ico"))
 	}
 	logf("building NSIS installer for %s %s", manifest.App.ID, manifest.Target)

@@ -1,4 +1,4 @@
-# wismed-pias-ecard
+# wisemed-pias-ecard
 
 Utilitar WiseMED PIAS eCard: serviciu Windows pentru card de sănătate / CEI,
 API local autentificat și același API prin WSM. Nu include modulele de laborator
@@ -19,10 +19,10 @@ API local autentificat și același API prin WSM. Nu include modulele de laborat
 Din directorul aplicației:
 
 ```powershell
-.\wismed-pias-ecard.exe -version
-.\wismed-pias-ecard.exe -config deployments/config.yaml -showlog
-.\wismed-pias-ecard.exe -installservice
-.\wismed-pias-ecard.exe -headless
+.\wisemed-pias-ecard.exe -version
+.\wisemed-pias-ecard.exe -config deployments/config.yaml -showlog
+.\wisemed-pias-ecard.exe -installservice
+.\wisemed-pias-ecard.exe -headless
 ```
 
 Sunt moștenite `-config`, `-headless`, `-installservice`, `-reconfigure`,
@@ -32,7 +32,7 @@ Configurați API-ul WiseMED și autentificați-vă în shell-ul comun. Setări �
 configurează conexiunea și identitatea echipamentului. WSM este oprit implicit
 până există configurarea reală; nu sunt livrate credențiale inventate.
 Actualizările comune sunt activate implicit, canal `stable`, app_id exact
-`wismed-pias-ecard`; adresa implicită este cea a utilitarelor existente.
+`wisemed-pias-ecard`; adresa implicită este cea a utilitarelor existente.
 
 Structura standard a repository-ului folosește numele **deployments/**. Toate
 SDK-urile, hostul și ajutorul sunt incluse acolo în installer și în update.
@@ -60,12 +60,12 @@ pentru a împiedica reluarea semnării după expirarea rezultatelor.
 ```sh
 cd readersv3
 go test -race ./modules/ecard ./modules/localhttp ./shared/apibridge ./apps/runner
-make release APP=wismed-pias-ecard TARGET=windows-amd64
-scripts/prepare-reader-output.sh wismed-pias-ecard
+make release APP=wisemed-pias-ecard TARGET=windows-amd64
+scripts/prepare-reader-output.sh wisemed-pias-ecard
 ```
 
 Hostul se reconstruiește pe Windows cu
-`apps/wismed-pias-ecard/deployments/host/build-host.ps1`, sau multiplatformă cu
+`apps/wisemed-pias-ecard/deployments/host/build-host.ps1`, sau multiplatformă cu
 `scripts/build-host.sh` și variabilele DOTNET, CSC_DLL, NET48_REFS (Roslyn 4.8 și
 reference assemblies .NET Framework 4.8). Actualizați și manifestul hostului după
 rebuild. Nu publicați un release cu un EXE vechi față de sursă.

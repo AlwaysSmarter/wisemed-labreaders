@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-APP_ID="wismed-pias-ecard"
-SERVICE_NAME="wisemed-wismed-pias-ecard"
+APP_ID="wisemed-pias-ecard"
+SERVICE_NAME="wisemed-wisemed-pias-ecard"
 SOURCE_DIR="$(cd "$(dirname "$0")" && pwd)"
 INSTALL_DIR="/opt/${APP_ID}"
 

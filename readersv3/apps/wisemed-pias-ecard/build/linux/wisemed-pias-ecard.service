@@ -1,13 +1,13 @@
 [Unit]
-Description=WiseMED readersv3 Wismed Pias Ecard background service
+Description=WiseMED readersv3 Wisemed Pias Ecard background service
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=simple
 User=root
-WorkingDirectory=/opt/wismed-pias-ecard
-ExecStart=/opt/wismed-pias-ecard/wismed-pias-ecard -config deployments/config.yaml -headless
+WorkingDirectory=/opt/wisemed-pias-ecard
+ExecStart=/opt/wisemed-pias-ecard/wisemed-pias-ecard -config deployments/config.yaml -headless
 Restart=on-failure
 RestartSec=5
 StandardOutput=journal

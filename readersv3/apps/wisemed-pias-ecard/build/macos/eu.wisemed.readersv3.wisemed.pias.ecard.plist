@@ -3,10 +3,10 @@
 <plist version="1.0">
 <dict>
   <key>Label</key>
-  <string>eu.wisemed.readersv3.wismed.pias.ecard</string>
+  <string>eu.wisemed.readersv3.wisemed.pias.ecard</string>
   <key>ProgramArguments</key>
   <array>
-    <string>/usr/local/wismed-pias-ecard/wismed-pias-ecard</string>
+    <string>/usr/local/wisemed-pias-ecard/wisemed-pias-ecard</string>
     <string>-config</string>
     <string>deployments/config.yaml</string>
     <string>-headless</string>
@@ -16,10 +16,10 @@
   <key>KeepAlive</key>
   <true/>
   <key>WorkingDirectory</key>
-  <string>/usr/local/wismed-pias-ecard</string>
+  <string>/usr/local/wisemed-pias-ecard</string>
   <key>StandardOutPath</key>
-  <string>/var/log/wismed-pias-ecard.log</string>
+  <string>/var/log/wisemed-pias-ecard.log</string>
   <key>StandardErrorPath</key>
-  <string>/var/log/wismed-pias-ecard.log</string>
+  <string>/var/log/wisemed-pias-ecard.log</string>
 </dict>
 </plist>

@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <service>
-  <id>wisemed-wismed-pias-ecard</id>
-  <name>WiseMED Wismed Pias Ecard</name>
-  <description>WiseMED readersv3 Wismed Pias Ecard background service</description>
-  <executable>wismed-pias-ecard.exe</executable>
+  <id>wisemed-wisemed-pias-ecard</id>
+  <name>WiseMED Wisemed Pias Ecard</name>
+  <description>WiseMED readersv3 Wisemed Pias Ecard background service</description>
+  <executable>wisemed-pias-ecard.exe</executable>
   <arguments>-config deployments\config.yaml -headless</arguments>
   <stoptimeout>15sec</stoptimeout>
   <startmode>Automatic</startmode>

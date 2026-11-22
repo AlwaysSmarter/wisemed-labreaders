@@ -13,7 +13,7 @@ import (
 // Fail the release before building if the bundled host is stale or SDK payloads
 // have been omitted/changed. Runtime keys, TDX and logs are never release inputs.
 func validateECardPayload(root string) error {
-	base := filepath.Join(root, "apps", "wismed-pias-ecard", "deployments")
+	base := filepath.Join(root, "apps", "wisemed-pias-ecard", "deployments")
 	raw, e := os.ReadFile(filepath.Join(base, "host", "manifest.json"))
 	if e != nil {
 		return e

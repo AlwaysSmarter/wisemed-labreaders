@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-APP_ID="wismed-pias-ecard"
-BUNDLE_ID="eu.wisemed.readersv3.wismed.pias.ecard"
+APP_ID="wisemed-pias-ecard"
+BUNDLE_ID="eu.wisemed.readersv3.wisemed.pias.ecard"
 
 sudo launchctl bootout system "/Library/LaunchDaemons/${BUNDLE_ID}.plist" >/dev/null 2>&1 || true
 sudo rm -f "/Library/LaunchDaemons/${BUNDLE_ID}.plist"

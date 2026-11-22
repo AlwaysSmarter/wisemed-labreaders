@@ -1,9 +1,9 @@
 reader:
-  id: wismed-pias-ecard
+  id: wisemed-pias-ecard
   label: PIAS eCard
   analyzer_name: WiseMED PIAS eCard
-  analyzer_code: wismed-pias-ecard
-  db_name: wismed-pias-ecard.db
+  analyzer_code: wisemed-pias-ecard
+  db_name: wisemed-pias-ecard.db
 logging:
   verbose_level: 0
 local_http:
@@ -32,7 +32,7 @@ modules:
     help_dir: ./help
   app-updates:
     enabled: true
-    app_id: wismed-pias-ecard
+    app_id: wisemed-pias-ecard
     channel: stable
     base_url: http://127.0.0.1:19090
     auto_download: true

@@ -1,11 +1,11 @@
-# Checkpoint — wismed-pias-ecard
+# Checkpoint — wisemed-pias-ecard
 
 Cerere: utilitar exclusiv (service, CLI, WiseMED login/API, WSM, update), SDK-uri
 împachetate și selectabile în ordine, fallback la citire, migrare TDX numai
 explicită, CEAS/CEI, batch mare, un call API sincron opțional. Semnare protejată
 prin CNP/CID: CNP vid sau 0000000000000 cere CID; CNP normal diferit respinge.
 
-Implementat în `modules/ecard` și `apps/wismed-pias-ecard`:
+Implementat în `modules/ecard` și `apps/wisemed-pias-ecard`:
 - sesiuni autentificate comune și acces WSM via api.request;
 - host .NET Framework 4.8 x86 separat per SDK, IPC prin pipes;
 - șapte SDK-uri incluse, thinkIT după pachetul 2.0.0.3; manifest SHA-256;
@@ -30,22 +30,21 @@ pe 19124 și refuzul accesului neautentificat verificate; proces oprit.
 NU s-au făcut apeluri CNAS, login WiseMED real, test hardware Windows sau publish.
 NU s-a migrat/scris vreun TDX real. Fișierele HITMED nu sunt în pachete.
 
-## Release Windows finalizat — 2026-11-21
+## Redenumire — 2026-11-22
 
-Utilizatorul a eliberat spațiul. Buildul standard Windows amd64 0.1.0,
-installerul NSIS și arhiva de update au fost generate și verificate local:
-- `readersv3/dist/installers/wismed-pias-ecard-0.1.0-Setup.exe`
-- `readersv3/dist/updates/wismed-pias-ecard-0.1.0-windows-amd64.zip`
-- metadate și SHA-256: `readersv3/dist/releases/wismed-pias-ecard/windows-amd64/0.1.0.json`.
+Numele canonic este `wisemed-pias-ecard`: director apps, app_id pentru update,
+configurări, scripturi de build/service, resurse icon, documentație și output local.
+Maparea Update Server este descoperită din config.install.yaml; nu necesită
+modificarea codului serverului sau un alias. Testul ECardReleaseMapping verifică
+ID-ul și directorul sursă corecte.
 
-Ambele pachete au fost extrase; toate fișierele deployments și executabilul
-corespund byte-cu-byte sursei/runtime-ului, inclusiv cele șapte SDK-uri și hostul.
-Fără config.yaml, TDX, chei locale, DB sau loguri. Installerul include iconul eCard.
-Testele releasectl au trecut după includerea iconului.
+Pachetele Windows v0.1.0 construite și verificate pe 2026-11-21 aveau numele vechi.
+Artefactele generate cu numele vechi au fost eliminate. La cererea utilizatorului,
+nu se reconstruiesc aici: compilarea cu noul nume se face pe Update Server.
+Starea și configurația output-ului local au fost păstrate la redenumire.
 
-NSIS local se prăbușea la autotest din cauza locale-ului; compilarea a reușit cu:
-`LC_ALL=en_US.UTF-8 LANG=en_US.UTF-8 go run ./tools/releasectl release --app wismed-pias-ecard --target windows-amd64 --version 0.1.0`.
-Nu s-a modificat instalarea globală NSIS. Artefactele nu au fost publicate.
+NSIS pe acest Mac necesită locale UTF-8 explicit (`LC_ALL=en_US.UTF-8
+LANG=en_US.UTF-8`) pentru a evita căderea la autotest.
 
 ## Validare rămasă
 
