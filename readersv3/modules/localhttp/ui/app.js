@@ -857,6 +857,7 @@ const state = {
  signatureSocket: null,
   utilityMode: false,
   formatterMode: false,
+  ecardMode: false,
   formatterPDFURL: null,
   barcodeSettings: {},
   barcodePrinters: [],
@@ -1375,6 +1376,74 @@ function applyWiseMEDAIUI() {
   if (dashboard) dashboard.hidden = !!window.WSM_REMOTE;
 }
 
+function applyECardUI() {
+  state.utilityMode=true;state.barcodeMode=false;
+  for (const name of ["orders", "qc", "daily-details"]) {
+    const link = barcodeNavButton(name); if (link) link.hidden = true;
+  }
+  for (const id of ["analyzer-pill", "result-sync-pill", "daily-analysis-filter-pill", "debug-communication-link"]) {
+    const node = document.getElementById(id); if (node) node.hidden = true;
+  }
+  document.querySelectorAll("#settings-panel-reader .settings-section-transport, #settings-panel-reader .settings-section-results").forEach(node => node.hidden = true);
+  // Keep server identity and update controls, without unused analyzer/database fields.
+  for (const name of ["analyzer_name", "analyzer_code", "db_name", "sqlite_path"]) {
+    const field = els.readerSettingsForm?.elements.namedItem(name); if (field) field.closest("label").hidden = true;
+  }
+  for (const id of ["today-donut", "qc-summary", "line-chart"]) {
+    const node = document.getElementById(id); if (node) node.closest("article").hidden = true;
+  }
+  if (els.settingsSubmenu) els.settingsSubmenu.hidden = false;
+  els.navSublinks.forEach(link => {
+    if (link.dataset.settingsSubview) link.hidden = !["reader", "wss"].includes(link.dataset.settingsSubview);
+    if (link.dataset.settingsSubview === "reader") link.textContent = "Server și actualizări";
+  });
+  for (const [id, label] of [["reader-eyebrow", "UTILITAR"], ["reader-summary-title", "PIAS eCard"], ["reader-settings-title", "Server și actualizări"]]) {
+    const node = document.getElementById(id); if (node) node.textContent = label;
+  }
+  for (const name of ["history", "operations"]) { const link=barcodeNavButton(name); if(link)link.hidden=true; }
+  const debug=barcodeNavButton("debug");if(debug){debug.hidden=false;debug.textContent="Debug eCard";}
+  if(!document.getElementById("ecard-settings-nav")){const link=document.createElement("button");link.id="ecard-settings-nav";link.className="nav-sublink";link.textContent="Cititor și terminal eCard";link.onclick=()=>{window.history.pushState({},"","/settings/ecard");activateView("analytes",false)};els.settingsSubmenu.append(link);}
+  document.title="WiseMED · PIAS eCard";
+  const idLabel=els.readerSettingsForm?.elements.namedItem("reader_id")?.closest("label")?.querySelector("span");if(idLabel)idLabel.textContent="ID utilitar";
+  const save=els.readerSettingsForm?.querySelector('[type="submit"]');if(save)save.textContent="Salvează configurația";
+  const overview=barcodeNavButton("overview");if(overview)overview.textContent="PIAS eCard";
+  const summary=document.getElementById("reader-summary-card");if(summary)summary.hidden=true;
+  if (!document.getElementById("ecard-workspace")) {
+    const panel=document.createElement("article");panel.id="ecard-workspace";panel.className="panel full-span";
+    panel.innerHTML='<h3>Terminal PIAS eCard</h3><p>Citire card CEAS / CI, semnare batch, operații PIN și înrolare.</p><pre id="ecard-status" role="status">Se încarcă…</pre><button type="button" id="ecard-refresh">Actualizează starea</button><p><a id="ecard-open" href="/ecard/">Deschide operațiile cardului și configurarea terminalului</a></p><p>Semnarea verifică CNP/CID; pentru CNP vid sau anonimizat este necesar CID. Înrolarea și migrarea TDX sunt operații explicite.</p>';
+    els.views.overview.insertBefore(panel,els.logsPanel);
+    document.getElementById("ecard-refresh").onclick=()=>loadECardDashboard();
+    const link=document.getElementById("ecard-open");link.href="/debug/ecard";link.onclick=event=>{event.preventDefault();activateView("debug")};
+    loadECardDashboard();
+  }
+}
+
+// Expose only the eCard namespace to the trusted embedded utility UI. The parent
+// fetch adapter preserves authenticated HTTP / WSM transport and response status.
+window.wiseMEDECardRequest=async(path,method,body)=>{
+ if(!/^(health|ui|settings|sign\/(batch|verify)|jobs(?:\/[^/?]+(?:\/(items|start|pin|cancel|results))?)?|tdx\/(preview|migrate))(?:\?[^#]*)?$/.test(path))throw Error("Endpoint eCard invalid");
+ const response=await fetch("/api/ecard/"+path,{method,credentials:"same-origin",headers:{"Content-Type":"application/json"},body:body===undefined?undefined:JSON.stringify(body)});
+ return {ok:response.ok,status:response.status,data:await response.json()};
+};
+async function mountECardPanel(mode) {
+ const id=mode==="settings"?"settings-panel-ecard":"ecard-debug-panel";
+ let panel=document.getElementById(id);
+ if(panel){panel.hidden=false;return;}
+ panel=document.createElement("article");panel.id=id;panel.className="panel full-span";
+ const container=mode==="settings"?els.views.analytes:els.views.debug;
+ if(mode!=="settings")Array.from(container.children).forEach(node=>node.hidden=true);
+ container.append(panel);panel.textContent="Se încarcă interfața eCard…";
+ try{const data=await api("/api/ecard/ui");const frame=document.createElement("iframe");frame.title=mode==="settings"?"Configurare cititor eCard":"Debug endpointuri eCard";frame.dataset.mode=mode;frame.style="width:100%;height:78vh;border:0";frame.srcdoc=data.html;panel.replaceChildren(frame);}catch(error){panel.textContent=error.message;const retry=document.createElement("button");retry.textContent="Reîncearcă";retry.onclick=()=>{panel.remove();mountECardPanel(mode)};panel.append(retry);}
+}
+
+async function loadECardDashboard() {
+  const node=document.getElementById("ecard-status");if(!node)return;
+  try {
+    const [health,settings]=await Promise.all([api("/api/ecard/health"),api("/api/ecard/settings")]);
+    node.textContent=["Serviciu: "+(health.ok?"disponibil":"indisponibil"),"Acces hardware: "+(health.hardware_supported?"platformă Windows":"necesită Windows"),"Cititor configurat: "+(settings.reader_name||"selecție automată"),"UM: "+settings.um_host+":"+settings.um_port,"Ordine SDK: "+health.sdk_order.join(" → "),"Batch: semnare secvențială pe același card; maximum "+settings.max_items+" texte","Starea cardului se verifică explicit în operațiile cardului."].join("\n");
+  } catch(error) {node.textContent="Starea eCard nu poate fi citită: "+error.message;}
+}
+
 function applyHTMLFormatterUI() {
   for (const name of ["orders", "qc", "daily-details"]) {
     const link = barcodeNavButton(name); if (link) link.hidden = true;
@@ -1489,6 +1558,7 @@ function barcodeNavButton(viewName) {
 }
 
 function applyBarcodeModeUI() {
+ if(state.ecardMode) {applyECardUI();return;}
  if(state.aiMode) {applyWiseMEDAIUI();return;}
  for(const id of ["siui-data-versions-nav","siui-data-setup-nav"]){const link=document.getElementById(id);if(link)link.hidden=!isSIUIDataMode()||!!window.WSM_REMOTE;}
  if(isSIUIDataMode()) {
@@ -1566,7 +1636,7 @@ async function onLanguageChange(event) {
   syncLanguageControls();
   applyLanguage();
   if (!els.dashboardView.hidden) {
-    if (state.formatterMode || state.aiMode) {
+    if (state.ecardMode || state.formatterMode || state.aiMode) {
       await Promise.all([loadStatus(), loadLogs(), loadReaderSettings()]);
     } else if (isSIUIMode() || isHistoryMode()) {
       await Promise.all([loadStatus(), loadLogs(), loadReaderSettings()]);
@@ -1797,6 +1867,7 @@ async function mountDashboard(sessionResp) {
   els.dashboardView.hidden = false;
   state.readerInfo = { ...(sessionResp.reader || {}) };
   state.appUpdateSettings = { ...(sessionResp.app_update || state.appUpdateSettings || {}) };
+  state.ecardMode = state.readerInfo?.protocol === "ecard";
   state.formatterMode = state.readerInfo?.protocol === "html-print-formatter";
   state.aiMode = state.readerInfo?.protocol === "wisemed-ai" || state.readerInfo?.id === "wisemed-ai";
   state.settingsSubView = settingsSubViewFromLocation();
@@ -1819,7 +1890,7 @@ async function mountDashboard(sessionResp) {
   }
   renderRoundSelect();
   activateView(viewFromLocation(), false);
-  if (state.formatterMode || state.aiMode) {
+  if (state.ecardMode || state.formatterMode || state.aiMode) {
     await Promise.all([loadStatus(), loadLogs(), loadReaderSettings()]);
   } else if (isSIUIMode() || isHistoryMode()) {
     if(isSIUIMode()) await refreshSIUICertificatesAfterLogin();
@@ -1845,7 +1916,7 @@ async function mountDashboard(sessionResp) {
   }
   restartLogPolling();
   restartStatusPolling();
-  if (!state.aiMode && (Number(state.session?.user_type) || 0) <= 0) {
+  if (!state.ecardMode && !state.aiMode && (Number(state.session?.user_type) || 0) <= 0) {
     loadDebugTests().catch(() => {
       state.debugEnabled = false;
       syncDebugNavVisibility();
@@ -1870,6 +1941,7 @@ async function refreshAppUpdateStatus(force = false) {
 }
 
 function syncDebugNavVisibility() {
+ if(state.ecardMode){els.debugNavLink.hidden=false;els.debugNavLink.textContent="Debug eCard";document.getElementById("debug-submenu").hidden=true;return;}
   if (!els.debugNavLink) return;
   if(state.aiMode){els.debugNavLink.hidden=true;document.getElementById("debug-submenu").hidden=true;return;}
   const enabled = (isSIUIMode() || isHistoryMode() || isSIUIDataMode() || !!state.debugEnabled) && (Number(state.session?.user_type) || 0) <= 0;
@@ -2036,7 +2108,7 @@ function activateView(name, pushHistory = true) {
  if(state.aiMode && !["analytes","wsm","help"].includes(name)) name="analytes";
  if(name==="history"&&!isHistoryMode()) name="overview";
  if(name==="operations"&&!isSIUIMode()) name="overview";
- if(state.formatterMode && ["orders","qc","daily-details","debug"].includes(name)) name="overview";
+ if((state.formatterMode && ["orders","qc","daily-details","debug"].includes(name)) || (state.ecardMode && ["orders","qc","daily-details"].includes(name))) name="overview";
  if (isESignatureMode() && name !== "analytes") closeESignatureDemo();
   if (name === "help") {
     if (window.WSM_REMOTE) { showRemoteHelp(); return; }
@@ -2044,7 +2116,7 @@ function activateView(name, pushHistory = true) {
     if (helpTab) helpTab.opener = null;
     return;
   }
-  if (name === "debug" && ((!isSIUIMode() && !isHistoryMode() && !state.debugEnabled) || (Number(state.session?.user_type) || 0) > 0)) {
+  if (name === "debug" && !state.ecardMode && ((!isSIUIMode() && !isHistoryMode() && !state.debugEnabled) || (Number(state.session?.user_type) || 0) > 0)) {
     name = "overview";
   }
   if (state.utilityMode && name === "qc") {
@@ -2069,6 +2141,7 @@ function activateView(name, pushHistory = true) {
       window.history.pushState({ view: name }, "", path);
     }
   }
+  if(state.ecardMode && name==="debug"){mountECardPanel("debug");return;}
   if(name === "history") {loadCentralHistory();return;}
   if(name === "overview" && isSIUIDataMode()) {mountSIUIDataDashboard();return;}
   if(name === "overview" && isHistoryMode()) {mountArchiveDashboard();return;}
@@ -2080,7 +2153,7 @@ function activateView(name, pushHistory = true) {
     return;
   }
   if (name === "analytes") {
-    if (state.formatterMode || state.aiMode) {activateSettingsSubView(state.settingsSubView);if(state.settingsSubView==="reader")loadReaderSettings().catch(error=>showToast(error.message,"error"));return;}
+    if (state.ecardMode || state.formatterMode || state.aiMode) {activateSettingsSubView(state.settingsSubView);if(state.settingsSubView==="reader")loadReaderSettings().catch(error=>showToast(error.message,"error"));return;}
     if (isSIUIMode() || isHistoryMode()) {activateSettingsSubView(state.settingsSubView);if(state.settingsSubView==="reader")loadReaderSettings().catch(error=>showToast(error.message,"error"));return;}
     if (isESignatureMode()) {activateSettingsSubView(state.settingsSubView); return;}
     if (state.settingsSubView === "wss") { activateSettingsSubView("wss"); return; }
@@ -2124,6 +2197,7 @@ function renderTopbarTitle() {
  if(state.currentView==="history"){document.getElementById("dashboard-title").textContent="Istoric";return;}
  if(state.currentView==="operations"){document.getElementById("dashboard-title").textContent="Operations";return;}
  if(state.currentView === "wsm"){document.getElementById("dashboard-title").textContent="Debug · WSM";return;}
+ if(state.ecardMode){document.getElementById("dashboard-title").textContent=state.currentView==="analytes" ? (state.settingsSubView==="wss" ? "WSM / WSS" : state.settingsSubView==="ecard"?"Cititor și terminal eCard":"Server și actualizări") : (state.currentView==="debug"?"Debug eCard":"PIAS eCard");return;}
  if(state.formatterMode){document.getElementById("dashboard-title").textContent=state.currentView==="analytes" ? (state.settingsSubView==="wss" ? "WSS" : "Server și actualizări") : "HTML Print Formatter";return;}
   if (state.currentView === "analytes" && state.settingsSubView === "wss") { document.getElementById("dashboard-title").textContent = "WSS"; return; }
  if(isESignatureMode()) {
@@ -2179,7 +2253,8 @@ function renderTopbarTitle() {
 function viewFromLocation() {
  if(state.aiMode) return currentUIPath()==="/debug/wsm" ? "wsm" : "analytes";
  if(currentUIPath() === "/debug/wsm") return "wsm";
- if(state.formatterMode) return currentUIPath().startsWith("/settings") ? "analytes" : "overview";
+ if(state.ecardMode && currentUIPath().startsWith("/debug")) return "debug";
+ if(state.ecardMode || state.formatterMode) return currentUIPath().startsWith("/settings") ? "analytes" : "overview";
  if(isHistoryMode()) return currentUIPath()==="/history" ? "history" : currentUIPath()==="/debug" ? "debug" : currentUIPath().startsWith("/settings") ? "analytes" : "overview";
  if(isSIUIMode()) return currentUIPath()==="/operations" ? "operations" : currentUIPath()==="/debug" ? "debug" : currentUIPath().startsWith("/settings") ? "analytes" : "overview";
   if (currentUIPath() === "/settings/wss") return "analytes";
@@ -2206,7 +2281,8 @@ function settingsSubViewFromLocation() {
  if(state.aiMode) return currentUIPath()==="/settings/wss" ? "wss" : "reader";
  if(currentUIPath()==="/settings/history")return "history";
  if(isHistoryMode()) return currentUIPath()==="/settings/wss"?"wss":currentUIPath()==="/settings/reader"?"reader":"history";
- if(state.formatterMode) return currentUIPath()==="/settings/wss" ? "wss" : "reader";
+ if(state.ecardMode && currentUIPath()==="/settings/ecard") return "ecard";
+ if(state.ecardMode || state.formatterMode) return currentUIPath()==="/settings/wss" ? "wss" : "reader";
  if(isSIUIMode()) return currentUIPath()==="/settings/wss" ? "wss" : currentUIPath()==="/settings/reader" ? "reader" : "siui";
   if (currentUIPath() === "/settings/wss") return "wss";
  if(isESignatureMode()) {return currentUIPath()==="/settings/demo" ? "demo" : currentUIPath()==="/settings/reader" ? "reader" : "pad";}
@@ -2220,12 +2296,14 @@ function settingsSubViewFromLocation() {
 }
 
 function pathForView(name) {
+ if(state.ecardMode && name==="debug")return "/debug/ecard";
+ if(state.ecardMode && name==="analytes" && state.settingsSubView==="ecard")return "/settings/ecard";
  if(state.aiMode) return name==="wsm" ? "/debug/wsm" : state.settingsSubView==="wss" ? "/settings/wss" : "/settings/reader";
  if(name==="history") return "/history";
  if(name==="operations") return "/operations";
  if(name==="analytes"&&state.settingsSubView==="history")return "/settings/history";
  if(name === "wsm") return "/debug/wsm";
- if(state.formatterMode) return name==="analytes" ? (state.settingsSubView==="wss" ? "/settings/wss" : "/settings/reader") : "/";
+ if(state.ecardMode || state.formatterMode) return name==="analytes" ? (state.settingsSubView==="wss" ? "/settings/wss" : "/settings/reader") : "/";
  if(isSIUIMode() && name==="analytes" && state.settingsSubView==="siui") return "/settings/siui";
   if (name === "analytes" && state.settingsSubView === "wss") return "/settings/wss";
  if(isESignatureMode() && name==="analytes") return "/settings/"+(["pad","demo","reader"].includes(state.settingsSubView)?state.settingsSubView:"pad");
@@ -2254,9 +2332,11 @@ function pathForView(name) {
 }
 
 function activateSettingsSubView(name) {
+ const ecardPanel=document.getElementById("settings-panel-ecard");if(ecardPanel)ecardPanel.hidden=true;
+ if(state.ecardMode && name==="ecard"){state.settingsSubView="ecard";document.querySelectorAll('[id^="settings-panel-"]').forEach(p=>p.hidden=true);mountECardPanel("settings");return;}
  if(state.aiMode && !["reader","wss"].includes(name)) name="reader";
  if(name==="history" && (isSIUIMode()||isHistoryMode())){state.settingsSubView="history";document.querySelectorAll('[id^="settings-panel-"]').forEach(p=>p.hidden=p.id!=="settings-panel-siui");els.navSublinks.forEach(link=>link.classList.toggle("active",link.dataset.settingsSubview==="history"));window.history.replaceState({view:"analytes"},"","/settings/history");loadHistoryPanel().catch(e=>showToast(e.message,"error"));return;}
- if(state.formatterMode && !["reader","wss"].includes(name)) name="reader";
+ if((state.ecardMode || state.formatterMode) && !["reader","wss"].includes(name)) name="reader";
  const siuiPanel=document.getElementById("settings-panel-siui");
  if(siuiPanel) siuiPanel.hidden=name!=="siui";
  if(name==="siui" && isSIUIMode()) {
@@ -2462,7 +2542,7 @@ async function loadStatus() {
   const connections = data.connections || {};
   updateConnectionPills(connections);
  if(isESignatureMode()) applyESignatureUI();
-  const cards = state.aiMode ? [{label:"Utilitar",value:"WiseMED AI"},{label:"Comunicare",value:"HTTP / WSS"}] : state.formatterMode ? [{label:"Utilitar",value:"HTML Print Formatter"},{label:"Comunicare",value:"HTTP / WSS"}] : isESignatureMode() ? [{label:"Utilitar",value:"eSignature server"},{label:"Comunicare",value:"HTTP / WSS"}] : state.barcodeMode ? [
+  const cards = state.ecardMode ? [{label:"Utilitar",value:"PIAS eCard"},{label:"Comunicare",value:"API local / WSM"}] : state.aiMode ? [{label:"Utilitar",value:"WiseMED AI"},{label:"Comunicare",value:"HTTP / WSS"}] : state.formatterMode ? [{label:"Utilitar",value:"HTML Print Formatter"},{label:"Comunicare",value:"HTTP / WSS"}] : isESignatureMode() ? [{label:"Utilitar",value:"eSignature server"},{label:"Comunicare",value:"HTTP / WSS"}] : state.barcodeMode ? [
     { label: "Tipariri", value: stats.orders ?? 0 },
     { label: "Etichete", value: stats.results ?? 0 },
     { label: t("events"), value: stats.events ?? 0 },
@@ -2486,6 +2566,7 @@ async function loadStatus() {
 
 async function loadDashboard() {
  if(state.aiMode) return;
+ if(state.ecardMode) {await loadECardDashboard();return;}
  if(state.formatterMode) return;
  if(isSIUIMode()||isHistoryMode()) return;
  if(isESignatureMode()) {
@@ -2656,6 +2737,7 @@ async function loadReaderSettings() {
   }
   els.repeatModeSelect.value = state.readerSettings.repeat_mode;
   if(state.aiMode) applyWiseMEDAIUI();
+  if(state.ecardMode) applyECardUI();
   syncDeleteOrdersPreferenceControls();
   await loadResultSyncStatus();
   if (els.readerSettingsMessage) {
@@ -2787,6 +2869,7 @@ async function onSaveReaderSettings(event) {
   };
   els.repeatModeSelect.value = state.readerSettings.repeat_mode;
   if(state.aiMode) applyWiseMEDAIUI();
+  if(state.ecardMode) applyECardUI();
   syncDeleteOrdersPreferenceControls();
   syncReaderSettingsTransportFields();
   if (els.readerSettingsMessage) {
@@ -2873,6 +2956,7 @@ function syncReaderSettingsTransportFields() {
 }
 
 async function loadResultSyncStatus() {
+ if(state.ecardMode) return;
   if(state.aiMode) return;
   if (!els.resultSyncStatus && !els.resultSyncStatusLabel) return;
   try {
@@ -6571,6 +6655,7 @@ function applyLanguage() {
   applyBarcodeOverviewLabels();
   renderDebugTests();
   renderDebugResult();
+  if(state.ecardMode) applyECardUI();
   if(state.formatterMode) applyHTMLFormatterUI();
   if(state.aiMode) applyWiseMEDAIUI();
 }
@@ -6594,7 +6679,7 @@ function toggleLogsAccess(canViewLogs) {
 }
 
 function updateConnectionPills(connections) {
-  if (state.formatterMode || state.aiMode) { els.analyzerPill.hidden = true; return; }
+  if (state.ecardMode || state.formatterMode || state.aiMode) { els.analyzerPill.hidden = true; return; }
   const analyzerConnected = !!connections.analyzer_connected;
   const analyzerLastPacketAt = String(connections.analyzer_last_packet_at || "").trim();
   if (state.barcodeMode) {
@@ -6675,6 +6760,7 @@ function formatReaderSecondaryLabel(readerInfo = {}) {
 }
 
 function renderReaderSidebar() {
+ if(state.ecardMode){els.readerIdentityIcon.textContent="eC";els.readerIdentityTitle.textContent="Utilitar";els.readerIdentitySubtitle.textContent="PIAS eCard";els.readerSummaryList.textContent="Card CEAS / CI · Semnare · Înrolare";return;}
  if(state.aiMode){
   els.readerIdentityIcon.textContent="AI";els.readerIdentityTitle.textContent="Utilitar";els.readerIdentitySubtitle.textContent="WiseMED AI";
   els.readerSummaryList.textContent="Documentare clinică · HTTP / WSS";return;

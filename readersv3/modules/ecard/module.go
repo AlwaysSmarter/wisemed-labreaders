@@ -153,6 +153,15 @@ func (m *Module) handle(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	path := strings.TrimPrefix(r.URL.Path, "/api/ecard/")
+	if path == "ui" && r.Method == "GET" {
+		b, _ := assets.ReadFile("ui/index.html")
+		respond(w, 200, map[string]string{"html": string(b)})
+		return
+	}
+	if path == "sign/verify" && r.Method == "POST" {
+		m.verify(w, r)
+		return
+	}
 	if path == "sign/batch" {
 		m.batch(w, r, owner)
 		return

@@ -77,6 +77,8 @@ corespondența criptografică a rezultatului.
 
 | Rută | Metodă | Rol |
 |---|---|---|
+| `/ui` | GET | formular eCard, transportabil și prin WSM |
+| `/sign/verify` | POST | verificare CMS cu text și semnatar așteptat, fără card |
 | `/health` | GET | stare serviciu, disponibilitate platformă |
 | `/settings` | GET / PUT | setări active / salvare admin pentru repornire |
 | `/jobs` | POST | creează job în `uploading` |
@@ -146,3 +148,35 @@ Scriere numai pe Windows în ProgramData/Novensys.eCard.SDK/TerminalData, fără
 job activ, cu backup înainte de înlocuire. Nu există generare automată de TDX
 la pornire/card inserat. Fișierul este verificat înainte de ObtineToken pentru a
 împiedica auto-înrolarea SDK atunci când lipsește sau este corupt.
+
+## Verificarea unei semnături existente
+
+`POST /api/ecard/sign/verify` primește:
+
+```json
+{"text":"textul exact","encoding":"ascii","signature_base64":"CMS_BASE64","certificate_base64":"X509_DER_BASE64","public_key_pem":"","detached":false}
+```
+
+Este obligatoriu certificatul așteptat sau `public_key_pem` (SPKI / RSA PKCS#1).
+Cu cheie publică, CMS trebuie să conțină certificatul semnatarului. Se acceptă un
+singur semnatar. `encoding` este ASCII strict sau UTF-8, fără normalizarea textului.
+Pentru CMS detașat utilizați `detached:true`; conținutul inclus trebuie altfel să
+coincidă byte-cu-byte. Verificarea nu accesează SDK/card/CNAS și funcționează și pe
+macOS/Linux. Rezultatul `valid` reflectă verificarea CMS; biblioteca verifică și
+încadrarea atributului signingTime în intervalul certificatului, dacă este prezent.
+Nu validează lanțul CA, revocarea sau acceptarea CNAS, marcate explicit `false`.
+Datele nu se persistă. Parserul și verificatorul sunt din
+[digitorus/pkcs7](https://github.com/digitorus/pkcs7/tree/e76b763bdc49).
+
+## Interfață de configurare și debug
+
+- **Setări → Cititor și terminal eCard**: Detectează cititoarele creează un job
+  `readers`, îl pornește, citește rezultatul și șterge jobul reușit. Selectați
+  numele exact, salvați și reporniți serviciul. Gol înseamnă selecție automată SDK.
+  Detectarea reflectă cititoarele accesibile contului serviciului Windows.
+- **Debug eCard**: operații card și înrolare, migrare TDX, verificare CMS și
+  consola tuturor rutelor eCard. Crearea jobului și pornirea sunt pași separați.
+  Mutațiile necesită confirmare în consolă, iar operațiile SDK păstrează validările
+  `confirm`, identitate și rol de administrator. PIN-ul nu se salvează în browser.
+- Formularele folosesc transportul autentificat al paginii principale inclusiv
+  prin WSM. API-urile comune server/login/WSM/actualizări rămân în paginile lor.

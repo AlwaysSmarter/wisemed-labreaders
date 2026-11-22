@@ -25,6 +25,16 @@
 - Do not add extra text on the main canvas, and do not add extra colored geometric decorations beyond the badge itself.
 - Use a visible colored badge with high-contrast text; the `CARY60` `UV` badge style is the preferred reference for short app markers.
 
+## Preferință permanentă — utilitare WiseMED
+
+Orice utilitar WiseMED trebuie să aibă interfață specifică funcției sale, fără
+meniuri, dashboard sau configurări de laborator. Eliminați Detalii zilnice,
+Cereri analize, Setări analize, Setări detalii zilnice, Setări filtre, Setări reader
+și Setări QC. Pagina principală prezintă starea și operațiile utilitarului.
+Păstrați numai configurările utile (login WiseMED, server, WSM, actualizări și
+setările proprii), cu denumiri de utilitar. Regula se aplică și rutelor directe și
+interfeței prin WSM, nu doar ascunderii meniurilor. Nu încărcați API-uri de laborator.
+
 ## Protocol docs
 
 - For protocol and communication specifications, prefer the per-app docs directory under `readersv3/apps/<app-name>/docs/`.

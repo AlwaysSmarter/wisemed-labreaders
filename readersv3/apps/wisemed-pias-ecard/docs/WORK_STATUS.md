@@ -55,3 +55,31 @@ LANG=en_US.UTF-8`) pentru a evita căderea la autotest.
 
 Nu reluați crearea aplicației de la zero. Modificările de documentație arhitectură
 și fișierele .DS_Store deja existente în git status nu aparțin acestei lucrări.
+
+## Interfață utilitar — 2026-11-22
+
+Pagina principală afișează starea serviciului eCard, suportul platformei Windows,
+cititorul configurat, UM, ordinea SDK și limita batch, cu acces local la operațiile
+cardului. Meniurile, graficele și subpaginile de laborator sunt eliminate din
+navigare; rutele directe sunt redirecționate spre interfața utilitarului și prin
+WSM. Rămân Server și actualizări, WSM și ajutorul. Nu se încarcă liste de analize,
+cereri, detalii zilnice, QC sau starea sincronizării rezultatelor.
+Preferința permanentă este în aimemory/wisemed-labreaders.md și readersv3/AGENTS.md.
+Teste Node pentru rute locale/WSM, meniuri, încărcare și dashboard; teste Go localhttp
+și ecard trecute. Executabilul local actualizat; fără build Windows, conform cererii.
+
+## Debug complet și cititor — 2026-11-22
+
+Debug eCard este acum intrare vizibilă, inclusiv prin WSM, cu toate operațiile,
+înrolare și migrare, verificare CMS și 26 exemple de cereri care acoperă toate
+rutele eCard. Setări → Cititor și terminal eCard oferă detectare prin SDK și
+alegerea numelui exact. Salvarea cere repornire, conform configurării existente.
+Interfața modulului se încarcă prin GET /api/ecard/ui în pagina comună și folosește
+transportul autentificat al părintelui, inclusiv WSM; nu mai depinde de linkul local.
+POST /api/ecard/sign/verify verifică CMS inclus/detașat cu certificat sau cheie
+publică așteptată, fără card, fără stocare. Nu verifică încrederea CA/revocarea/CNAS.
+Bibliotecă Go digitorus/pkcs7 fixată la e76b763bdc49; hostul C# nu s-a modificat.
+Teste Go race: ecard/localhttp/apibridge/releasectl. Teste Node pentru rute locale
+și WSM; verificare DOM cu jsdom pentru detectare/salvare cititor, toate cele 26
+exemple, execuție cerere, meniu Debug și Setări, încărcare formular în iframe.
+Nu există test cu cititor fizic; nu se compilează pachete Windows aici.

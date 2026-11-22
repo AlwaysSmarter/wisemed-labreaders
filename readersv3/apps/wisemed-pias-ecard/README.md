@@ -74,3 +74,10 @@ Buildul Go nativ macOS permite verificarea API-ului și a stocării, dar operaț
 hardware nu sunt disponibile pe macOS/Linux. SDK-ul CNAS este Windows/.NET și
 folosește WinSCard. Suportul fizic CEAS/CEI și acceptarea CNAS necesită probe reale;
 un build reușit nu reprezintă certificarea fluxului.
+
+## Interfață
+
+După login, **Setări → Cititor și terminal eCard** permite detectarea și alegerea
+cititorului, ordinea SDK și adresa UM. Salvați și reporniți serviciul pentru aplicare.
+**Debug eCard** oferă toate operațiile cardului, înrolarea, migrarea TDX, verificarea
+semnăturilor CMS și consola endpointurilor, atât local, cât și prin WSM.
