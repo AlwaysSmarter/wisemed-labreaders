@@ -3,6 +3,7 @@
 Acest setup pornește un container `ubuntu:24.04` care:
 
 - are Go `1.24.0` instalat în container
+- are .NET SDK 8 pentru compilarea automată a hostului eCard Windows
 - are NSIS (`makensis`) pentru build de installer Windows
 - are MinGW binutils pentru `windres`
 - montează repo-ul host-ului în `/opt/wmlr`
@@ -88,3 +89,14 @@ La fiecare startup, logurile containerului afișează explicit:
 - `app-update-server.db`, `files/` și release-urile rămân în afara clonei Git, deci supraviețuiesc la `git reset --hard` și `git pull`
 - dacă lipsește `config.yaml`, aplicația îl recreează automat din `config.install.yaml`
 - la prima pornire este necesar acces la internet pentru descărcarea modulelor Go, dacă cache-ul este gol
+
+
+## Release PIAS eCard
+
+Build-ul `wisemed-pias-ecard` compilează automat și `ECardHost.exe`, inclusiv pe
+Linux. Installerul și update-ul conțin executabilul nou și SDK-urile CNAS, fără
+fișiere C# sau compilator pe stația client. Erorile de compilare opresc release-ul.
+După actualizarea Dockerfile, recreați imaginea prin `docker compose up --build -d`.
+Prima compilare restaurează reference assemblies .NET Framework 4.8 din NuGet;
+serverul are nevoie de acces la NuGet. Pentru servere existente fără dotnet în
+PATH, scriptul de build poate instala SDK-ul în cache-ul utilizatorului, fără sudo.

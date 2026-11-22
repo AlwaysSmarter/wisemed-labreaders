@@ -80,7 +80,7 @@ corespondența criptografică a rezultatului.
 | `/ui` | GET | formular eCard, transportabil și prin WSM |
 | `/sign/verify` | POST | verificare CMS cu text și semnatar așteptat, fără card |
 | `/health` | GET | stare serviciu, disponibilitate platformă |
-| `/settings` | GET / PUT | setări active / salvare admin pentru repornire |
+| `/settings` | GET / PUT | setări active / salvare admin cu aplicare imediată |
 | `/jobs` | POST | creează job în `uploading` |
 | `/jobs/{id}/items` | POST | adaugă chunk semnare `{offset,items}` |
 | `/jobs/{id}/start` | POST | pornește jobul o singură dată |
@@ -172,7 +172,7 @@ Datele nu se persistă. Parserul și verificatorul sunt din
 
 - **Setări → Cititor și terminal eCard**: Detectează cititoarele creează un job
   `readers`, îl pornește, citește rezultatul și șterge jobul reușit. Selectați
-  numele exact, salvați și reporniți serviciul. Gol înseamnă selecție automată SDK.
+  cititorul din select și salvați pentru aplicare imediată. Opțiunea automată lasă alegerea SDK-ului.
   Detectarea reflectă cititoarele accesibile contului serviciului Windows.
 - **Debug eCard**: operații card și înrolare, migrare TDX, verificare CMS și
   consola tuturor rutelor eCard. Crearea jobului și pornirea sunt pași separați.
@@ -180,3 +180,65 @@ Datele nu se persistă. Parserul și verificatorul sunt din
   `confirm`, identitate și rol de administrator. PIN-ul nu se salvează în browser.
 - Formularele folosesc transportul autentificat al paginii principale inclusiv
   prin WSM. API-urile comune server/login/WSM/actualizări rămân în paginile lor.
+
+
+## Conexiune UM-CEAS configurabilă
+
+În interfața eCard → Biblioteci și terminal, completați Producție/Test sau un
+host și port personalizate, apoi salvați; setările se aplică imediat.
+Butoanele completează doar formularul; nu salvează automat configurația.
+Configurația existentă nu este înlocuită la încărcarea interfeței.
+
+```yaml
+modules:
+  ecard:
+    um_host: umceas.siui.ro
+    um_port: 443
+```
+
+Producție implicită: `tcp://umceas.siui.ro:443`; test: `tcp://testumceas.siui.ro:443`.
+`um_host` este un nume DNS sau IP, fără schemă, port sau cale; `um_port` este
+între 1 și 65535. Sunt acceptate și adrese personalizate.
+Aceste câmpuri sunt disponibile prin `GET /api/ecard/settings` și
+`PUT /api/ecard/settings` (administrator), împreună cu `sdk_order` și `reader_name`.
+PUT salvează în config.yaml și întoarce `restart_required: false`; GET reflectă
+imediat setările salvate. Salvarea este refuzată cât există joburi
+active sau în coadă.
+
+UM-CEAS folosește eCard.SDK, care primește separat hostul și portul prin
+`SetAdresaUnitateManagement`, înainte de crearea sesiunii de card. Portul 443
+nu înseamnă că endpointul este HTTPS. SIUI/SIPE sunt servicii web separate,
+configurate în siui-bridge, nu în eCard.
+
+Surse: [portalul CNAS](https://portal.cnas.ro/cnas/pias/specificatii) și
+`docs/CNAS/Specificatie Interfatare PIAS - Anexa 102 - Specificatii_eCard_SDK2.0.0.3-v.pdf`,
+secțiunea de configurare UM (exemplul testumceas.siui.ro, port 443).
+
+
+## Ordine SDK și detectarea cititoarelor
+
+Gridul de configurare oferă câte un select pe rând, Adaugă bibliotecă, Elimină
+și mutare sus/jos. Fiecare SDK apare o singură dată; rămâne cel puțin un rând.
+Catalogul disponibil este expus prin `GET /api/ecard/health`, `available_sdks`.
+
+Selectul Cititor păstrează opțiunea de selecție automată și cititorul configurat.
+Detectarea folosește Windows PC/SC `SCardListReadersW`, nu catalogul SDK
+`GetSupportedTerminalNames`. Rezultatul conține dispozitivele conectate și
+vizibile serviciului Windows pe calculatorul țintă, inclusiv când UI este
+accesată prin WSM. O selecție absentă din detectare este păstrată și marcată
+„nedetectat”; detectarea nu modifică automat alegerea operatorului.
+Erorile PC/SC sunt raportate ca erori, nu drept listă goală.
+
+SDK-ul selectează un model de cititor. Numele PC/SC cu sufix de instanță este
+asociat celui mai lung nume de model compatibil. Dacă sunt conectate mai multe
+instanțe ale acelui model, selecția explicită este refuzată pentru a evita
+folosirea altui dispozitiv. Configurațiile vechi cu numele modelului SDK își
+păstrează comportamentul.
+
+Ordinea SDK, cititorul și hostul/portul UM se persistă înainte de aplicarea în
+memorie. Nu necesită restart; salvarea este refuzată cu HTTP 409 cât există
+joburi active sau în coadă. Fiecare job folosește o copie stabilă a setărilor.
+Această aplicare imediată privește câmpurile din formularul eCard, nu setările
+generale ale serviciului (de exemplu portul HTTP).
+
+Enumerare Windows: https://learn.microsoft.com/en-us/windows/win32/api/winscard/nf-winscard-scardlistreadersw

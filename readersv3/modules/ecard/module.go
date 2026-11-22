@@ -175,11 +175,11 @@ func (m *Module) handle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if path == "settings" && r.Method == "GET" {
-		respond(w, 200, m.settings)
+		respond(w, 200, m.settingsSnapshot())
 		return
 	}
 	if path == "health" && r.Method == "GET" {
-		respond(w, 200, map[string]interface{}{"ok": true, "hardware_supported": runtime.GOOS == "windows", "sdk_order": m.settings.SDKOrder, "batch_parallelism_per_card": 1})
+		respond(w, 200, map[string]interface{}{"ok": true, "hardware_supported": runtime.GOOS == "windows", "sdk_order": m.settingsSnapshot().SDKOrder, "available_sdks": sdkIDs, "batch_parallelism_per_card": 1})
 		return
 	}
 	if strings.HasPrefix(path, "tdx/") {

@@ -20,7 +20,8 @@ func (m *Module) run(parent context.Context, id string) {
 		m.mu.Unlock()
 		return
 	}
-	ctx, cancel := context.WithTimeout(parent, time.Duration(m.settings.JobTimeout)*time.Second)
+	settings := m.settings
+	ctx, cancel := context.WithTimeout(parent, time.Duration(settings.JobTimeout)*time.Second)
 	a := &activeJob{cancel: cancel, pin: make(chan string, 1)}
 	m.active[id] = a
 	_ = m.store.state(id, "running", "")
@@ -54,19 +55,19 @@ func (m *Module) run(parent context.Context, id string) {
 		}
 	}
 	call := func(b backend, p map[string]interface{}) (Reply, error) {
-		c, stop := context.WithTimeout(ctx, time.Duration(m.settings.OperationTimeout)*time.Second)
+		c, stop := context.WithTimeout(ctx, time.Duration(settings.OperationTimeout)*time.Second)
 		defer stop()
 		return b.Call(c, p, func(prompt string) (string, error) { return pin(c, prompt) })
 	}
 	var b backend
 	var answer Reply
-	for index, sdk := range m.settings.SDKOrder {
+	for index, sdk := range settings.SDKOrder {
 		if ctx.Err() != nil {
 			final = "cancelled"
 			code = "cancelled_before_operation"
 			return
 		}
-		b, e = m.factory(ctx, sdk, m.settings)
+		b, e = m.factory(ctx, sdk, settings)
 		if e != nil {
 			answer = Reply{Code: "sdk_unavailable"}
 			e = nil
@@ -77,7 +78,7 @@ func (m *Module) run(parent context.Context, id string) {
 				code = "storage_failed"
 				return
 			}
-			answer, e = call(b, map[string]interface{}{"action": "open", "reader": m.settings.Reader, "um_host": m.settings.UMHost, "um_port": m.settings.UMPort, "request": req})
+			answer, e = call(b, map[string]interface{}{"action": "open", "reader": settings.Reader, "um_host": settings.UMHost, "um_port": settings.UMPort, "request": req})
 			if e == nil && answer.OK {
 				break
 			}
@@ -86,7 +87,7 @@ func (m *Module) run(parent context.Context, id string) {
 		}
 		// Startup/parse fallback is only allowed before any PIN interaction, including
 		// physical PIN pad input reported by the host. No ambiguous timeouts retry.
-		if e != nil || !canFallback(req.Operation, answer, a.pinSeen) || index == len(m.settings.SDKOrder)-1 {
+		if e != nil || !canFallback(req.Operation, answer, a.pinSeen) || index == len(settings.SDKOrder)-1 {
 			if e != nil {
 				code = "host_start_failed"
 			} else {

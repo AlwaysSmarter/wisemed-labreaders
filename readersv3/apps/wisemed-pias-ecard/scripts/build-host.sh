@@ -1,17 +1,45 @@
 #!/usr/bin/env bash
-# Cross-compile using Roslyn and official .NET Framework 4.8 reference assemblies.
-# These are build-only dependencies; no runtime NuGet/network restore on site.
+# Compile the Windows .NET Framework host on Linux/macOS. No compiler on clients.
 set -euo pipefail
 app="$(cd "$(dirname "$0")/.." && pwd)"
-: "${DOTNET:?path to dotnet runtime}"
-: "${CSC_DLL:?path to Roslyn csc.dll}"
-: "${NET48_REFS:?directory containing .NET Framework 4.8 reference DLLs}"
-args=()
-for dll in mscorlib System System.Core System.Security System.Xml System.Web.Extensions; do args+=("-r:$NET48_REFS/$dll.dll"); done
-DOTNET_ROLL_FORWARD=Major "$DOTNET" "$CSC_DLL" -nologo -deterministic -optimize+ -target:exe -platform:x86 -nostdlib "${args[@]}" "-out:$app/deployments/host/ECardHost.exe" "$app/deployments/host/ECardHost.cs"
+output="${1:?Usage: build-host.sh OUTPUT_DIRECTORY}"
+mkdir -p "$output"
+output="$(cd "$output" && pwd)"
 
-python3 - "$app/deployments/host" <<'PYCODE'
-import pathlib,sys,json,hashlib
-p=pathlib.Path(sys.argv[1])
-(p/'manifest.json').write_text(json.dumps({n:hashlib.sha256((p/n).read_bytes()).hexdigest() for n in ['ECardHost.cs','ECardHost.exe','ECardHost.exe.config']},indent=2)+'\n')
-PYCODE
+# Existing servers need no administrator install: bootstrap the official SDK in
+# their writable cache. Containers can preinstall dotnet to avoid this download.
+dotnet_cmd="${DOTNET:-}"
+if [[ -z "$dotnet_cmd" ]]; then dotnet_cmd="$(command -v dotnet || true)"; fi
+if [[ -n "$dotnet_cmd" ]]; then
+  if [[ -z "$("$dotnet_cmd" --list-sdks)" ]]; then
+    echo 'Configured dotnet has no SDK; install .NET SDK 8 or newer.' >&2
+    exit 1
+  fi
+else
+  cache="${WMR_ECARD_TOOLCHAIN_CACHE:-${XDG_CACHE_HOME:-$HOME/.cache}/wisemed-ecard}"
+  mkdir -p "$cache"
+  dotnet_cmd="$cache/dotnet/dotnet"
+  # Serialize bootstrap across independent build processes.
+  if [[ ! -x "$dotnet_cmd" ]] || [[ -z "$("$dotnet_cmd" --list-sdks 2>/dev/null || true)" ]]; then
+    lock="$cache/install.lock"
+    attempts=0
+    until mkdir "$lock" 2>/dev/null; do
+      attempts=$((attempts+1))
+      if [[ "$attempts" -gt 300 ]]; then echo "Timed out waiting for $lock; check other builds before removing a stale lock." >&2; exit 1; fi
+      sleep 1
+    done
+    trap 'rmdir "$lock"' EXIT
+    if [[ ! -x "$dotnet_cmd" ]] || [[ -z "$("$dotnet_cmd" --list-sdks 2>/dev/null || true)" ]]; then
+      echo 'Preparing .NET SDK in the eCard build cache...' >&2
+      curl --fail --silent --show-error --location --retry 3 --connect-timeout 30 --max-time 180 https://dot.net/v1/dotnet-install.sh -o "$cache/dotnet-install.sh"
+      bash "$cache/dotnet-install.sh" --channel 8.0 --install-dir "$cache/dotnet" --no-path >&2
+    fi
+    rmdir "$lock"
+    trap - EXIT
+  fi
+fi
+export DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_NOLOGO=1
+# The build does not require locale data; support minimal Linux build images.
+export DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1
+"$dotnet_cmd" build "$app/scripts/ECardHost.csproj" --configuration Release --output "$output" --nologo \
+  "-p:BaseIntermediateOutputPath=$output/obj/" "-p:MSBuildProjectExtensionsPath=$output/obj/" >&2

@@ -64,6 +64,8 @@ modules:
     host_dir: ./host
     state_dir: ./ecard-state
     reader_name: ""
+    # UM-CEAS TCP via eCard.SDK: bare hostname/IP, without tcp:// or https://.
+    # Test: testumceas.siui.ro; custom host/port supported. UI/API changes apply immediately; manual file edits require restart.
     um_host: umceas.siui.ro
     um_port: 443
     operation_timeout_seconds: 180

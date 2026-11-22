@@ -17,6 +17,7 @@ RUN apt-get update \
         build-essential \
         nsis \
         binutils-mingw-w64 \
+        dotnet-sdk-8.0 \
     && rm -rf /var/lib/apt/lists/*
 
 RUN curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" -o /tmp/go.tgz \

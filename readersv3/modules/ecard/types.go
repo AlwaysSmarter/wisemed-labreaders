@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"regexp"
+	"strings"
 	"time"
 )
 
@@ -53,10 +55,29 @@ func readSettings(in map[string]interface{}) (Settings, error) {
 		}
 		seen[id] = true
 	}
-	if s.UMHost == "" || s.UMPort < 1 || s.UMPort > 65535 || s.OperationTimeout < 10 || s.OperationTimeout > 600 || s.JobTimeout < 60 || s.JobTimeout > 86400 || s.MaxItems < 1 || s.MaxItems > 1000000 || s.MaxItemBytes < 1 || s.MaxItemBytes > 65536 || s.MaxJobBytes < 1 || s.MaxJobBytes > 1<<30 || s.MaxJobs < 1 || s.MaxJobs > 128 || s.RetentionHours < 1 || s.RetentionHours > 720 {
+	if !validUMHost(s.UMHost) {
+		return s, errors.New("um_host must be a hostname or IP address without scheme, port or path; configure um_port separately")
+	}
+	if s.UMPort < 1 || s.UMPort > 65535 || s.OperationTimeout < 10 || s.OperationTimeout > 600 || s.JobTimeout < 60 || s.JobTimeout > 86400 || s.MaxItems < 1 || s.MaxItems > 1000000 || s.MaxItemBytes < 1 || s.MaxItemBytes > 65536 || s.MaxJobBytes < 1 || s.MaxJobBytes > 1<<30 || s.MaxJobs < 1 || s.MaxJobs > 128 || s.RetentionHours < 1 || s.RetentionHours > 720 {
 		return s, errors.New("settings outside supported bounds")
 	}
 	return s, nil
+}
+
+// The SDK accepts a bare DNS name or IP, not a web/TCP URL.
+func validUMHost(host string) bool {
+	if net.ParseIP(host) != nil {
+		return true
+	}
+	if len(host) == 0 || len(host) > 253 {
+		return false
+	}
+	for _, label := range strings.Split(strings.TrimSuffix(host, "."), ".") {
+		if len(label) == 0 || len(label) > 63 || !regexp.MustCompile(`^[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?$`).MatchString(label) {
+			return false
+		}
+	}
+	return true
 }
 
 type Contract struct {

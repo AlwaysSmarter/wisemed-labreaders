@@ -177,7 +177,8 @@ func (m *Module) handleTDX(w http.ResponseWriter, r *http.Request, action string
 		fail(w, 500, e)
 		return
 	}
-	addresses, e := net.DefaultResolver.LookupIPAddr(r.Context(), m.settings.UMHost)
+	settings := m.settingsSnapshot()
+	addresses, e := net.DefaultResolver.LookupIPAddr(r.Context(), settings.UMHost)
 	if e != nil || len(addresses) == 0 {
 		fail(w, 400, errors.New("cannot resolve configured UM"))
 		return
@@ -187,7 +188,7 @@ func (m *Module) handleTDX(w http.ResponseWriter, r *http.Request, action string
 		fail(w, 409, errors.New("UM resolves to multiple addresses; configure the intended IP explicitly before migration"))
 		return
 	}
-	target := TDXIdentity{Contract: in.Source.Contract, Host: host, UMEndpoint: net.JoinHostPort(addresses[0].IP.String(), fmt.Sprint(m.settings.UMPort))}
+	target := TDXIdentity{Contract: in.Source.Contract, Host: host, UMEndpoint: net.JoinHostPort(addresses[0].IP.String(), fmt.Sprint(settings.UMPort))}
 	name, e := target.filename()
 	if e != nil {
 		fail(w, 400, e)
@@ -212,6 +213,10 @@ func (m *Module) handleTDX(w http.ResponseWriter, r *http.Request, action string
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if m.settings.UMHost != settings.UMHost || m.settings.UMPort != settings.UMPort {
+		fail(w, 409, errors.New("UM settings changed; repeat migration preview"))
+		return
+	}
 	if len(m.active) > 0 {
 		fail(w, 409, errors.New("wait for card jobs before migrating"))
 		return

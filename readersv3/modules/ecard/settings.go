@@ -44,6 +44,16 @@ func (m *Module) saveSettings(w http.ResponseWriter, r *http.Request) {
 		fail(w, 500, errors.New("cannot save config"))
 		return
 	}
-	// Running workers read an immutable settings snapshot. Apply on restart.
-	respond(w, 200, map[string]interface{}{"ok": true, "restart_required": true, "saved": in})
+	// Publish only editable fields after persistence, under the admission lock.
+	m.settings.SDKOrder = append([]string(nil), in.SDKOrder...)
+	m.settings.Reader = in.Reader
+	m.settings.UMHost = in.UMHost
+	m.settings.UMPort = in.UMPort
+	respond(w, 200, map[string]interface{}{"ok": true, "restart_required": false, "saved": in})
+}
+
+func (m *Module) settingsSnapshot() Settings {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.settings
 }

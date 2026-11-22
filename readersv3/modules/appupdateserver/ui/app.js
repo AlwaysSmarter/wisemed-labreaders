@@ -135,6 +135,7 @@ async function loadAll() {
   activateView("dashboard");
   await loadSettings();
   await loadApps();
+  await pollRelease();
 }
 
 async function loadApps() {
@@ -369,6 +370,7 @@ async function saveVersion() {
 }
 
 async function makeRelease() {
+  if (state.releaseBusy) return;
   versionMsg.textContent = "";
   state.selectedAppId = Number(versionAppSelect.value || state.selectedAppId || 0);
   if (!state.selectedAppId) {
@@ -400,23 +402,70 @@ async function makeRelease() {
       allowFail: true,
     });
     if (!resp || resp.ok === false) {
+      if (resp?.job) renderReleaseJob(resp.job);
       versionMsg.textContent = resp?.error || "Make release failed";
       return;
     }
-    bumpReleaseProgress("Actualizam lista de versiuni", "Release-ul a fost creat. Reincarcam tabelul si selectam versiunea noua.");
-    const saved = resp.version || {};
-    versionMsg.textContent = `Release creat: ${saved.version || "-"} (${saved.target_os || "-"} / ${saved.target_arch || "-"})${saved.installer_file_name ? `, installer: ${saved.installer_file_name}` : ""}`;
-    state.selectedVersionId = Number(saved.id || 0);
-    await loadVersions();
-    if (state.selectedVersionId) {
-      const current = state.versions.find((item) => item.id === state.selectedVersionId);
-      if (current) {
-        fillVersionForm(current);
-        renderVersions();
-      }
-    }
+    renderReleaseJob(resp.job);
+  } catch (err) {
+    versionMsg.textContent = `Conexiune intrerupta: ${err.message}. Verific starea pe server.`;
   } finally {
-    setReleaseBusy(false);
+    await pollRelease();
+  }
+}
+
+let releasePollTimer;
+let currentReleaseJob;
+let completedReleaseID;
+const cancelReleaseBtn = document.getElementById("cancel-release");
+const releaseLogs = document.getElementById("release-logs");
+cancelReleaseBtn.addEventListener("click", async () => {
+  if (!currentReleaseJob) return;
+  cancelReleaseBtn.disabled = true;
+  try {
+    const resp = await api(`/api/update-server/apps/${currentReleaseJob.application_id}/make-release?id=${encodeURIComponent(currentReleaseJob.id)}`, {method: "DELETE", allowFail: true});
+    if (resp.job) renderReleaseJob(resp.job);
+    if (!resp.ok) versionMsg.textContent = resp.error;
+  } catch (err) { versionMsg.textContent = err.message; }
+  await pollRelease();
+});
+
+function renderReleaseJob(job) {
+  currentReleaseJob = job;
+  const busy = job && ["running", "cancelling", "publishing"].includes(job.status);
+  setReleaseBusy(Boolean(busy));
+  if (!job) return;
+  releaseProgress.hidden = false;
+  releaseProgress.querySelector(".release-progress-spinner").hidden = !busy;
+  cancelReleaseBtn.hidden = !busy;
+  cancelReleaseBtn.disabled = job.status !== "running";
+  const elapsed = Math.max(0, Math.floor(((busy ? Date.now() : Date.parse(job.updated_at)) - Date.parse(job.started_at)) / 1000));
+  const quiet = Math.max(0, Math.floor((Date.now() - Date.parse(job.updated_at)) / 1000));
+  const labels = {running: "Compilare / impachetare", cancelling: "Se opresc procesele", publishing: "Se publica release-ul", succeeded: "Release finalizat", failed: "Release esuat", cancelled: "Release anulat"};
+  bumpReleaseProgress(`${labels[job.status] || job.status} — ${Math.floor(elapsed / 60)}m ${elapsed % 60}s`,
+    `Aplicatia #${job.application_id}` + (busy ? ` · Ultimul mesaj acum ${quiet}s. Compilarea poate continua fara mesaje noi.` : ""));
+  releaseLogs.textContent = (job.logs || []).join("\n");
+  if (!busy) {
+    versionMsg.textContent = job.status === "succeeded" ? `Release creat: ${job.version?.version || "-"}` : job.error || labels[job.status];
+  }
+}
+
+async function pollRelease() {
+  clearTimeout(releasePollTimer);
+  if (appView.hidden) return;
+  try {
+    const resp = await api(`/api/update-server/apps/${state.selectedAppId || 0}/make-release`);
+    renderReleaseJob(resp.job);
+    if (resp.job && !state.releaseBusy && completedReleaseID !== resp.job.id) {
+      completedReleaseID = resp.job.id;
+      await loadVersions();
+    }
+  } catch (err) {
+    // An unavailable status endpoint is not evidence that the build stopped.
+    makeReleaseBtn.disabled = true;
+    versionMsg.textContent = `Nu pot verifica release-ul: ${err.message}. Reincerc automat.`;
+  } finally {
+    releasePollTimer = setTimeout(pollRelease, 2000);
   }
 }
 

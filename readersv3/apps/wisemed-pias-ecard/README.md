@@ -42,7 +42,7 @@ SDK-urile, hostul și ajutorul sunt incluse acolo în installer și în update.
 
 `modules.ecard.sdk_order` selectează subsetul și ordinea SDK-urilor. UI și
 `PUT /api/ecard/settings` permit schimbarea ordinii, cititorului și UM; necesită
-administrator și repornire. Restul limitelor se configurează în YAML.
+administrator; modificările se aplică imediat. Restul limitelor se configurează în YAML.
 Citiți [API](docs/API.md), [analiza documentației](docs/SDK-STUDY.md) și
 [validarea / verificările pe stație](docs/VALIDATION.md).
 
@@ -64,11 +64,9 @@ make release APP=wisemed-pias-ecard TARGET=windows-amd64
 scripts/prepare-reader-output.sh wisemed-pias-ecard
 ```
 
-Hostul se reconstruiește pe Windows cu
-`apps/wisemed-pias-ecard/deployments/host/build-host.ps1`, sau multiplatformă cu
-`scripts/build-host.sh` și variabilele DOTNET, CSC_DLL, NET48_REFS (Roslyn 4.8 și
-reference assemblies .NET Framework 4.8). Actualizați și manifestul hostului după
-rebuild. Nu publicați un release cu un EXE vechi față de sursă.
+Hostul este compilat automat de releasectl pentru fiecare release, inclusiv pe
+Linux. Nu este necesară actualizarea manuală a EXE-ului sau a manifestului.
+Vezi secțiunea Automatic host compilation in releases de mai jos.
 
 Buildul Go nativ macOS permite verificarea API-ului și a stocării, dar operațiile
 hardware nu sunt disponibile pe macOS/Linux. SDK-ul CNAS este Windows/.NET și
@@ -78,6 +76,42 @@ un build reușit nu reprezintă certificarea fluxului.
 ## Interfață
 
 După login, **Setări → Cititor și terminal eCard** permite detectarea și alegerea
-cititorului, ordinea SDK și adresa UM. Salvați și reporniți serviciul pentru aplicare.
+cititorului, ordinea SDK și adresa UM. Salvați pentru aplicare imediată.
 **Debug eCard** oferă toate operațiile cardului, înrolarea, migrarea TDX, verificarea
 semnăturilor CMS și consola endpointurilor, atât local, cât și prin WSM.
+
+
+## Automatic host compilation in releases
+
+`releasectl build`, `package`, `package-update` and `release` compile both the Go
+application and `ECardHost.exe`. The update-server's Make release/update and
+installer actions use this path automatically. The checked-in host EXE and its
+old source manifest are not release inputs; vendor SDK hashes are still checked.
+A compiler/restore error fails the release, with no fallback to an old host.
+
+On Linux/macOS, the build uses the .NET SDK and the pinned
+`Microsoft.NETFramework.ReferenceAssemblies.net48` 1.0.3 package. If `dotnet` is
+not on PATH, the script installs the official .NET 8 SDK into the build user's
+`~/.cache/wisemed-ecard` directory. The first build needs internet access to
+Microsoft and NuGet; subsequent builds reuse the toolchain and package caches.
+No sudo or Windows runner is needed. Standard .NET Linux native dependencies
+must be installed on the build server. The Ubuntu update-server image includes
+`dotnet-sdk-8.0` and its dependencies; rebuild that image to preinstall them.
+
+Optional server environment settings: `DOTNET` (SDK executable),
+`WMR_ECARD_TOOLCHAIN_CACHE` (bootstrap cache), `NUGET_PACKAGES` (package cache).
+The update server passes these settings to the release command. Explicit
+`DOTNET` installations must include an SDK, not just the runtime.
+Windows build hosts use the installed .NET Framework compiler.
+
+Each build compiles into its own temporary directory. Delivered `deployments/host`
+contains only `ECardHost.exe`, `ECardHost.exe.config` and a generated SHA-256
+manifest. C# sources, compiler scripts, reference assemblies and build caches
+are not shipped. Windows clients still need .NET Framework 4.8 and reader drivers;
+there is no client-side compilation or download.
+
+For a manual host-only development build:
+
+```sh
+bash apps/wisemed-pias-ecard/scripts/build-host.sh /tmp/ecard-host-build
+```

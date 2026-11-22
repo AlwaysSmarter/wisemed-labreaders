@@ -183,11 +183,13 @@
               <div class="release-progress-head">
                 <div class="release-progress-spinner" aria-hidden="true"></div>
                 <div class="release-progress-copy">
+                  <button id="cancel-release" class="ghost" type="button" hidden>Anuleaza release</button>
                   <strong id="release-progress-title">Se pregateste release-ul</strong>
                   <span id="release-progress-detail">Operatia poate dura cateva zeci de secunde.</span>
                 </div>
               </div>
             </div>
+            <pre id="release-logs" style="max-height:240px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere" aria-label="Log compilare"></pre>
             <p id="version-msg" class="error-text"></p>
             <div class="version-workspace">
               <div class="analyte-table-wrap version-table-pane">

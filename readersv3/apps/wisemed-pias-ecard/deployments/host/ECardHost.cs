@@ -7,6 +7,7 @@ using System.Linq;
 using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Linq.Expressions;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
@@ -91,10 +92,48 @@ public static class ECardHost {
   if(anonymous){if(ei==""||cid==""||ei!=cid)throw new HostError("matching_cid_required",0);}
   else {if(ec!=""&&ec!="0000000000000"&&ec!=cnp)throw new HostError("cnp_mismatch",0);if(ei!=""&&ei!=cid)throw new HostError("cid_mismatch",0);if((ec==""||ec=="0000000000000")&&ei=="")throw new HostError("expected_identity_required",0);}
  }
+ // PC/SC enumerates attached devices; the SDK catalogue is not hardware detection.
+ [DllImport("winscard.dll")] static extern int SCardEstablishContext(uint scope,IntPtr r1,IntPtr r2,out IntPtr context);
+ [DllImport("winscard.dll",CharSet=CharSet.Unicode,ExactSpelling=true)] static extern int SCardListReadersW(IntPtr context,string groups,IntPtr readers,ref uint length);
+ [DllImport("winscard.dll")] static extern int SCardReleaseContext(IntPtr context);
+ static string[] ConnectedReaders(){
+  IntPtr context;int rc=SCardEstablishContext(2,IntPtr.Zero,IntPtr.Zero,out context);
+  if(rc!=0)throw new HostError("pcsc_context_failed",rc);
+  try {
+   for(int attempt=0;attempt<3;attempt++){
+    uint length=0;rc=SCardListReadersW(context,null,IntPtr.Zero,ref length);
+    if(rc==unchecked((int)0x8010002E))return new string[0];
+    if(rc!=0)throw new HostError("pcsc_list_readers_failed",rc);
+    if(length==0)return new string[0];
+    if(length>1048576)throw new HostError("pcsc_reader_list_too_large",0);
+    IntPtr buffer=Marshal.AllocHGlobal(checked((int)length*2));
+    try {
+     rc=SCardListReadersW(context,null,buffer,ref length);
+     if(rc==unchecked((int)0x80100008))continue; // Device list changed: retry sizing.
+     if(rc==unchecked((int)0x8010002E))return new string[0];
+     if(rc!=0)throw new HostError("pcsc_list_readers_failed",rc);
+     return Marshal.PtrToStringUni(buffer,(int)length).Split(new[]{'\0'},StringSplitOptions.RemoveEmptyEntries).Distinct().ToArray();
+    } finally {Marshal.FreeHGlobal(buffer);}
+   }
+   throw new HostError("pcsc_reader_list_changed_retry",0);
+  } finally {SCardReleaseContext(context);}
+ }
+ static string SDKReader(Type manager,string selected){
+  if(selected=="")return selected;
+  var supported=((IEnumerable)Invoke(manager,"GetSupportedTerminalNames")).Cast<object>().Select(Str).ToArray();
+  // Legacy saved configurations contain SDK model names. Preserve their semantics.
+  if(supported.Contains(selected))return selected;
+  var connected=ConnectedReaders();
+  if(!connected.Contains(selected))throw new HostError("selected_reader_not_connected",0);
+  var model=supported.OrderByDescending(x=>x.Length).FirstOrDefault(x=>selected.StartsWith(x+" ",StringComparison.OrdinalIgnoreCase));
+  if(model==null)throw new HostError("selected_reader_not_supported_by_sdk",0);
+  // SDK selects a model, not a PC/SC instance. Never silently use another twin.
+  if(connected.Count(x=>x.Equals(model,StringComparison.OrdinalIgnoreCase)||x.StartsWith(model+" ",StringComparison.OrdinalIgnoreCase))>1)throw new HostError("multiple_readers_of_same_model_not_supported_by_sdk",0);
+  return model;
+ }
  static object Open(Dictionary<string,object> input){
-  if(Opened)throw new HostError("session_already_open",0);Opened=true;Current=Dict(input,"request");var op=Text(Current,"operation");var manager=TypeNamed("ManagerSesiuniCard");string um=Text(input,"um_host");int port=Convert.ToInt32(input["um_port"]);Invoke(manager,"SetAdresaUnitateManagement",um,port);
-  if(op=="readers")return Result(Invoke(manager,"GetSupportedTerminalNames"));
-  Session=Invoke(manager,"StartSesiuneNoua",Text(input,"reader"));
+  if(Opened)throw new HostError("session_already_open",0);Opened=true;Current=Dict(input,"request");var op=Text(Current,"operation");if(op=="readers")return Result(ConnectedReaders());var manager=TypeNamed("ManagerSesiuniCard");string um=Text(input,"um_host");int port=Convert.ToInt32(input["um_port"]);Invoke(manager,"SetAdresaUnitateManagement",um,port);
+  Session=Invoke(manager,"StartSesiuneNoua",SDKReader(manager,Text(input,"reader")));
   Hook("UserInputRequired",UserInput);
   Hook("StareCardInTerminalSchimbata",args=>Interlocked.Increment(ref Generation));
   Hook("StareEditarePeTerminalSchimbata",args=>{if(Convert.ToInt32(args[0])!=0)PinAttempted=true;});

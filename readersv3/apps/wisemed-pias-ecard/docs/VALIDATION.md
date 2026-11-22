@@ -71,3 +71,18 @@ Rezultatele buildurilor Windows din 2026-11-21 sunt istorice, pentru numele
 anterior. Numele canonic este acum `wisemed-pias-ecard`. Pachetele vechi au fost
 eliminate; noile pachete Windows vor fi compilate de utilizator pe Update Server.
 Nu se declară pachete Windows generate local sub noul nume.
+
+
+## Automatic host release build — 2026-11-22
+
+- `go test ./tools/releasectl ./modules/appupdateserver` passes, including
+  compiler-failure/no-prebuilt-fallback, runtime-only host packaging, manifest
+  hashes and propagation of build-tool environment settings.
+- Clean .NET SDK bootstrap and real net48/x86 compilation on macOS pass.
+- Full Windows release command builds Go and host together and produces the
+  update ZIP. Archive inspection confirms only EXE/config/hash manifest in host,
+  no C# sources or build scripts, with hashes matching the compiled executable.
+- Local NSIS aborts even on its minimal self-test (`std::bad_alloc`), so installer
+  creation could not be completed on this Mac. Installer and update generation
+  both consume the same runtime, but Linux/remote installer execution is not
+  claimed as tested. Nothing was deployed to the remote update server.

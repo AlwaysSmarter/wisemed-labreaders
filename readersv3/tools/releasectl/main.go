@@ -527,6 +527,11 @@ func buildRuntime(root string, app appInfo, target string, ti targetInfo, versio
 	if err := copyDeployments(deploymentsSrc, deploymentsDst); err != nil {
 		return runtimeManifest{}, err
 	}
+	if app.ID == "wisemed-pias-ecard" {
+		if err := buildECardHost(root, filepath.Join(deploymentsDst, "host")); err != nil {
+			return runtimeManifest{}, err
+		}
+	}
 	if app.ID == "esignature-server" {
 		if err := copyFile(filepath.Join(root, "..", "docs", "signotec", "WebSocketPadServer", "STPadLib.dll"), filepath.Join(deploymentsDst, "signotec", "STPadLib.dll"), 0o644); err != nil {
 			return runtimeManifest{}, fmt.Errorf("bundle Signotec DLL: %w", err)

@@ -47,6 +47,9 @@ const sessionCookieName = "wmr_update_server_session"
 type Module struct {
 	rt module.Runtime
 
+	releaseMu  sync.Mutex
+	releaseJob *releaseJob
+
 	mu             sync.RWMutex
 	db             *sql.DB
 	server         *http.Server
@@ -179,6 +182,11 @@ func (m *Module) Start(ctx context.Context) error {
 		m.mu.Unlock()
 		go func() {
 			<-ctx.Done()
+			m.releaseMu.Lock()
+			if releaseActive(m.releaseJob) {
+				m.releaseJob.cancel()
+			}
+			m.releaseMu.Unlock()
 			shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
 			if m.server != nil {
@@ -566,19 +574,10 @@ func (m *Module) handleAppSubroutes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if len(parts) == 2 && parts[1] == "make-release" {
-		if r.Method != http.MethodPost {
-			writeJSON(w, http.StatusMethodNotAllowed, map[string]interface{}{"ok": false, "error": "method not allowed"})
-			return
-		}
-		sess, _ := m.currentSession(r)
-		saved, err := m.makeReleaseFromRequest(r, appID, sess.Username)
-		if err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]interface{}{"ok": false, "error": err.Error()})
-			return
-		}
-		writeJSON(w, http.StatusOK, map[string]interface{}{"ok": true, "version": saved})
+		m.handleReleaseJob(w, r, appID)
 		return
 	}
+
 	http.NotFound(w, r)
 }
 
@@ -1371,13 +1370,16 @@ func (m *Module) makeReleaseFromRequest(r *http.Request, appID int64, actor stri
 
 	m.rt.Logf("update-server: pregatesc release-ul app_id=%s source_app=%s version=%s target=%s actor=%s", appItem.AppID, managed.SourceAppID, nextVersion, target, strings.TrimSpace(actor))
 
-	releaseResult, err := m.runReleaseCtlRelease(repoRoot, managed.SourceAppID, target, nextVersion)
+	releaseResult, err := m.runReleaseCtlRelease(r.Context(), repoRoot, managed.SourceAppID, target, nextVersion)
 	if err != nil {
 		m.rt.Logf("update-server: release esuat app_id=%s version=%s target=%s err=%v", appItem.AppID, nextVersion, target, err)
 		return versionRecord{}, err
 	}
 	m.rt.Logf("update-server: compilarea s-a incheiat app_id=%s version=%s target=%s update_artifact=%s update_checksum=%s update_size=%d installer_artifact=%s",
 		appItem.AppID, nextVersion, target, strings.TrimSpace(releaseResult.Update.Path), strings.TrimSpace(releaseResult.Update.ChecksumSHA256), releaseResult.Update.Size, describeReleaseInstaller(releaseResult.Installer))
+	if err := m.beginReleasePublication(r.Context()); err != nil {
+		return versionRecord{}, err
+	}
 	fileName := sanitizeFileName(releaseResult.Update.FileName)
 	if fileName == "" {
 		m.rt.Logf("update-server: release invalid update artifact app_id=%s version=%s target=%s raw_file_name=%q", appItem.AppID, nextVersion, target, releaseResult.Update.FileName)
@@ -1772,8 +1774,8 @@ type releaseCtlResult struct {
 	Installer *releaseCtlArtifact `json:"installer,omitempty"`
 }
 
-func (m *Module) runReleaseCtlRelease(repoRoot, sourceAppID, target, version string) (releaseCtlResult, error) {
-	goVersion, err := goToolVersion(repoRoot)
+func (m *Module) runReleaseCtlRelease(ctx context.Context, repoRoot, sourceAppID, target, version string) (releaseCtlResult, error) {
+	goVersion, err := goToolVersionContext(ctx, repoRoot)
 	if err != nil {
 		return releaseCtlResult{}, err
 	}
@@ -1787,8 +1789,9 @@ func (m *Module) runReleaseCtlRelease(repoRoot, sourceAppID, target, version str
 	}
 	verboseLevel := m.verboseLevel()
 	m.rt.Logf("update-server: compilez release source_app=%s version=%s target=%s repo=%s gocache=%s verbose_level=%d", sourceAppID, version, target, repoRoot, tmpCache, verboseLevel)
-	output, err := runReleaseCtlReleaseCommand(repoRoot, sourceAppID, target, version, tmpCache, m.effectivePublicBaseURL(), verboseLevel, func(line string) {
+	output, err := runReleaseCtlReleaseCommandContext(ctx, repoRoot, sourceAppID, target, version, tmpCache, m.effectivePublicBaseURL(), verboseLevel, func(line string) {
 		m.rt.Logf("update-server: %s", line)
+		m.releaseProgress(line)
 	})
 	if err == nil {
 		m.rt.Logf("update-server: releasectl a terminat source_app=%s version=%s target=%s", sourceAppID, version, target)
@@ -1800,8 +1803,9 @@ func (m *Module) runReleaseCtlRelease(repoRoot, sourceAppID, target, version str
 		if err := os.MkdirAll(tmpCache, 0o755); err != nil {
 			return releaseCtlResult{}, err
 		}
-		output, retryErr := runReleaseCtlReleaseCommand(repoRoot, sourceAppID, target, version, tmpCache, m.effectivePublicBaseURL(), verboseLevel, func(line string) {
+		output, retryErr := runReleaseCtlReleaseCommandContext(ctx, repoRoot, sourceAppID, target, version, tmpCache, m.effectivePublicBaseURL(), verboseLevel, func(line string) {
 			m.rt.Logf("update-server: %s", line)
+			m.releaseProgress(line)
 		})
 		if retryErr == nil {
 			m.rt.Logf("update-server: releasectl a terminat dupa retry source_app=%s version=%s target=%s", sourceAppID, version, target)
@@ -1813,11 +1817,16 @@ func (m *Module) runReleaseCtlRelease(repoRoot, sourceAppID, target, version str
 }
 
 func runReleaseCtlReleaseCommand(repoRoot, sourceAppID, target, version, goCache, appUpdatesBaseURL string, verboseLevel int, progress func(string)) (releaseCtlResult, error) {
+	return runReleaseCtlReleaseCommandContext(context.Background(), repoRoot, sourceAppID, target, version, goCache, appUpdatesBaseURL, verboseLevel, progress)
+}
+
+func runReleaseCtlReleaseCommandContext(ctx context.Context, repoRoot, sourceAppID, target, version, goCache, appUpdatesBaseURL string, verboseLevel int, progress func(string)) (releaseCtlResult, error) {
 	args := []string{"run", "-a", "./tools/releasectl", "release", "--json", "--app", sourceAppID, "--target", target, "--version", version}
 	if strings.TrimSpace(appUpdatesBaseURL) != "" {
 		args = append(args, "--app-updates-base-url", strings.TrimSpace(appUpdatesBaseURL))
 	}
-	cmd := exec.Command("go", args...)
+	cmd := exec.CommandContext(ctx, "go", args...)
+	configureReleaseProcess(cmd)
 	cmd.Dir = repoRoot
 	cmd.Env = append(cleanGoCommandEnv(), "GOCACHE="+goCache, fmt.Sprintf("WMR_RELEASE_VERBOSE=%d", verboseLevel))
 	var stdout bytes.Buffer
@@ -1842,6 +1851,8 @@ func runReleaseCtlReleaseCommand(repoRoot, sourceAppID, target, version, goCache
 		}
 	}()
 	if err := cmd.Start(); err != nil {
+		_ = stderrPipe.Close()
+		stderrWG.Wait()
 		return releaseCtlResult{}, err
 	}
 	if err := cmd.Wait(); err != nil {
@@ -1867,7 +1878,12 @@ func runReleaseCtlReleaseCommand(repoRoot, sourceAppID, target, version, goCache
 }
 
 func goToolVersion(repoRoot string) (string, error) {
-	cmd := exec.Command("go", "env", "GOVERSION")
+	return goToolVersionContext(context.Background(), repoRoot)
+}
+
+func goToolVersionContext(ctx context.Context, repoRoot string) (string, error) {
+	cmd := exec.CommandContext(ctx, "go", "env", "GOVERSION")
+	configureReleaseProcess(cmd)
 	cmd.Dir = repoRoot
 	cmd.Env = cleanGoCommandEnv()
 	var output bytes.Buffer
@@ -1898,6 +1914,14 @@ func copyFileWithMode(src, dst string, mode os.FileMode) error {
 
 func cleanGoCommandEnv() []string {
 	keep := map[string]bool{
+		// Build-only .NET tooling for the eCard Windows host.
+		"DOTNET":                    true,
+		"DOTNET_ROOT":               true,
+		"DOTNET_CLI_HOME":           true,
+		"WMR_ECARD_TOOLCHAIN_CACHE": true,
+		"XDG_CACHE_HOME":            true,
+		"NUGET_PACKAGES":            true,
+
 		"PATH":     true,
 		"HOME":     true,
 		"TMPDIR":   true,
