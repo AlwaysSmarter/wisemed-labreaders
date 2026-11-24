@@ -121,3 +121,103 @@ test('token provider timeout prevents late socket creation and permits a fresh a
  const pending=wsm.connect();await tick();const ws=Socket.instances.at(-1);ws.onopen();ws.receive({type:'hello_ack',payload:{connection_id:'retry'}});await pending;
  assert.equal(requests,2);wsm.disconnect();
 });
+
+const station = {connectionID:'ecard-a',equipmentID:'18'};
+function apiAnswer(ws,request,body,status=200) {
+ ws.answer(request,'reply',{kind:'api.response',status,body},request.target.connection_id);
+}
+test('first eCard API calls share automatic hardware subscription; discovery and other APIs do not subscribe',async()=>{
+ const {wsm,ws}=await connected();try{
+  const a=wsm.callAPI(station,'/api/ecard/health'),b=wsm.callAPI(station,'/api/ecard/events');
+  await tick();const subscriptions=ws.sent.filter(m=>m.payload?.args?.path==='/api/ecard/events/subscribe');
+  assert.equal(subscriptions.length,1);assert.deepEqual(subscriptions[0].payload.args.body,{hardware:true});
+  assert.equal(subscriptions[0].target.connection_id,'ecard-a');
+  apiAnswer(ws,subscriptions[0],{subscription_id:'auto-1'});await tick();
+  for(const request of ws.sent.slice(-2))apiAnswer(ws,request,{});
+  await Promise.all([a,b]);
+  const discovery=wsm.listClients();await tick();ws.answer(ws.sent.at(-1),'connections',{connections:[{id:'ecard-b',equipment_id:'19'}]});await discovery;
+  assert.equal(ws.sent.filter(m=>m.payload?.args?.path==='/api/ecard/events/subscribe').length,1);
+  const events=[];wsm.onEvent=e=>events.push(e.payload.data.event);
+  for(const event of ['card_inserted','card_removed'])ws.receive({type:'event',connection_id:'ecard-a',payload:{event:'ecard.event',data:{event}}});
+  assert.deepEqual(events,['card_inserted','card_removed']);
+ }finally{wsm.disconnect();}
+});
+test('station switch deletes old subscription and subscribes only selected station',async()=>{
+ const {wsm,ws}=await connected();try{
+  let pending=wsm.selectECard(station);await tick();apiAnswer(ws,ws.sent.at(-1),{subscription_id:'first'});await pending;
+  pending=wsm.selectECard({connectionID:'ecard-b',equipmentID:'19'});await tick();
+  const requests=ws.sent.slice(-2),remove=requests.find(m=>m.payload.args.method==='DELETE'),add=requests.find(m=>m.payload.args.method==='POST');
+  assert.equal(remove.target.connection_id,'ecard-a');assert.deepEqual(remove.payload.args.body,{subscription_id:'first'});
+  assert.equal(add.target.connection_id,'ecard-b');apiAnswer(ws,remove,{ok:true});apiAnswer(ws,add,{subscription_id:'second'});await pending;
+  assert.equal(wsm._ecard.subscription,'second');
+ }finally{wsm.disconnect();}
+});
+test('browser and selected station reconnect restore by equipment identity without replaying operations',async()=>{
+ const {wsm,ws}=await connected();try{
+  const selection=wsm.selectECard(station);await tick();apiAnswer(ws,ws.sent.at(-1),{subscription_id:'first'});await selection;
+  const reconnect=wsm.reconnect();await tick();const next=Socket.instances.at(-1);next.onopen();next.receive({type:'hello_ack',payload:{connection_id:'browser-new'}});await reconnect;await tick();
+  assert.equal(next.sent.at(-1).type,'list_connections');
+  next.answer(next.sent.at(-1),'connections',{connections:[{id:'wrong',equipment_id:'19'},{id:'ecard-new',equipment_id:'18'}]});await tick();
+  const subscription=next.sent.at(-1);assert.equal(subscription.target.connection_id,'ecard-new');assert.deepEqual(subscription.payload.args.body,{hardware:true});
+  apiAnswer(next,subscription,{subscription_id:'restored'});await tick();
+  next.receive({type:'presence',payload:{event:'disconnected',equipment_id:'18',connection_id:'ecard-new'}});
+  next.receive({type:'presence',payload:{event:'connected',equipment_id:'18',connection_id:'ecard-newer'}});await tick();
+  next.answer(next.sent.at(-1),'connections',{connections:[{id:'ecard-newer',equipment_id:'18'}]});await tick();
+  assert.equal(next.sent.at(-1).target.connection_id,'ecard-newer');apiAnswer(next,next.sent.at(-1),{subscription_id:'again'});await tick();
+  assert.ok(next.sent.filter(m=>m.type==='command').every(m=>m.payload.args.path==='/api/ecard/events/subscribe'));
+ }finally{wsm.disconnect();}
+});
+test('renewal uses existing lease and expired lease is recreated automatically',async()=>{
+ const {wsm,ws}=await connected();try{
+  let pending=wsm.selectECard(station);await tick();apiAnswer(ws,ws.sent.at(-1),{subscription_id:'first'});await pending;
+  pending=wsm._subscribeECard(wsm._ecard,true);await tick();assert.equal(ws.sent.at(-1).payload.args.body.subscription_id,'first');
+  apiAnswer(ws,ws.sent.at(-1),{error:'subscription not found'},404);await tick();
+  assert.deepEqual(ws.sent.at(-1).payload.args.body,{hardware:true});apiAnswer(ws,ws.sent.at(-1),{subscription_id:'renewed'});await pending;
+  assert.equal(wsm._ecard.subscription,'renewed');
+ }finally{wsm.disconnect();}
+});
+test('failed subscription blocks hardware operation and reports the failure',async()=>{
+ const {wsm,ws}=await connected();try{
+  const operation=wsm.callAPI(station,'/api/ecard/operations',{method:'POST',body:{operation:'sign'}});
+  const rejected=assert.rejects(operation,{status:403});await tick();apiAnswer(ws,ws.sent.at(-1),{error:'denied'},403);await rejected;
+  assert.equal(ws.sent.filter(m=>m.payload?.args?.path==='/api/ecard/operations').length,0);
+ }finally{wsm.disconnect();}
+});
+test('deselection during subscription cleans late lease and does not submit pending operation',async()=>{
+ const {wsm,ws}=await connected();try{
+  const operation=wsm.callAPI(station,'/api/ecard/operations',{method:'POST',body:{operation:'sign'}});
+  const rejected=assert.rejects(operation,{code:'ecard_selection_changed'});await tick();const sub=ws.sent.at(-1);
+  await wsm.clearECard();apiAnswer(ws,sub,{subscription_id:'late'});await rejected;await tick();
+  assert.equal(ws.sent.at(-1).payload.args.method,'DELETE');apiAnswer(ws,ws.sent.at(-1),{ok:true});
+  assert.equal(ws.sent.filter(m=>m.payload?.args?.path==='/api/ecard/operations').length,0);
+ }finally{wsm.disconnect();}
+});
+test('connection-only selection resolves stable equipment identity for later reconnect',async()=>{
+ const {wsm,ws}=await connected();try{
+  const selection=wsm.selectECard({id:'ecard-a'});await tick();assert.equal(ws.sent.at(-1).type,'list_connections');
+  ws.answer(ws.sent.at(-1),'connections',{connections:[{id:'ecard-a',equipment_id:'18'},{id:'ecard-b',equipment_id:'19'}]});await tick();
+  assert.equal(ws.sent.at(-1).target.connection_id,'ecard-a');apiAnswer(ws,ws.sent.at(-1),{subscription_id:'selected'});await selection;
+  assert.equal(wsm._ecard.equipmentID,'18');
+ }finally{wsm.disconnect();}
+});
+test('authentication renews without socket replacement or disconnect and keeps eCard selection',async()=>{
+ let expires=Math.floor(Date.now()/1000)+300;
+ const {wsm,ws}=await connected({tokenProvider:async()=>jwt({exp:expires})});
+ try {
+  let disconnected=0;wsm.onDisconnect=()=>disconnected++;
+  wsm._authRefreshSupported=true;
+  const selection=wsm.selectECard(station);await tick();apiAnswer(ws,ws.sent.at(-1),{subscription_id:'stable'});await selection;
+  expires+=300;const renewal=wsm._refreshAuth();await tick();const request=ws.sent.at(-1);
+  assert.equal(request.type,'auth.refresh');assert.ok(request.payload.token);
+  ws.answer(request,'auth_refreshed',{expires_at:new Date(expires*1000).toISOString()});await renewal;
+  assert.equal(disconnected,0);assert.equal(wsm._ws,ws);assert.equal(wsm._ecard.subscription,'stable');assert.equal(wsm._expires,expires*1000);
+ }finally{wsm.disconnect();}
+});
+test('generic topic subscriptions are restored after reconnect',async()=>{
+ const {wsm,ws}=await connected();try{
+  const subscription=wsm.subscribe('logs:utility');await tick();ws.answer(ws.sent.at(-1),'subscribe_ack',{ok:true});await subscription;
+  const reconnect=wsm.reconnect();await tick();const next=Socket.instances.at(-1);next.onopen();next.receive({type:'hello_ack',payload:{connection_id:'new'}});await reconnect;await tick();
+  assert.equal(next.sent.at(-1).type,'subscribe');assert.equal(next.sent.at(-1).payload.topic,'logs:utility');
+  next.answer(next.sent.at(-1),'subscribe_ack',{ok:true});await tick();
+ }finally{wsm.disconnect();}
+});

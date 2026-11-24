@@ -115,3 +115,16 @@ For a manual host-only development build:
 ```sh
 bash apps/wisemed-pias-ecard/scripts/build-host.sh /tmp/ecard-host-build
 ```
+
+## Operații și diagnostic complet
+
+Folosiți `POST /api/ecard/operations` pentru încărcare și pornire asincronă într-un
+singur apel. `GET /api/ecard/jobs/{id}/report` grupează rezultatul final, cererile,
+răspunsurile, erorile și evenimentele pe SDK. `POST /api/ecard/events/subscribe`
+prin WSM livrează evenimentele intermediare și pachetul final. Rapoartele mari se
+reconstruiesc din părți verificate SHA-256; datele nu sunt trunchiate.
+
+Variante distincte: `2.0.0.4` (SDK oficial direct) și `cnas-wrapper-1.0.0.0`
+(wrapperul DLL original CNAS, cu SDK 2.0.0.4). Ordinea existentă se păstrează.
+Detalii de integrare și limite de verificare: `docs/API.md` și
+`docs/CNAS-COMPATIBILITY.md`.

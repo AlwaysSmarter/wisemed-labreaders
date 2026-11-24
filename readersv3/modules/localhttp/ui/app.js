@@ -1402,7 +1402,20 @@ function applyECardUI() {
   }
   for (const name of ["history", "operations"]) { const link=barcodeNavButton(name); if(link)link.hidden=true; }
   const debug=barcodeNavButton("debug");if(debug){debug.hidden=false;debug.textContent="Debug eCard";}
-  if(!document.getElementById("ecard-settings-nav")){const link=document.createElement("button");link.id="ecard-settings-nav";link.className="nav-sublink";link.textContent="Cititor și terminal eCard";link.onclick=()=>{window.history.pushState({},"","/settings/ecard");activateView("analytes",false)};els.settingsSubmenu.append(link);}
+  if (!document.getElementById("ecard-settings-nav")) {
+    const link = document.createElement("button");
+    link.id = "ecard-settings-nav";
+    link.className = "nav-sublink";
+    link.dataset.settingsSubview = "ecard";
+    link.textContent = "Cititor și terminal eCard";
+    link.onclick = () => {
+      activateSettingsSubView("ecard");
+      activateView("analytes");
+    };
+    els.settingsSubmenu.append(link);
+    els.navSublinks.push(link);
+  }
+  document.getElementById("ecard-settings-nav").hidden = false;
   document.title="WiseMED · PIAS eCard";
   const idLabel=els.readerSettingsForm?.elements.namedItem("reader_id")?.closest("label")?.querySelector("span");if(idLabel)idLabel.textContent="ID utilitar";
   const save=els.readerSettingsForm?.querySelector('[type="submit"]');if(save)save.textContent="Salvează configurația";
@@ -1421,7 +1434,7 @@ function applyECardUI() {
 // Expose only the eCard namespace to the trusted embedded utility UI. The parent
 // fetch adapter preserves authenticated HTTP / WSM transport and response status.
 window.wiseMEDECardRequest=async(path,method,body)=>{
- if(!/^(health|ui|settings|sign\/(batch|verify)|jobs(?:\/[^/?]+(?:\/(items|start|pin|cancel|results))?)?|tdx\/(preview|migrate))(?:\?[^#]*)?$/.test(path))throw Error("Endpoint eCard invalid");
+ if(!/^(health|ui|settings|operations|history|events(?:\/subscribe)?|sign\/(batch|verify)|jobs(?:\/[A-Za-z0-9_-]+(?:\/(items|start|pin|cancel|results|report))?)?|tdx\/(preview|migrate))(?:\?[^#]*)?$/.test(path))throw Error("Endpoint eCard invalid");
  const response=await fetch("/api/ecard/"+path,{method,credentials:"same-origin",headers:{"Content-Type":"application/json"},body:body===undefined?undefined:JSON.stringify(body)});
  return {ok:response.ok,status:response.status,data:await response.json()};
 };
@@ -1440,7 +1453,12 @@ async function loadECardDashboard() {
   const node=document.getElementById("ecard-status");if(!node)return;
   try {
     const [health,settings]=await Promise.all([api("/api/ecard/health"),api("/api/ecard/settings")]);
-    node.textContent=["Serviciu: "+(health.ok?"disponibil":"indisponibil"),"Acces hardware: "+(health.hardware_supported?"platformă Windows":"necesită Windows"),"Cititor configurat: "+(settings.reader_name||"selecție automată"),"UM: "+settings.um_host+":"+settings.um_port,"Ordine SDK: "+health.sdk_order.join(" → "),"Batch: semnare secvențială pe același card; maximum "+settings.max_items+" texte","Starea cardului se verifică explicit în operațiile cardului."].join("\n");
+    const appVersion=health.versions?.app_version||"indisponibilă";
+    const hostVersion=health.versions?.ecard_host_version||"indisponibilă";
+    const hostNode=document.getElementById("dashboard-ecard-host-version");
+    if(hostNode){hostNode.textContent="· ECardHost: "+hostVersion;hostNode.hidden=false;hostNode.title="ECardHost SHA-256: "+(health.versions?.ecard_host_sha256||"indisponibil");}
+    const equipmentID=Number(state.readerInfo?.equipment_id)>0?String(state.readerInfo.equipment_id):"neînregistrat";
+    node.textContent=["PIAS eCard: "+appVersion+" · ECardHost: "+hostVersion,"ID echipament: "+equipmentID,"Serviciu: "+(health.ok?"disponibil":"indisponibil"),"Acces hardware: "+(health.hardware_supported?"platformă Windows":"necesită Windows"),"Cititor configurat: "+(settings.reader_name||"selecție automată"),"UM: "+settings.um_host+":"+settings.um_port,"Ordine SDK: "+health.sdk_order.join(" → "),"Batch: semnare secvențială pe același card; maximum "+settings.max_items+" texte","Starea cardului se verifică explicit în operațiile cardului."].join("\n");
   } catch(error) {node.textContent="Starea eCard nu poate fi citită: "+error.message;}
 }
 
@@ -2333,7 +2351,15 @@ function pathForView(name) {
 
 function activateSettingsSubView(name) {
  const ecardPanel=document.getElementById("settings-panel-ecard");if(ecardPanel)ecardPanel.hidden=true;
- if(state.ecardMode && name==="ecard"){state.settingsSubView="ecard";document.querySelectorAll('[id^="settings-panel-"]').forEach(p=>p.hidden=true);mountECardPanel("settings");return;}
+ if (state.ecardMode && name === "ecard") {
+   state.settingsSubView = "ecard";
+   document.querySelectorAll('[id^="settings-panel-"]').forEach(panel => panel.hidden = true);
+   els.navSublinks.forEach(link => link.classList.toggle("active", link.dataset.settingsSubview === "ecard"));
+   window.history.replaceState({view:"analytes"}, "", "/settings/ecard");
+   mountECardPanel("settings");
+   renderTopbarTitle();
+   return;
+ }
  if(state.aiMode && !["reader","wss"].includes(name)) name="reader";
  if(name==="history" && (isSIUIMode()||isHistoryMode())){state.settingsSubView="history";document.querySelectorAll('[id^="settings-panel-"]').forEach(p=>p.hidden=p.id!=="settings-panel-siui");els.navSublinks.forEach(link=>link.classList.toggle("active",link.dataset.settingsSubview==="history"));window.history.replaceState({view:"analytes"},"","/settings/history");loadHistoryPanel().catch(e=>showToast(e.message,"error"));return;}
  if((state.ecardMode || state.formatterMode) && !["reader","wss"].includes(name)) name="reader";
@@ -6760,7 +6786,12 @@ function formatReaderSecondaryLabel(readerInfo = {}) {
 }
 
 function renderReaderSidebar() {
- if(state.ecardMode){els.readerIdentityIcon.textContent="eC";els.readerIdentityTitle.textContent="Utilitar";els.readerIdentitySubtitle.textContent="PIAS eCard";els.readerSummaryList.textContent="Card CEAS / CI · Semnare · Înrolare";return;}
+ if(state.ecardMode){
+  const equipmentID=Number(state.readerInfo?.equipment_id)>0?String(state.readerInfo.equipment_id):"neînregistrat";
+  els.readerIdentityIcon.textContent="eC";els.readerIdentityTitle.textContent="Utilitar";
+  els.readerIdentitySubtitle.textContent="PIAS eCard · ID echipament: "+equipmentID;
+  els.readerSummaryList.textContent="Card CEAS / CI · Semnare · Înrolare";return;
+ }
  if(state.aiMode){
   els.readerIdentityIcon.textContent="AI";els.readerIdentityTitle.textContent="Utilitar";els.readerIdentitySubtitle.textContent="WiseMED AI";
   els.readerSummaryList.textContent="Documentare clinică · HTTP / WSS";return;

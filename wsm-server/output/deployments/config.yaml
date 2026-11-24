@@ -52,6 +52,7 @@ tenants:
             - https://wslocal.wisemed.eu
             - https://wslocalhost.wisemed.eu
             - https://php.wisemed.eu
+            - https://phpr.wisemed.eu
         issuer: https://localhost:8443
         wisemed:
             api_key_file: keys/local-wisemed-api.key

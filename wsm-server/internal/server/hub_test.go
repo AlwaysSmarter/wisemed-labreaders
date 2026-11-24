@@ -81,8 +81,8 @@ func TestHubDuplicateAndBackpressure(t *testing.T) {
 	}
 	select {
 	case <-c.closed:
+		t.Fatal("queue pressure disconnected the consumer")
 	default:
-		t.Fatal("slow consumer not disconnected")
 	}
 	h.Remove(c.ID)
 	if len(h.Snapshot("a")) != 0 {

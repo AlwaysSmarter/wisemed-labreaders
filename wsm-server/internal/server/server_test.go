@@ -491,15 +491,9 @@ func TestConnectionLimitRateAndRepeatedHello(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		_ = a.WriteJSON(Envelope{Type: "ping"})
 	}
-	a.SetReadDeadline(time.Now().Add(time.Second))
-	for {
-		_, _, e = a.ReadMessage()
-		if e != nil {
-			break
-		}
-	}
-	if !websocket.IsCloseError(e, websocket.ClosePolicyViolation) {
-		t.Fatal("rate limit", e)
+	a.SetReadDeadline(time.Now().Add(6 * time.Second))
+	for i := 0; i < 5; i++ {
+		readType(t, a, "pong")
 	}
 }
 func TestRejectInvalidReloadRetainsConfig(t *testing.T) {

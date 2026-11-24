@@ -19,6 +19,111 @@ Exemplu payload WSM (în envelope-ul comun al clientului):
 {&quot;method&quot;:&quot;POST&quot;,&quot;path&quot;:&quot;/api/ecard/sign/batch?async=true&quot;,&quot;body&quot;:{&quot;operation_id&quot;:&quot;346c04d6-675a-44f8-92af-172159720364&quot;,&quot;request&quot;:{&quot;contract&quot;:{&quot;cif&quot;:&quot;COD_FURNIZOR&quot;,&quot;cui&quot;:&quot;CUI&quot;,&quot;number&quot;:&quot;CONTRACT&quot;,&quot;date&quot;:&quot;2026-01-01&quot;,&quot;house&quot;:&quot;CAS-B&quot;,&quot;provider_type&quot;:&quot;PARA&quot;},&quot;expected&quot;:{&quot;cnp&quot;:&quot;CNP_ASTEPTAT&quot;,&quot;cid&quot;:&quot;CID_ASTEPTAT&quot;},&quot;encoding&quot;:&quot;ascii&quot;},&quot;items&quot;:[{&quot;id&quot;:&quot;serviciu-1&quot;,&quot;text&quot;:&quot;TEXTUL EXACT&quot;}]}}
 ```
 
+## Operație asincronă cu raport unic
+
+`POST /api/ecard/operations` primește `{operation_id, request, items?}`. `request`
+este obiectul folosit la `/jobs`; `items` este permis și obligatoriu numai pentru
+`sign`. Corpul JSON local are maximum 32 MiB; prin WSM se aplică limita de 4 MiB.
+Batch-urile mai mari folosesc încărcarea în chunk-uri și același raport final.
+Serverul creează și pune în coadă atomic operația. Nu se mai apelează `/start`.
+
+```json
+{
+  &quot;operation_id&quot;: &quot;346c04d6-675a-44f8-92af-172159720364&quot;,
+  &quot;request&quot;: {
+    &quot;operation&quot;: &quot;read&quot;,
+    &quot;contract&quot;: {&quot;cif&quot;:&quot;COD_FURNIZOR&quot;,&quot;cui&quot;:&quot;CUI&quot;,&quot;number&quot;:&quot;CONTRACT&quot;,&quot;date&quot;:&quot;2023-06-30&quot;,&quot;house&quot;:&quot;CAS-B&quot;,&quot;provider_type&quot;:&quot;PAR&quot;},
+    &quot;fields&quot;: [&quot;A1&quot;,&quot;B1&quot;,&quot;B2&quot;,&quot;C1&quot;,&quot;D1&quot;,&quot;D2&quot;]
+  }
+}
+```
+
+Răspunsul inițial este HTTP 202 cu `id`, `state`, `status_path`, `report_path` și
+`events_path`. Folosiți un UUID stabil: retrimiterea cu aceeași identitate și același
+conținut întoarce același job; conținut diferit produce 409. Un ID șters nu este
+reutilizat. Deconectarea clientului nu anulează și nu repetă operația.
+
+`GET /api/ecard/jobs/{id}/report` returnează formatul compact:
+
+```json
+{
+  &quot;operation_id&quot;: &quot;...&quot;,
+  &quot;state&quot;: &quot;completed&quot;,
+  &quot;used_sdk&quot;: &quot;2.0.0.4&quot;,
+  &quot;request&quot;: {&quot;operation&quot;:&quot;readers&quot;},
+  &quot;response&quot;: {&quot;ok&quot;:true,&quot;data&quot;:[&quot;Gemalto USB Smart Card Reader 0&quot;],&quot;error&quot;:null},
+  &quot;events&quot;: [{&quot;event&quot;:&quot;sdk_loaded&quot;,&quot;time&quot;:&quot;...&quot;}],
+  &quot;errors&quot;: [],
+  &quot;other_sdks&quot;: []
+}
+```
+
+`used_sdk` este o valoare simplă: ID-ul ultimului SDK încercat, inclusiv la eșec.
+`request`, `response`, `events` și `errors` de la nivelul principal aparțin numai
+acestui SDK. `other_sdks` conține, în ordinea încercării, celelalte SDK-uri efectiv
+încercate, fiecare cu `sdk`, `request`, `response`, `events`, `errors`. Nu include
+SDK-uri doar configurate și nu repetă ultimul SDK. `state` indică execuția; succesul
+se citește din `response.ok`. Pentru o operație în curs, `response` este null.
+Solicitările PIN includ temporar `pin_request`; răspunsul PIN folosește în continuare
+`POST /jobs/{id}/pin`.
+
+Pentru `readers`, cererea raportată conține numai `operation`, iar lista cititoarelor
+apare o singură dată în `response.data`. Contractul, câmpurile cardului, certificatele
+și encodingul nefolosite de această operație sunt omise. Evenimentele compacte
+păstrează numele, timpul și detaliile relevante, fără copia răspunsului complet în
+fiecare eveniment. Mesajele informative despre selecția SDK nu sunt erori.
+
+Pentru semnare, `response.data` păstrează și elementele deja semnate la un eșec.
+Cererea principală include `items`. Instantaneul complet criptat, cu detaliile
+tehnice și cronologia comună, poate fi cerut explicit cu `?diagnostics=full`.
+Formatul compact este implicit și pe WSM; diagnosticul extins nu este afișat implicit.
+Evenimentele operației se păstrează până la ștergerea/expirarea jobului, separat de
+jurnalul global. Rapoartele vechi salvate se proiectează în același format compact;
+`diagnostic_warning`, când există, semnalează istoricul care nu poate fi recuperat.
+
+Raportul WSM peste 3 MiB produce explicit 413 cu `report_parts_path`, fără
+trunchiere. Folosiți `/jobs/{id}/report?part=0`, apoi toate părțile până la `parts-1`.
+Fiecare răspuns include `data_base64`, `encoding:base64-json-utf8`, `part`, `parts`,
+`total_bytes` și SHA-256 al întregului JSON. Concatenați octeții decodați, verificați
+hash-ul și decodați o singură dată JSON-ul final. Părțile sunt disponibile numai
+pentru operații terminate și prin același transport/proprietar; autentificarea
+locală nu oferă acces la joburile unui proprietar WSM.
+
+## Abonare WSM la busul de evenimente eCard
+
+Prin `api.request`, apelați `POST /api/ecard/events/subscribe` cu
+`{&quot;hardware&quot;:true}` înainte de operație. Fără `job_id`, abonarea primește operațiile
+proprietarului curent; cu `job_id`, numai acea operație. `hardware:true` include și
+evenimentele fizice ale stației, fără datele operațiilor altui utilizator.
+Nu se acceptă connection ID din cerere: destinația vine din identitatea atestată WSM.
+Dispozitivul trebuie să aibă permisiunea WSM existentă `route:event`.
+
+Abonarea întoarce `subscription_id` și `expires_at` (30 minute). Reînnoire:
+POST cu același `subscription_id`; oprire: DELETE cu acel ID. La reconectare WSM
+sau restart aplicație se creează o abonare nouă. Maximum 32 abonări/proprietar.
+
+Evenimentele sunt trimise prin rutarea WSM către conexiunea abonată:
+
+```json
+{
+  &quot;event&quot;: &quot;ecard.event&quot;,
+  &quot;instance_id&quot;: &quot;...&quot;,
+  &quot;data&quot;: {&quot;id&quot;:123,&quot;time&quot;:&quot;...&quot;,&quot;job&quot;:&quot;...&quot;,&quot;source&quot;:&quot;cnas-wrapper-1.0.0.0&quot;,&quot;event&quot;:&quot;sdk_changed&quot;,&quot;data&quot;:{&quot;previous_sdk&quot;:&quot;2.0.0.4&quot;,&quot;sdk&quot;:&quot;cnas-wrapper-1.0.0.0&quot;,&quot;reason&quot;:&quot;previous_sdk_failed&quot;,&quot;previous_sdk_code&quot;:-29}},
+  &quot;report_path&quot;: &quot;/api/ecard/jobs/.../report&quot;
+}
+```
+
+Sunt publicate `sdk_selected`, `sdk_changed`, etapele hostului/wrapperului,
+solicitarea PIN fără valoarea PIN, citirea/semnarea și rezultatele, plus evenimentele
+PC/SC de introducere/retragere card. `operation_finished` include `operation_report`
+cu pachetul final complet. Dacă pachetul depășește limita live, include
+`report_delivery:chunked` și `report_parts_path`. Live este best-effort; ID-urile
+persistate permit recuperarea după întrerupere. Pentru replay folosiți
+`GET /api/ecard/events?job_id={id}&amp;after=0`, apoi `cursor` drept `after` până la
+pagina goală. Fără `job_id` se citește jurnalul global accesibil utilizatorului.
+PIN, tokenuri și chei sunt omise; flagurile `pin_attempted` și `_offline_token`
+rămân booleene vizibile. Raportul și evenimentele aparțin aceleiași operații.
+
 ## Apel unic batch
 
 `POST /api/ecard/sign/batch` primește întreg batch-ul și returnează întreg rezultatul
@@ -111,7 +216,9 @@ private; G2/G3/G4 nu sunt expuse ca operații de citire.
 
 PIN este cerut de evenimentul SDK; pe cititor cu tastatură se introduce fizic.
 Pe cititor fără tastatură: interogați jobul, preluați `pin_request.challenge` și
-`prompt`, trimiteți `{challenge,value}`. PIN-ul nu este memorat între operații.
+`prompt`, trimiteți `{challenge,value}`. PIN-ul de autentificare poate fi reutilizat
+exclusiv în memorie pentru același utilizator/card până la retragere sau eroare;
+vezi secțiunea „PIN pe durata prezenței cardului”.
 Timeout implicit per comandă/interacțiune: 180 secunde; job: 7200 secunde.
 
 Limite implicite: 100.000 itemi/job, 64 KiB UTF-8/item, 256 MiB texte/job, 32 joburi
@@ -130,6 +237,15 @@ schimbă biblioteca automat. Biblioteca aleasă rămâne fixă pentru întreg ba
 Erorile necunoscute se opresc; nu se inventează succes sau semnături.
 
 ## Migrare TDX
+
+Formularul are câmpuri separate pentru contractul sursă. Completați numărul,
+data și tipul originale ale înrolării (tipul contractului, de exemplu `PAR`,
+nu categoria `PARA`), numele exact al calculatorului și IP:port UM original.
+Butonul de copiere preia explicit contractul formularului principal; modificarea
+sursei invalidează verificarea precedentă. Contractul principal rămâne neschimbat.
+Migrarea păstrează contractul sursă, nu înrolează terminalul pentru un contract nou.
+La nepotrivire, eroarea indică numele de fișier calculat din datele introduse.
+Previzualizarea afișează atât identitatea sursă, cât și destinația.
 
 `preview` primește:
 
@@ -259,4 +375,296 @@ trimite cererea; API-ul continuă să ceară `confirm: true`.
 În consola Debug, bifarea confirmării explicite a unei cereri `POST /jobs`
 pentru aceste operații setează și `confirm: true` în JSON-ul trimis. Confirmarea
 se resetează după trimitere și la schimbarea exemplului/operației.
-</pre>
+
+## Memorarea formularului Debug
+
+Câmpurile Debug (contract, identificatori card, operație, semnare/scriere,
+migrare, verificare CMS și consola API) se memorează automat în browser și se
+restaurează la redeschidere. Memorarea este separată pentru fiecare instalație
+și utilizator autentificat; nu se sincronizează între browsere sau calculatoare.
+Butonul **Șterge valorile memorate** șterge copia locală și resetează formularul.
+
+PIN-ul, confirmările operațiilor și fișierele TDX nu sunt memorate. În consola
+API se salvează numai JSON valid, fără câmpurile PIN, password, secret,
+confirm, confirm_digest și challenge; corpul răspunsului PIN nu se salvează.
+
+## CEAS offline prin Windows Firewall
+
+În Configurare, `CEAS offline` (`ceas_offline`, implicit false) aplică imediat
+regula persistentă `WiseMED-PIAS-eCard-CEAS-Offline`. Regula blochează traficul TCP
+către toate IP-urile rezolvate ale hostului UM și portul configurat, pentru toate
+aplicațiile și profilurile de rețea. Nu modifică DNS-ul. Necesită Windows și
+privilegii de administrator. Debifarea și salvarea elimină numai această regulă;
+regula veche `WMBlockCEAS`, dacă există, nu este modificată.
+
+La salvare și la pornirea cu opțiunea activată se rezolvă din nou hostul UM.
+Schimbările DNS ulterioare necesită o nouă salvare sau repornire. Regula rămâne
+activă după închiderea aplicației. Erorile firewall refuză salvarea; aplicația
+încearcă restaurarea configurației firewall precedente. Erorile de restaurare
+sunt afișate. Salvarea este refuzată cât timp există joburi active sau în coadă.
+
+Blocarea simulează indisponibilitatea UM; comportamentul offline depinde de SDK
+și operație. Nu generează înrolări, nu schimbă contracte și nu modifică răspunsurile
+SDK pentru a transforma alte erori în autentificare offline.
+
+## Istoric apeluri și operații
+
+`max_jobs` limitează numai operațiile neterminate: uploading, queued, running și
+waiting_pin. Operațiile completed, failed, cancelled, unknown și interrupted nu
+consumă limita; nu trebuie șterse pentru a efectua un apel nou. Limita rămâne
+comună stației pentru a proteja cititorul și coada de lucru.
+
+`GET /api/ecard/jobs?offset=0` listează operațiile utilizatorului curent, câte 50,
+cu `items` și `next_offset`. În Debug, secțiunea Operații și rezultate permite
+vizualizarea rezultatelor paginate, anularea operațiilor active și ștergerea celor
+inactive, inclusiv după reîncărcarea paginii. Retenția rezultatelor rămâne cea
+configurată prin `retention_hours`.
+
+`GET /api/ecard/history?offset=0` listează ultimele apeluri ale utilizatorului,
+câte 50, cu `items`, `next_offset` și `limit`. Se păstrează ultimele 1.000 de apeluri
+per utilizator, criptate în baza locală, inclusiv cereri eșuate și răspunsuri de
+polling. Fiecare intrare are timpul, metoda, calea, statusul HTTP, durata, cererea
+și răspunsul. Istoricul însuși și HTML-ul interfeței sunt excluse. Query string-ul
+nu este înregistrat. PIN-urile, tokenurile, parolele, cheile și conținutul TDX sunt
+omise. Corpurile non-JSON sau peste 64 KiB sunt înlocuite cu o explicație, nu
+trunchiate în mod ambiguu. Istoricul nu reexecută operațiile și nu înlocuiește
+rezultatele complete disponibile la endpoint-ul de rezultate.
+
+## Încercări SDK la citirea cardului
+
+Pentru operația `read`, orice eroare permite încercarea următoarei biblioteci
+configurate, inclusiv eroare de transport sau după interacțiunea PIN, până la
+primul succes ori epuizarea listei. Fiecare bibliotecă are o sesiune nouă; PIN-ul
+introdus în browser poate fi reutilizat între apeluri dacă PC/SC
+confirmă continuitatea aceluiași card. Anularea și limita
+totală de timp opresc operația. Semnarea și modificările păstrează regulile stricte
+de evitare a repetării. `try_next_sdk` este o decizie raportată, nu un parametru
+care se setează din Debug.
+
+Fiecare încercare de deschidere/citire este păstrată criptat, inclusiv SDK-ul,
+câmpurile cerute, răspunsul, codul numeric SDK și decizia de continuare.
+`GET /jobs/{id}` include `sdk_attempts`; interfața le afișează în panoul rezultat.
+Istoricul apelurilor include și intrări `SDK`, chiar dacă operația finală eșuează.
+Încercările sunt șterse împreună cu operația la ștergere sau expirarea retenției.
+
+## Jurnal de evenimente
+
+Debug include **Evenimente în timp real**, cu buton de afișare live și filtru.
+`GET /api/ecard/events?after=0` returnează până la 100 de evenimente în ordine,
+cu `items` și `cursor`; următoarea cerere folosește cursorul drept `after`.
+La afișare live, interfața verifică evenimentele la fiecare secundă și păstrează
+ultimele 1.000 în pagină. Baza stației păstrează ultimele 5.000 de evenimente
+criptate. Un payload peste 64 KiB este înlocuit în jurnalul global/live cu o indicație către
+raport. Copia păstrată pentru raportul operației conține întregul eveniment. Interogarea jurnalului nu generează intrări în istoricul apelurilor.
+
+Pe Windows, un monitor PC/SC verifică la fiecare secundă cititoarele și prezența
+cardului fără a deschide o sesiune SDK sau a solicita PIN. Funcționează și între
+operații. Detectează conectarea/deconectarea cititorului, introducerea/scoaterea
+cardului și indisponibilitatea/restabilirea monitorizării. Starea inițială este
+marcată `initial_snapshot`; schimbările mai scurte decât intervalul de sondare
+pot să nu fie observate. Evenimentele fizice sunt vizibile utilizatorilor
+autentificați ai stației; evenimentele operațiilor apar numai proprietarului lor.
+
+În timpul operațiilor, hostul transmite schimbările de stare card, editare pe
+terminal, autentificare și comunicare UM expuse de SDK, starea inițială a sesiunii
+și începutul/finalul solicitării tokenului (fără token). Evenimentele opționale
+neexpuse de o bibliotecă sunt marcate `event_unavailable`. Workerul înregistrează
+începutul/finalul operațiilor și apelurilor, rezultatele și încercările SDK.
+Nu se capturează PIN-uri, tokenuri, chei, APDU-uri sau traficul UM brut. Stările
+SDK sunt păstrate în forma disponibilă în biblioteca respectivă.
+
+## Rezultate lângă apel și certificate expirate
+
+Panoul rezultatului operației include apelurile, răspunsurile și evenimentele
+corelate prin ID-ul jobului, actualizate automat. Filtrul selectează erori sau
+informări; limita permite 10/25/50/100 mesaje. Curăță afișarea apelului elimină
+doar datele din panou, fără ștergerea istoricului serverului sau anularea jobului.
+O operație nouă pornește cu panoul curățat. Afișarea live pornește automat în Debug.
+
+Verificarea CMS raportează separat `cryptographic_valid`, `certificate_valid_now`,
+perioada certificatului și, când există, `certificate_valid_at_signing_time`.
+`signing_time` este atributul semnat, nu o marcă temporală de încredere
+(`signing_time_trusted: false`). `valid` necesită semnătura corectă și certificatul
+valabil la data declarată a semnării, sau acum dacă atributul lipsește.
+Un certificat expirat la data semnării produce `certificate_outside_validity_period`,
+chiar dacă `cryptographic_valid: true`. Verificarea matematică nu schimbă certificatul
+original, cheia, atributele semnate sau conținutul. Lanțul, revocarea și acceptarea
+CNAS rămân neverificate. Interfața explică separat cele două rezultate.
+
+## PIN pe durata prezenței cardului
+
+PIN-ul introdus în browser, dacă autentificarea nu a dat eroare, este reutilizat
+între operații și SDK-uri pentru autentificarea aceluiași card, de același utilizator.
+Se reutilizează și când wrapperul cere autentificarea de mai multe ori în același
+apel (de exemplu la pregătirea semnării unui batch), înaintea răspunsului final,
+dacă nu s-a raportat o eroare de PIN/autentificare și continuitatea este păstrată.
+Este păstrat exclusiv în memorie; nu apare în baze de date, istoric sau evenimente.
+Se șterge la retragere/schimbare card, pierderea continuității cititorului,
+monitor indisponibil, PIN incorect, autentificare respinsă, card blocat sau oprirea aplicației.
+Continuitatea se verifică prin cititor, ATR, contorul Windows PC/SC și generația
+monitorului, inclusiv înainte și după introducerea manuală. Valoarea zero a
+contorului este acceptată; nu reprezintă o eroare PC/SC. Dacă verificarea nu
+este posibilă, PIN-ul trebuie reintrodus. Un PIN introdus în timpul unei retrageri
+nu poate reactiva memoria invalidată.
+
+Schimbarea/resetarea PIN-ului și activarea cer introducere explicită și golesc
+PIN-ul memorat. Solicitările wrapperului CNAS pentru modificarea PIN-ului sunt
+tratate separat de autentificare. PIN-ul tastaturii cititorului nu este disponibil
+aplicației pentru reutilizare. Evenimentele `pin_required` și `pin_reused` indică
+solicitarea manuală, respectiv reutilizarea; niciunul nu conține valoarea PIN-ului. `pin_required`
+include `input_kind` și `reason`: `no_cached_pin`, `card_continuity_unavailable`
+sau `explicit_input_required`. Câmpul `continuity_error` păstrează eroarea
+concretă PC/SC când verificarea continuității nu poate fi efectuată.
+Hostul emite `reader_selected` cu numele fizic ales de SDK; verificarea PIN-ului
+folosește acest nume, inclusiv când configurația conține doar modelul cititorului.
+Pentru hosturi vechi, un model este rezolvat numai dacă identifică un singur cititor.
+Câmpul `reader` din `pin_required` indică numele folosit la verificare.
+
+
+## Inițializarea cardului înaintea citirii
+
+SDK-ul poate iniția autentificarea automat, pe un fir separat, la notificarea
+introducerii cardului. Prezența fizică și `TerminalConectat=True` nu înseamnă că
+această etapă s-a terminat. Hostul se abonează la notificarea SDK de introducere
+a cardului numai după terminarea pregătirii tokenului și profilului. Această
+abonare poate declanșa ea însăși autentificarea automată pentru un card deja
+introdus. Evenimentul `card_notifications_attached` indică profilul pregătit;
+`ProfilId` este inclus și în starea sesiunii. După obținerea tokenului, înainte de `read`, pregătirea
+`sign` sau `certificates`, hostul sincronizează finalizarea notificării prin metoda
+SDK `SchimbareStareCardInTerminal`, care folosește aceeași blocare ca notificarea
+asincronă și suprimă notificările duplicate. Nu pornește citirea în paralel cu
+această autentificare. Dacă metoda nu există în SDK, emite
+`card_initialization_sync_unavailable` și păstrează comportamentul acelui SDK.
+
+Evenimentele `card_initialization_wait` și `card_initialization_finished` arată
+etapa, codul și starea finală. Un cod negativ de autentificare nu este transformat
+în succes pe baza stării `AUTENTIFICAT_OFFILINE`: SDK-ul poate seta această stare
+înainte să returneze o eroare. Pentru wrapper, evaluarea și reparațiile permise
+rămân delegate bibliotecii CNAS originale. Un eșec rămas este returnat fără o
+nouă autentificare automată în aceeași sesiune.
+
+## SDK oficial și wrapper CNAS distincte
+
+| ID configurare/API | Etichetă | Execuție |
+|---|---|---|
+| `2.0.0.4` | SDK (2.0.0.4) | SDK din documentația oficială, cu recuperările CNAS în adaptor |
+| `cnas-wrapper-1.0.0.0` | CNAS (2.0.0.4) | DLL-ul original Cnas.Ceas.SmartCard.Novensys, cu SDK-ul său |
+
+Cele două copii Ceas.eCard.SDK.dll au același SHA-256, verificat prin manifest;
+diferența este adaptorul folosit. Identitatea reală apare în `sdk_identity`:
+modul, AssemblyVersion și SHA-256 SDK, versiunea și SHA-256 wrapperului. Hostul
+raportează separat `host_version`.
+
+Toate SDK-urile directe păstrează adaptările inspirate din analiza CNAS, în măsura
+în care versiunea expune membrii necesari: extinderea listei de răspunsuri UM pentru
+offline, token local numai pentru erorile UM permise și cu înrolare/profil 2,
+refresh de token cu o singură repetare a citirii, recitirea CID după autentificare,
+rezultate parțiale și tratarea separată a certificatelor. Continuarea offline nu
+cere activarea firewallului. Lipsa unui membru opțional este diagnosticată. Nu se
+repetă semnarea/scrierea cu rezultat incert și nu se transformă PIN invalid în succes.
+
+Varianta CNAS încarcă și apelează DLL-ul original `Cnas.Ceas.SmartCard.Novensys.dll`,
+AssemblyVersion 1.0.0.0, cu SDK 2.0.0.4. Utilizează implementarea originală pentru
+GetToken, EvaluateOperationResult, interceptorul offline, ComputeHash și operațiile
+explicite; recuperările acestuia nu sunt înlocuite cu cele din adaptorul direct.
+Wrapperul poate efectua reparații de stare/PIN în timpul evaluării, conform CNAS.
+
+Adaptorul furnizează sesiunea și contractul jobului către contextul CNAS. Nu
+pornește interfața desktop CNAS și nu folosește auditul/cache-ul pacientului sau
+baza SQL CNAS. `ReadData`/`WriteData` desktop fac și traduceri prin acea bază; pentru
+citire/scriere apelăm evaluatorul real al wrapperului în jurul apelului SDK și
+păstrăm datele/codurile brute. Recitirea CID din `ServiceReadData` desktop nu este
+invocată separat. Semnarea cu certificatul MAI explicit este raportată incompatibilă
+pe calea wrapper care nu expune o metodă MAI distinctă; SDK-urile directe rămân
+selectabile. Verificarea identității, continuitatea cardului și verificarea CMS
+rămân în hostul WiseMED.
+
+Configurațiile existente își păstrează ordinea explicită; noua variantă poate fi
+adăugată în Setări. Configurația implicită nouă include ambele variante. Compilarea
+și testele cu sesiuni simulate nu certifică încă funcționarea wrapperului original
+pe Windows/card/UM: proba fizică trebuie să confirme încărcarea dependențelor,
+inițializarea contextului CNAS și operațiile efective.
+
+## Explicații ale erorilor și versiuni
+
+Răspunsurile de eroare păstrează codurile tehnice și includ `message`; erorile
+joburilor au și `error_message`. Codurile SDK au descrieri text din catalogul
+CNAS-PARA, iar hostul transmite descrierea din biblioteca efectiv încărcată.
+Pentru codurile necunoscute se indică explicit lipsa explicației specifice și
+necesitatea consultării etapei/evenimentelor, fără inventarea unei cauze.
+
+`GET /api/ecard/health` include permanent `versions`: `app_version`,
+`ecard_host_version`, `ecard_host_sha256`. Interfața le afișează în antet.
+Când `logging.verbose_level` este exact 5, aceste metadate sunt adăugate și la
+celelalte răspunsuri ale modulului, inclusiv erori, plus antetele
+`X-ECard-App-Version`, `X-ECard-Host-Version`, `X-ECard-Host-SHA256`.
+La celelalte niveluri nu sunt adăugate răspunsurilor obișnuite.
+
+La compilarea prin releasectl/update-server, versiunea detectată în executabilul
+Go este transmisă scriptului de compilare C#. `AssemblyInformationalVersion`
+(ProductVersion) și `ECardHost.exe --version` conțin exact aceeași versiune.
+Nu se folosește o valoare manuală din sursa hostului. Buildurile directe fără
+versiune explicită sunt marcate `dev`. Scripturile acceptă versiunea ca al doilea
+argument pentru build-host.sh și ca `-Version` pentru build-host.ps1.
+
+Versiunea hostului instalat este citită din executabilul real, separat de aplicație;
+un host vechi fără comandă de versiune este marcat necunoscut, nu etichetat cu
+versiunea aplicației. SHA-256 identifică fișierul efectiv. Cache-ul se invalidează
+când se schimbă calea, dimensiunea sau timpul de modificare al executabilului.
+
+## Inițializarea wrapperului CNAS pe Windows
+
+Varianta CNAS rulează hostul pe un fir STA, asemenea entrypointului aplicației
+CNAS decompilate. SDK-urile directe păstrează modelul lor de execuție. Înainte de
+fiecare pas de bootstrap se emite `cnas_wrapper_initializing`, cu `step` și
+`apartment_state`: load_assembly, resolve_context_type, construct_cnas_context,
+initialize_cnas_shell (înaintea constructorului), construct_provider, attach_session,
+construct_cnas_interceptor.
+
+Un Win32Exception păstrează mesajul Windows în `response.error.message` și include
+`response.error.diagnostics`: native_error_code, native_message,
+initialization_step, apartment_state, exception_chain și stack_frames (numai numele metodelor,
+fără argumente/PIN/token sau căi de sursă). Astfel o eroare de inițializare nu este
+confundată cu eșecul citirii cardului ori cu lipsa drepturilor de administrator.
+Alegerea STA aliniază hostul cu aplicația originală; nu demonstrează singură cauza
+unui Win32Exception fără cod nativ. Este necesară verificarea pe Windows.
+
+Un Win32Exception de la baza lanțului poate avea stack gol dacă a fost construit
+ca inner exception, fără să fie aruncat direct. exception_chain păstrează toate
+excepțiile de învelire și type_name pentru TypeInitializationException; stack_frames
+folosește cel mai profund stack disponibil. Mesajele de bootstrap sunt limitate
+la 2.048 de caractere/excepție, iar constructorul nu a primit încă cereri de token
+sau citire. Inițializarea statică originală Simavi.Applications.Shell.Host este
+executată explicit în pasul initialize_cnas_shell, înaintea constructorului care
+ar accesa oricum Host.Container. Nicio dependență care eșuează nu este ocolită.
+
+## Provider de credențiale pentru wrapperul independent
+
+Constructorul NovensysSmartCardContext rezolvă ICredentialsProvider din
+Host.Container. Dacă nu există înregistrarea implicită, creează
+HttpsCredentialsProvider; SetupDefaults citește CommonContext.GetActivationKey
+și adresele serviciilor din SQL-ul aplicației CNAS. O eroare Shared Memory/233
+în acest punct este o eroare de autentificare SQL înaintea operației pe card.
+
+Adaptorul înregistrează în pasul register_standalone_credentials o instanță
+construită normal, derivată din AbstractCredentialsProvider original, prin
+interfața și RegisterInstance originale Unity. Astfel constructorul original nu
+mai intră în fallback-ul SQL. Contextul, interceptorii, GetToken,
+EvaluateOperationResult și ComputeHash rămân implementările originale CNAS.
+GetToken pentru eCard folosește contractul ProviderData și sesiunea/enrolarea SDK,
+nu credențialele HTTPS SIUI. Metodele HTTPS neconfigurate produc explicit
+NotSupportedException; nu se furnizează parole, certificate sau tokenuri fictive.
+Evenimentul cnas_credentials_configured confirmă înregistrarea. Testele verifică
+fallback-ul SQL într-un fixture și înregistrarea/Resolve cu DLL-urile originale
+Microsoft.Practices.Unity și Cnas.Siui.WebServices. Rularea completă a citirii cu
+wrapperul original necesită în continuare verificarea pe Windows și hardware.
+
+
+## Exemplu WiseMED: fișe și semnare din browser prin WSS
+
+[Exemplul complet și pagina de test WSS](../../../../wsm-server/docs/ecard-wss-workflows.md)
+folosesc SDK-ul WSM existent, evenimentele fizice ale cardului și operațiile
+asincrone. Acoperă creare fișă la introducerea cardului și semnare automată dintr-o
+fișă existentă cu identitate CNP/CID verificată. Callbackurile de business se leagă
+la backendul WiseMED; pagina de test folosește fișe simulate, fără salvare clinică.
+</pre></html>

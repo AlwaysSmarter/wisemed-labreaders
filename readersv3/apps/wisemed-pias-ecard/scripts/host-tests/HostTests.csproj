@@ -1,0 +1,4 @@
+<Project Sdk="Microsoft.NET.Sdk">
+<PropertyGroup><TargetFramework>net8.0</TargetFramework><OutputType>Exe</OutputType><StartupObject>HostTests</StartupObject><EnableDefaultCompileItems>false</EnableDefaultCompileItems></PropertyGroup>
+<ItemGroup><Compile Include="../../deployments/host/CnasWrapperAdapter.cs"/><Compile Include="../../deployments/host/ECardHost.cs"/><Compile Include="HostTests.cs"/><Compile Include="CnasWrapperFixture.cs"/><Compile Include="CnasCredentialsFixture.cs"/><FrameworkReference Include="Microsoft.AspNetCore.App"/><Reference Include="System.Security.Cryptography.Pkcs"><HintPath>$(MSBuildSDKsPath)/../System.Security.Cryptography.Pkcs.dll</HintPath></Reference></ItemGroup>
+</Project>

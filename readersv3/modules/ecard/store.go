@@ -58,6 +58,12 @@ func openStore(dir string) (*store, error) {
 	s := &store{db: db, box: box}
 	_, e = db.Exec(`PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000;
  CREATE TABLE IF NOT EXISTS jobs(id TEXT PRIMARY KEY,owner TEXT NOT NULL,operation TEXT NOT NULL,state TEXT NOT NULL,sdk TEXT NOT NULL DEFAULT '',total INTEGER NOT NULL DEFAULT 0,completed INTEGER NOT NULL DEFAULT 0,bytes INTEGER NOT NULL DEFAULT 0,created INTEGER NOT NULL,error TEXT NOT NULL DEFAULT '',request BLOB NOT NULL);
+ CREATE TABLE IF NOT EXISTS events(id INTEGER PRIMARY KEY AUTOINCREMENT,owner TEXT NOT NULL,payload BLOB NOT NULL);
+ CREATE TABLE IF NOT EXISTS job_events(job TEXT NOT NULL,id INTEGER NOT NULL,owner TEXT NOT NULL,payload BLOB NOT NULL,PRIMARY KEY(job,id));
+ CREATE TABLE IF NOT EXISTS operation_reports(job TEXT PRIMARY KEY,owner TEXT NOT NULL,payload BLOB NOT NULL);
+ CREATE TABLE IF NOT EXISTS sdk_attempts(job TEXT NOT NULL,n INTEGER NOT NULL,payload BLOB NOT NULL,PRIMARY KEY(job,n));
+ CREATE TABLE IF NOT EXISTS call_history(id TEXT PRIMARY KEY,owner TEXT NOT NULL,created INTEGER NOT NULL,payload BLOB NOT NULL);
+ CREATE INDEX IF NOT EXISTS call_history_owner_created ON call_history(owner,created);
  CREATE TABLE IF NOT EXISTS batch_keys(id TEXT PRIMARY KEY, owner TEXT NOT NULL, fingerprint TEXT NOT NULL);
  CREATE TABLE IF NOT EXISTS items(job TEXT NOT NULL,n INTEGER NOT NULL,id TEXT NOT NULL,payload BLOB NOT NULL,result BLOB,PRIMARY KEY(job,n),UNIQUE(job,id));
  UPDATE jobs SET state='interrupted',error='service_restarted_no_replay' WHERE state IN ('queued','running','waiting_pin');`)
@@ -99,6 +105,6 @@ func (s *store) state(id, state, code string) error {
 	return e
 }
 func (s *store) cleanup(hours int) error {
-	_, e := s.db.Exec(`DELETE FROM items WHERE job IN (SELECT id FROM jobs WHERE created<? AND state NOT IN ('running','waiting_pin','queued')); DELETE FROM jobs WHERE created<? AND state NOT IN ('running','waiting_pin','queued')`, time.Now().Add(-time.Duration(hours)*time.Hour).Unix(), time.Now().Add(-time.Duration(hours)*time.Hour).Unix())
+	_, e := s.db.Exec(`DELETE FROM items WHERE job IN (SELECT id FROM jobs WHERE created<? AND state NOT IN ('running','waiting_pin','queued')); DELETE FROM jobs WHERE created<? AND state NOT IN ('running','waiting_pin','queued'); DELETE FROM sdk_attempts WHERE job NOT IN (SELECT id FROM jobs); DELETE FROM job_events WHERE job NOT IN (SELECT id FROM jobs); DELETE FROM operation_reports WHERE job NOT IN (SELECT id FROM jobs)`, time.Now().Add(-time.Duration(hours)*time.Hour).Unix(), time.Now().Add(-time.Duration(hours)*time.Hour).Unix())
 	return e
 }

@@ -11,9 +11,10 @@ import (
 	"time"
 )
 
-var sdkIDs = []string{"2.0.0.4", "2.0.0.3", "thinkit-1.3.1.4", "1.3.0.4", "1.3.0.2", "1.3.0.1", "1.2.0.1"}
+var sdkIDs = []string{"2.0.0.4", "cnas-wrapper-1.0.0.0", "2.0.0.3", "thinkit-1.3.1.4", "1.3.0.4", "1.3.0.2", "1.3.0.1", "1.2.0.1"}
 
 type Settings struct {
+	CEASOffline      bool     `json:"ceas_offline"`
 	SDKOrder         []string `json:"sdk_order"`
 	SDKRoot          string   `json:"sdk_root"`
 	HostDir          string   `json:"host_dir"`
@@ -175,18 +176,33 @@ type Job struct {
 	Error     string `json:"error,omitempty"`
 }
 type Reply struct {
-	OK           bool            `json:"ok"`
-	Code         string          `json:"code,omitempty"`
-	SDKCode      int             `json:"sdk_code,omitempty"`
-	Data         json.RawMessage `json:"data,omitempty"`
-	Event        string          `json:"event,omitempty"`
-	Prompt       string          `json:"prompt,omitempty"`
-	PINAttempted bool            `json:"pin_attempted,omitempty"`
+	InputKind     string          `json:"input_kind,omitempty"`
+	Diagnostics   json.RawMessage `json:"diagnostics,omitempty"`
+	ExceptionType string          `json:"exception_type,omitempty"`
+	SDKIdentity   json.RawMessage `json:"sdk_identity,omitempty"`
+	HostVersion   string          `json:"host_version,omitempty"`
+	Message       string          `json:"message,omitempty"`
+	SDKName       string          `json:"sdk_name,omitempty"`
+	Stage         string          `json:"stage,omitempty"`
+	State         json.RawMessage `json:"state,omitempty"`
+	OK            bool            `json:"ok"`
+	Code          string          `json:"code,omitempty"`
+	SDKCode       int             `json:"sdk_code,omitempty"`
+	Data          json.RawMessage `json:"data,omitempty"`
+	Event         string          `json:"event,omitempty"`
+	Prompt        string          `json:"prompt,omitempty"`
+	PINAttempted  bool            `json:"pin_attempted,omitempty"`
 }
 
-// Only known parse/read failures, never PIN, absent/changed card, rights, UM,
-// timeout, signing or ambiguous write failures. PIN interaction disables replay.
+// Reads try every configured SDK on failure with a fresh session/PIN prompt.
+// Signing preparation retains restricted fallback; mutations are never replayed.
 func canFallback(op string, r Reply, pinSeen bool) bool {
+	if invalidatesPIN(r) {
+		return false
+	}
+	if op == "read" {
+		return true
+	}
 	if (op != "read" && op != "certificates" && op != "sign") || pinSeen || r.PINAttempted {
 		return false
 	}

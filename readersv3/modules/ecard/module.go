@@ -2,18 +2,22 @@ package ecard
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
 	"embed"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -29,6 +33,9 @@ type sessionGuard interface {
 	SessionIdentity(*http.Request) (string, bool, bool)
 }
 type activeJob struct {
+	owner     string
+	sdk       string
+	cachedPIN *operationPIN
 	cancel    context.CancelFunc
 	pin       chan string
 	prompt    string
@@ -36,15 +43,19 @@ type activeJob struct {
 	pinSeen   bool
 }
 type Module struct {
-	rt       module.Runtime
-	guard    sessionGuard
-	settings Settings
-	store    *store
-	mu       sync.Mutex // admission, upload, commit and PIN handoff
-	active   map[string]*activeJob
-	queue    chan string
-	ctx      context.Context
-	factory  func(context.Context, string, Settings) (backend, error)
+	bus           eventBus
+	cardEpoch     atomic.Uint64
+	rememberedPIN cardPIN
+	continuity    func(string) (string, error)
+	rt            module.Runtime
+	guard         sessionGuard
+	settings      Settings
+	store         *store
+	mu            sync.Mutex // admission, upload, commit and PIN handoff
+	active        map[string]*activeJob
+	queue         chan string
+	ctx           context.Context
+	factory       func(context.Context, string, Settings) (backend, error)
 }
 
 func New() module.Module     { return &Module{} }
@@ -61,6 +72,11 @@ func (m *Module) Init(rt module.Runtime) error {
 		*p, err = filepath.Abs(rt.ResolvePath(*p))
 		if err != nil {
 			return err
+		}
+	}
+	if m.settings.CEASOffline {
+		if e = applyCEASFirewall(context.Background(), m.settings); e != nil {
+			return e
 		}
 	}
 	m.store, e = openStore(m.settings.StateDir)
@@ -91,6 +107,9 @@ func (m *Module) Start(ctx context.Context) error {
 	m.ctx = ctx
 	m.mu.Unlock()
 	defer m.store.db.Close()
+	stopMonitor := m.startEventMonitor(ctx)
+	defer stopMonitor()
+	defer m.rememberedPIN.clear()
 	timer := time.NewTicker(time.Hour)
 	defer timer.Stop()
 	_ = m.store.cleanup(m.settings.RetentionHours)
@@ -112,6 +131,16 @@ func ownerKey(r *http.Request, user string) string {
 	return "local:" + user
 }
 func respond(w http.ResponseWriter, status int, v interface{}) {
+	if raw, err := json.Marshal(v); err == nil {
+		var obj interface{}
+		if json.Unmarshal(raw, &obj) == nil {
+			explainErrors(obj)
+			if data, ok := obj.(map[string]interface{}); ok && w.Header().Get("X-ECard-App-Version") != "" {
+				data["versions"] = versionInfo{App: w.Header().Get("X-ECard-App-Version"), Host: w.Header().Get("X-ECard-Host-Version"), SHA: w.Header().Get("X-ECard-Host-SHA256")}
+			}
+			v = obj
+		}
+	}
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-store")
 	w.WriteHeader(status)
@@ -133,12 +162,43 @@ func decode(w http.ResponseWriter, r *http.Request, v interface{}) error {
 	return nil
 }
 func (m *Module) handle(w http.ResponseWriter, r *http.Request) {
+	if m.verboseVersions() {
+		v := m.versions()
+		w.Header().Set("X-ECard-App-Version", v.App)
+		w.Header().Set("X-ECard-Host-Version", v.Host)
+		w.Header().Set("X-ECard-Host-SHA256", v.SHA)
+	}
 	user, admin, ok := m.guard.SessionIdentity(r)
 	if !ok || user == "" {
 		fail(w, 401, errors.New("authentication required"))
 		return
 	}
 	owner := ownerKey(r, user)
+	if r.URL.Path == "/api/ecard/operations" && r.Method == "POST" {
+		m.createOperation(w, r, owner, admin)
+		return
+	}
+	if r.URL.Path == "/api/ecard/events/subscribe" {
+		m.subscribeEvents(w, r, owner)
+		return
+	}
+	if r.URL.Path == "/api/ecard/events" && r.Method == "GET" {
+		m.events(w, r, owner)
+		return
+	}
+	if r.URL.Path == "/api/ecard/history" && r.Method == "GET" {
+		m.history(w, r, owner)
+		return
+	}
+	if r.URL.Path != "/api/ecard/ui" {
+		wrapped, finish := m.recordCall(w, r, owner)
+		w = wrapped
+		defer finish()
+	}
+	if r.URL.Path == "/api/ecard/jobs" && r.Method == "GET" {
+		m.listJobs(w, r, owner)
+		return
+	}
 	if r.Method != "GET" {
 		if !strings.HasPrefix(strings.ToLower(r.Header.Get("Content-Type")), "application/json") {
 			fail(w, 415, errors.New("application/json required"))
@@ -166,6 +226,30 @@ func (m *Module) handle(w http.ResponseWriter, r *http.Request) {
 		m.batch(w, r, owner)
 		return
 	}
+	if path == "debug/verbosity" && r.Method == "PUT" {
+		if !admin {
+			fail(w, 403, errors.New("administrator required"))
+			return
+		}
+		var input struct {
+			Level int `json:"verbose_level"`
+		}
+		if err := decode(w, r, &input); err != nil || input.Level < 1 || input.Level > 5 {
+			fail(w, 400, errors.New("verbose_level must be an integer from 1 to 5"))
+			return
+		}
+		changer, ok := m.rt.(interface{ ChangeDebugVerbosity(int) error })
+		if !ok {
+			fail(w, 503, errors.New("live verbosity changes unavailable"))
+			return
+		}
+		if err := changer.ChangeDebugVerbosity(input.Level); err != nil {
+			fail(w, 500, err)
+			return
+		}
+		respond(w, 200, map[string]interface{}{"ok": true, "verbose_level": input.Level})
+		return
+	}
 	if path == "settings" && r.Method == "PUT" {
 		if !admin {
 			fail(w, 403, errors.New("administrator required"))
@@ -179,7 +263,7 @@ func (m *Module) handle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if path == "health" && r.Method == "GET" {
-		respond(w, 200, map[string]interface{}{"ok": true, "hardware_supported": runtime.GOOS == "windows", "sdk_order": m.settingsSnapshot().SDKOrder, "available_sdks": sdkIDs, "batch_parallelism_per_card": 1})
+		respond(w, 200, map[string]interface{}{"versions": m.versions(), "verbose_versions": m.verboseVersions(), "ok": true, "hardware_supported": runtime.GOOS == "windows", "sdk_order": m.settingsSnapshot().SDKOrder, "available_sdks": sdkIDs, "draft_scope": m.draftScope(owner), "batch_parallelism_per_card": 1})
 		return
 	}
 	if strings.HasPrefix(path, "tdx/") {
@@ -211,12 +295,12 @@ func (m *Module) handle(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		var count int
-		if e := m.store.db.QueryRow(`SELECT count(*) FROM jobs`).Scan(&count); e != nil {
+		if e := m.store.db.QueryRow(`SELECT count(*) FROM jobs WHERE state IN ('uploading','queued','running','waiting_pin')`).Scan(&count); e != nil {
 			fail(w, 500, errors.New("storage unavailable"))
 			return
 		}
 		if count >= m.settings.MaxJobs {
-			fail(w, 429, errors.New("job capacity reached; delete completed jobs"))
+			fail(w, 429, errors.New("too many unfinished operations; finish or cancel pending operations"))
 			return
 		}
 		id := uuid.NewString()
@@ -254,7 +338,12 @@ func (m *Module) handle(w http.ResponseWriter, r *http.Request) {
 	}
 	switch {
 	case suffix == "" && r.Method == "GET":
-		out := map[string]interface{}{"job": j}
+		attempts, err := m.sdkAttempts(id)
+		if err != nil {
+			fail(w, 500, err)
+			return
+		}
+		out := map[string]interface{}{"job": j, "sdk_attempts": attempts}
 		if a := m.active[id]; a != nil && a.prompt != "" {
 			out["pin_request"] = map[string]string{"prompt": a.prompt, "challenge": a.challenge}
 		}
@@ -270,7 +359,16 @@ func (m *Module) handle(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		defer tx.Rollback()
-		_, e = tx.Exec(`DELETE FROM items WHERE job=?`, id)
+		_, e = tx.Exec(`DELETE FROM sdk_attempts WHERE job=?`, id)
+		if e == nil {
+			_, e = tx.Exec(`DELETE FROM job_events WHERE job=?`, id)
+		}
+		if e == nil {
+			_, e = tx.Exec(`DELETE FROM operation_reports WHERE job=?`, id)
+		}
+		if e == nil {
+			_, e = tx.Exec(`DELETE FROM items WHERE job=?`, id)
+		}
 		if e == nil {
 			_, e = tx.Exec(`DELETE FROM jobs WHERE id=?`, id)
 		}
@@ -307,7 +405,11 @@ func (m *Module) handle(w http.ResponseWriter, r *http.Request) {
 		if a := m.active[id]; a != nil {
 			a.cancel()
 		} else if j.State == "queued" || j.State == "uploading" {
-			_ = m.store.state(id, "cancelled", "")
+			if err := m.store.state(id, "cancelled", ""); err != nil {
+				fail(w, 500, err)
+				return
+			}
+			m.emitEvent(owner, id, "worker", "operation_finished", map[string]interface{}{"state": "cancelled", "not_started": true, "report_version": 1})
 		}
 		respond(w, 202, map[string]bool{"ok": true})
 	case suffix == "pin" && r.Method == "POST":
@@ -338,6 +440,8 @@ func (m *Module) handle(w http.ResponseWriter, r *http.Request) {
 		}
 	case suffix == "results" && r.Method == "GET":
 		m.results(w, r, id)
+	case suffix == "report" && r.Method == "GET":
+		m.reportHTTP(w, r, owner, j)
 	default:
 		fail(w, 405, errors.New("method not allowed"))
 	}
@@ -459,3 +563,14 @@ func (m *Module) results(w http.ResponseWriter, r *http.Request, id string) {
 }
 
 var _ = sql.ErrNoRows
+
+// Keep browser drafts isolated by installation and authenticated principal.
+func (m *Module) draftScope(owner string) string {
+	host, _ := os.Hostname()
+	identity := host + "\x00" + m.settingsSnapshot().StateDir
+	if m.rt != nil {
+		identity += "\x00" + m.rt.ReaderID()
+	}
+	sum := sha256.Sum256([]byte(identity + "\x00" + owner))
+	return hex.EncodeToString(sum[:])
+}

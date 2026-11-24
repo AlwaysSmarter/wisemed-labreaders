@@ -48,6 +48,10 @@ func isArchiveUpdate(path string) bool {
 }
 
 func extractUpdateArchive(archivePath string) (string, error) {
+	archivePath, err := filepath.Abs(archivePath)
+	if err != nil {
+		return "", err
+	}
 	reader, err := zip.OpenReader(archivePath)
 	if err != nil {
 		return "", err
@@ -94,13 +98,24 @@ func extractUpdateArchive(archivePath string) (string, error) {
 }
 
 func launchWindowsArchiveUpdate(stageDir, appDir, exePath, configPath string, cfg *config.Config) error {
+	var err error
+	stageDir, err = filepath.Abs(stageDir)
+	if err != nil {
+		return err
+	}
+	if configPath != "" {
+		configPath, err = filepath.Abs(configPath)
+		if err != nil {
+			return err
+		}
+	}
 	scriptPath := filepath.Join(stageDir, "apply-update.ps1")
 	logPath := filepath.Join(stageDir, "apply-update.log")
 	restartLines := []string{
 		"if ([string]::IsNullOrWhiteSpace($ConfigPath)) {",
-		"  Start-Process -FilePath $ExePath | Out-Null",
+		"  Start-Process -FilePath $ExePath -WorkingDirectory $AppDir | Out-Null",
 		"} else {",
-		"  Start-Process -FilePath $ExePath -ArgumentList @('-config', $ConfigPath) | Out-Null",
+		"  Start-Process -FilePath $ExePath -WorkingDirectory $AppDir -ArgumentList ('-config ' + [char]34 + $ConfigPath + [char]34) | Out-Null",
 		"}",
 	}
 	if currentRunsAsService() && cfg != nil {
@@ -112,9 +127,9 @@ func launchWindowsArchiveUpdate(stageDir, appDir, exePath, configPath string, cf
 			}
 			restartLines = append(restartLines,
 				"  if ([string]::IsNullOrWhiteSpace($ConfigPath)) {",
-				"    Start-Process -FilePath $ExePath | Out-Null",
+				"    Start-Process -FilePath $ExePath -WorkingDirectory $AppDir | Out-Null",
 				"  } else {",
-				"    Start-Process -FilePath $ExePath -ArgumentList @('-config', $ConfigPath) | Out-Null",
+				"    Start-Process -FilePath $ExePath -WorkingDirectory $AppDir -ArgumentList ('-config ' + [char]34 + $ConfigPath + [char]34) | Out-Null",
 				"  }",
 				"}",
 			)
@@ -136,27 +151,95 @@ func launchWindowsArchiveUpdate(stageDir, appDir, exePath, configPath string, cf
 		"Write-Log (\"APP_DIR=\" + $AppDir)",
 		"Write-Log (\"STAGE_DIR=\" + $StageDir)",
 		"Write-Log (\"EXE_PATH=\" + $ExePath)",
+		"try {",
+		"Set-Content -LiteralPath ($LogPath + '.ready') -Value 'ready'",
 		"while (Get-Process -Id $CurrentPid -ErrorAction SilentlyContinue) {",
 		"  Write-Log 'waiting for current pid to exit'",
 		"  Start-Sleep -Seconds 1",
 		"}",
 		"Write-Log 'copying staged files'",
-		"$copyItems = Get-ChildItem -LiteralPath $StageDir -Force | Where-Object { $_.Name -notin @('apply-update.ps1', 'apply-update.log') }",
-		"foreach ($item in $copyItems) {",
-		"  $destination = Join-Path $AppDir $item.Name",
-		"  Copy-Item -LiteralPath $item.FullName -Destination $destination -Recurse -Force",
+		"function Copy-UpdateTree([string]$Source, [string]$Destination) {",
+		"  New-Item -ItemType Directory -Force -Path $Destination | Out-Null",
+		"  foreach ($item in (Get-ChildItem -LiteralPath $Source -Force)) {",
+		"    if ($Source -eq $StageDir -and $item.Name -in @('apply-update.ps1', 'apply-update.log', 'apply-update.log.ready', 'apply-update.log.launcher')) { continue }",
+		"    $target = Join-Path $Destination $item.Name",
+		"    if ($item.PSIsContainer) {",
+		"      Copy-UpdateTree $item.FullName $target",
+		"      continue",
+		"    }",
+		"    Write-Log ('copying ' + $item.FullName + ' -> ' + $target)",
+		"    for ($attempt = 1; $attempt -le 10; $attempt++) {",
+		"      try {",
+		"        Copy-Item -LiteralPath $item.FullName -Destination $target -Force -ErrorAction Stop",
+		"        break",
+		"      } catch {",
+		"        Write-Log ('copy failed, attempt ' + $attempt + ': ' + $target + ': ' + $_.Exception.Message)",
+		"        if ($attempt -eq 10) { throw }",
+		"        Start-Sleep -Seconds 1",
+		"      }",
+		"    }",
+		"  }",
 		"}",
+		"Copy-UpdateTree $StageDir $AppDir",
 		"Write-Log 'copy finished'",
 		"Write-Log 'restarting application'",
 	}
 	lines = append(lines, restartLines...)
-	lines = append(lines, "Write-Log 'restart command dispatched'")
+	lines = append(lines, "Write-Log 'restart command dispatched'", "} catch {", "Write-Log ($_ | Out-String)", "exit 1", "}")
 	body := strings.Join(lines, "\r\n") + "\r\n"
 	if err := os.WriteFile(scriptPath, []byte(body), 0o644); err != nil {
 		return err
 	}
-	cmd := exec.Command("cmd.exe", "/C", "start", "", "powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-WindowStyle", "Hidden", "-File", scriptPath)
-	return cmd.Start()
+	// Leave evidence even when PowerShell fails before executing the script.
+	if err := os.WriteFile(logPath, []byte("[apply-update] launcher starting PowerShell\r\n"), 0o600); err != nil {
+		return err
+	}
+	cmd := exec.Command("powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", scriptPath)
+	cmd.Dir = appDir
+	configureUpdateProcess(cmd)
+	launchLog, err := os.OpenFile(logPath+".launcher", os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
+	if err != nil {
+		return err
+	}
+	defer launchLog.Close()
+	cmd.Stdout, cmd.Stderr = launchLog, launchLog
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+	done := make(chan error, 1)
+	go func() { done <- cmd.Wait() }()
+	deadline := time.NewTimer(15 * time.Second)
+	defer deadline.Stop()
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		select {
+		case err := <-done:
+			return updateHandoffError(err, logPath)
+		case <-deadline.C:
+			_ = cmd.Process.Kill()
+			return fmt.Errorf("updater startup timed out; inspect %s.launcher", logPath)
+		case <-ticker.C:
+			if _, err := os.Stat(logPath + ".ready"); err == nil {
+				return nil
+			}
+		}
+	}
+}
+
+func updateHandoffError(processErr error, logPath string) error {
+	status := "exit code 0, but the script did not confirm startup"
+	if processErr != nil {
+		status = processErr.Error()
+	}
+	output, readErr := os.ReadFile(logPath + ".launcher")
+	detail := strings.TrimSpace(string(output))
+	if readErr != nil {
+		detail = "cannot read PowerShell output: " + readErr.Error()
+	} else if detail == "" {
+		detail = "PowerShell produced no diagnostic output"
+	}
+	return fmt.Errorf("updater exited before handoff (%s): %s; inspect %s and %s.launcher", status, detail, logPath, logPath)
 }
 
 func launchUnixArchiveUpdate(stageDir, appDir, exePath, configPath string) error {

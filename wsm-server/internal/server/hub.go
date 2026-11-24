@@ -41,6 +41,7 @@ type HubStats struct {
 	TotalDropped  uint64 `json:"total_dropped"`
 }
 type Hub struct {
+	observers   map[*trafficObserver]bool
 	mu          sync.RWMutex
 	connections map[string]*Connection
 	stats       map[string]HubStats
@@ -116,12 +117,14 @@ func (h *Hub) Stats(tenant string) HubStats {
 	return h.stats[tenant]
 }
 func (h *Hub) Broadcast(tenant string, msg Envelope) int {
+	h.publish(tenant, msg)
 	return h.route(tenant, msg, func(*Connection) bool { return true })
 }
 func (h *Hub) Route(msg Envelope, sender *Connection) int {
 	if sender == nil || msg.Target == nil {
 		return 0
 	}
+	h.publish(sender.TenantID, msg)
 	t := msg.Target
 	return h.route(sender.TenantID, msg, func(c *Connection) bool {
 		switch t.Mode {
@@ -210,8 +213,7 @@ func (h *Hub) send(c *Connection, msg Envelope) bool {
 		st.TotalDropped++
 		h.stats[c.TenantID] = st
 		h.mu.Unlock()
-		// A slow peer must reconnect/resynchronize; never silently keep losing traffic.
-		c.Close()
+		// Queue pressure is reported to the sender; keep the session and subscriptions alive.
 		return false
 	}
 }

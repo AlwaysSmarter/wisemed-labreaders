@@ -18,11 +18,12 @@ type backend interface {
 	Close()
 }
 type processBackend struct {
-	cmd    *exec.Cmd
-	in     io.WriteCloser
-	out    *bufio.Scanner
-	close  sync.Once
-	cancel context.CancelFunc
+	eventSink func(Reply)
+	cmd       *exec.Cmd
+	in        io.WriteCloser
+	out       *bufio.Scanner
+	close     sync.Once
+	cancel    context.CancelFunc
 }
 
 func newBackend(parent context.Context, id string, s Settings) (backend, error) {
@@ -38,7 +39,11 @@ func newBackend(parent context.Context, id string, s Settings) (backend, error) 
 		return nil, errors.New("SDK payload missing")
 	}
 	ctx, cancel := context.WithCancel(parent)
-	cmd := exec.CommandContext(ctx, filepath.Join(s.HostDir, "ECardHost.exe"), path)
+	args := []string{path}
+	if id == "cnas-wrapper-1.0.0.0" {
+		args = append(args, "--cnas-wrapper")
+	}
+	cmd := exec.CommandContext(ctx, filepath.Join(s.HostDir, "ECardHost.exe"), args...)
 	cmd.Dir = s.HostDir
 	cmd.Env = append(os.Environ(), "CEAS_UM_LOCAL=0")
 	in, e := cmd.StdinPipe()
@@ -60,6 +65,7 @@ func newBackend(parent context.Context, id string, s Settings) (backend, error) 
 	p.out.Buffer(make([]byte, 65536), 2<<20)
 	return p, nil
 }
+func (p *processBackend) SetEventSink(sink func(Reply)) { p.eventSink = sink }
 func (p *processBackend) Close() {
 	p.close.Do(func() { p.cancel(); _ = p.in.Close(); _ = p.cmd.Wait() })
 }
@@ -74,6 +80,9 @@ func (p *processBackend) Call(ctx context.Context, request map[string]interface{
 		if e := json.Unmarshal(p.out.Bytes(), &r); e != nil {
 			return Reply{}, errors.New("invalid_host_response")
 		}
+		if r.Event != "" && p.eventSink != nil {
+			p.eventSink(r)
+		}
 		if r.Event == "pin" {
 			v, e := pin(r.Prompt)
 			if e != nil {
@@ -87,6 +96,9 @@ func (p *processBackend) Call(ctx context.Context, request map[string]interface{
 		}
 		if r.Event != "" {
 			continue
+		}
+		if !r.OK && r.Message == "" {
+			r.Message = errorDescription(r.Code, r.SDKCode)
 		}
 		return r, nil
 	}

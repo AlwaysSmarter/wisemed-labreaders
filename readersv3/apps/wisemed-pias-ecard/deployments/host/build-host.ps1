@@ -1,11 +1,14 @@
-param([string]$OutputDirectory = $PSScriptRoot)
+param([string]$OutputDirectory = $PSScriptRoot, [string]$Version = "dev")
 $ErrorActionPreference = 'Stop'
 $dir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $csc = Join-Path $env:WINDIR 'Microsoft.NET\Framework\v4.0.30319\csc.exe'
 if (!(Test-Path $csc)) { throw '.NET Framework 4.8 is required' }
 New-Item -ItemType Directory -Force -Path $OutputDirectory | Out-Null
+if ($Version -notmatch '^[A-Za-z0-9][A-Za-z0-9.+_-]*$') { throw 'Invalid host version' }
+$versionSource = Join-Path $OutputDirectory 'BuildVersion.cs'
+('[assembly: System.Reflection.AssemblyInformationalVersion("' + $Version + '")]') | Set-Content $versionSource -Encoding Ascii
 $out = Join-Path $OutputDirectory 'ECardHost.exe'
-& $csc /nologo /target:exe /platform:x86 /optimize+ /r:System.Web.Extensions.dll /r:System.Core.dll /r:System.Security.dll /r:System.Xml.dll /out:$out (Join-Path $dir 'ECardHost.cs') | Out-Null
+& $csc /nologo /target:exe /platform:x86 /optimize+ /r:System.Web.Extensions.dll /r:System.Core.dll /r:System.Security.dll /r:System.Xml.dll /out:$out (Join-Path $dir 'ECardHost.cs') (Join-Path $dir 'CnasWrapperAdapter.cs') $versionSource | Out-Null
 if ($LASTEXITCODE -ne 0) { throw 'eCard host compilation failed' }
 
 if ([IO.Path]::GetFullPath($OutputDirectory) -ne [IO.Path]::GetFullPath($dir)) { exit 0 }

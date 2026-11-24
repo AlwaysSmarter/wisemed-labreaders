@@ -6,6 +6,23 @@ function checkOrigin(value){
 }
 function parseCommand(input){
  const args=String(input).trim().split(/\s+/);const command=args.shift().toLowerCase();
+ if(command==='clients'){
+  if(args.length && !(args.length===1&&args[0]==='list'))throw new Error('Format: clients [list].');
+  return {command};
+ }
+ if(['kick','reconnect','message'].includes(command)){
+  const id=args.shift();
+  if(!id||!/^[a-f0-9]{32}$/.test(id)||(command==='message'?!args.length:args.length))throw new Error('Format: '+command+' <connection-id>'+(command==='message'?' <text>':''));
+  return {command,id,...(command==='message'?{message:args.join(' ')}:{})};
+ }
+ if(command==='messages'){
+  const action=args.shift()||'list';
+  if(!['list','subscriptions','subscribe','unsubscribe','clear'].includes(action))throw new Error('Format: messages list/subscriptions/subscribe/unsubscribe/clear.');
+  if(['subscribe','unsubscribe'].includes(action)){
+   if(!args.length||args.some(f=>!['all','command','reply','event','presence'].includes(f)&&!/^topic:[A-Za-z0-9_.:-]{1,128}$/.test(f)))throw new Error('Alege all, command, reply, event, presence sau topic:<nume>.');
+  }else if(args.length)throw new Error('Această subcomandă nu primește argumente.');
+  return {command,action,filters:args};
+ }
  if(command==='logs'){
   let action='show',date='';
   if(['live','stop','dates'].includes(args[0]))action=args.shift();
@@ -58,7 +75,7 @@ class CommandHistory {
  }
  reset(){this.index=this.entries.length;this.draft='';}
  add(command){
-  parseCommand(command);this.entries.push(command.trim());this.entries=this.entries.slice(-1000);this.reset();
+  if(parseCommand(command).command==='message')return;this.entries.push(command.trim());this.entries=this.entries.slice(-1000);this.reset();
   try{this.storage.setItem(this.key,JSON.stringify(this.entries));this.persistent=true;}catch{this.persistent=false;}
  }
  move(direction,current){
@@ -80,6 +97,29 @@ function appendOutput(doc,host,text){
 if(typeof module!=='undefined'&&module.exports){module.exports={parseCommand,appendOutput,permissionInfo,CommandHistory,historyKey};return;}
 const doc=root.document,$=id=>doc.getElementById(id);let csrf='',session=null,busy=false,rightsDraft=null,commandHistory=null;
 const logsState={generation:0,timer:null,controller:null,live:false,cursor:-1,cursorDate:'',date:'',timezone:'UTC'};
+const subscriptions=new Set();let messageStream=null;
+function stopMessages(clear=false){
+ messageStream?.close();messageStream=null;
+ if(clear){subscriptions.clear();$('message-feed').replaceChildren();$('messages-panel').hidden=true;}
+}
+function startMessages(){
+ stopMessages();$('messages-panel').hidden=false;
+ $('message-state').textContent=subscriptions.size?'Conectare…':'Fără abonamente active';
+ if(!subscriptions.size)return;
+ const stream=new root.EventSource('/admin/api/messages/stream?'+new URLSearchParams({filters:[...subscriptions].join(',')}));messageStream=stream;
+ stream.addEventListener('ready',()=>{$('message-state').textContent='Live: '+[...subscriptions].join(', ');});
+ stream.addEventListener('traffic',event=>{
+  if(messageStream!==stream)return;
+  const m=JSON.parse(event.data),p=m.payload||{};
+  const sender=p.sender_client_id||p.client_id||'server';
+  const connection=m.connection_id||p.connection_id||p.sender_connection_id||'—';
+  appendOutput(doc,$('message-feed'),`${m.timestamp} | ${m.type} | ${sender} | conexiune ${connection}\n${JSON.stringify(m,null,2)}`);
+ });
+ const failed=text=>{if(messageStream!==stream)return;stopMessages();$('message-state').textContent=text;};
+ stream.addEventListener('expired',()=>failed('Sesiune expirată. Autentifică-te din nou.'));
+ stream.addEventListener('gap',()=>failed('Feed oprit: consum prea lent; unele mesaje au fost pierdute. Reia cu messages subscribe.'));
+ stream.onerror=()=>failed('Feed întrerupt. Reia cu messages subscribe; mesajele din interval nu sunt recuperate.');
+}
 function notice(message){$('notice').textContent=message;}
 function forgetSecret(){ $('device-secret').value='';$('device-secret').type='password';$('device-fields').textContent='';$('secret-panel').hidden=true;$('toggle-secret').textContent='Arată cheia'; }
 function setBusy(value){busy=value;doc.querySelectorAll('button').forEach(button=>{button.disabled=value;});$('busy-label').textContent=value?'Se execută…':'';}
@@ -100,7 +140,7 @@ function renderSession(){
 
  $('login-panel').hidden=!!session;$('console-panel').hidden=!session;
  $('session-label').textContent=session?`${session.tenant_id} / ${session.username}`:'Consolă echipamente';
- if(!session){stopLogs(true);$('history').replaceChildren();$('tenant-panel').hidden=true;$('tenant-form').elements.api_key.value='';}
+ if(!session){stopMessages(true);stopLogs(true);$('history').replaceChildren();$('tenant-panel').hidden=true;$('tenant-form').elements.api_key.value='';}
 }
 function stopLogs(hide=false){
  clearTimeout(logsState.timer);logsState.controller?.abort();logsState.controller=null;
@@ -142,7 +182,7 @@ async function openLogs(date='',live=false){
  $('logs-panel').hidden=false;$('log-content').textContent='';$('log-live').textContent=live?'Oprește live':'În timp real';
  await readLogPage();
 }
-async function logout(){stopLogs(true);rightsDraft=null;forgetSecret();await api('logout','POST',{});csrf='';session=null;renderSession();notice('Sesiune închisă.');}
+async function logout(){stopMessages(true);stopLogs(true);rightsDraft=null;forgetSecret();await api('logout','POST',{});csrf='';session=null;renderSession();notice('Sesiune închisă.');}
 function showRights(){
  output(`Drepturi pentru ${rightsDraft.kind==='browser'?'browser':'echipamentul'} ${rightsDraft.equipment_id} (modificări încă nesalvate):\n`+rightsDraft.catalog.map((p,i)=>`${i+1}. [${rightsDraft.selected.has(p.id)?'x':' '}] ${p.id} — ${p.description}`).join('\n')+'\nFolosește info 1 2 pentru explicații, toggle 1 2 pentru bifare/debifare, save pentru aplicare sau cancel.');
 }
@@ -153,12 +193,31 @@ async function run(command){
  if(parsed.command==='clear'){$('history').replaceChildren();return;}
  if(parsed.command==='logout'){await logout();return;}
  output('wsm › '+command.trim());
+ if(parsed.command==='clients'){
+  const data=await api('clients');
+  output(data.clients.length?data.clients.map(c=>`${c.id} | ${c.client_type} | ${c.client_id} | ${c.label||'—'} | equipment=${c.equipment_id||'—'} | reader=${c.reader_id||'—'} | IP=${c.remote_ip||'—'} | conectat=${c.connected_at} | topics=${(c.topics||[]).join(',')}`).join('\n'):'Niciun client conectat.');return;
+ }
+ if(['kick','reconnect','message'].includes(parsed.command)){
+  const data=await api('clients/action','POST',{id:parsed.id,action:parsed.command,...(parsed.command==='message'?{message:parsed.message}:{})});
+  output(data.closed?'Conexiune închisă. Clientul poate reveni prin reconectare automată.':`Comandă pusă în coadă: ${data.request_id}. Urmărește răspunsul cu messages subscribe reply; execuția nu este încă confirmată.`);return;
+ }
+ if(parsed.command==='messages'){
+  if(parsed.action==='list'){const data=await api('messages');output('Filtre disponibile:\n'+data.messages.join('\n')+'\nPoți folosi și topic:<nume> pentru un topic cunoscut.');return;}
+  if(parsed.action==='subscriptions'){output('Abonamente: '+([...subscriptions].join(', ')||'niciunul'));return;}
+  if(parsed.action==='clear'){$('message-feed').replaceChildren();return;}
+  if(parsed.action==='subscribe'){
+   const next=new Set([...subscriptions,...parsed.filters]);if(next.size>32)throw new Error('Maximum 32 de abonamente.');
+   for(const f of parsed.filters)subscriptions.add(f);
+  }else if(parsed.filters.includes('all'))subscriptions.clear();else for(const f of parsed.filters)subscriptions.delete(f);
+  startMessages();output('Abonamente: '+([...subscriptions].join(', ')||'niciunul'));return;
+ }
  if(parsed.command==='logs'){
   if(parsed.action==='stop'){stopLogs();output('Urmărirea logurilor a fost oprită.');return;}
   if(parsed.action==='dates'){const data=await api('logs/dates');output('Zile disponibile ('+data.timezone+'):\n'+data.dates.join('\n'));return;}
   await openLogs(parsed.date,parsed.action==='live');return;
  }
  if(parsed.command==='help'){
+  output('clients [list] — conexiuni active\nkick <connection-id> — închide conexiunea\nreconnect <connection-id> — ws.reconnect pentru readere/utilitare\nmessage <connection-id> <text> — debug.message\nmessages list — tipuri și topicuri disponibile\nmessages subscriptions — abonamente curente\nmessages subscribe <filtru> [filtru ...] — pornește feed live\nmessages unsubscribe <filtru> [filtru ...] — elimină abonamente (all = toate)\nmessages clear — curăță feed-ul\nFiltre: all, command, reply, event, presence, topic:<nume>.');
   output('logs [YYYY-MM-DD]              Loguri pentru ziua selectată (implicit azi UTC)\nlogs live [YYYY-MM-DD]         Urmărire în timp real\nlogs stop / logs dates        Oprește urmărirea / listează zilele\n\ntenant                         Setări tenant și cheie API mascată\ntenant edit                    Formular modificare issuer/API/cheie\norigin add/delete <https://origine>  Adaugă/șterge origine permisă\nbrowsers / browser list         Chei browser/backend (inclusiv YAML)\nbrowser add <key-id> <origine>  Generează cheia și permite originea\nbrowser edit <key-id> <origine> Modifică originea; păstrează cheia\nbrowser key <key-id>            Afișează separat cheia pentru PHP\nbrowser rotate <key-id>         Generează altă cheie și revocă accesul vechi\nbrowser rights <key-id>         Editează drepturile cu toggle/save\nbrowser delete <key-id>         Revocă cheia generată\n\ndevices / list                  Lista echipamentelor și starea online\nkey <equipment-id>              Afișează cheia echipamentului\nadd <equipment-id> [reader-id]   Creează cheia unui echipament (reader + service)\nedit <equipment-id> <reader-id>  Adaugă sau schimbă restricția reader-id\nedit <equipment-id> --remove-reader  Elimină restricția reader-id\ndelete <equipment-id>            Șterge accesul WSS și revocă cheia\nrights <equipment-id>            Afișează și editează drepturile\ntoggle <număr> [număr ...]       Bifează/debifează drepturile din lista rights\ninfo <număr> [număr ...]         Explicații și exemple pentru drepturile din lista rights\nsave / cancel                   Aplică / abandonează selecția drepturilor\nhistory                         Afișează istoricul comenzilor (↑/↓ pentru navigare)\nclear                           Curăță afișajul; păstrează istoricul comenzilor\nlogout                          Închide sesiunea\n\nEquipment ID = ID-ul echipamentului din WiseMED. Reader ID este opțional; completează-l numai dacă știi ID-ul intern exact al aplicației. Nu sunt acceptate comenzi de sistem.');return;
  }
  if(parsed.command==='tenant'){

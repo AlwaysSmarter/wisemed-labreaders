@@ -47,6 +47,10 @@ type adminState struct {
 }
 
 func (s *Server) adminRoutes(r chi.Router) {
+	r.Get("/admin/api/clients", s.adminClients)
+	r.Post("/admin/api/clients/action", s.adminClientAction)
+	r.Get("/admin/api/messages", s.adminMessageCatalog)
+	r.Get("/admin/api/messages/stream", s.adminMessageStream)
 	r.Get("/admin/api/logs/dates", s.adminLogDates)
 	r.Get("/admin/api/logs", s.adminLogs)
 	r.Get("/admin/api/tenant", s.adminTenantInfo)

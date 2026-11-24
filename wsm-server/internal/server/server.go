@@ -253,9 +253,13 @@ func (s *Server) handleWS(w http.ResponseWriter, r *http.Request) {
 	s.active[conn] = true
 	s.activeMu.Unlock()
 	s.gate.RUnlock()
+	registered := false
 	defer func() {
 		conn.Close()
 		s.hub.Remove(conn.ID)
+		if registered {
+			s.hub.Broadcast(conn.TenantID, presence(conn, "disconnected"))
+		}
 		s.activeMu.Lock()
 		delete(s.active, conn)
 		s.activeMu.Unlock()
@@ -270,7 +274,6 @@ func (s *Server) handleWS(w http.ResponseWriter, r *http.Request) {
 	ws.SetReadLimit(cfg.Server.MaxMessageBytes)
 	helloDeadline := time.Now().Add(time.Duration(cfg.Server.HelloTimeoutMS) * time.Millisecond)
 	_ = ws.SetReadDeadline(helloDeadline)
-	registered := false
 	ws.SetPongHandler(func(string) error {
 		s.hub.Touch(conn.ID)
 		if !registered {
@@ -293,18 +296,24 @@ func (s *Server) handleWS(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 			log.Printf("ws disconnected tenant=%s connection=%s hello_completed=%t reason=%s", conn.TenantID, conn.ID, registered, reason)
-			if registered {
-				s.hub.Remove(conn.ID)
-				s.hub.Broadcast(conn.TenantID, presence(conn, "disconnected"))
-			}
 			return
 		}
 		now := time.Now()
 		tokens = min(float64(cfg.Server.MessageBurst), tokens+now.Sub(last).Seconds()*float64(cfg.Server.MessagesPerSecond))
 		last = now
 		if tokens < 1 {
-			policyClose(ws, "message rate exceeded")
-			return
+			// Apply backpressure instead of disconnecting a busy authenticated reader.
+			wait := time.Duration((1-tokens)/float64(cfg.Server.MessagesPerSecond)*float64(time.Second)) + time.Nanosecond
+			timer := time.NewTimer(wait)
+			select {
+			case <-ctx.Done():
+				timer.Stop()
+				return
+			case <-timer.C:
+			}
+			now = time.Now()
+			tokens = min(float64(cfg.Server.MessageBurst), tokens+now.Sub(last).Seconds()*float64(cfg.Server.MessagesPerSecond))
+			last = now
 		}
 		tokens--
 		s.gate.RLock()
@@ -336,7 +345,7 @@ func (s *Server) handleWS(w http.ResponseWriter, r *http.Request) {
 			}
 			registered = true
 			_ = ws.SetReadDeadline(now.Add(time.Duration(cfg.Server.ReadTimeoutMS) * time.Millisecond))
-			s.hub.send(conn, Envelope{Type: "hello_ack", Payload: map[string]interface{}{"connection_id": conn.ID, "tenant_id": conn.TenantID, "equipment_id": conn.EquipmentID, "client_type": conn.ClientType, "client_id": conn.ClientID, "reader_id": conn.ReaderID, "subject": conn.Subject, "expires_at": claims.ExpiresAt.Time}})
+			s.hub.send(conn, Envelope{Type: "hello_ack", Payload: map[string]interface{}{"connection_id": conn.ID, "tenant_id": conn.TenantID, "equipment_id": conn.EquipmentID, "client_type": conn.ClientType, "client_id": conn.ClientID, "reader_id": conn.ReaderID, "subject": conn.Subject, "expires_at": claims.ExpiresAt.Time, "auth_refresh": true}})
 			s.hub.Broadcast(conn.TenantID, presence(conn, "connected"))
 			s.gate.RUnlock()
 			log.Printf("ws connected tenant=%s connection=%s role=%s", conn.TenantID, conn.ID, conn.ClientType)
@@ -347,6 +356,23 @@ func (s *Server) handleWS(w http.ResponseWriter, r *http.Request) {
 			s.gate.RUnlock()
 			policyClose(ws, "hello already completed")
 			return
+		}
+		// Refresh authentication without replacing the socket or its subscriptions.
+		// This control message is never routed, observed, or logged with its JWT.
+		if msg.Type == "auth.refresh" {
+			next, err := refreshClaims(cfg, claims, msg)
+			if err != nil {
+				s.hub.send(conn, errorReply(msg, "auth_refresh_denied", "Authentication renewal refused; obtain a fresh token for the same identity and permissions."))
+			} else if expiry.Stop() {
+				claims = next
+				expiry.Reset(time.Until(claims.ExpiresAt.Time))
+				s.hub.send(conn, Envelope{Type: "auth_refreshed", CorrelationID: msg.RequestID, Payload: map[string]interface{}{"expires_at": claims.ExpiresAt.Time}})
+			} else {
+				s.gate.RUnlock()
+				return
+			}
+			s.gate.RUnlock()
+			continue
 		}
 		if err := authorizeMessage(claims, msg); err != nil {
 			s.hub.send(conn, errorReply(msg, "forbidden", err.Error()))
@@ -465,14 +491,15 @@ func authorizeMessage(c *AuthClaims, m Envelope) error {
 					return nil
 				}
 			}
-			// Readers respond directly and publish only their own telemetry topic.
+			// Readers reply and emit direct notifications to subscribed connections;
+			// topic telemetry remains restricted to their own topics.
 			if m.Type == "command" {
 				return denied
 			}
 			if m.Type == "reply" && t.Mode != "connection" {
 				return denied
 			}
-			if m.Type == "event" && (t.Mode != "topic" || (t.Topic != "results:"+c.ReaderID && t.Topic != "logs:"+c.ReaderID)) {
+			if m.Type == "event" && t.Mode != "connection" && (t.Mode != "topic" || (t.Topic != "results:"+c.ReaderID && t.Topic != "logs:"+c.ReaderID)) {
 				return denied
 			}
 		}

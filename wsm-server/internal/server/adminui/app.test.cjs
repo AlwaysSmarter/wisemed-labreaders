@@ -1,4 +1,4 @@
-const {test}=require('node:test');const assert=require('node:assert/strict');const {parseCommand,appendOutput}=require('./app.js');
+const {test}=require('node:test');const assert=require('node:assert/strict');const {parseCommand,appendOutput,CommandHistory}=require('./app.js');
 test('allowlisted commands and optional reader binding',()=>{assert.deepEqual(parseCommand('add 42'),{command:'add',equipment_id:'42'});assert.deepEqual(parseCommand(' add 42 reader-1 '),{command:'add',equipment_id:'42',reader_id:'reader-1'});for(const command of ['help','devices','list','clear','logout'])assert.deepEqual(parseCommand(command),{command});});
 test('shell syntax and unexpected arguments are rejected',()=>{for(const text of ['rm -rf /','devices; whoami','add 42 $(whoami)','add 42 reader >x','add','devices --all','add <script>','add ../secret','add '+'x'.repeat(129),''])assert.throws(()=>parseCommand(text));});
 test('output never interprets attacker supplied markup',()=>{const host={children:[],append(value){this.children.push(value)}};const doc={createElement:()=>({})};appendOutput(doc,host,'<img src=x onerror=alert(1)>');assert.equal(host.children[0].textContent,'<img src=x onerror=alert(1)>');assert.equal(Object.hasOwn(host.children[0],'innerHTML'),false);});
@@ -75,4 +75,13 @@ test('daily log commands accept dates and reject paths or invalid dates',()=>{
  assert.deepEqual(parseCommand('logs 2026-10-28'),{command:'logs',action:'show',date:'2026-10-28'});
  assert.deepEqual(parseCommand('logs live 2026-10-27'),{command:'logs',action:'live',date:'2026-10-27'});
  for(const command of ['logs ../../secret','logs 2026-02-31','logs stop today','logs dates 2026-10-28'])assert.throws(()=>parseCommand(command));
+});
+test('client operations and subscription grammar',()=>{
+ const id='a'.repeat(32);
+ assert.deepEqual(parseCommand('clients list'),{command:'clients'});
+ assert.deepEqual(parseCommand('message '+id+' salut lume'),{command:'message',id,message:'salut lume'});
+ for(const cmd of ['kick','reconnect'])assert.deepEqual(parseCommand(cmd+' '+id),{command:cmd,id});
+ assert.deepEqual(parseCommand('messages subscribe event topic:ecard'),{command:'messages',action:'subscribe',filters:['event','topic:ecard']});
+ for(const bad of ['kick','kick '+id+' extra','message '+id,'clients extra','messages subscribe','messages subscribe secret','messages list extra'])assert.throws(()=>parseCommand(bad));
+ const h=new CommandHistory({getItem:()=>null,setItem:()=>{}},'test');h.add('message '+id+' private');assert.deepEqual(h.entries,[]);
 });

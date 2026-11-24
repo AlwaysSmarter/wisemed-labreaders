@@ -3,21 +3,24 @@ package runtime
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
 	"path/filepath"
 	"sort"
 	"sync"
+	"sync/atomic"
 
 	"wisemed-labreaders/readersv3/core/config"
 	"wisemed-labreaders/readersv3/core/module"
 )
 
 type App struct {
-	cfg      *config.Config
-	logger   *log.Logger
-	mux      *http.ServeMux
-	registry *module.Registry
+	debugVerbosity atomic.Int32
+	cfg            *config.Config
+	logger         *log.Logger
+	mux            *http.ServeMux
+	registry       *module.Registry
 
 	mu       sync.RWMutex
 	modules  []module.Module
@@ -61,7 +64,30 @@ func (a *App) Logf(format string, args ...interface{}) {
 }
 
 func (a *App) ModuleSettings(moduleID string) map[string]interface{} {
-	return a.cfg.ModuleSettings(moduleID)
+	settings := a.cfg.ModuleSettings(moduleID)
+	if level := a.debugVerbosity.Load(); moduleID == "logging" && level != 0 {
+		next := make(map[string]interface{}, len(settings)+1)
+		for k, v := range settings {
+			next[k] = v
+		}
+		next["verbose_level"] = int(level)
+		return next
+	}
+	return settings
+}
+
+// ChangeDebugVerbosity updates logging in place without restarting modules or WSM.
+func (a *App) ChangeDebugVerbosity(level int) error {
+	if level < 1 || level > 5 {
+		return errors.New("verbose_level must be an integer from 1 to 5")
+	}
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if err := config.Update(a.ConfigPath(), map[string]interface{}{"logging.verbose_level": level, "modules.logging.verbose_level": level}); err != nil {
+		return err
+	}
+	a.debugVerbosity.Store(int32(level))
+	return nil
 }
 
 func (a *App) ResolvePath(path string) string {

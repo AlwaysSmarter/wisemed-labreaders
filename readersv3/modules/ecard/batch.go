@@ -108,7 +108,7 @@ func (m *Module) batch(w http.ResponseWriter, r *http.Request, owner string) {
 		return
 	}
 	var count int
-	e := m.store.db.QueryRow(`SELECT count(*) FROM jobs`).Scan(&count)
+	e := m.store.db.QueryRow(`SELECT count(*) FROM jobs WHERE state IN ('uploading','queued','running','waiting_pin')`).Scan(&count)
 	if e != nil || count >= m.settings.MaxJobs || len(m.queue) == cap(m.queue) || m.ctx == nil || m.ctx.Err() != nil {
 		m.mu.Unlock()
 		fail(w, 503, errors.New("job capacity unavailable"))

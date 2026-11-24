@@ -6,6 +6,9 @@ output="${1:?Usage: build-host.sh OUTPUT_DIRECTORY}"
 mkdir -p "$output"
 output="$(cd "$output" && pwd)"
 
+host_version="${2:-dev}"
+if [[ ! "$host_version" =~ ^[A-Za-z0-9][A-Za-z0-9.+_-]*$ ]]; then echo 'Invalid host version' >&2; exit 1; fi
+printf '[assembly: System.Reflection.AssemblyInformationalVersion("%s")]\n' "$host_version" > "$output/BuildVersion.cs"
 # Existing servers need no administrator install: bootstrap the official SDK in
 # their writable cache. Containers can preinstall dotnet to avoid this download.
 dotnet_cmd="${DOTNET:-}"
@@ -42,4 +45,4 @@ export DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_NOLOGO=1
 # The build does not require locale data; support minimal Linux build images.
 export DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1
 "$dotnet_cmd" build "$app/scripts/ECardHost.csproj" --configuration Release --output "$output" --nologo \
-  "-p:BaseIntermediateOutputPath=$output/obj/" "-p:MSBuildProjectExtensionsPath=$output/obj/" >&2
+  "-p:HostVersionFile=$output/BuildVersion.cs" "-p:BaseIntermediateOutputPath=$output/obj/" "-p:MSBuildProjectExtensionsPath=$output/obj/" >&2

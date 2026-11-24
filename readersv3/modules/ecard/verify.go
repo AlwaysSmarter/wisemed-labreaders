@@ -10,6 +10,7 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/digitorus/pkcs7"
 )
@@ -101,12 +102,40 @@ func verifySignature(in verifyRequest) (map[string]interface{}, error) {
 		out["reason"] = "content_mismatch"
 		return out, nil
 	}
+	// Check signature mathematics separately from certificate dates. A copy of
+	// the parsed certificate widens only the library's implicit date gate; raw
+	// certificate bytes, issuer/serial, public key and signed attributes stay intact.
+	out["cryptographic_valid"] = false
+	out["certificate_not_before"] = signer.NotBefore.UTC().Format(time.RFC3339)
+	out["certificate_not_after"] = signer.NotAfter.UTC().Format(time.RFC3339)
+	now := time.Now()
+	out["certificate_valid_now"] = !now.Before(signer.NotBefore) && !now.After(signer.NotAfter)
+	var signingTime time.Time
+	hasTime := cms.UnmarshalSignedAttribute(pkcs7.OIDAttributeSigningTime, &signingTime) == nil
+	dateValid := out["certificate_valid_now"].(bool)
+	out["signing_time_trusted"] = false
+	if hasTime {
+		out["signing_time"] = signingTime.UTC().Format(time.RFC3339)
+		dateValid = !signingTime.Before(signer.NotBefore) && !signingTime.After(signer.NotAfter)
+		out["certificate_valid_at_signing_time"] = dateValid
+	}
+	cryptoCert := *signer
+	cryptoCert.NotBefore = time.Date(1, 1, 1, 0, 0, 0, 0, time.UTC)
+	cryptoCert.NotAfter = time.Date(9999, 12, 31, 23, 59, 59, 0, time.UTC)
+	cms.Certificates = []*x509.Certificate{&cryptoCert}
 	if e = cms.Verify(); e != nil {
 		out["reason"] = "signature_verification_failed"
 		return out, nil
 	}
 	digest := sha256.Sum256(signer.Raw)
-	out["valid"] = true
+	out["cryptographic_valid"] = true
+	out["valid"] = dateValid
+	if !dateValid {
+		out["reason"] = "certificate_outside_validity_period"
+	}
+	if !out["certificate_valid_now"].(bool) {
+		out["certificate_time_warning"] = "certificate_outside_validity_period_now"
+	}
 	out["signer_certificate_sha256"] = hex.EncodeToString(digest[:])
 	return out, nil
 }

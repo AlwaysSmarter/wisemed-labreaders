@@ -425,6 +425,16 @@ func (m *Module) runSession(ctx context.Context, settings map[string]interface{}
 	writerDone := make(chan struct{})
 	go func() { defer close(writerDone); defer conn.Close(); m.writeLoop(sessionCtx, conn, sendCh) }()
 	defer func() { cancel(); conn.Close(); <-writerDone }()
+	if supported, _ := ack.Payload["auth_refresh"].(bool); supported {
+		if expires, err := time.Parse(time.RFC3339Nano, asString(ack.Payload["expires_at"])); err == nil {
+			renewDone := make(chan struct{})
+			go func() {
+				defer close(renewDone)
+				m.renewAuthentication(sessionCtx, expires, func(ctx context.Context) (string, error) { return m.accessToken(ctx, settings, api, equipment) })
+			}()
+			defer func() { cancel(); <-renewDone }()
+		}
+	}
 	commands := make(chan Envelope, 16)
 	workerDone := make(chan struct{})
 	go func() {
@@ -493,7 +503,7 @@ func (m *Module) handleIncoming(msg Envelope) error {
 			return m.resolvePending(msg)
 		}
 		return nil
-	case "reply", "error", "connections", "pong":
+	case "reply", "error", "connections", "pong", "auth_refreshed":
 		return m.resolvePending(msg)
 	case "command":
 		return m.handleCommand(msg)

@@ -1,0 +1,102 @@
+<!doctype html><html lang="ro"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Test PIAS eCard prin WSS</title>
+<style>body{font:16px system-ui;max-width:1000px;margin:24px auto;padding:0 18px;background:#f4f7fb;color:#16273b}section{background:white;padding:20px;margin:16px 0;border:1px solid #ccd7e3;border-radius:10px}label{display:block;margin:10px 0}input,textarea,select,button{font:inherit;padding:8px;max-width:100%;box-sizing:border-box}input,textarea,select{width:100%}button{cursor:pointer;margin:6px 6px 0 0}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#edf2f7;padding:12px}dialog{border:1px solid #ccd7e3;border-radius:10px;max-width:400px}.notice{color:#684300}#state{font-weight:bold}</style>
+<h1>Test PIAS eCard prin WSS</h1>
+<p>Browser → WSM → stația Windows → card. Fișele și serviciile de mai jos sunt simulate în memoria paginii. Nu se salvează nimic în baza WiseMED și nu se raportează servicii la CNAS.</p>
+<section><h2>1. Conectare</h2>
+<label>Adresă WSS<input id="url" value="wss://wslocal.wisemed.eu"></label>
+<label>JWT browser emis de backend (nu cheia secretă)<textarea id="jwt" rows="3" autocomplete="off" spellcheck="false"></textarea></label>
+<button id="connect">Conectează WSS</button><button id="disconnect" disabled>Deconectează</button>
+<label>Echipament eCard<select id="equipment"></select></label>
+<label>Numele fizic al cititorului<input id="reader" value="Gemalto USB Smart Card Reader 0"></label>
+<label>Contract JSON<textarea id="contract" rows="5">{"cif":"COD_FURNIZOR","cui":"CUI","number":"CONTRACT","date":"2023-06-30","house":"CAS-B","provider_type":"PAR"}</textarea></label>
+<p class="notice">Contractul trebuie să corespundă înrolării existente pe stația Windows. JWT-ul este ținut doar în memorie și trebuie să permită originea acestei pagini.</p></section>
+<section><h2>2. Cele două fluxuri</h2>
+<button id="create">Mod 1: creează fișă la introducerea cardului</button>
+<label>ID fișă existentă de test<input id="fisa-id" value="TEST-EXISTENTA"></label>
+<label>CNP așteptat pe fișă<input id="cnp" autocomplete="off"></label>
+<label>CID așteptat (obligatoriu pentru CNP vid/anonimizat)<input id="cid" autocomplete="off"></label>
+<button id="existing">Mod 2: intră pe fișă și semnează dacă identitatea corespunde</button>
+<p id="state" role="status">Neconectat</p><p id="current">Nicio fișă selectată.</p>
+<label>Cod serviciu de test<input id="service" value="TEST-SERVICIU"></label>
+<button id="add">Adaugă serviciul și declanșează semnarea</button><button id="resume">Recuperează operația existentă</button>
+<p>Semnarea folosește cardul real și cere PIN în acest dialog sau pe tastatura cititorului. Textele sunt de test, nu documente clinice.</p>
+<pre id="services">Niciun serviciu.</pre></section>
+<section><h2>Evenimente</h2><p>Se afișează numai numele etapelor și ID-uri operaționale. Rapoartele clinice și PIN-ul nu sunt scrise în jurnal.</p><pre id="events"></pre></section>
+<dialog id="pin-dialog"><form method="dialog" id="pin-form"><p id="pin-prompt"></p><input id="pin" type="password" autocomplete="off" maxlength="32" required aria-label="PIN card"><button value="submit">Trimite PIN</button><button type="button" id="pin-cancel">Anulează operația</button></form></dialog>
+<script src="wsm.js"></script><script src="ecard-workflows.js"></script><script>
+'use strict';
+const $=id=>document.getElementById(id);let wsm,flow,current;
+const files=new Map(),plans=new Map();
+function log(text){$('events').textContent=(new Date().toLocaleTimeString()+' · '+text+'\n'+$('events').textContent).slice(0,12000);}
+function error(e){if(flow&&!flow.started)flow=null;$('state').textContent=e.code==='identity_mismatch'?'Cardul nu corespunde fișei.':e.message;log('Eroare: '+(e.code||'request_failed')+(e.operationId?' · '+e.operationId:''));}
+function render(){if(!current)return;$('current').textContent='Fișă de test: '+current.id;$('services').textContent=current.services.map(s=>s.id+' · '+s.code+' · '+(s.signed?'semnat':'nesemnat')).join('\n')||'Niciun serviciu.';}
+const backend={
+ async createFisaFromCard({expected,readOperationId}){
+  const fisa={id:'TEST-'+readOperationId,expected,services:[],revision:0};files.set(fisa.id,fisa);current=fisa;render();return {id:fisa.id,expected};
+ },
+ async prepareSigning({fisa,card}){
+  const row=files.get(fisa.id),unsigned=row.services.filter(s=>!s.signed);if(!unsigned.length)return null;
+  // Real WiseMED: prepare and persist this immutable plan in the backend BEFORE returning it.
+  const key=row.id+':'+row.revision;if(plans.has(key))return plans.get(key);
+  const plan={operationId:crypto.randomUUID(),fisaId:row.id,version:row.revision,expected:row.expected,encoding:'ascii',
+   items:unsigned.map(s=>({id:s.id,text:WiseMEDECard.legacyServiceText({cid:card.C1,cardNumber:card.A1,serviceDate:s.date,code:s.code})}))};
+  plans.set(key,plan);return plan;
+ },
+ async saveSigningResult({plan,report}){
+  const row=files.get(plan.fisaId);
+  for(const item of report.response?.data||[]){if(item.ok===true&&typeof item.signature==='string'){
+   const service=row.services.find(s=>s.id===item.id);if(service)service.signed=true;
+  }}
+  // Real backend: validate signature/content against the stored plan and save idempotently.
+  render();log('Rezultat păstrat pentru '+plan.fisaId+' · '+report.state);
+ }
+};
+function requestPIN({prompt}){
+ return new Promise(resolve=>{
+  const dialog=$('pin-dialog');$('pin-prompt').textContent=prompt;$('pin').value='';
+  const finish=value=>{$('pin').value='';dialog.close();$('pin-form').onsubmit=null;$('pin-cancel').onclick=null;dialog.oncancel=null;resolve(value);};
+  $('pin-form').onsubmit=e=>{e.preventDefault();finish($('pin').value);};
+  $('pin-cancel').onclick=()=>finish(null);dialog.oncancel=e=>{e.preventDefault();finish(null);};dialog.showModal();$('pin').focus();
+ });
+}
+async function workflow(){
+ if(!wsm?.isConnected)throw new Error('Conectează WSS înainte de test.');
+ if(flow)return flow;
+ flow=new WiseMEDECard.Workflow({wsm,equipmentID:$('equipment').value,readerName:$('reader').value,contract:JSON.parse($('contract').value),backend,requestPIN,onError:error,
+  onEvent:e=>log(e.event),onState:event=>{
+   $('state').textContent=event.state+(event.job?' · '+event.job.completed+'/'+event.job.total:'');
+   if(event.state==='fisa_created'){current=files.get(event.fisa.id);render();}
+  }});
+ try{await flow.start();}catch(e){flow=null;throw e;}return flow;
+}
+$('connect').onclick=async()=>{try{
+ const token=$('jwt').value;$('jwt').value='';
+ if(wsm)await wsm.reconnect(token);else {wsm=WSMServer($('url').value,token);wsm.onError=error;
+ wsm.onDisconnect=()=>{if($('pin-dialog').open)$('pin-cancel').click();if(flow){flow.present=false;flow.card=null;}log('WSS deconectat; nu se retrimite semnarea.');};
+ wsm.onConnect=()=>{if(flow?.started)flow.reconnect().catch(error);};}
+ await wsm.ready;const clients=await wsm.listClients();$('equipment').replaceChildren();
+ for(const c of clients.filter(c=>c.equipmentID)){
+  const option=document.createElement('option');option.value=c.equipmentID;option.textContent=c.equipmentID+' · '+c.clientID;$('equipment').append(option);
+ }
+ $('state').textContent='WSS conectat. Alege echipamentul și un flux.';$('disconnect').disabled=false;
+}catch(e){error(e);}};
+$('disconnect').onclick=async()=>{await flow?.stop();flow=null;wsm?.disconnect();wsm=null;$('disconnect').disabled=true;};
+$('create').onclick=async()=>{try{if(flow){await flow.createOnCard();}else await workflow();}catch(e){error(e);}};
+$('existing').onclick=async()=>{try{
+ const expected={cnp:$('cnp').value.trim(),cid:$('cid').value.trim()},id=$('fisa-id').value;
+ if(!expected.cnp&&!expected.cid)throw new Error('Introdu CNP sau CID pentru fișa existentă.');
+ current=files.get(id)||{id,expected,services:[{id:'TEST-SRV-'+crypto.randomUUID(),code:'TEST-SERVICIU',date:new Date().toISOString(),signed:false}],revision:1};files.set(id,current);render();
+ // Seed existing mode before start, so startup never creates an unintended test file.
+ if(!flow){
+  if(!wsm?.isConnected)throw new Error('Conectează WSS înainte de test.');
+  flow=new WiseMEDECard.Workflow({wsm,equipmentID:$('equipment').value,readerName:$('reader').value,contract:JSON.parse($('contract').value),backend,requestPIN,onError:error,onEvent:e=>log(e.event),onState:e=>{$('state').textContent=e.state;}});
+  flow.mode='existing';flow.fisa={id,expected};await flow.start();
+ }else await flow.enterFisa({id,expected});
+}catch(e){error(e);}};
+$('add').onclick=async()=>{try{if(!current||!flow)throw new Error('Selectează sau creează o fișă.');
+ const code=$('service').value;if(!/^[\x20-\x7e]+$/.test(code))throw new Error('Pentru testul ASCII folosește un cod fără diacritice.');
+ current.services.push({id:'TEST-SRV-'+crypto.randomUUID(),code,date:new Date().toISOString(),signed:false});current.revision++;render();await flow.servicesSaved();
+}catch(e){error(e);}};
+$('resume').onclick=()=>flow?.resume().catch(error);
+</script></html>

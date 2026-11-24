@@ -540,3 +540,55 @@ Integrarea WiseMED din footer folosește `getWiseMEDWSM()` pentru crearea obiect
 la cerere și `getWiseMEDWSMToken()` pentru endpointul autentificat `/wsm/token`.
 `getWSMTokenAndConnect()` rămâne disponibil pentru conectare explicită din alte
 acțiuni ale paginii. Inițializarea și cererile simultane de token sunt reunite.
+
+
+## Exemplu PIAS eCard prin WSS
+
+[Fișe, servicii și semnare cu cardul](ecard-wss-workflows.md) include un orchestrator
+browser pentru crearea unei fișe la introducerea cardului și semnarea automată la
+deschiderea unei fișe existente cu CNP/CID potrivit. Pagina de test WSS se pornește
+cu `./scripts/serve-ecard-example.sh` din `wsm-server/`; folosește WSM și card reale,
+dar fișe simulate în memoria paginii. API-ul este transportat prin `callAPI` →
+`api.request`; nu necesită un alt socket, server, topic sau wrapper DLL în browser.
+
+## Abonare automată eCard pentru stația selectată
+
+`callAPI(statie, '/api/ecard/...')` activează automat abonarea la evenimente
+pentru acea stație, înainte de primul apel API. Nu este necesar un POST separat
+la `events/subscribe`. Pentru o interfață care doar selectează stația și așteaptă
+cardul, selecția se face cu `await wsm.selectECard(statie)`; `statie` este obiectul
+întors de `listClients()`. Descoperirea stațiilor nu le abonează.
+
+Există o singură stație selectată per obiect WSM. Alegerea alteia dezabonează
+stația precedentă. `await wsm.clearECard()` încheie selecția. SDK-ul reînnoiește
+abonarea la 20 minute și o reface după reconectarea browserului sau a stației,
+identificând aceeași stație prin `equipmentID`. Nicio operație de card/semnare nu
+este reluată automat. Erorile de întreținere ajung la `onError`.
+
+```js
+wsm.onEvent = message => {
+  if (message.payload?.event === 'ecard.event') {
+    const event = message.payload.data;
+    // event.event: card_inserted, card_removed, reader_connected, etc.
+    afiseazaEveniment(event);
+  }
+};
+await wsm.selectECard(statiaSelectata);
+```
+
+Selecția folosește aceleași drepturi existente: browserul are `route:command`,
+`api:invoke`, `connections:read`, iar stația `route:event` și `route:reply`.
+Abonarea nu transmite starea istorică a cardului; pentru un card deja introdus,
+interfața cere starea curentă (exemplul Workflow face acest lucru).
+Clienții care trimit direct mesaje WSM, fără SDK, păstrează API-ul explicit de
+abonare. Fișierul SDK este inclus în executabilul WSM: publicarea schimbării
+necesită rebuild/update WSM și reîncărcarea paginii client.
+
+
+Cu un server care anunță `auth_refresh` și `tokenProvider`, SDK-ul reînnoiește
+JWT-ul înainte de expirare, fără deconectare și fără pierderea abonărilor. Emitentul
+trebuie să păstreze identitatea clientului și drepturile între reînnoiri. După o
+întrerupere reală, `autoReconnect` restabilește transportul, iar SDK-ul reface
+abonările la topicuri confirmate anterior. `callAPI(..., {ecardEvents:false})`
+este destinat adaptoarelor care gestionează deja automat abonarea eCard (precum
+piasecard.js), pentru a evita două abonări independente pe aceeași conexiune.

@@ -59,13 +59,14 @@ modules:
     heartbeat_ms: 15000
     reconnect_delay_ms: 30000
   ecard:
-    sdk_order: ["2.0.0.4", "2.0.0.3", "thinkit-1.3.1.4", "1.3.0.4", "1.3.0.2", "1.3.0.1", "1.2.0.1"]
+    sdk_order: ["2.0.0.4", "cnas-wrapper-1.0.0.0", "2.0.0.3", "thinkit-1.3.1.4", "1.3.0.4", "1.3.0.2", "1.3.0.1", "1.2.0.1"]
     sdk_root: ./sdks
     host_dir: ./host
     state_dir: ./ecard-state
     reader_name: ""
     # UM-CEAS TCP via eCard.SDK: bare hostname/IP, without tcp:// or https://.
     # Test: testumceas.siui.ro; custom host/port supported. UI/API changes apply immediately; manual file edits require restart.
+    ceas_offline: false # Windows Firewall; requires administrator rights when changed
     um_host: umceas.siui.ro
     um_port: 443
     operation_timeout_seconds: 180

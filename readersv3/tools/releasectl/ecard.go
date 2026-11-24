@@ -45,7 +45,7 @@ func validateECardPayload(root string) error {
 			found[lib.SDK] = true
 		}
 	}
-	for _, id := range []string{"2.0.0.4", "2.0.0.3", "thinkit-1.3.1.4", "1.3.0.4", "1.3.0.2", "1.3.0.1", "1.2.0.1"} {
+	for _, id := range []string{"2.0.0.4", "cnas-wrapper-1.0.0.0", "2.0.0.3", "thinkit-1.3.1.4", "1.3.0.4", "1.3.0.2", "1.3.0.1", "1.2.0.1"} {
 		if !found[id] {
 			return fmt.Errorf("eCard SDK %s missing from release", id)
 		}
@@ -66,7 +66,7 @@ func checkECardHash(path, want string) error {
 
 // Build in a private directory so parallel targets cannot overwrite each other's
 // host or modify the source checkout. Only runtime files enter the release.
-func buildECardHost(root, destination string) error {
+func buildECardHost(root, destination, version string) error {
 	temp, err := os.MkdirTemp("", "wisemed-ecard-host-*")
 	if err != nil {
 		return err
@@ -77,9 +77,9 @@ func buildECardHost(root, destination string) error {
 	defer cancel()
 	var cmd *exec.Cmd
 	if runtime.GOOS == "windows" {
-		cmd = exec.CommandContext(ctx, "powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", filepath.Join(app, "deployments", "host", "build-host.ps1"), "-OutputDirectory", temp)
+		cmd = exec.CommandContext(ctx, "powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", filepath.Join(app, "deployments", "host", "build-host.ps1"), "-OutputDirectory", temp, "-Version", version)
 	} else {
-		cmd = exec.CommandContext(ctx, "bash", filepath.Join(app, "scripts", "build-host.sh"), temp)
+		cmd = exec.CommandContext(ctx, "bash", filepath.Join(app, "scripts", "build-host.sh"), temp, version)
 	}
 	cmd.Dir = root
 	logf("eCard host compilation start (Windows x86 / .NET Framework 4.8)")

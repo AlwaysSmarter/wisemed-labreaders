@@ -22,6 +22,7 @@ separate între instanțe.
 pentru descoperire, mesagerie și API-uri remote.
 [Integrare completă și emiterea JWT în PHP](docs/browser-sdk.md).
 [Wrapper SIUIBridge: toate endpointurile SIUI prin același socket](docs/siui-browser-wrapper.md).
+[Exemplu eCard: creare fișă, semnare automată și pagină de test WSS](docs/ecard-wss-workflows.md).
 
 ## Documentație
 

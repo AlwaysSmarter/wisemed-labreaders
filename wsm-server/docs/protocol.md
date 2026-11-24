@@ -94,8 +94,8 @@ Restricții suplimentare pentru reader: comenzile către peer sunt permise numai
 1:1 (`connection`, `equipment`, `reader`): cele trei comenzi de diagnostic cu
 `devices:debug`, respectiv `api.request` cu `api:invoke`, toate cerând și
 `route:command`. Celelalte comenzi către peer sunt respinse. `reply` numai către o
-conexiune; `event` numai pe `results:<reader_id>` sau
-`logs:<reader_id>`. Aceste evenimente nu necesită `route:broadcast`. Răspunsurile nu
+conexiune; `event` către o conexiune explicită (notificări pentru clientul abonat)
+sau pe `results:<reader_id>` / `logs:<reader_id>`. Aceste evenimente nu necesită `route:broadcast`. Răspunsurile nu
 sunt validate față de un registru de comenzi în așteptare; destinatarul verifică
 `correlation_id` și identitatea expeditorului. Un reader este o componentă de
 încredere a propriului tenant, nu un utilizator cu acces la un singur pacient.
@@ -313,8 +313,9 @@ Nu este activat CORS HTTP cross-origin; browserul poate continua să folosească
 ## Erori și reconectare
 
 Handshake: `401` token invalid/lipsă/expirat; `403` Origin nepermis; `503` limita
-conexiunilor sau server în oprire. După upgrade, hello incorect/repetat și depășirea
-ratei duc la close `1008`. Operațiile nepermise întorc:
+conexiunilor sau server în oprire. După upgrade, hello incorect/repetat duce la close `1008`. Depășirea ratei temporizează
+procesarea fără deconectare. O coadă de livrare plină raportează nelivrarea
+către expeditor, fără închiderea conexiunii destinatarului. Operațiile nepermise întorc:
 
 ```json
 {"type":"error","request_id":"req-1","correlation_id":"req-1","payload":{"code":"forbidden","message":"operation not permitted or invalid message"}}
@@ -340,3 +341,19 @@ History can receive `hello_ack`; changing the device key alone does not fix this
 connection's network peer (also for HTTP command connections). Client-supplied
 values are overwritten. Behind a proxy it is the proxy peer IP. Readers may use
 it as audit metadata; it is not an authorization claim.
+
+
+## Reînnoirea autentificării pe același socket
+
+`hello_ack.auth_refresh: true` anunță suportul. Clientul trimite înainte de
+expirare `{"type":"auth.refresh","request_id":"renew-1","payload":{"token":"<JWT nou>"}}`.
+Serverul validează integral semnătura și politica tokenului, cere aceeași
+identitate (tenant, subiect, rol, client, reader, echipament) și aceleași drepturi,
+plus o expirare ulterioară. Răspunde cu `auth_refreshed`, corelat cu request_id,
+și `payload.expires_at`. Connection ID și abonările rămân neschimbate.
+Tichetele de control nu se pot reînnoi astfel. JWT-ul nu intră în fluxul CLI.
+Dacă reînnoirea nu reușește, limita vechiului token rămâne valabilă; verificarea
+expirării și revocarea prin reload nu sunt dezactivate.
+SDK-ul browser cu tokenProvider și transportul comun readersv3 reînnoiesc automat.
+După o întrerupere reală, SDK-ul reface topicurile și abonarea eCard selectată;
+operațiile cu efecte secundare nu sunt reluate.

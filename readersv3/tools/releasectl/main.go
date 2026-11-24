@@ -528,7 +528,7 @@ func buildRuntime(root string, app appInfo, target string, ti targetInfo, versio
 		return runtimeManifest{}, err
 	}
 	if app.ID == "wisemed-pias-ecard" {
-		if err := buildECardHost(root, filepath.Join(deploymentsDst, "host")); err != nil {
+		if err := buildECardHost(root, filepath.Join(deploymentsDst, "host"), version); err != nil {
 			return runtimeManifest{}, err
 		}
 	}

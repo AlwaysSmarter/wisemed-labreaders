@@ -11,7 +11,8 @@ modules:
         allowed_user_types: "-1"
         db_path: ./app-update-server.db
         files_dir: ./files
-        public_base_url: https://us.wisemed.eu
+        public_base_url: https://uslocal.wisemed.eu
+        verbose_level: "1"
     local-http:
         address: 0.0.0.0:19090
         enabled: true

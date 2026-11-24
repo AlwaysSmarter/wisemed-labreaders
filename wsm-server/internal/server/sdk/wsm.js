@@ -24,7 +24,7 @@
       this.isConnected = false; this.connectionID = ''; this.clients = [];
       this.onConnect = null; this.onDisconnect = null; this.onError = null; this.onTokenRequired = null;
       this.onEvent = null; this.onCommand = null; this.onReply = null; this.onPresence = null; this.onMessage = null;
-      this._ready = null;
+      this._ready = null; this._ecard = null; this._topics = new Set();
       if(this.options.autoConnect) {
         this.ready = this.connect();
         this.ready.catch(() => {});
@@ -85,6 +85,29 @@
       });
       return this.ready;
     }
+    _scheduleAuthRefresh(delay) {
+      clearTimeout(this._authTimer);
+      if(!this.isConnected || !this._authRefreshSupported || typeof this.options.tokenProvider !== 'function') return;
+      const remaining = this._expires - Date.now();
+      if(remaining <= 0) return;
+      this._authTimer = setTimeout(()=>this._refreshAuth(),delay ?? Math.max(1000,remaining - Math.min(60000,remaining / 2)));
+    }
+    async _refreshAuth() {
+      const generation = this._generation;
+      try {
+        const token = await this.options.tokenProvider();
+        if(generation !== this._generation || !this.isConnected) return;
+        const identity = claims(token);
+        if(!identity.exp || identity.exp * 1000 <= this._expires) throw error('token_not_renewed','Token provider did not extend WSM authentication.');
+        await this._request('auth.refresh',{token},undefined,'auth_refreshed');
+        if(generation !== this._generation || !this.isConnected) return;
+        this._token = token; this._expires = identity.exp * 1000;
+        this._scheduleAuthRefresh();
+      } catch(e) {
+        if(generation !== this._generation || !this.isConnected) return;
+        this._emit('onError',e); this._scheduleAuthRefresh(5000);
+      }
+    }
     _scheduleReconnect() {
       if (this._stopped || !this.options.autoReconnect) return;
       if (typeof this.options.tokenProvider !== 'function' && (!this._expires || this._expires <= Date.now())) {
@@ -94,6 +117,7 @@
       this._retry = setTimeout(() => this.connect(), this.options.reconnectDelay);
     }
     _fail(e) {
+      this._resetECard(); clearTimeout(this._authTimer);
       clearTimeout(this._helloTimer); this.isConnected = false; this._connecting = false;
       this.connectionID = ''; this.clients = [];
       this._rejectConnect?.(e); this._resolveConnect = this._rejectConnect = null;
@@ -112,7 +136,16 @@
       if (message.type === 'hello_ack' && this._connecting) {
         clearTimeout(this._helloTimer); this._connecting = false; this.isConnected = true;
         this.connectionID = p.connection_id; this._resolveConnect?.(this);
-        this._resolveConnect = this._rejectConnect = null; this._emit('onConnect',p); return;
+        this._resolveConnect = this._rejectConnect = null;
+        this._authRefreshSupported = p.auth_refresh === true;
+        this._scheduleAuthRefresh();
+        for(const topic of this._topics) this.subscribe(topic).catch(e=>this._emit('onError',e));
+        if(this._ecard) this._restoreECard().catch(e=>this._emit('onError',e));
+        this._emit('onConnect',p); return;
+      }
+      if(message.type === 'presence' && this._ecard && p.equipment_id && String(p.equipment_id) === this._ecard.equipmentID) {
+        if(p.event === 'disconnected' && p.connection_id === this._ecard.peer) this._resetECard();
+        if(p.event === 'connected') this._restoreECard().catch(e=>this._emit('onError',e));
       }
       const pending = this._pending.get(message.correlation_id || message.request_id);
       if (pending) {
@@ -186,6 +219,7 @@
         if(opts.query) { const query = new URLSearchParams(opts.query).toString(); if(query) path += (path.includes('?')?'&':'?')+query; }
         const args = {method,path};
         for(const field of ['body','body_base64','content_type']) if(opts[field] !== undefined) args[field]=opts[field];
+        if(opts.ecardEvents !== false && /^\/api\/ecard\//.test(path) && path.split('?')[0] !== '/api/ecard/events/subscribe') await this.selectECard(client);
         const response = await this.command(client,'api.request',args,{timeout:opts.timeout});
         if(response.kind !== 'api.response' || !Number.isInteger(response.status)) throw error('invalid_response','Expected api.response.',{response});
         if(response.status < 200 || response.status >= 300) throw error('http_error',`Remote API returned HTTP ${response.status}.`,{status:response.status,response});
@@ -195,8 +229,106 @@
       if(onSuccess || onFail) promise.then(value => {if(onSuccess) onSuccess(value);},e => {if(onFail) onFail(e);else this._emit('onError',e);}).catch(e => this._emit('onError',e));
       return promise;
     }
-    subscribe(topic) {return this._request('subscribe',{topic},undefined,'subscribe_ack');}
-    unsubscribe(topic) {return this._request('unsubscribe',{topic},undefined,'unsubscribe_ack');}
+    // A station selection owns one hardware subscription; discovery never subscribes.
+    async selectECard(client) {
+      await this.ready;
+      const target = await this._target(client);
+      let known = (typeof client === 'object' && (client.equipmentID || client.equipment_id)) ? client : this.clients.find(c=>c.connectionID === target.connection_id);
+      if(!known && this._ecard?.peer !== target.connection_id) known = (await this.listClients()).find(c=>c.connectionID === target.connection_id);
+      let selected = this._ecard;
+      if(!selected || selected.peer !== target.connection_id) {
+        const equipmentID = String(known?.equipmentID || known?.equipment_id || '');
+        if(selected && equipmentID && selected.equipmentID === equipmentID) {
+          this._resetECard(); selected.peer = target.connection_id;
+        } else {
+          this.clearECard();
+          selected = this._ecard = {peer:target.connection_id,equipmentID,subscription:null,pending:null,timer:null,version:0};
+        }
+      }
+      if(selected.subscription) return selected.subscription;
+      return this._subscribeECard(selected);
+    }
+    _resetECard() {
+      const selected = this._ecard;
+      if(!selected) return;
+      clearTimeout(selected.timer); selected.subscription = null; selected.pending = null; selected.version++;
+    }
+    async clearECard() {
+      const selected = this._ecard;
+      if(!selected) return;
+      this._ecard = null; clearTimeout(selected.timer); selected.version++;
+      if(selected.subscription && this.isConnected) {
+        try { await this.callAPI({id:selected.peer},'/api/ecard/events/subscribe',{method:'DELETE',body:{subscription_id:selected.subscription}}); }
+        catch(e) { this._emit('onError',e); }
+      }
+    }
+    async _restoreECard() {
+      const selected = this._ecard;
+      if(!selected || !this.isConnected) return;
+      let clients;
+      try { clients = await this.listClients(); }
+      catch(e) {
+        if(this._ecard === selected && this.isConnected) {
+          clearTimeout(selected.timer);
+          selected.timer = setTimeout(()=>this._restoreECard().catch(err=>this._emit('onError',err)),30000);
+        }
+        throw e;
+      }
+      if(this._ecard !== selected || !this.isConnected) return;
+      const matches = clients.filter(c=>selected.equipmentID ? String(c.equipmentID) === selected.equipmentID : c.connectionID === selected.peer);
+      if(matches.length !== 1) return; // Wait for the selected station's presence, never select another.
+      if(selected.peer !== matches[0].connectionID) { this._resetECard(); selected.peer = matches[0].connectionID; }
+      if(!selected.subscription) await this._subscribeECard(selected);
+    }
+    _subscribeECard(selected, renew = false) {
+      if(this._ecard !== selected || !this.isConnected) return Promise.resolve();
+      if(selected.pending) return selected.pending;
+      const version = selected.version, generation = this._generation, peer = selected.peer;
+      const current = ()=>this._ecard === selected && selected.version === version && this.isConnected;
+      const request = async subscription => {
+        const result = await this.callAPI({id:peer},'/api/ecard/events/subscribe',{
+          method:'POST',body:{hardware:true,...(subscription?{subscription_id:subscription}:{})}
+        });
+        const body = typeof result.body === 'string' ? JSON.parse(result.body) : result.body;
+        if(!body?.subscription_id) throw error('invalid_response','Missing eCard subscription ID.');
+        return body.subscription_id;
+      };
+      selected.pending = (async()=>{
+        try {
+          let subscription;
+          try { subscription = await request(renew ? selected.subscription : null); }
+          catch(e) {
+            if(!renew || e.status !== 404 || !current()) throw e;
+            subscription = await request(null); // Lease expired, only subscription creation is retried.
+          }
+          if(!current()) {
+            if(this.isConnected && this._generation === generation) {
+              this.callAPI({id:peer},'/api/ecard/events/subscribe',{method:'DELETE',body:{subscription_id:subscription}}).catch(e=>this._emit('onError',e));
+            }
+            throw error('ecard_selection_changed','eCard selection or connection changed during subscription.');
+          }
+          selected.subscription = subscription;
+          clearTimeout(selected.timer);
+          selected.timer = setTimeout(()=>this._subscribeECard(selected,true).catch(e=>this._emit('onError',e)),20*60*1000);
+          return subscription;
+        } catch(e) {
+          if(current()) {
+            clearTimeout(selected.timer);
+            selected.timer = setTimeout(()=>this._subscribeECard(selected,!!selected.subscription).catch(err=>this._emit('onError',err)),30000);
+          }
+          throw e;
+        } finally { if(current()) selected.pending = null; }
+      })();
+      return selected.pending;
+    }
+    async subscribe(topic) {
+      const result = await this._request('subscribe',{topic},undefined,'subscribe_ack');
+      this._topics.add(topic); return result;
+    }
+    async unsubscribe(topic) {
+      const result = await this._request('unsubscribe',{topic},undefined,'unsubscribe_ack');
+      this._topics.delete(topic); return result;
+    }
     // Advanced routing returns queue ACK only; peer replies arrive via onReply.
     send(type,target,payload = {}) {
       if(target?.mode === 'server') return Promise.reject(error('invalid_target','Use serverCommand() for server operations.'));

@@ -603,7 +603,7 @@ func (m *Module) handleIndex(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	switch r.URL.Path {
-	case "/history", "/operations", "/settings/history", "/settings/siui", "/settings/wss", "/", "/daily-details", "/settings", "/settings/pad", "/settings/demo", "/settings/reader", "/settings/analytes", "/settings/qc", "/settings/daily-details", "/settings/daily-analysis-filters", "/orders", "/qc", "/debug", "/debug/wsm":
+	case "/debug/ecard", "/settings/ecard", "/settings/astm-specimens", "/history", "/operations", "/settings/history", "/settings/siui", "/settings/wss", "/", "/daily-details", "/settings", "/settings/pad", "/settings/demo", "/settings/reader", "/settings/analytes", "/settings/qc", "/settings/daily-details", "/settings/daily-analysis-filters", "/orders", "/qc", "/debug", "/debug/wsm":
 	default:
 		http.NotFound(w, r)
 		return

@@ -14,7 +14,8 @@
     <AppConfig>../deployments/host/ECardHost.exe.config</AppConfig>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="../deployments/host/ECardHost.cs" />
+    <Compile Include="../deployments/host/CnasWrapperAdapter.cs"/><Compile Include="../deployments/host/ECardHost.cs" />
+    <Compile Include="$(HostVersionFile)" Condition="'$(HostVersionFile)' != ''" />
     <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies.net48" Version="1.0.3" PrivateAssets="All" />
     <Reference Include="System.Web.Extensions" />
     <Reference Include="System.Core" />

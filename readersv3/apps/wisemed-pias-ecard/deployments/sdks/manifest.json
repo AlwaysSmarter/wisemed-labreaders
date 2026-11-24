@@ -100,5 +100,109 @@
     "file": "thinkit-1.3.1.4/Newtonsoft.Json.dll",
     "source": "old-src/WiseMEDeCARDManager/bin/Release/Newtonsoft.Json.dll",
     "sha256": "500eb5560aae4d3a4d7dc4c61a880906ed0231f1a636113f74778b86eaf979b1"
+  },
+  {
+    "sdk": "2.0.0.4",
+    "file": "2.0.0.4/Ceas.eCard.SDK.pdb",
+    "source": "User-provided CNAS application symbols: Ceas.eCard.SDK (2).pdb",
+    "sha256": "615fbb4b150e95590637e8aeea3a06ea0b7eeafe7df5e476c3f68e7de60e901a"
+  },
+  {
+    "sdk": "cnas-wrapper-1.0.0.0",
+    "file": "cnas-wrapper-1.0.0.0/Ceas.eCard.SDK.dll",
+    "source": "docs/CNAS/CNAS-PARA/Ceas.eCard.SDK.dll",
+    "assembly_version": "2.0.0.4",
+    "sha256": "ceeedba57dfcbb96639095e9abcb935674ae4054b0e462064a01bdc092b40ce4"
+  },
+  {
+    "sdk": "cnas-wrapper-1.0.0.0",
+    "file": "cnas-wrapper-1.0.0.0/Cnas.Ceas.SmartCard.dll",
+    "source": "docs/CNAS/CNAS-PARA/Cnas.Ceas.SmartCard.dll",
+    "assembly_version": "4.0.0.0",
+    "sha256": "53d04e4018f8cdd73d2150f320923a71188d451e1063ef6b4e021cf803225aee"
+  },
+  {
+    "sdk": "cnas-wrapper-1.0.0.0",
+    "file": "cnas-wrapper-1.0.0.0/Cnas.Ceas.SmartCard.Novensys.dll",
+    "source": "docs/CNAS/CNAS-PARA/Cnas.Ceas.SmartCard.Novensys.dll",
+    "assembly_version": "1.0.0.0",
+    "sha256": "36e12ae523dfd81523b73f981c14b5da6dd534f193a0a99db03b402c56c1609d"
+  },
+  {
+    "sdk": "cnas-wrapper-1.0.0.0",
+    "file": "cnas-wrapper-1.0.0.0/Cnas.Siui.CidGen.dll",
+    "source": "docs/CNAS/CNAS-PARA/Cnas.Siui.CidGen.dll",
+    "assembly_version": "1.0.2012.1",
+    "sha256": "89f63cbde0a1cab1d1379f92192f076131239923c9c36f42752e960aae944ea9"
+  },
+  {
+    "sdk": "cnas-wrapper-1.0.0.0",
+    "file": "cnas-wrapper-1.0.0.0/Cnas.Siui.Common.dll",
+    "source": "docs/CNAS/CNAS-PARA/Cnas.Siui.Common.dll",
+    "assembly_version": "4.0.0.0",
+    "sha256": "97395d6164f0cf46d4bf67e3e54f056e6c0cf927be73832b1f8c2c7fb4b26815"
+  },
+  {
+    "sdk": "cnas-wrapper-1.0.0.0",
+    "file": "cnas-wrapper-1.0.0.0/Cnas.Siui.WebServices.dll",
+    "source": "docs/CNAS/CNAS-PARA/Cnas.Siui.WebServices.dll",
+    "assembly_version": "4.0.0.0",
+    "sha256": "23f1548181d74257e3a1399847f67c5cbe530b6d409c1cc8b9d55c96c60f2ddb"
+  },
+  {
+    "sdk": "cnas-wrapper-1.0.0.0",
+    "file": "cnas-wrapper-1.0.0.0/EntityFramework.dll",
+    "source": "docs/CNAS/CNAS-PARA/EntityFramework.dll",
+    "assembly_version": "6.0.0.0",
+    "sha256": "ce25578a749c17a559832340004ac1af2bf3594b79795ae53f8cab09999e8ff6"
+  },
+  {
+    "sdk": "cnas-wrapper-1.0.0.0",
+    "file": "cnas-wrapper-1.0.0.0/EntityFramework.SqlServer.dll",
+    "source": "docs/CNAS/CNAS-PARA/EntityFramework.SqlServer.dll",
+    "assembly_version": "6.0.0.0",
+    "sha256": "a0dcf975c7e3a1496d8e58cc972210b4cf91193e474d2c868a0869c7643ade5a"
+  },
+  {
+    "sdk": "cnas-wrapper-1.0.0.0",
+    "file": "cnas-wrapper-1.0.0.0/Microsoft.Practices.ServiceLocation.dll",
+    "source": "docs/CNAS/CNAS-PARA/Microsoft.Practices.ServiceLocation.dll",
+    "assembly_version": "1.0.0.0",
+    "sha256": "79e7be6be7509a1a5263f0292f1462a57744a7c52c4da6475c70a5054d08c327"
+  },
+  {
+    "sdk": "cnas-wrapper-1.0.0.0",
+    "file": "cnas-wrapper-1.0.0.0/Microsoft.Practices.Unity.Configuration.dll",
+    "source": "docs/CNAS/CNAS-PARA/Microsoft.Practices.Unity.Configuration.dll",
+    "assembly_version": "2.1.505.0",
+    "sha256": "b92de6dbbcea39dc320dcf38db69c0db1ca84749f5511a3457b11078fd7ef667"
+  },
+  {
+    "sdk": "cnas-wrapper-1.0.0.0",
+    "file": "cnas-wrapper-1.0.0.0/Microsoft.Practices.Unity.dll",
+    "source": "docs/CNAS/CNAS-PARA/Microsoft.Practices.Unity.dll",
+    "assembly_version": "2.1.505.0",
+    "sha256": "7910859afc2969ce1745835fd920766767d079206a5ff10036a92a0c42c9a8a2"
+  },
+  {
+    "sdk": "cnas-wrapper-1.0.0.0",
+    "file": "cnas-wrapper-1.0.0.0/Simavi.Applications.Framework.dll",
+    "source": "docs/CNAS/CNAS-PARA/Simavi.Applications.Framework.dll",
+    "assembly_version": "4.8.0.0",
+    "sha256": "2b425bb2d0e361c06a40e85e73d433a75a0dce1cb2e0a6cfa9ff4e8be0b25f8d"
+  },
+  {
+    "sdk": "cnas-wrapper-1.0.0.0",
+    "file": "cnas-wrapper-1.0.0.0/Simavi.Applications.Shell.dll",
+    "source": "docs/CNAS/CNAS-PARA/Simavi.Applications.Shell.dll",
+    "assembly_version": "4.8.0.0",
+    "sha256": "beb33e9582ab630e12df0a011c47095ed7e12835dbcefe6997d04b4ea89a1610"
+  },
+  {
+    "sdk": "cnas-wrapper-1.0.0.0",
+    "file": "cnas-wrapper-1.0.0.0/Simavi.Applications.Shell.WinForms.dll",
+    "source": "docs/CNAS/CNAS-PARA/Simavi.Applications.Shell.WinForms.dll",
+    "assembly_version": "4.8.0.0",
+    "sha256": "d6baae8f93ef4d884bd4f86e7c92f621a4c0b7e727a9f80e3b77c26ddc728e5d"
   }
 ]

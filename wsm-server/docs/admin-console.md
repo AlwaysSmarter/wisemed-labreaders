@@ -323,3 +323,56 @@ sau inițializarea directorului se văd în stderr.
 Refuzurile JWT includ codul, peer-ul și o origine validată, fără JWT/secret/query.
 Refuzurile de origine și de identitate hello sunt acum logate explicit. Nu sunt
 logate corpurile API medicale sau textul erorilor de parsare a mesajelor WSS.
+
+## Clienți conectați și feed live
+
+În CLI-ul web `/admin/`:
+
+```text
+clients
+messages list
+messages subscribe reply event presence
+message <connection-id> Salut din consola WSM
+reconnect <connection-id>
+kick <connection-id>
+messages subscribe topic:ecard
+messages subscriptions
+messages unsubscribe event topic:ecard
+messages unsubscribe all
+messages clear
+```
+
+`clients` (sau `clients list`) listează conexiunile active din tenant, cu ID-ul
+conexiunii, tip/client ID, etichetă, echipament/reader, IP, data conectării și
+abonamentele la topicuri. Folosește ID-ul de conexiune exact, nu equipment_id.
+`kick` închide socketul fără revocarea cheii: reconectarea automată poate readuce
+clientul online. `reconnect` trimite `ws.reconnect` către readere/utilitare care
+suportă această comandă; alte tipuri sunt refuzate explicit. `message` trimite
+`debug.message`, cu textul în `args.message`; afișarea textului depinde de client.
+Confirmarea HTTP înseamnă doar punerea în coadă. Abonează-te la `reply` înainte
+pentru a vedea răspunsul și corelează-l prin request_id/correlation_id.
+
+`messages list` afișează filtrele `all`, `command`, `reply`, `event`, `presence`
+și topicurile la care sunt abonați clienții conectați. Poți introduce și un topic
+cunoscut cu `topic:<nume>`. Filtrele multiple se combină prin OR, fără duplicarea
+mesajelor. `messages subscriptions` arată selecția; `unsubscribe all` o golește.
+Observarea nu modifică abonamentele clienților. Sunt observate mesajele rutate
+command/reply/event și notificările de prezență, nu handshake-uri, JWT-uri,
+control.ticket, ping/pong sau răspunsurile interne ale serverului.
+
+Feed-ul separat afișează timestamp, tip, clientul expeditor, ID-ul conexiunii,
+payload, țintă și corelarea cererilor. Identitatea mesajelor de la clienți este
+cea verificată și suprascrisă de server. Comenzile consolei apar ca admin-console.
+Sunt păstrate cel mult 100 de mesaje în pagină; payload-urile peste 64 KiB sunt
+înlocuite cu un indicator de trunchiere și identitatea expeditorului. Feed-ul nu
+salvează mesaje pe disc sau în localStorage. Textul comenzii `message` nu intră
+în istoricul persistent. Abonamentele sunt locale paginii, până la refresh/logout.
+
+Transportul SSE revalidează sesiunea la fiecare mesaj și la fiecare secundă;
+logout/expirarea/reload-ul îl opresc. Sunt permise maximum 32 de filtre și 8 feed-uri
+simultane per tenant, cu coadă de 32 de mesaje per feed. La întrerupere sau overflow,
+UI-ul semnalează oprirea și pierderea posibilă de mesaje; reluarea se face prin
+`messages subscribe ...`, fără replay. Proxy-ul trebuie să permită streaming SSE
+(răspunsul include `X-Accel-Buffering: no`). API: GET `clients`, POST
+`clients/action`, GET `messages` și GET `messages/stream`, sub `/admin/api/`,
+cu aceeași sesiune administrativă; acțiunile POST necesită Origin și CSRF.

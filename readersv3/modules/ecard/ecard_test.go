@@ -53,11 +53,11 @@ func TestFallbackNeverReplaysPINOrMutations(t *testing.T) {
 		}
 	}
 	for _, code := range []int{-14, -15, -16, -29, -61, -57, -58, -71} {
-		if canFallback("read", Reply{SDKCode: code}, false) {
+		if canFallback("sign", Reply{SDKCode: code}, false) {
 			t.Fatal("unsafe fallback", code)
 		}
 	}
-	if canFallback("read", Reply{SDKCode: -6}, true) || canFallback("read", Reply{SDKCode: -6, PINAttempted: true}, false) {
+	if canFallback("sign", Reply{SDKCode: -6}, true) || canFallback("sign", Reply{SDKCode: -6, PINAttempted: true}, false) {
 		t.Fatal("PIN retried")
 	}
 }

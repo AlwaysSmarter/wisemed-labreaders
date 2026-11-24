@@ -20,8 +20,8 @@ test('SDK grid, unique choices, reordering and connected reader selection apply 
  const choice=rows()[0].querySelector('select');choice.value='2.0.0.4';choice.dispatchEvent(new dom.window.Event('change'));
  await $('detect-readers').onclick();assert.equal($('reader').value,'Saved reader');assert.match($('reader').selectedOptions[0].textContent,/nedetectat/);
  assert.equal($('reader').options.length,3);$('reader').value=readers[0];
- await $('save').onclick();const saved=JSON.parse(calls.find(c=>c.method==='PUT').body);
- assert.deepEqual(saved.sdk_order,['2.0.0.4','1.3.0.4']);assert.equal(saved.reader_name,readers[0]);assert.match($('message').textContent,/salvată și aplicată/);
+ $('ceas-offline').checked=true;await $('save').onclick();const saved=JSON.parse(calls.find(c=>c.method==='PUT').body);
+ assert.equal(saved.ceas_offline,true);assert.deepEqual(saved.sdk_order,['2.0.0.4','1.3.0.4']);assert.equal(saved.reader_name,readers[0]);assert.match($('message').textContent,/salvată și aplicată/);
  readers=[];await $('detect-readers').onclick();assert.equal($('reader').value,saved.reader_name);assert.match($('reader-notice').textContent,/Niciun cititor/);
  rows()[0].querySelectorAll('button')[2].click();assert.equal(rows().length,1);assert.equal(rows()[0].querySelectorAll('button')[2].disabled,true);
  }finally{dom.window.close()}

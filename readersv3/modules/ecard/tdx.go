@@ -158,8 +158,8 @@ func (m *Module) handleTDX(w http.ResponseWriter, r *http.Request, action string
 		fail(w, 400, e)
 		return
 	}
-	if in.Filename != expected {
-		fail(w, 400, errors.New("source filename does not match source identity"))
+	if !strings.EqualFold(in.Filename, expected) {
+		fail(w, 400, fmt.Errorf("source filename does not match source identity: expected %s; use the original contract number/date/type, exact source computer name and original resolved UM IP:port (not the current contract)", expected))
 		return
 	}
 	raw, e := base64.StdEncoding.DecodeString(in.Data)
@@ -200,7 +200,7 @@ func (m *Module) handleTDX(w http.ResponseWriter, r *http.Request, action string
 	digest.Write([]byte(name))
 	confirmation := hex.EncodeToString(digest.Sum(nil))
 	if action == "preview" {
-		respond(w, 200, map[string]interface{}{"metadata": meta, "target": target, "target_filename": name, "confirm_digest": confirmation, "new_cnas_enrollment": false})
+		respond(w, 200, map[string]interface{}{"metadata": meta, "source": in.Source, "target": target, "target_filename": name, "confirm_digest": confirmation, "new_cnas_enrollment": false})
 		return
 	}
 	if in.ConfirmDigest != confirmation {

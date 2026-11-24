@@ -809,3 +809,119 @@ Supersedes the configuration-only limitation in the prior CNAS note. Reader impl
 ## DocMED variable forms / frontend dependencies (2026-11-03)
 
 Reader Debug DocMED uses generated variable forms rather than XML textareas, posting fields through the same API/WSM adapter. Server builds/validates XML; raw parameters.requestXml stays compatible. New /docmed-forms.js frontend module and existing /siui-invoice.js are explicitly allowed in controlAsset at root and /control/, registered in server routes and included by build.sh/prepare-local.sh. Control still serves only named frontend assets; config/other files are not exposed. Added control module route tests. Local WSM/control bundles rebuilt, no running service restarted. WSM Go tests, reader Go race tests and 47 combined UI/DOM/SDK tests pass; the DocMED dropdown choices come from CNAS XSD enums and the available CAS nomenclature, not invented external codes.
+
+
+## Browser eCard workflows example (2026-11-24)
+
+`examples/browser/ecard-workflows.js` composes the existing `WSMServer.callAPI`
+with the readersv3 asynchronous eCard operations/event subscription APIs. It
+supports card insertion → read → backend file creation → service signing and
+existing-file entry → CNP/CID check → signing. Business persistence is supplied
+by three explicit callbacks; no new WiseMED endpoint/FID is claimed or created.
+Stable backend operation plans, partial results, PIN challenge UI, report parts
+with SHA-256 and GET-only resume are covered. `start({pendingPlan})` suppresses
+new work during reload recovery. `examples/browser/ecard-wss-test.html` uses real
+WSS/card but in-memory test files; `scripts/serve-ecard-example.sh` serves only
+three public example assets on loopback from a disposable directory. Docs:
+`docs/ecard-wss-workflows.md`. No server protocol, SDK route or production
+configuration was changed; no WSM process restarted and no real card was used
+in automated verification. Node tests include the actual browser SDK's wire
+envelopes through a simulated socket, not a claim of live TLS/CNAS success.
+
+Local verification of this example: 15 eCard example tests and 11 existing WSM
+browser SDK tests passed; an HTTP/JSDOM smoke exercised the test page, both
+flows, identity rejection and PIN dialog clearing. The broader SDK glob also
+exposed an independent SIUI catalogue failure: `report/package` is present in
+reader auxiliary routes but absent from the SIUI browser catalogue. That SIUI
+implementation was not changed as part of the eCard example.
+
+## Admin client operations and live traffic (2026-11-24)
+
+Web CLI now has clients [list], kick/reconnect/message <connection-id>, and
+messages list/subscriptions/subscribe/unsubscribe/clear. Client actions are
+same-tenant admin-session + CSRF protected. Kick closes only the current socket;
+reconnect uses reader/utility ws.reconnect, message uses debug.message. Queuing
+is not execution confirmation; replies are visible by subscribing before sending.
+Hub observers capture routed command/reply/event once plus presence, with stamped
+sender identity; internal server commands/tickets/auth are excluded. SSE filters
+are all/type/topic, tenant isolated, bounded to 8 streams per tenant, 32 filters,
+32 queued entries, 64 KiB payload threshold, 100 UI entries. Slow streams fail
+explicitly; no replay or disk persistence. Session checked per event and each
+second; logout/reload invalidates feed. Outgoing message commands are omitted
+from persistent command history. Details: docs/admin-console.md.
+Local validation: module race tests, vet, admin CLI Node tests, and HTTP SSE test
+for delivery/isolation/logout. No deployed process restarted or real client used.
+
+## Automatic selected eCard subscription (2026-11-24)
+
+Browser SDK `callAPI` now subscribes hardware events before the first eCard API
+request for the selected station. `selectECard(client)` supports selection-only
+interfaces; `clearECard()` deselects. One station per SDK instance, never all
+stations from discovery. Renew every 20 minutes, recreate expired leases, restore
+on browser hello and selected equipment presence using stable equipment identity.
+No hardware operation replay. Errors propagate to callers/onError. Workflow uses
+SDK lifecycle when available, retaining explicit subscriptions for older SDKs.
+Tests cover concurrent initial calls, selection changes, reconnects, expired lease,
+failed subscription and deselection during an in-flight subscription. Local tests
+only; Windows hardware and deployed Pias GS remain unverified. Embedded SDK needs
+WSM rebuild/deployment and browser reload. See docs/browser-sdk.md.
+
+
+## Direct utility events and continuous authentication (2026-11-24)
+
+Root cause reproduced: eCard uses role reader and sent connection-targeted events,
+but server authorization allowed reader events only on own topics. The common
+reader policy now permits route:event to one explicit connection, tenant-isolated;
+existing own-topic restrictions and no arbitrary fanout remain. TLS socket tests
+verify card inserted/removed delivery to browser and CLI observer, plus isolation.
+
+New non-routed auth.refresh / auth_refreshed protocol, advertised in hello_ack:
+fresh validated JWT must retain identity and scopes and extend expiry. Renew on
+same connection, preserving subscriptions; old expiry still closes failed leases.
+Browser SDK tokenProvider and readersv3 shared transport renew before expiry.
+Auth payload never reaches traffic observers; reader traces omit tokens. Browser
+SDK restores successful generic topic subscriptions after reconnect as well.
+
+Companion checkout /Users/raduichim/www/git/wisemed now starts shared WSM eagerly,
+auto-reconnects after 1 second, rebinds selected PIAS on equipment presence, and
+retains per-session/tenant/user browser client_id when PHP issues renewed JWTs.
+PIAS logs filter shared traffic to selected station and server errors. Deployment
+requires updated WSM executable/embedded SDK, reader binaries, and WiseMED sources;
+local checks do not establish installed Windows hardware success.
+
+### 2026-11-24 — terminal disconnect diagnostics
+
+Browser trace at 20:59 UTC shows successful eCard health, subscription and status
+SDK events, then no_recipient, followed by a new reader connection 30 seconds
+later; browser connection remains unchanged. The matching local WSM log records
+reader reconnects without disconnect reasons. This confirms reader-session loss,
+not its exact cause. Rate-policy exits previously lacked a log and presence.
+The server now logs message_rate_exceeded with configured rate/burst, and sends
+one disconnected presence from common registered-connection cleanup for all exit
+paths. No traffic limits changed. TLS regression tests with -race verify rate
+closure presence and removal from discovery. Running deployment must be rebuilt
+and restarted to obtain the new diagnostics; not done by this change.
+
+### 2026-11-24 — persistent sessions under traffic pressure
+
+Supersedes the rate-close behavior above: at the user's request, the incoming
+rate limiter now waits for a token (cancellable on session shutdown) instead of
+closing the WebSocket. Full outbound queues still return delivery failure and
+increment TotalDropped, but no longer close the recipient or destroy its
+subscriptions. This does not guarantee delivery to a stalled consumer. Network,
+authentication expiry/revocation and invalid protocol closures still apply.
+Updated protocol docs and tests cover delayed ping delivery on the same socket,
+queue overflow preserving the connection, and disconnect presence on invalid hello.
+Source changes require WSM rebuild/restart; runtime config was not modified.
+
+### 2026-11-24 — eCard verbosity and remote debug control
+
+PIAS eCard uses its existing logging.verbose_level setting for WSM publication
+and local GET events: below 5 only unscoped PCSC hardware, PIN-required and
+operation-finished events are emitted; detailed reports remain stored. Level 5
+restores diagnostic events and embedded completion reports. New admin-only
+PUT /api/ecard/debug/verbosity persists and applies levels 1–5 in runtime without
+module/socket restart. WiseMED changeDebugVerbosity(level) updates selected peer
+first, then local console only on confirmation. Reader and WSM source changes
+are not deployed automatically. Queue overflow retains the connection but still
+reports delivery failure; persistence is not an unconditional delivery guarantee.

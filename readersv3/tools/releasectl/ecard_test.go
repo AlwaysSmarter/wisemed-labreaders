@@ -89,11 +89,33 @@ func TestECardHostCompilerFailureNeverUsesPrebuilt(t *testing.T) {
 		t.Fatal(err)
 	}
 	dest := filepath.Join(root, "runtime", "host")
-	err := buildECardHost(root, dest)
+	err := buildECardHost(root, dest, "test-version")
 	if err == nil || !strings.Contains(err.Error(), "compiler-test-error") {
 		t.Fatalf("compiler failure lost: %v", err)
 	}
 	if _, err := os.Stat(dest); !os.IsNotExist(err) {
 		t.Fatal("failed build published host")
+	}
+}
+
+func TestHostBuildReceivesExactReleaseVersion(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("shell fixture")
+	}
+	root := t.TempDir()
+	app := filepath.Join(root, "apps", "wisemed-pias-ecard")
+	if e := os.MkdirAll(filepath.Join(app, "scripts"), 0755); e != nil {
+		t.Fatal(e)
+	}
+	if e := os.MkdirAll(filepath.Join(app, "deployments", "host"), 0755); e != nil {
+		t.Fatal(e)
+	}
+	os.WriteFile(filepath.Join(app, "deployments", "host", "ECardHost.exe.config"), []byte("config"), 0600)
+	script := "#!/bin/sh\n[ \"$2\" = \"2026.11.23.cnas.2\" ] || exit 45\nprintf MZtest > \"$1/ECardHost.exe\"\n"
+	if e := os.WriteFile(filepath.Join(app, "scripts", "build-host.sh"), []byte(script), 0755); e != nil {
+		t.Fatal(e)
+	}
+	if e := buildECardHost(root, filepath.Join(root, "output"), "2026.11.23.cnas.2"); e != nil {
+		t.Fatal(e)
 	}
 }
